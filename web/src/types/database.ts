@@ -284,6 +284,8 @@ export interface AlconObject {
   name: string
   description: string | null
   color: string | null
+  /** Its own icon: 'glyph:<Name>', 'lucide:<name>' or an emoji; null shows the Object icon. */
+  icon?: string | null
   prefix: string | null            // ID prefix e.g. "PH1"
   display_id: string | null        // e.g. "OBJ_PH1"
   order_index: number | null
@@ -306,6 +308,7 @@ export interface AlconObjectInsert {
   name: string
   description?: string | null
   color?: string | null
+  icon?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -324,6 +327,7 @@ export interface AlconObjectUpdate {
   name?: string
   description?: string | null
   color?: string | null
+  icon?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -440,6 +444,8 @@ export interface Element {
   due_date: string | null
   due_time: string | null    // 'HH:MM:SS' format (TIME column)
   color: string | null  // カレンダー表示用のカラーコード
+  /** Its own icon: 'glyph:<Name>', 'lucide:<name>' or an emoji; null shows none. */
+  icon?: string | null
   estimated_hours: number | null
   actual_hours: number | null
   progress: number | null  // 0-100, set explicitly via the status picker

@@ -154,6 +154,9 @@ export interface FleetObject {
   objectId: string | null;
   name: string;
   domainId: string | null;
+  /** The Object's own icon and colour, when it has them. */
+  icon?: string | null;
+  color?: string | null;
   draft: boolean;
   elements: FleetElement[];
   tally: FleetTally;
@@ -162,7 +165,7 @@ export interface FleetObject {
   costUsd: number;
 }
 
-export interface FleetObjectRow { id: string; name: string; domain_id: string | null }
+export interface FleetObjectRow { id: string; name: string; domain_id: string | null; icon?: string | null; color?: string | null }
 
 const roundCost = (n: number) => Math.round(n * 100) / 100;
 
@@ -237,7 +240,7 @@ export function buildFleet(input: {
     };
   };
   return input.objects.map((o) => withTally({
-    key: o.id, objectId: o.id, name: o.name, domainId: o.domain_id, draft: false,
+    key: o.id, objectId: o.id, name: o.name, domainId: o.domain_id, icon: o.icon ?? null, color: o.color ?? null, draft: false,
     elements: input.elements.filter((e) => e.object_id === o.id).map(card)
       .map((c, i) => ({ c, i }))
       .sort((x, y) => CARD_ORDER[x.c.state] - CARD_ORDER[y.c.state] || x.i - y.i)

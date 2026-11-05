@@ -14,6 +14,8 @@ import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckReques
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon, NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { InitiativeActionsButton, InitiativeMenu } from './InitiativeMenu';
@@ -372,7 +374,7 @@ function StrategyListView({
               <div aria-hidden className={`pointer-events-none absolute right-0 h-0.5 rounded-full bg-primary ${over === 'before' ? '-top-px' : '-bottom-px'}`}
                 style={{ left: depth * 20 + 22 }} />
             )}
-            <IndexRow indent={depth * 20} icon={<NavStrategyIcon size={16} />} name={s.name}
+            <IndexRow indent={depth * 20} icon={<ItemIcon icon={s.icon} color={s.color} fallback={<NavStrategyIcon size={16} />} />} name={s.name}
               lead={children.length > 0 ? (
                 <button type="button"
                   onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; })}
@@ -545,6 +547,8 @@ function StrategyDetailView({
   const userId = user?.id ?? null;
   const ownsItsSpace = useSpaceRole(strategy.activity_space_id) === 'owner';
   const canEdit = canEditInitiative(userId, strategy.created_by, ownsItsSpace);
+  const [look, changeLook] = useItemLook({ icon: strategy.icon, color: strategy.color },
+    async (next) => { await updateStrategy(strategy.id, next); onSaved(); });
   // The Object rows write to objects / domains, which answer to Object
   // membership and Domain role — not to who owns the Strategy.
   const { data: myObjects } = useMyObjectMemberships(userId);
@@ -941,7 +945,9 @@ function StrategyDetailView({
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
         <div className="space-y-5">
           <div>
-            <PageIcon><NavStrategyIcon size={18} /></PageIcon>
+            <PageIcon>
+              <ItemIconButton value={look} onChange={changeLook} canEdit={canEdit} defaultIcon={<NavStrategyIcon size={18} />} />
+            </PageIcon>
             <textarea
               ref={nameRef}
               value={name}
@@ -1007,7 +1013,7 @@ function StrategyDetailView({
                 {childStrategies.map((child) => {
                   const n = countObjects(child.objectIds);
                   return (
-                    <ContentRow key={child.id} icon={<NavStrategyIcon size={14} />} name={child.name}
+                    <ContentRow key={child.id} icon={<ItemIcon icon={child.icon} color={child.color} size={14} fallback={<NavStrategyIcon size={14} />} />} name={child.name}
                       onOpen={() => onOpenStrategy(child.id)}
                       meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
                       actions={canEdit ? (

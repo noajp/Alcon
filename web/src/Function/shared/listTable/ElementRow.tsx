@@ -1,5 +1,6 @@
 'use client';
 
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { memo, useState } from 'react';
 import { Grip, Lock, Check, Trash2 } from '@/ui/icons';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
@@ -180,6 +181,7 @@ export const ElementRow = memo(function ElementRow({
           slides under it at one edge. */}
       <td className="sticky left-13 z-10 bg-card pl-3.5 pr-0 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.875rem]">
+          {el.icon && <ItemIcon icon={el.icon} color={el.color} size={15} className="mr-2" />}
           <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
         </div>
       </td>

@@ -2314,6 +2314,7 @@ export type Database = {
       }
       elements: {
         Row: {
+          icon: string | null
           actual_hours: number | null
           ai_weight: string | null
           approval_state: string | null
@@ -2350,6 +2351,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          icon?: string | null
           actual_hours?: number | null
           ai_weight?: string | null
           approval_state?: string | null
@@ -2386,6 +2388,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          icon?: string | null
           actual_hours?: number | null
           ai_weight?: string | null
           approval_state?: string | null
@@ -3668,6 +3671,7 @@ export type Database = {
       }
       objects: {
         Row: {
+          icon: string | null
           archived_at: string | null
           archived_by: string | null
           color: string | null
@@ -3690,6 +3694,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          icon?: string | null
           archived_at?: string | null
           archived_by?: string | null
           color?: string | null
@@ -3712,6 +3717,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          icon?: string | null
           archived_at?: string | null
           archived_by?: string | null
           color?: string | null

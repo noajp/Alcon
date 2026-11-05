@@ -1,5 +1,6 @@
 'use client';
 
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { memo } from 'react';
 import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
@@ -90,7 +91,7 @@ export const ObjectRow = memo(function ObjectRow({
       {/* No checkbox: Shift- or ⌘-click selects (the bulk bar appears). */}
       <td className={`sticky left-0 z-10 bg-card w-13 pl-7.5 pr-1.5 py-2 ${LEAD_CELL} ${isSelected ? LEAD_CELL_SELECTED : LEAD_CELL_HOVER}`}>
         <div className="flex items-center text-muted-foreground/70">
-          <ObjectIcon size={16} />
+          <ItemIcon icon={obj.icon} color={obj.color} fallback={<ObjectIcon size={16} />} />
         </div>
       </td>
       <td className="md:sticky md:left-13 z-10 bg-card pl-3.5 pr-0.5 py-2 min-w-0 max-w-0">

@@ -10,6 +10,7 @@ import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSup
 import { updateObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   useBoard,
@@ -93,6 +94,8 @@ export function OverviewView({
   // auto-grow, save on blur — no Edit button, no view/edit toggle); the
   // description is the shared DescriptionEditor.
   const [title, setTitle] = useState(object.name);
+  const [look, changeLook] = useItemLook({ icon: object.icon ?? null, color: object.color },
+    async (next) => { await updateObject(object.id, next); onRefresh?.(); });
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(titleRef, title);
 
@@ -160,7 +163,9 @@ export function OverviewView({
               {/* Icon stacked above the name; the name sits flush with the
                   column's left edge so it lines up with the description. */}
               <div>
-                <PageIcon><ObjectIcon size={18} /></PageIcon>
+                <PageIcon>
+                  <ItemIconButton value={look} onChange={changeLook} defaultIcon={<ObjectIcon size={18} />} />
+                </PageIcon>
                 <textarea
                   ref={titleRef}
                   value={title}

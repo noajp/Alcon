@@ -1,6 +1,7 @@
 'use client';
 
 
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -248,7 +249,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       out.push({
         id: obj.id,
         name: obj.name,
-        icon: <ObjectIcon size={16} />,
+        icon: <ItemIcon icon={obj.icon} color={obj.color} fallback={<ObjectIcon size={16} />} />,
         objects: [],
         elements: obj.elements ?? [],
       });
