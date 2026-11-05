@@ -15,6 +15,8 @@ import { updateDomain, useDomainRole } from '@/hooks/domainData';
 import type { NavigationState } from '@/types/navigation';
 import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
+import type { Domain } from '@/types/database';
 
 export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   domainId: string | null;
@@ -66,7 +68,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
         {/* The spine — icon, title, description — is what Element detail opens
             with; the Domain's own readings and relationships sit below it, its
             facts in the island on the right. */}
-        <PageHead key={`head-${domain.id}`} icon={<DomainIcon size={18} />} title={domain.name} description={domain.description ?? ''}
+        <PageHead key={`head-${domain.id}`} icon={<DomainLookButton domain={domain} canEdit={role.data === 'owner' || role.data === 'admin'} onSaved={() => void query.refetch()} />} title={domain.name} description={domain.description ?? ''}
           canEdit={role.data === 'owner' || role.data === 'admin'}
           titleLabel={t('Domain name')} titlePlaceholder={t('Domain name…')}
           descriptionLabel={t('Description')} descriptionPlaceholder={t('What this Domain is for…')}
@@ -79,4 +81,12 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
       </PageLayout>
     </div>
   </div></WidgetActionSlotProvider>;
+}
+
+/** The Domain's icon and colour at the head of its page, picked as a
+ *  Strategy's or Object's is; the sidebar shows the same mark. */
+function DomainLookButton({ domain, canEdit, onSaved }: { domain: Pick<Domain, 'id' | 'icon' | 'color'>; canEdit: boolean; onSaved: () => void }) {
+  const [look, change] = useItemLook({ icon: domain.icon ?? null, color: domain.color ?? null },
+    async (next) => { await updateDomain(domain.id, { icon: next.icon, color: next.color }); onSaved(); });
+  return <ItemIconButton value={look} onChange={change} canEdit={canEdit} defaultIcon={<DomainIcon size={18} />} />;
 }
