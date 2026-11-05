@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, Clock, Flag, Hand, Pause } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ import {
 import { STATE_LABEL, Stat, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
 import { DefinitionPanel } from './DefinitionPanel';
+import { listenForPlanRequests } from './plannerRequest';
 import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
 // The Execution tab's mission: the Strategy's Objects in one column and the
@@ -340,10 +341,10 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const turns = useMemo(() => yourTurn({ fleet: current, elements: ctx.elements, runs: ctx.mission.runs, actions: ctx.mission.actions }),
     [current, ctx.elements, ctx.mission.runs, ctx.mission.actions]);
 
-  const plan = async (opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean } = {}) => {
+  const plan = async (opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean; guidance?: string } = {}) => {
     setPlanning(true); setError(null); setNotice(null);
     try {
-      const reply = await requestInitiativePlan(ctx.initiativeId, guidance, opts);
+      const reply = await requestInitiativePlan(ctx.initiativeId, opts.guidance ?? guidance, opts);
       const asked = normalizeQuestions(reply.questions);
       if (asked.length > 0) {
         setQuestions({ reason: reply.reason, items: asked });
@@ -365,6 +366,15 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
       setPlanning(false);
     }
   };
+
+  // The conversation hands the Planner its guidance: shown in the box, and
+  // planned with at once.
+  const planRef = useRef(plan);
+  useEffect(() => { planRef.current = plan; });
+  useEffect(() => listenForPlanRequests(ctx.initiativeId, (g) => {
+    setGuidance(g);
+    void planRef.current({ guidance: g });
+  }), [ctx.initiativeId]);
 
   // The answers become the Strategy's assumptions — what every later run
   // reads — and the Planner plans with them.
@@ -536,9 +546,16 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
             placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
             className="min-h-[52px] flex-1 resize-y rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:bg-muted/30" />
-          <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}>
-            {planning ? t('Planning…') : draft ? t('Plan again') : t('Break down with AI')}
-          </Button>
+          <div className="flex flex-col items-stretch gap-1">
+            <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}>
+              {planning ? t('Planning…') : draft ? t('Plan again') : t('Break down with AI')}
+            </Button>
+            {ctx.onTalk && (
+              <Button variant="ghost" size="sm" onClick={ctx.onTalk} title={t('Settle the purpose, success conditions and premises by talking first')}>
+                {t('Talk it through')}
+              </Button>
+            )}
+          </div>
         </div>
         {questions && (
           <div className="space-y-3 rounded-lg border border-border bg-muted/20 px-3 py-3">

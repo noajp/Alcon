@@ -256,7 +256,8 @@ export type Database = {
           cost_usd: number
           created_at: string
           domain_id: string | null
-          element_id: string
+          element_id: string | null
+          strategy_id: string | null
           error: string | null
           finished_at: string | null
           id: string
@@ -283,7 +284,8 @@ export type Database = {
           cost_usd?: number
           created_at?: string
           domain_id?: string | null
-          element_id: string
+          element_id?: string | null
+          strategy_id?: string | null
           error?: string | null
           finished_at?: string | null
           id?: string
@@ -310,7 +312,8 @@ export type Database = {
           cost_usd?: number
           created_at?: string
           domain_id?: string | null
-          element_id?: string
+          element_id?: string | null
+          strategy_id?: string | null
           error?: string | null
           finished_at?: string | null
           id?: string

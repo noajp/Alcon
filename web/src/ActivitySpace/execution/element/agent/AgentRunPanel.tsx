@@ -25,6 +25,7 @@ type Agent = ReturnType<typeof useAgentRun>;
 const STATUS: Record<AgentRunStatus, { label: string; tone: string }> = {
   queued: { label: 'Queued', tone: 'text-muted-foreground' },
   running: { label: 'Working', tone: 'text-[var(--accent-default)]' },
+  awaiting_input: { label: 'Waiting for you', tone: 'text-foreground' },
   awaiting_approval: { label: 'Awaiting approval', tone: 'text-[var(--accent-default)]' },
   paused: { label: 'Paused', tone: 'text-muted-foreground' },
   awaiting_review: { label: 'Awaiting review', tone: 'text-foreground' },
@@ -37,6 +38,7 @@ type Glyph = React.ComponentType<{ size?: number; className?: string; strokeWidt
 const STEP_ICON: Record<AgentRunStepType, Glyph> = {
   plan: ListChecks, thought: CircleDot, action: Wrench, subelement: CheckCircle2, comment: MessageSquare,
   status: ArrowRight, result: Flag, error: AlertCircle, approval: ShieldCheck, artifact: FileText,
+  message: MessageSquare, reply: MessageSquare, write: FileText, plan_request: ListChecks,
 };
 
 function StatusGlyph({ status }: { status: AgentRunStatus }) {
