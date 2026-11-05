@@ -60,12 +60,15 @@ function StateDot({ state }: { state: ActionState }) {
   return <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: stateColor(state) }} />;
 }
 
+/** A summary figure: one line of label, the number, and one line under it
+ *  (kept even when empty), so a row of them shares its height and every
+ *  number sits on the same baseline. */
 export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-border/60 px-3 py-2.5">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-[20px] font-semibold tabular-nums text-foreground">{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+    <div className="flex flex-col rounded-md border border-[var(--border-subtle)] px-3 py-2.5">
+      <div className="truncate text-[11px] leading-4 text-muted-foreground" title={label}>{label}</div>
+      <div className="mt-1.5 text-[22px] font-semibold leading-7 tracking-tight tabular-nums text-foreground">{value}</div>
+      <div className="truncate text-[11px] leading-4 text-muted-foreground">{sub ?? '\u00a0'}</div>
     </div>
   );
 }
@@ -86,7 +89,7 @@ export function MissionEvaluatePanel({ ctx }: { ctx: MissionContext }) {
   return (
     <div className="space-y-6">
       <PageSection title={t('Achievement')}>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label={t('Success conditions met')} value={`${summary.measuresMet} / ${summary.measures}`} />
           <Stat label={t('Actions done')} value={`${summary.progress}%`} sub={t('{done} of {all} actions', { done: summary.done, all: summary.actions })} />
           <Stat label={t('Deliverables')} value={String(summary.artifacts)} />

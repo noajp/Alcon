@@ -222,43 +222,58 @@ function PlanHandOff({ guidance, onPlan }: { guidance: string; onPlan: (guidance
 
 const DONE = new Set(['done']);
 
-/** The plan as it stands: the Strategy's Elements by Object, checked off as they are done. */
+/** The plan as it stands: the Strategy's Elements by Object, checked off as
+ *  they are done. Each Object is named once, over its own rows, never as a
+ *  tag repeated on every row; the marks sit in one fixed column so every
+ *  title starts at the same x. */
 function PlanCard({ objects, onPlan }: { objects: { id: string; name: string; elements?: ElementWithDetails[] }[]; onPlan: () => void }) {
   const { t } = useI18n();
   const [all, setAll] = useState(false);
-  const rows = objects.flatMap((o) => (o.elements ?? []).filter((e) => !e.parent_id && e.status !== 'cancelled').map((e) => ({ e, object: o.name })));
-  const done = rows.filter((r) => DONE.has(r.e.status ?? '')).length;
-  const shown = all ? rows : rows.slice(0, 10);
+  const groups = objects
+    .map((o) => ({ id: o.id, name: o.name, rows: (o.elements ?? []).filter((e) => !e.parent_id && e.status !== 'cancelled') }))
+    .filter((g) => g.rows.length > 0);
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  const done = groups.reduce((n, g) => n + g.rows.filter((e) => DONE.has(e.status ?? '')).length, 0);
+  // Ten rows until asked for all, cut across the groups in order.
+  const limit = all ? Infinity : 10;
+  const shown = groups.map((g, i) => {
+    const before = groups.slice(0, i).reduce((n, x) => n + x.rows.length, 0);
+    return { ...g, rows: g.rows.slice(0, Math.max(0, limit - before)) };
+  }).filter((g) => g.rows.length > 0);
   return (
-    <section className="rounded-lg border border-border/60 px-3.5 py-3">
+    <section className="rounded-md border border-[var(--border-subtle)] px-3.5 py-3">
       <div className="flex items-center gap-2">
-        <span className="text-[12px] text-muted-foreground">{t('Plan')}</span>
-        {rows.length > 0 && <span className="text-[12px] tabular-nums text-muted-foreground">{done}/{rows.length}</span>}
+        <span className="text-[12px] font-medium text-foreground">{t('Plan')}</span>
+        {total > 0 && <span className="text-[12px] tabular-nums text-muted-foreground">{done}/{total}</span>}
         <div className="flex-1" />
-        <Button size="xs" variant="ghost" onClick={onPlan}>{rows.length ? t('Plan again') : t('Break down with AI')}</Button>
+        <Button size="xs" variant="ghost" onClick={onPlan}>{total ? t('Plan again') : t('Break down with AI')}</Button>
       </div>
-      {rows.length === 0 ? (
+      {total === 0 ? (
         <p className="mt-1.5 text-[12px] text-muted-foreground">{t('No plan yet. The Planner breaks the Strategy down into Objects and Elements from what is recorded.')}</p>
       ) : (
-        <ul className="mt-2 space-y-1.5">
-          {shown.map(({ e, object }) => (
-            <li key={e.id} className="flex min-w-0 items-center gap-2 text-[13px]">
-              <span className="inline-flex shrink-0"><ElementProgressMark status={e.status} progress={getElementProgress(e)} size={15} /></span>
-              <span className={cn('min-w-0 truncate', DONE.has(e.status ?? '') ? 'text-muted-foreground' : 'text-foreground')}>{e.title}</span>
-              <span className="inline-flex h-[20px] max-w-[140px] shrink-0 items-center gap-1 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]" title={object}>
-                <span className="inline-flex shrink-0"><ObjectIcon size={10} /></span>
-                <span className="truncate">{object}</span>
-              </span>
-            </li>
+        <div className="mt-2 space-y-3">
+          {shown.map((g) => (
+            <div key={g.id}>
+              <div className="flex h-6 items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="inline-flex w-4 shrink-0 justify-center"><ObjectIcon size={11} /></span>
+                <span className="truncate">{g.name}</span>
+              </div>
+              <ul>
+                {g.rows.map((e) => (
+                  <li key={e.id} className="flex h-7 min-w-0 items-center gap-2 text-[13px]">
+                    <span className="inline-flex w-4 shrink-0 justify-center"><ElementProgressMark status={e.status} progress={getElementProgress(e)} size={14} /></span>
+                    <span className={cn('min-w-0 truncate', DONE.has(e.status ?? '') ? 'text-muted-foreground' : 'text-foreground')}>{e.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-          {rows.length > 10 && (
-            <li>
-              <button type="button" onClick={() => setAll((v) => !v)} className="text-[12px] text-muted-foreground hover:text-foreground">
-                {all ? t('Show fewer') : t('Show all {count}', { count: rows.length })}
-              </button>
-            </li>
+          {total > 10 && (
+            <button type="button" onClick={() => setAll((v) => !v)} className="pl-6 text-[12px] text-muted-foreground hover:text-foreground">
+              {all ? t('Show fewer') : t('Show all {count}', { count: total })}
+            </button>
           )}
-        </ul>
+        </div>
       )}
     </section>
   );
