@@ -10,10 +10,15 @@ import { useIntegrationActions } from './data';
 // commands come from the server's own tool list (the connection test writes
 // them into the integration's manifest); a person only chooses, per command,
 // whether agents may use it freely, must ask first, or may not use it at all.
-// The engine enforces exactly this (run-agent, _shared/connectorManifest.ts).
+// A command can also carry conditions on its arguments ("repo is Alcon →
+// allowed", "to is *@example.com → allowed, otherwise not allowed"): the
+// first that matches decides, under any delegation. Approving with "Don’t ask
+// again" adds one. The engine enforces exactly this (run-agent,
+// _shared/connectorManifest.ts).
 
 type Permission = 'allow' | 'ask' | 'deny';
-interface Command { name: string; effect: 'read' | 'write'; permission: Permission | null; description: string }
+interface Rule { when: Record<string, string>; permission: Permission }
+interface Command { name: string; effect: 'read' | 'write'; permission: Permission | null; description: string; rules: Rule[] }
 
 const LABEL: Record<Permission, string> = { allow: 'Allowed', ask: 'Asks first', deny: 'Not allowed' };
 
@@ -25,7 +30,14 @@ function readCommands(manifest: Json | null): { commands: Command[]; defaults: R
   const commands = (Array.isArray(m.commands) ? m.commands : []).flatMap((c): Command[] => {
     const x = c && typeof c === 'object' ? c as Record<string, unknown> : null;
     if (!x || typeof x.name !== 'string') return [];
-    return [{ name: x.name, effect: x.effect === 'read' ? 'read' : 'write', permission: perm(x.permission), description: typeof x.description === 'string' ? x.description : '' }];
+    const rules = (Array.isArray(x.rules) ? x.rules : []).flatMap((r): Rule[] => {
+      const y = r && typeof r === 'object' ? r as Record<string, unknown> : null;
+      const when = y?.when && typeof y.when === 'object' && !Array.isArray(y.when) ? y.when as Record<string, unknown> : null;
+      const p = perm(y?.permission);
+      if (!when || !p || !Object.values(when).every((v) => typeof v === 'string') || !Object.keys(when).length) return [];
+      return [{ when: when as Record<string, string>, permission: p }];
+    });
+    return [{ name: x.name, effect: x.effect === 'read' ? 'read' : 'write', permission: perm(x.permission), description: typeof x.description === 'string' ? x.description : '', rules }];
   });
   return { commands, defaults };
 }
@@ -40,17 +52,21 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
     return <p className="text-[12px] text-muted-foreground">{t('Run the connection test to list what agents can do here.')}</p>;
   }
 
-  const set = (name: string, permission: Permission) => {
+  const write = (name: string, patch: (c: Record<string, unknown>) => Record<string, unknown>) => {
     setError(null);
     const m = integration.manifest as Record<string, unknown>;
     const next = {
       ...m,
-      commands: (m.commands as Record<string, unknown>[]).map((c) => (c.name === name ? { ...c, permission } : c)),
+      commands: (m.commands as Record<string, unknown>[]).map((c) => (c.name === name ? patch(c) : c)),
     } as Json;
     actions.update.mutate({ id: integration.id, patch: { manifest: next } }, { onError: (e) => setError(e instanceof Error ? e.message : String(e)) });
   };
+  const set = (name: string, permission: Permission) => write(name, (c) => ({ ...c, permission }));
+  const setRules = (name: string, rules: Rule[]) => write(name, (c) => ({ ...c, rules }));
 
-  const sorted = [...commands].sort((a, b) => (a.effect === b.effect ? a.name.localeCompare(b.name) : a.effect === 'write' ? -1 : 1));
+  // Commands with conditions first, then writes, then reads.
+  const rank = (c: Command) => (c.rules.length ? 0 : c.effect === 'write' ? 1 : 2);
+  const sorted = [...commands].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
   const shown = showAll ? sorted : sorted.slice(0, 12);
   const writes = commands.filter((c) => c.effect === 'write').length;
   return (
@@ -59,13 +75,14 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
         {t('{reads} read and {writes} write commands. Reads are allowed and writes ask first unless you change them.', { reads: commands.length - writes, writes })}
       </p>
       {integration.delegation === 'full_delegation' && (
-        <p className="text-[12px] text-[var(--status-warning)]">{t('Full delegation is on, so commands set to “Asks first” run without asking. “Not allowed” still holds.')}</p>
+        <p className="text-[12px] text-[var(--status-warning)]">{t('Full delegation is on, so commands set to “Asks first” run without asking. Conditions and “Not allowed” still hold.')}</p>
       )}
       <ul className="min-w-0 divide-y divide-[var(--border-default)]">
         {shown.map((c) => {
           const effective = c.permission ?? defaults[c.effect];
           return (
-            <li key={c.name} className="flex min-w-0 items-center gap-2 py-1.5 text-[12px]">
+            <li key={c.name} className="min-w-0 py-1.5 text-[12px]">
+            <div className="flex min-w-0 items-center gap-2">
               <span className="min-w-0 flex-1 overflow-hidden">
                 <span className="font-mono text-foreground">{c.name}</span>
                 <span className="ml-2 text-muted-foreground">{c.effect === 'read' ? t('read') : t('write')}</span>
@@ -76,6 +93,8 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
                 className={cn('rounded border border-border/60 bg-transparent px-1 py-0.5 text-[12px]', effective === 'deny' ? 'text-[var(--status-danger)]' : 'text-foreground')}>
                 {(['allow', 'ask', 'deny'] as const).map((p) => <option key={p} value={p}>{t(LABEL[p])}</option>)}
               </select>
+            </div>
+            <CommandRules rules={c.rules} disabled={readOnly || actions.update.isPending} onChange={(rules) => setRules(c.name, rules)} />
             </li>
           );
         })}
@@ -86,6 +105,56 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
         </button>
       )}
       {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+    </div>
+  );
+}
+
+/** A command's conditions on its arguments: read, remove, or add one. */
+function CommandRules({ rules, disabled, onChange }: { rules: Rule[]; disabled: boolean; onChange: (rules: Rule[]) => void }) {
+  const { t } = useI18n();
+  const [adding, setAdding] = useState(false);
+  const [field, setField] = useState('');
+  const [pattern, setPattern] = useState('');
+  const [permission, setPermission] = useState<Permission>('allow');
+  const fieldOk = /^[A-Za-z0-9_.-]{1,64}$/.test(field.trim());
+  const add = () => {
+    if (!fieldOk || !pattern.trim()) return;
+    onChange([...rules, { when: { [field.trim()]: pattern.trim() }, permission }]);
+    setField(''); setPattern(''); setPermission('allow'); setAdding(false);
+  };
+  return (
+    <div className="mt-1 space-y-0.5 pl-3">
+      {rules.map((r, i) => (
+        <div key={i} className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate">
+            {t('When')} <span className="font-mono text-foreground">{Object.entries(r.when).map(([k, v]) => `${k} = ${v}`).join(', ')}</span>
+            {' → '}<span className={r.permission === 'deny' ? 'text-[var(--status-danger)]' : 'text-foreground'}>{t(LABEL[r.permission])}</span>
+          </span>
+          {!disabled && (
+            <button type="button" onClick={() => onChange(rules.filter((_, j) => j !== i))} aria-label={t('Remove condition')}
+              className="rounded px-1 text-muted-foreground hover:bg-muted/50 hover:text-foreground">×</button>
+          )}
+        </div>
+      ))}
+      {!disabled && (adding ? (
+        <form className="flex min-w-0 flex-wrap items-center gap-1 text-[11px]" onSubmit={(e) => { e.preventDefault(); add(); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }}>
+          <input autoFocus value={field} onChange={(e) => setField(e.target.value)} placeholder={t('argument (e.g. repo)')} aria-label={t('Argument')}
+            className="w-28 rounded border border-border/60 bg-transparent px-1 py-0.5" />
+          <span>=</span>
+          <input value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder={t('value (* matches anything)')} aria-label={t('Value')}
+            className="w-40 rounded border border-border/60 bg-transparent px-1 py-0.5" />
+          <span>→</span>
+          <select value={permission} onChange={(e) => setPermission(e.target.value as Permission)} aria-label={t('Permission')}
+            className="rounded border border-border/60 bg-transparent px-1 py-0.5">
+            {(['allow', 'ask', 'deny'] as const).map((p) => <option key={p} value={p}>{t(LABEL[p])}</option>)}
+          </select>
+          <button type="submit" disabled={!fieldOk || !pattern.trim()} className="rounded px-1.5 py-0.5 text-foreground hover:bg-muted/50 disabled:opacity-50">{t('Add')}</button>
+          <button type="button" onClick={() => setAdding(false)} className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted/50">{t('Cancel')}</button>
+        </form>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} className="text-[11px] text-muted-foreground hover:text-foreground">+ {t('Condition')}</button>
+      ))}
     </div>
   );
 }

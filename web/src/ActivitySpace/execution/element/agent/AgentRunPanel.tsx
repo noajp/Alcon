@@ -11,7 +11,9 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { AgentOutput, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
 import type { useAgentRun } from '@/hooks/useSupabase';
-import { approvalRows, sharedColumns } from './approvalView';
+import { approvalRows, rememberChoices, sharedColumns } from './approvalView';
+import { useIsSpaceOwner } from '@/Function/integrations/data';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
 // The agent on an Element (ADR 0027): one status line for the run, its
 // Workpad as compact tool rows, the approval card when it waits on a
@@ -114,6 +116,12 @@ function ApprovalCard({ agent }: { agent: Agent }) {
   if (pendingId && pendingId !== noteFor) { setNoteFor(pendingId); setNote(''); }
   const [openRow, setOpenRow] = useState<string | null>(null);
   const rows = useMemo(() => (agent.pending ? approvalRows(agent.pending) : []), [agent.pending]);
+  // A standing approval changes the Space's connection rules: owners only.
+  const isOwner = useIsSpaceOwner(useActiveSpaceId()) === true;
+  const choices = useMemo(() => (agent.pending ? rememberChoices(agent.pending) : []), [agent.pending]);
+  const [remember, setRemember] = useState<string[]>([]);
+  const [rememberFor, setRememberFor] = useState(pendingId);
+  if (pendingId !== rememberFor) { setRememberFor(pendingId); setRemember([]); }
   if (!agent.pending) return null;
   const shared = sharedColumns(rows);
   const omitted = rows.reduce((n, r) => n + r.more, 0);
@@ -168,6 +176,28 @@ function ApprovalCard({ agent }: { agent: Agent }) {
         )}
       </div>
 
+      {agent.isMine && isOwner && choices.length > 0 && (
+        <div className="px-1 pt-2">
+          <div className="text-[12px] text-muted-foreground">{t('Don’t ask again for this operation when')}</div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {choices.map((c) => {
+              const on = remember.includes(c.field);
+              return (
+                <button key={c.field} type="button" aria-pressed={on}
+                  onClick={() => setRemember((r) => (on ? r.filter((f) => f !== c.field) : [...r, c.field]))}
+                  className={cn('max-w-full truncate rounded-[var(--control-tab-radius)] border px-2 py-0.5 text-[12px]',
+                    on ? 'border-[var(--accent-default)] bg-[var(--accent-default)]/10 text-foreground' : 'border-[var(--border-default)] text-muted-foreground hover:bg-muted/40')}>
+                  {c.field} = {c.value}
+                </button>
+              );
+            })}
+          </div>
+          {remember.length > 0 && (
+            <div className="mt-1 text-[12px] text-muted-foreground">{t('Approving also saves this as a rule on the connector. You can remove it in Settings › Customize.')}</div>
+          )}
+        </div>
+      )}
+
       <div className="px-1 pt-2">
         {agent.isMine ? (
           <TextComposer
@@ -178,7 +208,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
             className="text-[13px]"
             secondaryAction={<Button variant="secondary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(false, note)}>{t('Reject')}</Button>}
             action={
-              <Button variant="primary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(true, note)}>
+              <Button variant="primary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(true, note, remember)}>
                 {agent.deciding ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
                 {t('Approve and run')}
               </Button>

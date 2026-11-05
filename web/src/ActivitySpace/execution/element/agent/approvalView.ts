@@ -67,6 +67,24 @@ export function approvalRows(action: Pick<AgentAction, 'input'>): ApprovalRow[] 
   });
 }
 
+/**
+ * Pure. What a standing approval could be bound to: when every call is the
+ * same operation, the short plain values they all share (an owner, a repo, a
+ * recipient). Mirrors ruleFromCalls in the engine, which has the last word.
+ */
+export function rememberChoices(action: Pick<AgentAction, 'input'>): { field: string; value: string }[] {
+  const calls = action.input?.calls ?? [];
+  if (!calls.length || calls.some((c) => c.name !== calls[0].name)) return [];
+  const plain = (v: unknown) => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null);
+  return Object.keys(calls[0].input ?? {}).flatMap((field) => {
+    if (!/^[A-Za-z0-9_.-]{1,64}$/.test(field)) return [];
+    const values = calls.map((c) => plain((c.input ?? {})[field]));
+    const v = values[0];
+    if (v === null || v.length > 200 || v.includes('*') || values.some((x) => x !== v)) return [];
+    return [{ field, value: v }];
+  });
+}
+
 /** Pure. The columns shared by every row, when the batch is uniform (e.g. 20 replies) — a real table; else null. */
 export function sharedColumns(rows: ApprovalRow[]): string[] | null {
   if (rows.length < 2) return null;
