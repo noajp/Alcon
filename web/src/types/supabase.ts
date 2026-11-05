@@ -2314,6 +2314,7 @@ export type Database = {
       }
       elements: {
         Row: {
+          action: string | null
           icon: string | null
           actual_hours: number | null
           ai_weight: string | null
@@ -2351,6 +2352,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          action?: string | null
           icon?: string | null
           actual_hours?: number | null
           ai_weight?: string | null
@@ -2388,6 +2390,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          action?: string | null
           icon?: string | null
           actual_hours?: number | null
           ai_weight?: string | null

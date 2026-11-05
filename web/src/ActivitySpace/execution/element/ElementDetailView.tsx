@@ -59,7 +59,7 @@ import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import { liveLease, holderLabel, formatRemaining } from '@/Function/shared/element/lease';
 import { useNow } from '@/Function/shared/useNow';
 import { clearUnsavedDraft, pendingDraft, readUnsavedDraft, stashUnsavedDraft } from '@/Function/shared/element/unsavedDraft';
-import { Fingerprint, Copy, Bot } from '@/ui/icons';
+import { Fingerprint, Copy, Bot, Play } from '@/ui/icons';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/Function/shared/labelColor';
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { MenuShell } from '@/Function/shared/menu';
@@ -92,6 +92,8 @@ import { ElementActionsMenu } from './ElementActionsMenu';
 import { FileText, FolderInput, Trash2, RotateCcw, MoreHorizontal } from '@/ui/icons';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { ACTION_LABEL, ActionIcon, ActionPicker } from '@/Function/shared/elementAction';
+import { isElementAction, type ElementAction } from '@/Function/shared/elementActionKinds';
 import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { FileImportActions, canImport } from './FileImportActions';
 import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
@@ -327,6 +329,14 @@ function ElementDetailBody({
     try {
       await addDomainElementType(domainId, name);
       await refetchDomains();
+    } catch (e) { noticeElementSaveFailed(e); }
+  };
+
+  const elementAction = isElementAction(element.action) ? element.action : null;
+  const handleActionChange = async (action: ElementAction | null) => {
+    try {
+      await updateElement(element.id, { action });
+      onRefresh?.();
     } catch (e) { noticeElementSaveFailed(e); }
   };
 
@@ -1018,6 +1028,20 @@ function ElementDetailBody({
                   </button>
                 }
               />
+
+              {/* Action — what the Element asks someone to do. */}
+              <ActionPicker value={elementAction} onChange={(a) => void handleActionChange(a)}
+                trigger={
+                  <button className="w-full">
+                    <RailRow
+                      icon={elementAction ? <ActionIcon action={elementAction} size={14} /> : <Play size={14} className="text-muted-foreground" />}
+                      name={t('Action')}
+                      label={elementAction ? t(ACTION_LABEL[elementAction]) : t('Set action')}
+                      placeholder={!elementAction}
+                      dense
+                    />
+                  </button>
+                } />
 
               {/* Priority */}
               <DropdownMenu>

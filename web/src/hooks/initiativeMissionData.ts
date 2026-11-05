@@ -128,7 +128,7 @@ export interface ApplyPlanInput {
   dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
   objects: { key: string; objectId: string | null; name: string; domainId: string | null }[];
-  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null; weight?: AiWeight | null }[];
+  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null; weight?: AiWeight | null; action?: string | null }[];
 }
 
 export interface ApplyPlanResult {
@@ -191,6 +191,7 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       const handOver = t.assignee === 'ai' && !!input.aiWorkerId && !!input.dispatch;
       const el = await createElement({
         title: t.title, description: t.description || null, object_id: objectId, status: 'todo',
+        ...(t.action ? { action: t.action } : {}),
         ...(handOver ? { labels: ['dispatch'] } : {}),
       });
       elementFor.set(t.key, el.id);

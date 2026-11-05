@@ -143,6 +143,15 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   // ── Strategy page ───────────────────────────────────────────
   'Add Objects': ['Object を追加', 'Object 추가', 'Ajouter des Objects', 'Añadir Objects'],
   'Add description…': ['説明を追加…', '설명 추가…', 'Ajouter une description…', 'Añadir descripción…'],
+  // What an Element asks someone to do (Function/shared/elementAction)
+  'Judge': ['判断', '판단', 'Juger', 'Juzgar'],
+  'Decide': ['決定', '결정', 'Décider', 'Decidir'],
+  'Research': ['調査', '조사', 'Rechercher', 'Investigar'],
+  'Verify': ['検証', '검증', 'Vérifier', 'Verificar'],
+  'Report': ['報告', '보고', 'Rendre compte', 'Informar'],
+  'Delegate': ['委任', '위임', 'Déléguer', 'Delegar'],
+  'Monitor': ['監視', '모니터링', 'Surveiller', 'Supervisar'],
+  'Set action': ['行動を設定', '행동 설정', "Définir l'action", 'Definir la acción'],
   'Add existing Strategy': ['既存の Strategy を追加', '기존 Strategy 추가', 'Ajouter une Strategy existante', 'Añadir una Strategy existente'],
   'Sub Strategies': ['Sub Strategy', 'Sub Strategy', 'Sous-Strategies', 'Sub Strategies'],
   'Add Sub Strategy': ['Sub Strategy を追加', 'Sub Strategy 추가', 'Ajouter une sous-Strategy', 'Añadir una Sub Strategy'],

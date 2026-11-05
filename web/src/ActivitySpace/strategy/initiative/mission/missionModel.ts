@@ -10,6 +10,7 @@
 
 import { isAiWeight, type AgentRunStatus, type AiWeight, type Worker } from '@/types/database';
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
+import { isElementAction, isHumanAction, type ElementAction } from '@/Function/shared/elementActionKinds';
 
 export interface MissionElementRow {
   id: string;
@@ -24,6 +25,8 @@ export interface MissionElementRow {
   leased?: boolean;
   /** Who carries it out: an AI Worker, a person, or nobody yet. */
   assignee?: 'ai' | 'human' | null;
+  /** What it asks someone to do (elements.action). */
+  action?: ElementAction | null;
   assigneeName?: string | null;
   /** The Worker itself, for its avatar. */
   assigneeWorker?: MissionWorker | null;
@@ -127,6 +130,8 @@ export interface FleetElement {
   state: ActionState;
   draft: boolean;
   assignee: 'ai' | 'human' | null;
+  /** What it asks someone to do; null when not said. */
+  action: ElementAction | null;
   assigneeName: string | null;
   assigneeWorker: MissionWorker | null;
   /** The Element's own status; a draft task is 'todo'. */
@@ -231,7 +236,7 @@ export function buildFleet(input: {
     const run = latest.get(e.id);
     return {
       key: e.id, elementId: e.id, title: title.get(e.id)!, state: s, draft: false,
-      assignee: e.assignee ?? null, assigneeName: e.assigneeName ?? null, assigneeWorker: e.assigneeWorker ?? null,
+      assignee: e.assignee ?? null, action: e.action ?? null, assigneeName: e.assigneeName ?? null, assigneeWorker: e.assigneeWorker ?? null,
       status: e.status ?? 'todo', dueDate: e.due_date ?? null,
       serves: serves.get(e.id) ?? [], waitsOn,
       ready: open && !e.claudeCode && e.assignee !== 'human' && waitsOn.length === 0,
@@ -267,7 +272,7 @@ export function draftFleet(current: readonly FleetObject[], measures: readonly M
     const objective = t.objective ? objectiveTitle.get(t.objective) : undefined;
     added.set(column, [...(added.get(column) ?? []), {
       key: `t:${t.key}`, elementId: null, title: t.title, state: 'todo', draft: true,
-      assignee: t.assignee, assigneeName: null, assigneeWorker: null, status: 'todo', dueDate: null,
+      assignee: t.assignee, action: t.action ?? null, assigneeName: null, assigneeWorker: null, status: 'todo', dueDate: null,
       serves: objective ? [objective] : [],
       waitsOn: t.dependsOn.map((d) => taskTitle.get(d)!).filter(Boolean),
       ready: false, handable: false, model: null, costUsd: 0,
@@ -392,6 +397,8 @@ export interface PlanTask {
   definitionId?: string | null;
   /** How heavy the work is for an AI; picks the model by cost. */
   weight?: AiWeight | null;
+  /** What the task asks someone to do. */
+  action?: ElementAction | null;
 }
 
 export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
@@ -456,6 +463,7 @@ export function normalizePlan(
       assignee: x.assignee === 'human' ? 'human' : 'ai',
       definitionId: typeof x.definitionId === 'string' && known.definitionIds?.has(x.definitionId) ? x.definitionId : null,
       weight: isAiWeight(x.weight) ? x.weight : null,
+      action: isElementAction(x.action) ? x.action : null,
     });
     if (tasks.length >= 30) break;
   }
@@ -484,12 +492,24 @@ export interface YourTurn {
   kind: YourTurnKind;
   /** What the AI said (its summary, or the write it waits on). */
   detail: string | null;
+  /** What the person is asked to do, as a verb: the Element's own when it
+   *  is a person's verb, otherwise the one this kind of turn means. */
+  action: ElementAction;
 }
 
 const TURN_ORDER: Record<YourTurnKind, number> = { approve: 0, answer: 1, review: 2, do: 3 };
 
 /** Pure. Everything in the mission that waits on a person, in one list. A
  *  person's Element counts only once nothing it waits on is open. */
+/** The verb a turn asks of the person: what each kind of turn means, unless
+ *  the Element itself names a person's verb (judge, decide…) — that is the
+ *  more exact ask. A person's own Element keeps whatever verb it has. */
+const TURN_ACTION: Record<YourTurnKind, ElementAction> = { approve: 'approve', answer: 'answer', review: 'judge', do: 'execute' };
+function turnAction(kind: YourTurnKind, own: ElementAction | null): ElementAction {
+  if (own && (isHumanAction(own) || kind === 'do')) return own;
+  return TURN_ACTION[kind];
+}
+
 export function yourTurn(input: {
   fleet: readonly FleetObject[];
   elements: readonly MissionElementRow[];
@@ -507,13 +527,13 @@ export function yourTurn(input: {
       if (s === 'done' || s === 'cancelled') continue;
       if (run?.status === 'awaiting_approval') {
         const action = input.actions.find((a) => a.element_id === e.elementId && a.status === 'pending');
-        out.push({ elementId: e.elementId, title: e.title, kind: 'approve', detail: action?.summary ?? run.summary });
+        out.push({ elementId: e.elementId, title: e.title, kind: 'approve', detail: action?.summary ?? run.summary, action: turnAction('approve', e.action) });
       } else if (e.assignee !== 'human' && s === 'blocked') {
-        out.push({ elementId: e.elementId, title: e.title, kind: 'answer', detail: run?.summary ?? run?.error ?? null });
+        out.push({ elementId: e.elementId, title: e.title, kind: 'answer', detail: run?.summary ?? run?.error ?? null, action: turnAction('answer', e.action) });
       } else if (s === 'review') {
-        out.push({ elementId: e.elementId, title: e.title, kind: 'review', detail: run?.summary ?? null });
+        out.push({ elementId: e.elementId, title: e.title, kind: 'review', detail: run?.summary ?? null, action: turnAction('review', e.action) });
       } else if (e.assignee === 'human' && e.waitsOn.length === 0 && (e.state === 'todo' || e.state === 'running')) {
-        out.push({ elementId: e.elementId, title: e.title, kind: 'do', detail: null });
+        out.push({ elementId: e.elementId, title: e.title, kind: 'do', detail: null, action: turnAction('do', e.action) });
       }
     }
   }

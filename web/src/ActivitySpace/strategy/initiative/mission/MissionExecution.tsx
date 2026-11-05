@@ -18,6 +18,7 @@ import { AI_WEIGHTS, isAiWeight, type AiWeight, type ElementWithDetails, type St
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
+import { ActionTag } from '@/Function/shared/elementAction';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
@@ -228,6 +229,7 @@ function DraftCard({ element, draggable }: { element: FleetElement; draggable: b
       className={cn(CARD, 'border-dashed border-border px-3 py-2.5', draggable && 'cursor-grab active:cursor-grabbing')}>
       <div className="flex items-start gap-2">
         <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground line-clamp-3 break-words">{element.title}</p>
+        {element.action && <ActionTag action={element.action} className="mt-0.5" />}
         <DraftTag />
       </div>
       <MissionLines element={element} busy={false} />
@@ -721,7 +723,14 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                       )}
                       // Only what the Status cannot say: an AI run that is
                       // going, waiting on someone, or has failed.
-                      badge={runOnlyState(e.state, details.get(e.elementId)!.status) ? <StateBadge state={e.state} /> : undefined}
+                      // What it asks someone to do, then only what the Status
+                      // cannot say: an AI run going, waiting or failed.
+                      badge={(e.action || runOnlyState(e.state, details.get(e.elementId)!.status)) ? (
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {e.action && <ActionTag action={e.action} className="mt-0.5" />}
+                          {runOnlyState(e.state, details.get(e.elementId)!.status) && <StateBadge state={e.state} />}
+                        </span>
+                      ) : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
                         definitionPick={ctx.canEdit ? (
                           <>

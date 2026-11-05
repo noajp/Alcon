@@ -56,6 +56,8 @@ export async function createElement(element: {
   due_time?: string | null;
   estimated_hours?: number | null;
   order_index?: number;
+  /** What it asks someone to do (Function/shared/elementActionKinds). */
+  action?: string | null;
 }): Promise<Element> {
   // Get max order_index in the matching scope (same object_id, or null scope)
   let query = supabase
@@ -86,6 +88,7 @@ export async function createElement(element: {
     due_time: element.due_time || null,
     estimated_hours: element.estimated_hours || null,
     order_index: orderIndex,
+    action: element.action ?? null,
   };
 
   // Optimistic insert with a temp id — the new row shows up immediately

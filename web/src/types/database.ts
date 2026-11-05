@@ -428,6 +428,8 @@ export interface Element {
   definition_id?: string | null
   /** How heavy its work is for an AI: picks the model by cost when no setting names one. */
   ai_weight?: string | null  // an AiWeight; read through isAiWeight
+  /** What it asks someone to do (Function/shared/elementActionKinds); read through isElementAction. */
+  action?: string | null
   /** The Element this one is a Sub-element of; it lives in that Element's Object. */
   parent_id?: string | null
   title: string
@@ -470,6 +472,7 @@ export interface Element {
 }
 
 export interface ElementInsert {
+  action?: string | null
   id?: string
   object_id?: string | null
   title: string
@@ -498,6 +501,7 @@ export interface ElementInsert {
 }
 
 export interface ElementUpdate {
+  action?: string | null
   id?: string
   object_id?: string | null
   title?: string

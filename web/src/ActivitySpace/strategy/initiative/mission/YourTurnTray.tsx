@@ -1,5 +1,7 @@
 'use client';
 
+import { ACTION_LABEL, ActionIcon } from '@/Function/shared/elementAction';
+import { isHumanAction } from '@/Function/shared/elementActionKinds';
 import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -7,7 +9,7 @@ import { advanceFromElement, sendBackToAgent } from '@/Function/copilot/agentDat
 import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/preferencesStore';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateElement } from '@/hooks/useSupabase';
-import type { YourTurn, YourTurnKind } from './missionModel';
+import type { YourTurn } from './missionModel';
 
 // Everything in a Strategy's mission that waits on a person, at the top of
 // the Execution tab, answerable where it is shown: approve a result, send it
@@ -15,12 +17,6 @@ import type { YourTurn, YourTurnKind } from './missionModel';
 // own Element. An approval of an external write opens its Element, where the
 // approval card shows exactly what will be sent.
 
-const KIND_LABEL: Record<YourTurnKind, string> = {
-  approve: 'Approve',
-  answer: 'Answer',
-  review: 'To review',
-  do: 'Your Element',
-};
 
 export function YourTurnTray({ items, canEdit, onOpen, onChanged }: {
   items: YourTurn[];
@@ -76,11 +72,17 @@ function TurnRow({ item, canEdit, onOpen, onChanged }: { item: YourTurn; canEdit
   return (
     <li className="space-y-1.5 py-2">
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 shrink-0 rounded-md border border-border/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">{t(KIND_LABEL[item.kind])}</span>
-        <button type="button" onClick={() => onOpen(item.elementId)}
-          className="min-w-0 flex-1 text-left text-[13px] leading-5 text-foreground hover:underline">
-          {item.title}
-        </button>
+        {/* What is asked, as the verb's icon and name, then what it is about. */}
+        <span className="mt-[3px] flex shrink-0"><ActionIcon action={item.action} size={16} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] leading-5">
+            <span className="mr-1.5 font-medium" style={isHumanAction(item.action) ? { color: 'var(--status-warning)' } : undefined}>{t(ACTION_LABEL[item.action])}</span>
+            <button type="button" onClick={() => onOpen(item.elementId)} className="text-left font-medium text-foreground hover:underline">
+              {item.title}
+            </button>
+          </p>
+          {item.detail && <p className="mt-0.5 line-clamp-4 text-[13px] leading-5 text-foreground/80">{item.detail}</p>}
+        </div>
         {canEdit && (
           <div className="flex shrink-0 items-center gap-1">
             {item.kind === 'approve' && (
@@ -95,16 +97,15 @@ function TurnRow({ item, canEdit, onOpen, onChanged }: { item: YourTurn; canEdit
           </div>
         )}
       </div>
-      {item.detail && <p className="line-clamp-3 pl-1 text-[12px] leading-5 text-muted-foreground">{item.detail}</p>}
       {canEdit && replying && (
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 pl-6">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2}
             placeholder={item.kind === 'answer' ? t('Answer the AI — it picks up from here') : t('What should the AI change?')}
             className="min-h-[44px] flex-1 resize-y rounded-md border border-border/60 bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-muted/30" />
           <Button variant="primary" size="xs" onClick={() => void send()} disabled={busy || !text.trim()}>{t('Send')}</Button>
         </div>
       )}
-      {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+      {error && <p className="pl-6 text-[12px] text-[var(--status-danger)]">{error}</p>}
     </li>
   );
 }
