@@ -326,7 +326,14 @@ async function fetchStrategyTables(strategyId: string): Promise<StrategyTable[]>
 }
 
 /** The Tables a Strategy's runs keep what they found in (tables.strategy_id). */
-export function useStrategyTables(strategyId: string) {
-  const query = useQuery({ queryKey: ['strategy-tables', strategyId], queryFn: () => fetchStrategyTables(strategyId), refetchInterval: 15_000 });
-  return { data: query.data ?? [], loading: query.isPending };
+export function useStrategyTables(strategyId: string | null) {
+  const query = useQuery({
+    queryKey: ['strategy-tables', strategyId],
+    queryFn: () => fetchStrategyTables(strategyId!),
+    enabled: !!strategyId,
+    // A run adds Tables while the Strategy is open.
+    refetchInterval: 15_000,
+  });
+  return { data: query.data ?? EMPTY_STRATEGY_TABLES, loading: !!strategyId && query.isPending };
 }
+const EMPTY_STRATEGY_TABLES: StrategyTable[] = [];

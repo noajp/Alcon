@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, Settings2, Trash2 } from '@/ui/icons';
+import { ChevronDown, Maximize2, Settings2, Trash2 } from '@/ui/icons';
 import {
   Bar,
   BarChart,
@@ -18,10 +18,10 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { MenuShell, MENU_ROW } from "@/Function/shared/menu";
-import { useDataTables } from "@/hooks/tableData";
+import { useDataTables, useStrategyTables } from "@/hooks/tableData";
 import { useTableData } from "@/hooks/useTableData";
 import type { DataTableColumn, DataTableColumnType } from "@/types/database";
-import { WidgetHeaderAction, useWidgetMeta } from "../WidgetFrame";
+import { WidgetHeaderAction, useWidgetEmpty, useWidgetMeta } from "../WidgetFrame";
 import type { WidgetProps } from "../types";
 import { useI18n } from "@/Function/i18n/I18nProvider";
 import {
@@ -191,12 +191,24 @@ function EditValue({
   );
 }
 
-export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
+export function DataViewWidget({ host, params: rawParams, setParams }: WidgetProps) {
   const { t } = useI18n();
   const params = normalizeDataViewParams(rawParams);
   const tables = useDataTables();
-  const source = useTableData(params.tableId);
-  const [configure, setConfigure] = useState(!params.tableId);
+  // On a Strategy with no Table chosen, the widget follows the Strategy's own
+  // Tables — the ones its runs keep — so a new one shows up here by itself.
+  const strategyId = host.subject.kind === "initiative" ? host.subject.id : null;
+  const follows = !params.tableId && !!strategyId;
+  const strategyTables = useStrategyTables(follows ? strategyId : null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const followed = follows
+    ? strategyTables.data.find((s) => s.id === picked) ?? strategyTables.data[0] ?? null
+    : null;
+  const tableId = params.tableId ?? followed?.id ?? null;
+  const source = useTableData(tableId, { live: follows });
+  const [configure, setConfigure] = useState(!params.tableId && !strategyId);
+  // Nothing to show until the Strategy has a Table.
+  useWidgetEmpty(follows && !strategyTables.loading && !strategyTables.data.length);
   const [editData, setEditData] = useState(false);
   const [newTable, setNewTable] = useState("");
   const [newColumn, setNewColumn] = useState("");
@@ -268,6 +280,16 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
   return (
     <>
       <WidgetHeaderAction>
+        {data && host.onNavigate && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => host.onNavigate?.({ tableId: data.table.id })}
+            aria-label={t("Open in Tables")}
+          >
+            <Maximize2 size={12} />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="xs"
@@ -289,19 +311,22 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
           }
         }}
       >
-        {(configure || !params.tableId) && (
+        {(configure || (!params.tableId && !follows)) && (
           <div className="space-y-2">
             <Choice
               label={t("Table")}
-              value={params.tableId}
-              options={(tables.data ?? []).map((t) => ({
-                id: t.id,
-                label: t.name,
-              }))}
+              value={follows ? "" : params.tableId}
+              options={[
+                ...(strategyId ? [{ id: "", label: t("This Strategy’s Tables") }] : []),
+                ...(tables.data ?? []).map((t) => ({
+                  id: t.id,
+                  label: t.name,
+                })),
+              ]}
               disabled={saving}
               onChange={(tableId) => {
                 change({
-                  tableId,
+                  tableId: tableId || null,
                   labelColumnId: null,
                   valueColumnId: null,
                   groupColumnId: null,
@@ -476,12 +501,29 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
             </Button>
           </div>
         )}
-        {!params.tableId && (
+        {follows && strategyTables.data.length > 1 && (
+          <div className="flex flex-wrap gap-1" role="tablist" aria-label={t("This Strategy’s Tables")}>
+            {strategyTables.data.map((table) => (
+              <Button
+                key={table.id}
+                role="tab"
+                aria-selected={table.id === followed?.id}
+                variant={table.id === followed?.id ? "secondary" : "ghost"}
+                size="xs"
+                onClick={() => setPicked(table.id)}
+              >
+                {table.name}
+                <span className="tabular-nums text-muted-foreground">{table.rowCount}</span>
+              </Button>
+            ))}
+          </div>
+        )}
+        {!tableId && !follows && (
           <p className="text-sm text-muted-foreground">
             {t("Choose a table or create one. Add your own columns and rows, then display the same data as a table, cards, or chart.")}
           </p>
         )}
-        {params.tableId && !source.loading && !source.error && !data && (
+        {tableId && !source.loading && !source.error && !data && (
           <p className="text-sm text-muted-foreground">
             {t("This table is unavailable. Choose another table in Configure.")}
           </p>

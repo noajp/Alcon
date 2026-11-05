@@ -21,11 +21,13 @@ function requiredName(name: string): string {
 }
 
 /** One source for the Table app and every Widget referencing the same Table. */
-export function useTableData(tableId: string | null) {
+export function useTableData(tableId: string | null, options?: { live?: boolean }) {
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: [...TABLE_DATA_QUERY_KEY, tableId],
     enabled: Boolean(tableId),
+    // A Table an AI is filling shows its new rows without a reload.
+    refetchInterval: options?.live ? 15_000 : false,
     queryFn: async (): Promise<TableData> => {
       const { data: table, error } = await supabase.from('tables').select('*').eq('id', tableId!).single();
       if (error) throw error;

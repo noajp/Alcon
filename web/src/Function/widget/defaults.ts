@@ -74,11 +74,16 @@ export const INITIATIVE_BOARD: BoardLayout = {
 
 /**
  * Strategy detail, Execution tab: the work carrying it out. The Objects and
- * the AI's runs are drawn by the page; under them, where that work hurts.
+ * the AI's runs are drawn by the page; under them, the Tables those runs keep
+ * (the candidates, compared side by side — hidden until there is one), then
+ * where that work hurts.
  */
 export const INITIATIVE_PLAN_BOARD: BoardLayout = {
   band: [],
-  main: [{ id: 'cmp-risk', type: 'campaign-risk' }],
+  main: [
+    { id: 'cmp-tables', type: 'data-view' },
+    { id: 'cmp-risk', type: 'campaign-risk' },
+  ],
   rail: [],
 };
 

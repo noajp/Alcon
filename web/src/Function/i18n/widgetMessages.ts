@@ -154,6 +154,8 @@ const WIDGET_MESSAGES: Record<string, Row> = {
   '{label}: {value}': ['{label}：{value}', '{label}: {value}', '{label} : {value}', '{label}: {value}'],
   'Find {name}': ['{name} を検索', '{name} 검색', 'Chercher : {name}', 'Buscar {name}'],
   'Configure data widget': ['データウィジェットを設定', '데이터 위젯 설정', 'Configurer le widget de données', 'Configurar widget de datos'],
+  'Open in Tables': ['Table で開く', 'Table에서 열기', 'Ouvrir dans Tables', 'Abrir en Tables'],
+  'This Strategy’s Tables': ['この Strategy の表', '이 Strategy의 표', 'Les tables de cette Strategy', 'Las tablas de esta Strategy'],
   'Configure': ['設定', '설정', 'Configurer', 'Configurar'],
   'Loading tables…': ['Table を読み込み中…', 'Table 불러오는 중…', 'Chargement des Tables…', 'Cargando Tables…'],
   'Could not load tables.': ['Table を読み込めませんでした。', 'Table을 불러오지 못했습니다.', 'Impossible de charger les Tables.', 'No se pudieron cargar las Tables.'],

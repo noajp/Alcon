@@ -38,8 +38,6 @@ export interface MissionContext {
   refetch: () => void;
   /** Elements open their Object, as everywhere on this page. */
   onOpenElement: (elementId: string) => void;
-  /** Open one of the Strategy's Tables in the Table view. */
-  onOpenTable?: (tableId: string) => void;
 }
 
 export const STATE_LABEL: Record<ActionState, string> = {
