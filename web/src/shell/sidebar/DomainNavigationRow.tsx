@@ -25,7 +25,8 @@ export function DomainNavigationRow({ name, mark, active, expanded, activeView, 
           : <span aria-hidden className="size-6 shrink-0" />}
       </>} />
     {expanded && <div className="mt-0.5 pl-7">
-      {(['objects', 'domain-elements'] as const).map(id => {
+      {/* No "Objects" row: the Domain's own page already lists them. */}
+      {(['domain-elements'] as const).map(id => {
         const { icon: Icon, label } = VIEW_REGISTRY[id];
         return <SidebarRow key={id} active={active && activeView === id} icon={Icon && <Icon size={16} />} label={t(label)} onClick={() => onSelect(id)} />;
       })}
