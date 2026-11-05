@@ -10,8 +10,12 @@
 // Requests (POST JSON, Authorization: Bearer <the person's Supabase JWT>):
 //   { runId }                                   start a queued run
 //   { runId, resume: true }                     resume a paused run
-//   { runId, decision: { actionId, approve, inputHash, note? } }
-//                                               decide on a pending approval
+//   { runId, decision: { actionId, approve, inputHash, note?, remember? } }
+//                                               decide on a pending approval;
+//                                               `remember` (input field names)
+//                                               also lets the same command with
+//                                               the same values run without
+//                                               asking from now on
 //   { runId, continue: true }                   internal: the next slice of a
 //                                               long run (self-invoked)
 //   { advance: elementId }                      a person finished an Element:
@@ -49,7 +53,7 @@ import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./veri
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
-import { commandSchema, offeredCommands, parseManifest, permissionOf, requestFor, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
+import { commandSchema, decide, offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
 import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
@@ -136,7 +140,7 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "server env not configured" }, 500);
 
-  let body: { runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
+  let body: { runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] } };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
 
   if (body.ping) {
@@ -192,7 +196,9 @@ Deno.serve(async (req: Request) => {
     const d = body.decision;
     const { data: action } = await admin.from("agent_actions").select("id, status, input_hash").eq("id", d.actionId ?? "").eq("run_id", runId).maybeSingle();
     if (!action || action.status !== "pending" || !run.transcript?.pending) return json({ error: "この承認依頼はもう処理されています。" }, 409);
-    if (d.inputHash !== action.input_hash) return json({ error: "承認の内容が提示したものと一致しません。画面を更新してやり直してください。" }, 409);
+    // Bound to what is about to run, not only to what the row says.
+    const runningHash = await sha256(canonicalCalls(run.transcript.pending.calls));
+    if (d.inputHash !== action.input_hash || runningHash !== action.input_hash) return json({ error: "承認の内容が提示したものと一致しません。画面を更新してやり直してください。" }, 409);
   }
 
   // Claim the run atomically for the transition this request makes.
@@ -289,7 +295,7 @@ async function addStep(admin: SupabaseClient, runId: string, type: string, title
 interface ExecArgs {
   req: Request; run: Run; user: { id: string; email: string | null }; jwt: string;
   admin: SupabaseClient; userDb: SupabaseClient; anthropicKey: string | null; supabaseUrl: string;
-  body: { continue?: boolean; resume?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string } };
+  body: { continue?: boolean; resume?: boolean; token?: string; decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] } };
 }
 
 async function execute(a: ExecArgs): Promise<void> {
@@ -550,6 +556,11 @@ async function execute(a: ExecArgs): Promise<void> {
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
+    // Checked again at the moment it runs: an approval given before a rule
+    // denied these arguments does not carry them through.
+    if (it.command && it.manifest && decide(it.manifest, it.command, call.input).permission === "deny") {
+      return { content: `${it.command.name} はこの引数では許可されていません（連携のルール）。別の引数にするか、人に頼んでください。`, is_error: true };
+    }
     // A declared API command becomes exactly the request its manifest maps it to.
     let httpInput: Record<string, unknown> = call.input;
     if (it.command?.http) {
@@ -786,6 +797,31 @@ async function execute(a: ExecArgs): Promise<void> {
     return;
   }
 
+  // A standing approval: the command these calls are, with the chosen
+  // fields' values, runs without asking from now on. Written through the
+  // starter's session, so only a Space owner can add one (the integration's
+  // own RLS). It never fails the decision it rides on.
+  const rememberApproval = async (calls: ToolCall[], fields: string[]) => {
+    const its = calls.map((c) => integrationTools.get(c.name));
+    const first = its[0];
+    const command = first?.command;
+    if (!first || !command || its.some((it) => it?.integration.id !== first.integration.id || it?.command?.name !== command.name)) {
+      await addStep(admin, run.id, "approval", "以後の承認は保存できませんでした: 同じコマンドの呼び出しだけを条件にできます");
+      return;
+    }
+    const rule = ruleFromCalls(calls.map((c) => c.input), fields);
+    if ("error" in rule) { await addStep(admin, run.id, "approval", `以後の承認は保存できませんでした: ${rule.error}`); return; }
+    const { data: row } = await userDb.from("integrations").select("manifest").eq("id", first.integration.id).maybeSingle();
+    const manifest = withRule(row?.manifest, command.name, rule);
+    const { data: saved } = manifest
+      ? await userDb.from("integrations").update({ manifest, updated_at: new Date().toISOString() }).eq("id", first.integration.id).select("id")
+      : { data: null };
+    const condition = Object.entries(rule.when).map(([k, v]) => `${k} = ${v}`).join(", ");
+    await addStep(admin, run.id, "approval", saved?.length
+      ? `以後、${command.name}（${condition}）は確認なしで実行します`
+      : "以後の承認は保存できませんでした: 連携のルールを変えられるのは Space のオーナーだけです");
+  };
+
   // ── A decision answers the paused turn first ────────────────────────────
   if (a.body.decision && pending) {
     const d = a.body.decision;
@@ -794,6 +830,7 @@ async function execute(a: ExecArgs): Promise<void> {
     if (d.approve) {
       await admin.from("agent_actions").update({ status: "approved", decided_by: user.id, decided_at: new Date().toISOString(), decision_note: d.note ?? null }).eq("id", action.id);
       await addStep(admin, run.id, "approval", "承認されました", d.note ?? null);
+      if (d.remember?.length) await rememberApproval(pending.calls, d.remember);
       pending = { ...pending, approved: true, results: [] };
       await saveTranscript(pending);
     } else {
@@ -941,10 +978,13 @@ async function execute(a: ExecArgs): Promise<void> {
     needsApproval: (call) => {
       if (kindOf(call.name) !== "write") return false;
       const it = integrationTools.get(call.name);
-      // A declared command's own permission decides; a full delegation lifts "ask" only.
+      // A rule on the arguments decides under any delegation; otherwise the
+      // command's own permission does, and a full delegation lifts "ask" only.
+      // A denied call is not asked about: the executor refuses it.
       if (it?.command && it.manifest) {
-        const permission = permissionOf(it.manifest, it.command.action);
-        return permission === "ask" && it.integration.delegation !== "full_delegation";
+        const d = decide(it.manifest, it.command, call.input);
+        if (d.permission !== "ask") return false;
+        return d.rule !== null || it.integration.delegation !== "full_delegation";
       }
       if (isRead(call)) return false;
       return !it || it.integration.delegation !== "full_delegation";

@@ -229,10 +229,15 @@ async function decideAgentAction(opts: {
   action: AgentAction;
   approve: boolean;
   note?: string;
+  /** Input fields whose values let this operation run without asking from now on. */
+  remember?: string[];
 }): Promise<void> {
   await invokeEngine({
     runId: opts.runId,
-    decision: { actionId: opts.action.id, approve: opts.approve, inputHash: opts.action.input_hash, note: opts.note?.trim() || undefined },
+    decision: {
+      actionId: opts.action.id, approve: opts.approve, inputHash: opts.action.input_hash, note: opts.note?.trim() || undefined,
+      ...(opts.approve && opts.remember?.length ? { remember: opts.remember } : {}),
+    },
   });
 }
 
@@ -418,7 +423,7 @@ export function useAgentRun(
     }
   }, [run]);
 
-  const decide = useCallback(async (approve: boolean, note?: string) => {
+  const decide = useCallback(async (approve: boolean, note?: string, remember?: string[]) => {
     if (!run || !pending || deciding) return;
     setDeciding(true);
     setError(null);
@@ -426,7 +431,7 @@ export function useAgentRun(
     setRun({ ...run, status: 'running' });
     setPending(null);
     try {
-      await decideAgentAction({ runId: run.id, action: before.pending, approve, note });
+      await decideAgentAction({ runId: run.id, action: before.pending, approve, note, remember });
     } catch (e) {
       setRun(before.run);
       setPending(before.pending);

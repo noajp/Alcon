@@ -84,3 +84,78 @@ describe('manifestFromTools', () => {
     expect(m.commands.find((c: { name: string }) => c.name === 'merge_pull_request').permission).toBe('deny');
   });
 });
+
+describe('argument rules', () => {
+  const RULED = {
+    version: 1,
+    commands: [
+      { name: 'create_pull_request', effect: 'write', mcp: 'create_pull_request',
+        rules: [
+          { when: { owner: 'noajp', repo: 'Alcon' }, permission: 'allow' },
+          { when: { repo: 'secret-*' }, permission: 'deny' },
+          { when: { owner: 'noajp' }, permission: 'ask' },
+          { when: {}, permission: 'allow' },
+          { when: { repo: 'x' }, permission: 'sometimes' },
+        ] },
+      { name: 'send_mail', effect: 'write', permission: 'deny', mcp: 'send_mail',
+        rules: [{ when: { to: '*@example.com' }, permission: 'allow' }] },
+      { name: 'delete_repo', effect: 'write', permission: 'deny', mcp: 'delete_repo' },
+    ],
+  };
+  const { manifest } = cm.parseManifest(RULED);
+  const [pr, mail] = manifest.commands;
+
+  it('keeps only rules it can read', () => {
+    expect(pr.rules).toHaveLength(3);
+  });
+
+  it('lets the first matching rule decide, then the command', () => {
+    expect(cm.decide(manifest, pr, { owner: 'NOAJP', repo: 'alcon', title: 'x' })).toEqual({ permission: 'allow', rule: 0 });
+    expect(cm.decide(manifest, pr, { owner: 'other', repo: 'secret-plans' })).toEqual({ permission: 'deny', rule: 1 });
+    expect(cm.decide(manifest, pr, { owner: 'noajp', repo: 'web' })).toEqual({ permission: 'ask', rule: 2 });
+    expect(cm.decide(manifest, pr, { owner: 'other', repo: 'web' })).toEqual({ permission: 'ask', rule: null });
+  });
+
+  it('never matches a missing or structured value', () => {
+    expect(cm.ruleMatches({ when: { to: '*' }, permission: 'allow' }, {})).toBe(false);
+    expect(cm.ruleMatches({ when: { to: '*' }, permission: 'allow' }, { to: ['a'] })).toBe(false);
+  });
+
+  it('treats pattern characters other than * literally', () => {
+    expect(cm.globMatch('a.b', 'axb')).toBe(false);
+    expect(cm.globMatch('a.b', 'A.B')).toBe(true);
+    expect(cm.globMatch('*@example.com', 'x@evil.com?@example.com')).toBe(true);
+    expect(cm.globMatch('*@example.com', 'x@example.com.evil')).toBe(false);
+  });
+
+  it('offers a denied command that a rule lets through, as an allowlist', () => {
+    expect(cm.offeredCommands(manifest).map((c: { name: string }) => c.name)).toEqual(['create_pull_request', 'send_mail']);
+    expect(cm.decide(manifest, mail, { to: 'a@example.com' }).permission).toBe('allow');
+    expect(cm.decide(manifest, mail, { to: 'a@other.com' }).permission).toBe('deny');
+  });
+
+  it('builds a remembered rule only from values every call shares', () => {
+    const calls = [{ owner: 'noajp', repo: 'Alcon', title: 'a' }, { owner: 'noajp', repo: 'Alcon', title: 'b' }];
+    expect(cm.ruleFromCalls(calls, ['owner', 'repo'])).toEqual({ when: { owner: 'noajp', repo: 'Alcon' }, permission: 'allow' });
+    expect(cm.ruleFromCalls(calls, ['title'])).toHaveProperty('error');
+    expect(cm.ruleFromCalls([{ q: 'a*' }], ['q'])).toHaveProperty('error');
+    expect(cm.ruleFromCalls([{ body: { x: 1 } }], ['body'])).toHaveProperty('error');
+    expect(cm.ruleFromCalls(calls, [])).toHaveProperty('error');
+  });
+
+  it('adds a rule ahead of the others and does not store a condition twice', () => {
+    const rule = { when: { repo: 'web', owner: 'noajp' }, permission: 'allow' };
+    const once = cm.withRule(RULED, 'create_pull_request', rule);
+    const twice = cm.withRule(once, 'create_pull_request', { when: { owner: 'noajp', repo: 'web' }, permission: 'allow' });
+    const rules = (twice.commands as { name: string; rules: unknown[] }[])[0].rules;
+    expect(rules[0]).toEqual({ when: { owner: 'noajp', repo: 'web' }, permission: 'allow' });
+    expect(rules).toHaveLength(4);
+    expect(cm.withRule(RULED, 'nope', rule)).toBeNull();
+  });
+
+  it('keeps rules when the connection test rewrites the commands', () => {
+    const next = cm.manifestFromTools([{ name: 'create_pull_request', readOnly: false }], RULED);
+    const c = (next.commands as { mcp: string; rules?: unknown[] }[]).find((x) => x.mcp === 'create_pull_request');
+    expect(c?.rules).toHaveLength(5);
+  });
+});

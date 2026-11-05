@@ -14,12 +14,19 @@
 //         "description": "…", "input": { "q": { "type": "string" } }, "required": ["q"],
 //         "http": { "method": "GET", "path": "/search/issues", "query": ["q"] } },
 //       { "name": "comment", "action": "issues.comment", "effect": "write", "permission": "ask",
+//         "rules": [{ "when": { "repo": "acme/*" }, "permission": "allow" }],
 //         "input": { "repo": {…}, "number": {…}, "body": {…} }, "required": ["repo", "number", "body"],
 //         "http": { "method": "POST", "path": "/repos/{repo}/issues/{number}/comments", "body": ["body"] } },
 //       { "name": "list_files", "action": "drive.list", "effect": "read", "mcp": "list_files" }
 //     ],
 //     "aliases": { "find_issues": "issues.search" }
 //   }
+//
+// A command's rules bind its permission to the call's arguments. Each rule
+// names input fields and a pattern for each (`*` matches any run of
+// characters, case is ignored); the first rule whose fields all match
+// decides, under any delegation. A command denied as a whole but allowed by
+// a rule is an allowlist: only the calls a rule lets through can happen.
 
 export type Effect = "read" | "write";
 export type Permission = "allow" | "ask" | "deny";
@@ -33,6 +40,12 @@ export interface HttpMapping {
   body: string[];
 }
 
+/** A permission bound to the call's arguments: every field in `when` must match. */
+export interface CommandRule {
+  when: Record<string, string>;
+  permission: Permission;
+}
+
 export interface ManifestCommand {
   name: string;
   action: string;
@@ -44,6 +57,8 @@ export interface ManifestCommand {
   http: HttpMapping | null;
   /** The MCP tool this command is, for an MCP integration. */
   mcp: string | null;
+  /** Argument-bound permissions, first match wins. */
+  rules: CommandRule[];
 }
 
 export interface Manifest {
@@ -54,9 +69,103 @@ export interface Manifest {
 const METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]);
 const PERMISSIONS = new Set(["allow", "ask", "deny"]);
 const NAME = /^[a-z][a-z0-9_]{0,47}$/;
+const FIELD = /^[A-Za-z0-9_.-]{1,64}$/;
+export const MAX_RULES = 50;
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null);
+
+/** Pure. The rules stored on a command; one that cannot be read is left out. */
+export function parseRules(raw: unknown): CommandRule[] {
+  const rules: CommandRule[] = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    const x = obj(r);
+    const when = obj(x?.when);
+    if (!x || !when || typeof x.permission !== "string" || !PERMISSIONS.has(x.permission)) continue;
+    const fields = Object.entries(when).filter(([k, v]) => FIELD.test(k) && typeof v === "string" && v.length <= 500) as [string, string][];
+    if (!fields.length || fields.length !== Object.keys(when).length) continue;
+    rules.push({ when: Object.fromEntries(fields), permission: x.permission as Permission });
+    if (rules.length >= MAX_RULES) break;
+  }
+  return rules;
+}
+
+/** Pure. Whether a value matches a pattern: `*` is any run of characters, case is ignored. */
+export function globMatch(pattern: string, value: string): boolean {
+  const re = pattern.split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+  return new RegExp(`^${re}$`, "is").test(value);
+}
+
+/** The text a scalar input value is matched as; objects and missing values never match. */
+function scalar(v: unknown): string | null {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+}
+
+/** Pure. Whether every field a rule names matches the call's input. */
+export function ruleMatches(rule: CommandRule, input: Record<string, unknown>): boolean {
+  return Object.entries(rule.when).every(([field, pattern]) => {
+    const v = scalar(input[field]);
+    return v !== null && globMatch(pattern, v);
+  });
+}
+
+/**
+ * Pure. What a call to a command may do: the first of its rules that
+ * matches the input, else the permission of its action. `rule` is the index
+ * of the rule that decided, or null when the command's own permission did.
+ */
+export function decide(manifest: Manifest, command: ManifestCommand, input: Record<string, unknown>): { permission: Permission; rule: number | null } {
+  const i = command.rules.findIndex((r) => ruleMatches(r, input));
+  if (i >= 0) return { permission: command.rules[i].permission, rule: i };
+  return { permission: permissionOf(manifest, command.action), rule: null };
+}
+
+/** Pure. The input fields a standing approval can be bound to: short scalar values without a wildcard. */
+export function rememberableFields(input: Record<string, unknown>): string[] {
+  return Object.entries(input)
+    .filter(([k, v]) => FIELD.test(k) && scalar(v) !== null && String(v).length <= 200 && !String(v).includes("*"))
+    .map(([k]) => k);
+}
+
+/**
+ * Pure. The rule that lets these calls through from now on, bound to the
+ * chosen fields: each must be rememberable and hold the same value in every
+ * call. An error when it cannot be made.
+ */
+export function ruleFromCalls(inputs: Record<string, unknown>[], fields: string[]): CommandRule | { error: string } {
+  if (!inputs.length || !fields.length) return { error: "条件にする項目を選んでください。" };
+  const when: Record<string, string> = {};
+  for (const f of fields) {
+    if (!inputs.every((i) => rememberableFields(i).includes(f))) return { error: `${f} は条件にできません。` };
+    const values = new Set(inputs.map((i) => String(i[f])));
+    if (values.size !== 1) return { error: `${f} の値が呼び出しごとに違うので、条件にできません。` };
+    when[f] = [...values][0];
+  }
+  return { when, permission: "allow" };
+}
+
+/**
+ * Pure. Stored manifest JSON with a rule added to a command, ahead of the
+ * rules already there, or null when the command is not in it. The same
+ * condition is not stored twice.
+ */
+export function withRule(raw: unknown, commandName: string, rule: CommandRule): Record<string, unknown> | null {
+  const m = obj(raw);
+  const commands = Array.isArray(m?.commands) ? m!.commands : null;
+  if (!m || !commands) return null;
+  const key = JSON.stringify(Object.entries(rule.when).sort());
+  let found = false;
+  const next = commands.map((c) => {
+    const x = obj(c);
+    if (!x || x.name !== commandName) return c;
+    found = true;
+    const rest = parseRules(x.rules).filter((r) => JSON.stringify(Object.entries(r.when).sort()) !== key);
+    return { ...x, rules: [rule, ...rest].slice(0, MAX_RULES) };
+  });
+  return found ? { ...m, commands: next } : null;
+}
 
 /** Pure. A manifest from stored JSON, with what was wrong with it. A command
  *  that cannot be read is left out, never guessed. */
@@ -98,6 +207,7 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       description: typeof x.description === "string" ? x.description.slice(0, 1000) : "",
       input: obj(x.input) ?? {},
       required: strings(x.required),
+      rules: parseRules(x.rules),
     });
   }
   const aliases: Record<string, string> = {};
@@ -120,9 +230,10 @@ export function permissionOf(manifest: Manifest, action: string): Permission {
   return of.includes("ask") ? "ask" : "allow";
 }
 
-/** Pure. The commands offered to the agent: every declared one not denied. */
+/** Pure. The commands offered to the agent: every declared one not denied,
+ *  and a denied one some rule still lets through. */
 export function offeredCommands(manifest: Manifest): ManifestCommand[] {
-  return manifest.commands.filter((c) => permissionOf(manifest, c.action) !== "deny");
+  return manifest.commands.filter((c) => permissionOf(manifest, c.action) !== "deny" || c.rules.some((r) => r.permission !== "deny"));
 }
 
 /** Pure. A command's tool input schema. */
@@ -189,6 +300,7 @@ export function manifestFromTools(tools: { name: string; description?: string; r
     commands.push({
       name, action: typeof before?.action === "string" ? before.action : name, effect,
       ...(typeof before?.permission === "string" && PERMISSIONS.has(before.permission) ? { permission: before.permission } : {}),
+      ...(Array.isArray(before?.rules) && before!.rules.length ? { rules: before!.rules } : {}),
       description: (t.description ?? "").slice(0, 1000),
       mcp: t.name,
     });
