@@ -16,6 +16,7 @@ import { createIntent } from '@/hooks/strategyData';
 import { AI_WEIGHTS, isAiWeight, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
+import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
   answeredQuestions, buildFleet, draftFleet, handOverLabels, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
   startableTasks, UNPLACED, yourTurn,
@@ -64,6 +65,15 @@ function StateBadge({ state }: { state: ActionState }) {
       {t(STATE_LABEL[state])}
     </span>
   );
+}
+
+/** Whether the card's state comes from an AI run rather than the Element's
+ *  Status — the one case the card still needs a badge for. */
+function runOnlyState(state: ActionState, status: string | null): boolean {
+  if (state === 'failed') return true;
+  if (state === 'running') return status !== 'in_progress';
+  if (state === 'waiting') return status !== 'review';
+  return false;
 }
 
 function DraftTag() {
@@ -679,15 +689,20 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                   {e.elementId && details.get(e.elementId) ? (
                     <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
                       onOpen={() => ctx.onOpenElement(e.elementId!)}
-                      badge={ctx.canEdit ? (
-                        // The badge opens the status menu: work an agent left
-                        // for review is approved (Done) right from its card.
-                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()}>
+                      // The Element's Status, as every list shows it: the mark
+                      // opens the status menu, so work an agent left for
+                      // review is approved (Done) right from its card.
+                      lead={ctx.canEdit ? (
+                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()} className="flex">
                           <StatusPicker element={details.get(e.elementId)!}
-                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }}
-                            trigger={<button type="button" className="cursor-pointer" aria-label={t('Change status')}><StateBadge state={e.state} /></button>} />
+                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }} />
                         </span>
-                      ) : <StateBadge state={e.state} />}
+                      ) : (
+                        <ElementProgressMark status={details.get(e.elementId)!.status} progress={getElementProgress(details.get(e.elementId)!)} size={16} />
+                      )}
+                      // Only what the Status cannot say: an AI run that is
+                      // going, waiting on someone, or has failed.
+                      badge={runOnlyState(e.state, details.get(e.elementId)!.status) ? <StateBadge state={e.state} /> : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
                         definitionPick={ctx.canEdit ? (
                           <>

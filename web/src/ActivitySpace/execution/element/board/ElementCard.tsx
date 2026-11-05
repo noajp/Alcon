@@ -40,14 +40,15 @@ interface ElementCardProps {
   /** A plain click on the card (not a drag, not one of its inline controls)
    *  opens the Element — the same gesture every other list surface has. */
   onOpen?: (element: ElementWithDetails) => void;
-  /** Beside the title, at the right — where the Execution tab says how the
-   *  work stands. */
+  /** Before the title, at the left — the status mark, where a list row has it. */
+  lead?: React.ReactNode;
+  /** Beside the title, at the right — what the status cannot say (an AI run). */
   badge?: React.ReactNode;
   /** Lines between the title and the footer, for what the host adds. */
   extra?: React.ReactNode;
 }
 
-export function ElementCard({ element, onRefresh, onOpen, badge, extra }: ElementCardProps) {
+export function ElementCard({ element, onRefresh, onOpen, lead, badge, extra }: ElementCardProps) {
   const { t } = useI18n();
   // Who can be assigned to THIS Element, read when the assignee menu opens;
   // the people already on it stay listed so they can be removed.
@@ -150,6 +151,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, extra }: Elemen
     >
       <div className="px-3 py-2.5">
         <div className="flex items-start gap-2">
+        {lead && <div className="flex h-5 shrink-0 items-center">{lead}</div>}
         <div className="min-w-0 flex-1">
         {editingTitle ? (
           <textarea
