@@ -7,18 +7,22 @@ import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { updateStrategy, useStrategiesInSpace } from '@/hooks/strategyData';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { StrategyDelegation } from '@/types/database';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { AutomationsSection } from './AutomationsSection';
 
-// What runs on its own, in one place. For now that is each Strategy's AI
-// work: whether a verified result goes on to the next step by itself, or
-// waits for a person — the same choice its page offers under Execution.
+// What runs on its own, in one place: the automations that start a harness
+// by themselves, and, for each Strategy's AI work, whether a verified result
+// goes on to the next step by itself or waits for a person — the same choice
+// its page offers under Execution.
 
 const CHOICES: { value: StrategyDelegation; label: string }[] = [
   { value: 'manual', label: 'A person reviews each result' },
   { value: 'auto', label: 'Verified results go on to the next step' },
 ];
 
-export function AutomationView({ onOpenStrategy }: { onOpenStrategy: (id: string) => void }) {
+export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrategy: (id: string) => void; onOpenElement?: (id: string) => void }) {
   const { t } = useI18n();
+  const spaceId = useActiveSpaceId();
   const { data: strategies, loading, refetch } = useStrategiesInSpace();
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +37,11 @@ export function AutomationView({ onOpenStrategy }: { onOpenStrategy: (id: string
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-card">
       <IslandHeader crumbs={[{ id: 'automation', label: t('Automation') }]} count={strategies.length} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-        <p className="mb-3 text-[13px] text-muted-foreground">{t('What each Strategy’s AI work does when a run finishes.')}</p>
+      <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-4">
+        <AutomationsSection spaceId={spaceId} onOpenElement={onOpenElement} />
+        <section>
+        <h2 className="text-[14px] font-semibold text-foreground">{t('When a run finishes')}</h2>
+        <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">{t('What each Strategy’s AI work does when a run finishes.')}</p>
         {error && <p role="alert" className="mb-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         {loading ? (
           <p role="status" className="text-[13px] text-muted-foreground">{t('Loading…')}</p>
@@ -64,6 +71,7 @@ export function AutomationView({ onOpenStrategy }: { onOpenStrategy: (id: string
             ))}
           </ul>
         )}
+        </section>
       </div>
     </div>
   );

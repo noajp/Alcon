@@ -818,6 +818,156 @@ export type Database = {
           },
         ]
       }
+      automation_events: {
+        Row: {
+          activity_space_id: string
+          automation_id: string
+          created_at: string
+          element_id: string | null
+          error: string | null
+          id: string
+          payload: Json | null
+          run_id: string | null
+          source: string
+          status: string
+        }
+        Insert: {
+          activity_space_id: string
+          automation_id: string
+          created_at?: string
+          element_id?: string | null
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          run_id?: string | null
+          source: string
+          status?: string
+        }
+        Update: {
+          activity_space_id?: string
+          automation_id?: string
+          created_at?: string
+          element_id?: string | null
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          run_id?: string | null
+          source?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_events_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_events_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_events_element_id_fkey"
+            columns: ["element_id"]
+            isOneToOne: false
+            referencedRelation: "elements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automations: {
+        Row: {
+          activity_space_id: string
+          created_at: string
+          cron: string | null
+          definition_id: string
+          enabled: boolean
+          id: string
+          kind: string
+          last_error: string | null
+          last_fired_at: string | null
+          last_status: string | null
+          name: string
+          next_run_at: string | null
+          object_id: string
+          owner_id: string
+          timezone: string
+          token_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_space_id: string
+          created_at?: string
+          cron?: string | null
+          definition_id: string
+          enabled?: boolean
+          id?: string
+          kind: string
+          last_error?: string | null
+          last_fired_at?: string | null
+          last_status?: string | null
+          name: string
+          next_run_at?: string | null
+          object_id: string
+          owner_id?: string
+          timezone?: string
+          token_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_space_id?: string
+          created_at?: string
+          cron?: string | null
+          definition_id?: string
+          enabled?: boolean
+          id?: string
+          kind?: string
+          last_error?: string | null
+          last_fired_at?: string | null
+          last_status?: string | null
+          name?: string
+          next_run_at?: string | null
+          object_id?: string
+          owner_id?: string
+          timezone?: string
+          token_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automations_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automations_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automations_object_id_fkey"
+            columns: ["object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attachment_texts: {
         Row: {
           attachment_id: string
@@ -5306,6 +5456,7 @@ export type Database = {
         Returns: Json
       }
       board_presence_allowed: { Args: { p_topic: string }; Returns: boolean }
+      automation_tick_ok: { Args: { p_token: string }; Returns: boolean }
       can_edit_domain_approaches: {
         Args: { p_domain_id: string }
         Returns: boolean
