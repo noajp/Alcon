@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyTerms, reviewWithSkills, type Skill } from "@/ActivitySpace/sustainment/slides/kata/model/skill";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
+import { applyTerms, reviewWithSkills, type Skill } from "@/ActivitySpace/artifacts/slides/kata/model/skill";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
 
 const sk: Skill = { id: "a", name: "社内", enabled: true, terms: [{ from: "会員", to: "メンバー" }], banned: ["食卓"], maxTitle: 30 };
 
@@ -20,7 +20,7 @@ describe("skill", () => {
   });
 });
 
-import { respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
+import { respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
 describe("chat × skill", () => {
   it("「用語をそろえて」でスキルの用語に直す", () => {
     const r = respondLocally(SAMPLE_DECK, 0, "用語をそろえて", [sk]);
@@ -28,10 +28,10 @@ describe("chat × skill", () => {
   });
 });
 
-import { paletteFromPixels } from "@/ActivitySpace/sustainment/slides/kata/theme/custom";
-import { contrast } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
-import { reviewDeck } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { titleLimit } from "@/ActivitySpace/sustainment/slides/kata/model/skill";
+import { paletteFromPixels } from "@/ActivitySpace/artifacts/slides/kata/theme/custom";
+import { contrast } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
+import { reviewDeck } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { titleLimit } from "@/ActivitySpace/artifacts/slides/kata/model/skill";
 
 describe("スキルのレビュー指摘の再発防止", () => {
   const deck = { ...SAMPLE_DECK, slides: SAMPLE_DECK.slides.map((s, i) => (i === 2 ? { ...s, title: "法人の課題と法人顧客の声", role: "要約" } : s)) };

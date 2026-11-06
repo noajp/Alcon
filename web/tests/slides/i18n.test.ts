@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { setLang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
-import { ISSUES, respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
-import { reviewDeck, reviewSlide } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import type { Slide } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import { setLang } from "@/ActivitySpace/artifacts/slides/kata/i18n";
+import { ISSUES, respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
+import { reviewDeck, reviewSlide } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import type { Slide } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 // 英語で表示しているときの、チャットの頼み方と赤入れの文
 beforeAll(() => setLang("en"));

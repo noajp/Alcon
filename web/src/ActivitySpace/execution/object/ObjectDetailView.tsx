@@ -15,14 +15,14 @@ import {
 } from '@/hooks/useSupabase';
 import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
-import { TabBar } from '@/shell/TabBar';
+import { TabBar } from '@/Frame/TabBar';
 import { bulkSetAssignee } from '@/hooks/bulkAssign';
-import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
+import { CalendarView } from '@/ActivitySpace/calendar/CalendarView';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
 import { GanttView } from '@/ActivitySpace/execution/element/gantt';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
-import { ResourceView } from '@/ActivitySpace/sustainment/workload/ResourceView';
+import { ResourceView } from '@/ActivitySpace/people/workload/ResourceView';
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { useCustomColumns } from '@/Function/property/useCustomColumns';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';

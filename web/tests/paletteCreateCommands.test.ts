@@ -12,7 +12,7 @@ import {
   filterCreateCommands,
   matchesCreateCommand,
   type CreateCommandId,
-} from '@/shell/paletteCreateCommands';
+} from '@/Frame/paletteCreateCommands';
 
 const ids = (specs: { id: CreateCommandId }[]) => specs.map((s) => s.id);
 

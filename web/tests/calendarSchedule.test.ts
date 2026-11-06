@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries, filterByWorkers, miniMonthDays, monthOf, shiftMonth, layoutWeekSpans } from '../src/ActivitySpace/sustainment/calendar/schedule';
+import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries, filterByWorkers, miniMonthDays, monthOf, shiftMonth, layoutWeekSpans } from '../src/ActivitySpace/calendar/schedule';
 import type { AlconObjectWithChildren, ElementWithDetails } from '../src/types/database';
 
 const element = (id: string) => ({ id, title: id, start_date: '2026-09-06', due_date: '2026-09-08' } as ElementWithDetails);

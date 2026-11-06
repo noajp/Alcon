@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { CalendarView } from '@/ActivitySpace/sustainment/calendar/CalendarView';
-import { CalendarScopePicker, type CalendarSelection } from '@/ActivitySpace/sustainment/calendar/CalendarScopePicker';
-import { filterByWorkers, selectCalendarScope } from '@/ActivitySpace/sustainment/calendar/schedule';
-import { setCalendarDay, setCalendarWorkerIds, useCalendarDay, useHiddenCalendarWorkers } from '@/ActivitySpace/sustainment/calendar/calendarStore';
+import { CalendarView } from '@/ActivitySpace/calendar/CalendarView';
+import { CalendarScopePicker, type CalendarSelection } from '@/ActivitySpace/calendar/CalendarScopePicker';
+import { filterByWorkers, selectCalendarScope } from '@/ActivitySpace/calendar/schedule';
+import { setCalendarDay, setCalendarWorkerIds, useCalendarDay, useHiddenCalendarWorkers } from '@/ActivitySpace/calendar/calendarStore';
 import { parseDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
-import { NavCalendarIcon } from '@/shell/sidebar/NavIcons';
+import { NavCalendarIcon } from '@/Frame/sidebar/NavIcons';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
 import { fetchMyElements } from '@/hooks/myElementsData';

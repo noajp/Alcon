@@ -9,7 +9,7 @@ import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { useDomains } from '@/hooks/domainData';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import { objectDomainRoute } from '@/shell/navigationState';
+import { objectDomainRoute } from '@/Frame/navigationState';
 import { useCurrentUserId } from '@/providers/authContext';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';

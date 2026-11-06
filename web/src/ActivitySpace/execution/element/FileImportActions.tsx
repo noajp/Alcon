@@ -13,9 +13,9 @@ import { officeKindOf } from '@/Function/office/officePreview';
 import { tableFromSheet } from '@/Function/office/sheetToTable';
 import { docToNoteHtml } from '@/Function/office/docToNote';
 import { createNoteFile } from '@/hooks/useNotesDb';
-import { deckFromPptx } from '@/ActivitySpace/sustainment/slides/kata/model/fromPptx';
-import type { Deck } from '@/ActivitySpace/sustainment/slides/kata/model/types';
-import { requestNewDeck } from '@/ActivitySpace/sustainment/slides/newDeckRequest';
+import { deckFromPptx } from '@/ActivitySpace/artifacts/slides/kata/model/fromPptx';
+import type { Deck } from '@/ActivitySpace/artifacts/slides/kata/model/types';
+import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
 import { importDataTable } from '@/hooks/tableData';
 import { attachmentSource, type Attachment } from '@/hooks/attachmentData';
 

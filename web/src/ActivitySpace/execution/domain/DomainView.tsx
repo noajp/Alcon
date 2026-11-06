@@ -9,12 +9,12 @@ import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { Plus } from '@/ui/icons';
-import { TabBar } from '@/shell/TabBar';
+import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from '@/ActivitySpace/execution/object/ObjectDetailView';
 import { ObjectActionsMenu } from '@/ActivitySpace/execution/object/ObjectActionsMenu';
@@ -34,7 +34,7 @@ import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { FollowButton } from '@/Function/shared/FollowButton';
 import { useDomains } from '@/hooks/useSupabase';
@@ -53,8 +53,8 @@ function TabLoading() {
   return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
 }
 const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
-const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
-const ResourceView = dynamic(() => import('@/ActivitySpace/sustainment/workload/ResourceView').then((m) => m.ResourceView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const ResourceView = dynamic(() => import('@/ActivitySpace/people/workload/ResourceView').then((m) => m.ResourceView), { ssr: false, loading: () => <TabLoading /> });
 const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
 
 

@@ -8,7 +8,7 @@ import { ActionsButton, ActionsContextMenu, type ActionItem } from '@/Function/s
 import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverAnchor } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
-import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useSpaceRole } from '@/Function/space/data';

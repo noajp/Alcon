@@ -6,7 +6,7 @@ import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, User
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/ui/tooltip';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,

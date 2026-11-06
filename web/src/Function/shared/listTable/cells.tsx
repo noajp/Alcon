@@ -14,7 +14,7 @@ import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hook
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import type { Json } from '@/types/database';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { QuickDates } from '@/Function/shared/date/QuickDates';
 import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';

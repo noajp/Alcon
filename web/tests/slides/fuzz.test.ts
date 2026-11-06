@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { planDeck } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
-import { respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
-import { switchLayout, LAYOUTS } from "@/ActivitySpace/sustainment/slides/kata/model/layouts";
-import { reviewDeck } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { effectiveRoles } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
+import { planDeck } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
+import { respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
+import { switchLayout, LAYOUTS } from "@/ActivitySpace/artifacts/slides/kata/model/layouts";
+import { reviewDeck } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { effectiveRoles } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
 
 // 決まった乱数で、いろいろな形の文章とチャットを流し、落ちないこと・形が崩れないことを確かめる
 function rng(seed: number) {

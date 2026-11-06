@@ -11,8 +11,8 @@ import {
   type ElementWithDetails,
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
-import { ObjectIcon } from '@/shell/icons';
-import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { ObjectIcon } from '@/Frame/icons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { EmptyState } from '@/Function/shared/EmptyState';

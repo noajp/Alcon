@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, customPresetFor, darkIconFor, filterPresets, installedPresetIds,
   isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
-} from '@/Function/integrations/catalog';
+} from '@/AIP/connectors/catalog';
 
 import { existsSync } from 'node:fs';
 

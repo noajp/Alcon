@@ -7,7 +7,7 @@ import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { useIntegrations } from '@/Function/integrations/data';
+import { useIntegrations } from '@/AIP/connectors/data';
 import { agentModelDraft, agentModelPatch } from '@/Function/team/agentModel';
 import { updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';

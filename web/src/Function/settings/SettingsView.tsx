@@ -13,7 +13,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { SlaSettings } from './SlaSettings';
 import { LabelSettings } from './LabelSettings';
 import { ElementTemplateSettings } from './ElementTemplateSettings';
-import { IntegrationsSettings } from '@/Function/integrations/IntegrationsSettings';
+import { IntegrationsSettings } from '@/AIP/connectors/IntegrationsSettings';
 import { useActiveSpaceScope } from '@/Function/space/data';
 import { settingsInScope } from '@/Function/space/spaceScope';
 import { useActiveSettingsSection, useActiveSettingsTab, setActiveSettingsSection, SETTINGS_ITEMS, SETTINGS_ITEM_TITLES } from './settingsNav';

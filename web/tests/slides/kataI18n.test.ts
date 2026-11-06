@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { KATA_TRANSLATIONS } from "@/ActivitySpace/sustainment/slides/kata/kataMessages";
+import { KATA_TRANSLATIONS } from "@/ActivitySpace/artifacts/slides/kata/kataMessages";
 import { MESSAGES } from "@/Function/i18n/messages";
 
 // Slides の画面の文は tx("日本語", "English") で書く。韓国語・フランス語・スペイン語は
 // 英語の文をキーに辞書から引くので、書いた英語がすべて辞書にあることを確かめる。
 // ほかの画面と同じ意味の語（Cancel など）はアプリ共通の辞書にあればよい。
-const ROOT = path.resolve(__dirname, "../../src/ActivitySpace/sustainment/slides/kata");
+const ROOT = path.resolve(__dirname, "../../src/ActivitySpace/artifacts/slides/kata");
 
 function sources(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

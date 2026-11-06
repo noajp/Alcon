@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeNavigation, navigationAfterDomainChange, navigationForView, objectDomainRoute } from '@/shell/navigationState';
+import { mergeNavigation, navigationAfterDomainChange, navigationForView, objectDomainRoute } from '@/Frame/navigationState';
 
 describe('An Element opened from ⌘K', () => {
   const back = { view: 'note', objectId: 'prev-obj', objectDomainId: 'current-domain', domainId: 'current-domain' };

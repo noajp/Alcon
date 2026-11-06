@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { intakeDocument, looksLikeLongDocument } from "@/ActivitySpace/sustainment/slides/kata/model/intake";
-import { planDeck } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
-import { reviewDeck } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { summaryPage } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
-import { setLang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
+import { intakeDocument, looksLikeLongDocument } from "@/ActivitySpace/artifacts/slides/kata/model/intake";
+import { planDeck } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
+import { reviewDeck } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { summaryPage } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
+import { setLang } from "@/ActivitySpace/artifacts/slides/kata/i18n";
 
 const raw = fs.readFileSync("tests/slides/fixtures/pdf-plan.txt", "utf8");
 
@@ -87,7 +87,7 @@ describe("長い文書は、章ごとに中扉を立てて組む", () => {
 const real = `${process.env.HOME}/Documents/2025-National-Security-Strategy.pdf`;
 describe.skipIf(!fs.existsSync(real))("実物の PDF（手元にあるときだけ）", () => {
   it("章と地域を読み取り、20枚前後に組む", async () => {
-    const { pdfToText } = await import("@/ActivitySpace/sustainment/slides/kata/model/pdf");
+    const { pdfToText } = await import("@/ActivitySpace/artifacts/slides/kata/model/pdf");
     const { text } = await pdfToText(fs.readFileSync(real).buffer as ArrayBuffer);
     const deck = planDeck(intakeDocument(text).markdown);
     expect(deck.slides.length).toBeGreaterThanOrEqual(16);
@@ -96,9 +96,9 @@ describe.skipIf(!fs.existsSync(real))("実物の PDF（手元にあるときだ�
   }, 30000);
 });
 
-import { fromKataJson, toKataJson } from "@/ActivitySpace/sustainment/slides/kata/model/kataFile";
-import { remapRefs } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
-import { respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
+import { fromKataJson, toKataJson } from "@/ActivitySpace/artifacts/slides/kata/model/kataFile";
+import { remapRefs } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
+import { respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
 
 describe("レビューの指摘（取り込みの誤爆・ページの参照・壊れたファイル）", () => {
   it("折り返したマークダウンのメモや番号の箇条は、PDF の文として扱わない", () => {

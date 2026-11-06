@@ -6,7 +6,7 @@ import { useStrategies } from '@/hooks/useSupabase';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import { useInitiativeIntentContext } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import { isMeasure } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
-import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import {
   measureStateLabel,
   targetLabel,

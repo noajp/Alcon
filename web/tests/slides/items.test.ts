@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canChange, changeItems, itemCount } from "@/ActivitySpace/sustainment/slides/kata/model/items";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
+import { canChange, changeItems, itemCount } from "@/ActivitySpace/artifacts/slides/kata/model/items";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
 
 const cmp = SAMPLE_DECK.slides.find((s) => s.id === "s_r2")!;
 const steps = SAMPLE_DECK.slides.find((s) => s.layout === "steps")!;

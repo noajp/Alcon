@@ -2,7 +2,7 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { WorkspaceActionsProvider, useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+import { WorkspaceActionsProvider, useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 afterEach(cleanup);
 

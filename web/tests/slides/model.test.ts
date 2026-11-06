@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { rolesFor } from "@/ActivitySpace/sustainment/slides/kata/model/storyline";
-import { atomsOf, switchLayout } from "@/ActivitySpace/sustainment/slides/kata/model/layouts";
-import { moveSlide, deleteSlide, effectiveRoles } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
-import { planDeck, toClaim, parseDoc } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import { assignSources, mixWarnings, mixTokens, toggleLook } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
-import { LOOK_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/theme/looks";
+import { rolesFor } from "@/ActivitySpace/artifacts/slides/kata/model/storyline";
+import { atomsOf, switchLayout } from "@/ActivitySpace/artifacts/slides/kata/model/layouts";
+import { moveSlide, deleteSlide, effectiveRoles } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
+import { planDeck, toClaim, parseDoc } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import { assignSources, mixWarnings, mixTokens, toggleLook } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
+import { LOOK_BY_ID } from "@/ActivitySpace/artifacts/slides/kata/theme/looks";
 
 describe("rolesFor", () => {
   it("表紙・導入・本体・結びの順で枚数ぶん割り振る", () => {
@@ -148,7 +148,7 @@ describe("planner（週次報告）", () => {
   });
 });
 
-import { sectionText } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
+import { sectionText } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
 describe("出どころ", () => {
   it("見出しの節の本文を取り出す", () => {
     const md = fs.readFileSync("tests/slides/fixtures/minutes.md", "utf8");

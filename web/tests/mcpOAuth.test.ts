@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   authorizationIdFrom, mergeConnectedApps, redirectHost, safeRedirectUrl,
-} from '../src/Function/oauth/connectedApps';
+} from '../src/AIP/connectors/oauth/connectedApps';
 
 // MCP over OAuth (ELE_PLT-004, ADR 0034): discovery, the token classifier,
 // the record's name, and the consent / connected-apps helpers.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chartContent, deckFromPptx, hexOf } from '@/ActivitySpace/sustainment/slides/kata/model/fromPptx';
-import { fromKataJson, toKataJson } from '@/ActivitySpace/sustainment/slides/kata/model/kataFile';
+import { chartContent, deckFromPptx, hexOf } from '@/ActivitySpace/artifacts/slides/kata/model/fromPptx';
+import { fromKataJson, toKataJson } from '@/ActivitySpace/artifacts/slides/kata/model/kataFile';
 import type { Deck as PptxDeck, DeckItem, TextBody } from '@/Function/office/deckLayout';
 import type { ChartData, ChartSeries } from '@/Function/office/chartLayout';
 

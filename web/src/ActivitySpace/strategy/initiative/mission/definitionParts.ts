@@ -1,6 +1,6 @@
 // Which parts of a harness the engine will act on, for the screen, read by
 // the editor's copy of the engine's reader (sectionOf).
-import { sectionOf, type SectionKey } from '@/Function/customize/harnessDefinition';
+import { sectionOf, type SectionKey } from '@/AIP/harness/harnessDefinition';
 
 export type DefinitionPart = SectionKey;
 

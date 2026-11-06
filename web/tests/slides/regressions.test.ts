@@ -1,11 +1,11 @@
-import { seedWorkspace } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
+import { seedWorkspace } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
 import { describe, expect, it } from "vitest";
-import { respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
-import { switchLayout } from "@/ActivitySpace/sustainment/slides/kata/model/layouts";
-import { reviewSlide } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { rolesFor } from "@/ActivitySpace/sustainment/slides/kata/model/storyline";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import type { Slide } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import { respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
+import { switchLayout } from "@/ActivitySpace/artifacts/slides/kata/model/layouts";
+import { reviewSlide } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { rolesFor } from "@/ActivitySpace/artifacts/slides/kata/model/storyline";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import type { Slide } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 describe("レビュー指摘の再発防止", () => {
   it("「この1枚を比較にして」は絞り込みではなく型の変更", () => {
@@ -42,7 +42,7 @@ describe("レビュー指摘の再発防止", () => {
   });
 });
 
-import { planDeck, pickFigure, extractAsks } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
+import { planDeck, pickFigure, extractAsks } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
 
 describe("再レビュー指摘の再発防止", () => {
   it("中身の無い見出しは空のページにしない", () => {
@@ -75,7 +75,7 @@ describe("再レビュー指摘の再発防止", () => {
   });
 });
 
-import { ISSUES } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
+import { ISSUES } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
 describe("論点の置き方", () => {
   it("論点を選ぶと語る順番が変わる", () => {
     for (const x of ISSUES) {
@@ -86,10 +86,10 @@ describe("論点の置き方", () => {
   });
 });
 
-import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
-import { mixTokens } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
-import { LOOK_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/theme/looks";
-import { effectiveRoles } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
+import { exportPptx } from "@/ActivitySpace/artifacts/slides/kata/export/pptx";
+import { mixTokens } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
+import { LOOK_BY_ID } from "@/ActivitySpace/artifacts/slides/kata/theme/looks";
+import { effectiveRoles } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
 import nodeFs from "node:fs";
 describe("2×2", () => {
   it("チャットで2×2にでき、行き来しても元の比較が戻り、書き出せる", async () => {
@@ -117,8 +117,8 @@ describe("第3レビューの再発防止", () => {
   });
 });
 
-import { normalizeSlide } from "@/ActivitySpace/sustainment/slides/kata/model/layouts";
-import { tokensFromTheme } from "@/ActivitySpace/sustainment/slides/kata/theme/pptxTheme";
+import { normalizeSlide } from "@/ActivitySpace/artifacts/slides/kata/model/layouts";
+import { tokensFromTheme } from "@/ActivitySpace/artifacts/slides/kata/theme/pptxTheme";
 describe("第4レビューの再発防止", () => {
   it("AI から来た 2×2 は4象限にそろえ、推しを範囲に収める", () => {
     const s = normalizeSlide({ id: "a", title: "t", layout: "matrix", content: { matrix: { x: { low: "", high: "" }, y: { low: "", high: "" }, cells: [{ head: "a", body: "" }, { head: "b", body: "" }], highlight: 7 } } });
@@ -154,7 +154,7 @@ describe("第5レビューの再発防止", () => {
   });
 });
 
-import { sectionText as secText } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
+import { sectionText as secText } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
 describe("第6レビューの再発防止", () => {
   it("締めの見出しの言い換えも締めとみなす", () => {
     for (const h of ["お願い事項", "宿題事項", "アクションアイテム", "今後の進め方について", "次のアクション（担当・期日）", "今後のスケジュール", "今後の対応", "決めてほしいこと"]) {
@@ -174,7 +174,7 @@ describe("第6レビューの再発防止", () => {
   });
 });
 
-import { useKata } from "@/ActivitySpace/sustainment/slides/kata/store/useKata";
+import { useKata } from "@/ActivitySpace/artifacts/slides/kata/store/useKata";
 describe("取り消しと出どころ", () => {
   it("取り消すと、デッキと一緒に元の文章も戻る", () => {
     // Decks load from the Space in the app; here the seed workspace stands in for one.
@@ -201,7 +201,7 @@ describe("PM 指摘の再発防止", () => {
   });
 });
 
-import { isNumericHead } from "@/ActivitySpace/sustainment/slides/kata/model/figure";
+import { isNumericHead } from "@/ActivitySpace/artifacts/slides/kata/model/figure";
 describe("第8レビューの再発防止", () => {
   it("数字の見出しの判定", () => {
     for (const t of ["約3.8万社", "月120件", "年460億円", "+20%", "▲3%", "62%", "1.3倍"]) expect(isNumericHead(t), t).toBe(true);

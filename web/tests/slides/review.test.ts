@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { reviewDeck, reviewSlide } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import { compressDeck, respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
-import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
-import { mixTokens } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
-import { LOOK_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/theme/looks";
-import { effectiveRoles } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
-import type { Slide } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import { reviewDeck, reviewSlide } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import { compressDeck, respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
+import { exportPptx } from "@/ActivitySpace/artifacts/slides/kata/export/pptx";
+import { mixTokens } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
+import { LOOK_BY_ID } from "@/ActivitySpace/artifacts/slides/kata/theme/looks";
+import { effectiveRoles } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
+import type { Slide } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 const base: Slide = { id: "x", title: "", layout: "claim3", content: { claim3: { points: [{ head: "a", body: "b" }, { head: "c", body: "d" }] } } };
 
@@ -71,7 +71,7 @@ describe("pptx", () => {
   }, 30000);
 });
 
-import { fitSize } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
+import { fitSize } from "@/ActivitySpace/artifacts/slides/kata/export/pptx";
 describe("pptx fitSize", () => {
   it("短い文はそのまま、長い文は縮める", () => {
     expect(fitSize("短い", 300, 40, 20)).toBe(20);

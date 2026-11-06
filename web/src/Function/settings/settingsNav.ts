@@ -7,7 +7,7 @@ import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIc
 import {
   NavStrategyIcon, NavPhaseIcon,
   NavNoteIcon, NavTableIcon, NavTeamsIcon, NavCalendarIcon, NavWorkloadIcon,
-} from '@/shell/sidebar/NavIcons';
+} from '@/Frame/sidebar/NavIcons';
 
 // Shared Settings navigation model + a tiny external store for the active
 // page. The settings nav lives in the AppSidebar (replacing the Activity

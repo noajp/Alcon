@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { getLang, setLang, setUiLocale, tx } from "@/ActivitySpace/sustainment/slides/kata/i18n";
-import { consistentUnit, guessKind, looksLikeBridge, unitOf, waterfallSteps } from "@/ActivitySpace/sustainment/slides/kata/model/chart";
-import { looksLikeDocument, respondLocally } from "@/ActivitySpace/sustainment/slides/kata/model/chat";
-import { moveSlide, summaryPage } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
-import { planDeck } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
-import { reviewChartsAndVolume } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import type { Deck, Slide } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import { getLang, setLang, setUiLocale, tx } from "@/ActivitySpace/artifacts/slides/kata/i18n";
+import { consistentUnit, guessKind, looksLikeBridge, unitOf, waterfallSteps } from "@/ActivitySpace/artifacts/slides/kata/model/chart";
+import { looksLikeDocument, respondLocally } from "@/ActivitySpace/artifacts/slides/kata/model/chat";
+import { moveSlide, summaryPage } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
+import { planDeck } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
+import { reviewChartsAndVolume } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import type { Deck, Slide } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 // レビューで見つかった不具合の再発防止
 afterEach(() => setLang("ja"));

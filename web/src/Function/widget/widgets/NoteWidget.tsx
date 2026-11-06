@@ -5,8 +5,8 @@ import { Plus } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useNoteHeader } from '@/hooks/useNotesDb';
-import { NotePicker } from '@/ActivitySpace/sustainment/notebook/NotePicker';
-import { LinkedNoteEmbed } from '@/ActivitySpace/sustainment/notebook/LinkedNoteEmbed';
+import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
+import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';
 import { useWidgetMeta } from '../WidgetFrame';
 import type { WidgetProps } from '../types';
 

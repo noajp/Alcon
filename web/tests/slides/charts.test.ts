@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
-import { mixTokens } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
-import { LOOK_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/theme/looks";
-import { effectiveRoles } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
-import { guessKind, parseNumber, waterfallSteps } from "@/ActivitySpace/sustainment/slides/kata/model/chart";
-import { switchLayout } from "@/ActivitySpace/sustainment/slides/kata/model/layouts";
-import { SAMPLE_DECK } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import type { ChartKind, Deck } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import { exportPptx } from "@/ActivitySpace/artifacts/slides/kata/export/pptx";
+import { mixTokens } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
+import { LOOK_BY_ID } from "@/ActivitySpace/artifacts/slides/kata/theme/looks";
+import { effectiveRoles } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
+import { guessKind, parseNumber, waterfallSteps } from "@/ActivitySpace/artifacts/slides/kata/model/chart";
+import { switchLayout } from "@/ActivitySpace/artifacts/slides/kata/model/layouts";
+import { SAMPLE_DECK } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import type { ChartKind, Deck } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 describe("charts", () => {
   it("数を読む", () => {
@@ -58,7 +58,7 @@ describe("charts", () => {
   }, 30000);
 });
 
-import { mixWarnings } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
+import { mixWarnings } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
 describe("色覚への配慮", () => {
   it("色味だけで分かれた強調色と数字の地を警告する", () => {
     const t = { ...LOOK_BY_ID.forest.tokens, accent: { ...LOOK_BY_ID.forest.tokens.accent, accent: "#D55E00" }, number: { block: "#009E73", num: "#FFFFFF" } };
@@ -67,7 +67,7 @@ describe("色覚への配慮", () => {
   });
 });
 
-import { planDeck } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
+import { planDeck } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
 describe("プランナーとグラフ・サマリー", () => {
   it("時間の並びの数表は推移のグラフになる", () => {
     const d = planDeck("# 報告\n\n## 売上の推移\n- 売上は3年で倍になった\n\n| 年 | 売上 |\n|---|---|\n| 2022 | 120 |\n| 2023 | 180 |\n| 2024 | 240 |\n");

@@ -8,7 +8,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { fetchObjectDomainIds } from '@/hooks/objectData';
-import { objectDomainRoute } from '@/shell/navigationState';
+import { objectDomainRoute } from '@/Frame/navigationState';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mergeFiles, sameFile } from '@/ActivitySpace/sustainment/slides/kata/model/merge';
-import type { KataFile, Slide } from '@/ActivitySpace/sustainment/slides/kata/model/types';
+import { mergeFiles, sameFile } from '@/ActivitySpace/artifacts/slides/kata/model/merge';
+import type { KataFile, Slide } from '@/ActivitySpace/artifacts/slides/kata/model/types';
 
 const slide = (id: string, title = id, extra: Partial<Slide> = {}): Slide => ({ id, title, layout: 'statement', content: { statement: { lead: '', figure: '' } }, ...extra });
 const file = (slides: Slide[], extra: Partial<KataFile> = {}): KataFile => ({

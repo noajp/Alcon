@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset } from '@/types/database';
-import { describeManifest, describeObserved, isLive, relayEnvLines, sortAssets } from '@/Function/integrations/assetModel';
+import { describeManifest, describeObserved, isLive, relayEnvLines, sortAssets } from '@/AIP/connectors/assetModel';
 
 const asset = (over: Partial<Asset>): Asset => ({
   id: over.id ?? 'a', activity_space_id: 's', name: 'x', kind: 'app', status: 'active',

@@ -1444,7 +1444,7 @@ Object.assign(ko, { 'Views': '보기', 'Overview': '개요', 'Properties': '속�
 Object.assign(fr, { 'Views': 'Vues', 'Overview': 'Aperçu', 'Properties': 'Propriétés', 'Description': 'Description', 'Hide this view': 'Masquer cette vue', 'Show a view': 'Afficher une vue', '{n} days': '{n} jours' });
 Object.assign(es, { 'Views': 'Vistas', 'Overview': 'Resumen', 'Properties': 'Propiedades', 'Description': 'Descripción', 'Hide this view': 'Ocultar esta vista', 'Show a view': 'Mostrar una vista', '{n} days': '{n} días' });
 
-// Slides (ActivitySpace/sustainment/slides): its sidebar. The app name stays English.
+// Slides (ActivitySpace/artifacts/slides): its sidebar. The app name stays English.
 Object.assign(ja, { 'In the open deck’s folder, or the first one': '開いている資料のフォルダ（なければ最初のフォルダ）に', 'A place to keep decks together': '資料をまとめて置く場所', 'A .kata.json file, as a new deck': '.kata.json ファイルを新しい資料として', 'Slides': 'Slides', 'New deck': '新しい資料', 'Delete folder': 'フォルダを削除', 'Duplicate': '複製', 'Move to': '移動先', 'Delete deck': '資料を削除', 'New folder': '新しいフォルダ', 'Open a deck file': '資料ファイルを開く', 'My skills': 'マイ・スキル', 'Look library': '世界観ライブラリ' });
 Object.assign(ko, { 'In the open deck’s folder, or the first one': '열려 있는 자료의 폴더(없으면 첫 번째 폴더)에', 'A place to keep decks together': '자료를 모아 두는 곳', 'A .kata.json file, as a new deck': '.kata.json 파일을 새 자료로', 'Slides': 'Slides', 'New deck': '새 자료', 'Delete folder': '폴더 삭제', 'Duplicate': '복제', 'Move to': '이동', 'Delete deck': '자료 삭제', 'New folder': '새 폴더', 'Open a deck file': '자료 파일 열기', 'My skills': '내 스킬', 'Look library': '룩 라이브러리' });
 Object.assign(fr, { 'In the open deck’s folder, or the first one': 'Dans le dossier de la présentation ouverte, sinon le premier', 'A place to keep decks together': 'Un endroit pour regrouper les présentations', 'A .kata.json file, as a new deck': 'Un fichier .kata.json, comme nouvelle présentation', 'Slides': 'Slides', 'New deck': 'Nouvelle présentation', 'Delete folder': 'Supprimer le dossier', 'Duplicate': 'Dupliquer', 'Move to': 'Déplacer vers', 'Delete deck': 'Supprimer la présentation', 'New folder': 'Nouveau dossier', 'Open a deck file': 'Ouvrir un fichier de présentation', 'My skills': 'Mes compétences', 'Look library': 'Bibliothèque de styles' });
@@ -1481,7 +1481,7 @@ for (const area of [SHARED_TRANSLATIONS, WIDGET_TRANSLATIONS, STRATEGY_TRANSLATI
   Object.assign(es, area.es);
 }
 
-// People (ActivitySpace/sustainment/team). Last, so the app name stays
+// People (ActivitySpace/people). Last, so the app name stays
 // English everywhere, like every other concept name.
 Object.assign(ja, PEOPLE_TRANSLATIONS.ja);
 Object.assign(ko, PEOPLE_TRANSLATIONS.ko);
