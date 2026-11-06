@@ -1,7 +1,8 @@
 'use client';
 
+import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useDomainOverview } from '@/hooks/useDomainOverview';
-import { useBoard, WidgetSurface, WidgetZone, type WidgetHost } from '@/Function/widget';
+import { useBoard, WidgetSurface, WidgetZone, WidgetActionSlotProvider, WidgetActionSlotTarget, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
 import { DomainIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { Hash, Lock, Users } from '@/ui/icons';
@@ -42,9 +43,12 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     },
     onViewChange,
   };
-  // No header bar: it only repeated the Domain's name, which the page opens
-  // with, and held "Add widget", which now sits quietly above the widgets.
-  return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+  return <WidgetActionSlotProvider><div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+    <IslandHeader crumbs={[{ id: 'domain', label: domain.name }]} actions={<>
+      {viewOnly && <ViewOnlyBadge />}
+      {/* "Add widget" is page chrome: it sits in the header, as on Element detail. */}
+      <WidgetActionSlotTarget className="flex items-center gap-1" />
+    </>} />
     <div className="min-h-0 flex-1 overflow-y-auto">
       <PageLayout rail={
         <RailCard title={t('Properties')}>
@@ -60,7 +64,6 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
           <RailRow icon={<NavStrategyIcon size={14} />} name="Strategies" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
         </RailCard>
       }>
-        {viewOnly && <div className="flex justify-end"><ViewOnlyBadge /></div>}
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>{t('Unable to refresh this Domain. Showing the last loaded data; drafts are retained.')}</p><Button variant="ghost" onClick={() => void query.refetch()}>{t('Retry')}</Button></div>}
         {/* The spine — icon, title, description — is what Element detail opens
             with; the Domain's own readings and relationships sit below it, its
@@ -77,7 +80,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
         </WidgetSurface>
       </PageLayout>
     </div>
-  </div>;
+  </div></WidgetActionSlotProvider>;
 }
 
 /** The Domain's icon and colour at the head of its page, picked as a
