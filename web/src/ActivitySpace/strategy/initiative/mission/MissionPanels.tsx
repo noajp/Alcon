@@ -56,10 +56,10 @@ export function stateColor(state: ActionState): string {
 
 export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-border/60 px-3 py-2.5">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-[20px] font-semibold tabular-nums text-foreground">{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+    <div className="flex flex-col rounded-md border border-[var(--border-subtle)] px-3 py-2.5">
+      <div className="truncate text-[11px] leading-4 text-muted-foreground" title={label}>{label}</div>
+      <div className="mt-1.5 text-[22px] font-semibold leading-7 tracking-tight tabular-nums text-foreground">{value}</div>
+      <div className="truncate text-[11px] leading-4 text-muted-foreground">{sub ?? '\u00a0'}</div>
     </div>
   );
 }

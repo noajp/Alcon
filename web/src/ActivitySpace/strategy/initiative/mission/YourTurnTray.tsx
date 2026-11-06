@@ -27,9 +27,11 @@ export function YourTurnTray({ items, canEdit, onOpen, onChanged }: {
   const { t } = useI18n();
   if (items.length === 0) return null;
   return (
-    <div className="space-y-0.5 border-l-2 border-[var(--status-warning)] pl-3">
-      <p className="text-[13px] font-medium text-foreground">{t('Your turn ({n})', { n: items.length })}</p>
-      <ul className="divide-y divide-border/40">
+    // Set apart from everything the AI reports: a tinted ground and the
+    // warning bar at its left, so a person's turn never reads as one more row.
+    <div className="rounded-r-md border-l-2 border-[var(--status-warning)] bg-[color-mix(in_oklab,var(--status-warning)_6%,transparent)] px-3 pb-1 pt-2.5">
+      <p className="text-[12px] font-medium text-foreground">{t('Your turn ({n})', { n: items.length })}</p>
+      <ul className="divide-y divide-[var(--border-subtle)]">
         {items.map((item) => <TurnRow key={`${item.kind}:${item.elementId}`} item={item} canEdit={canEdit} onOpen={onOpen} onChanged={onChanged} />)}
       </ul>
     </div>
@@ -101,7 +103,7 @@ function TurnRow({ item, canEdit, onOpen, onChanged }: { item: YourTurn; canEdit
         <div className="flex items-start gap-2 pl-6">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2}
             placeholder={item.kind === 'answer' ? t('Answer the AI — it picks up from here') : t('What should the AI change?')}
-            className="min-h-[44px] flex-1 resize-y rounded-md border border-border/60 bg-transparent px-2 py-1 text-[12px] outline-none focus:bg-muted/30" />
+            className="min-h-[44px] flex-1 resize-y rounded bg-background/60 px-2 py-1.5 text-[13px] outline-none focus:bg-background" />
           <Button variant="primary" size="xs" onClick={() => void send()} disabled={busy || !text.trim()}>{t('Send')}</Button>
         </div>
       )}
