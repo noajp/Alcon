@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthPage } from '@/auth/AuthPage';
-import { OAuthConsentScreen } from '@/Function/oauth/OAuthConsentScreen';
+import { OAuthConsentScreen } from '@/AIP/connectors/oauth/OAuthConsentScreen';
 import { useAuthContext } from '@/providers/AuthProvider';
 
 // The OAuth server's authorization path (ADR 0034). Signing in here keeps the

@@ -22,7 +22,7 @@ import { PriorityPicker } from '@/Function/shared/PriorityPicker';
 import { labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { NavMyTasksIcon } from '@/Frame/sidebar/NavIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import {

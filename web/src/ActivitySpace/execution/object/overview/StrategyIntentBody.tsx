@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { ChevronRight } from '@/ui/icons';
 import type { StrategyWithObjects } from '@/types/database';
-import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { extractStrategyIntent } from './strategyIntent';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 

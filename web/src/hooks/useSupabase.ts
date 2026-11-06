@@ -176,7 +176,7 @@ export {
   pingAgentRuntime,
   useAgentRun,
   type AgentStartOutcome,
-} from '@/Function/copilot/agentData';
+} from '@/AIP/ai/agentData';
 
 export {
   addIntentBinding,

@@ -141,7 +141,7 @@ describe('the web copy of the harness reader', () => {
   it('is the same file run-agent and the Planner use', async () => {
     const { readFileSync } = await import('node:fs');
     const fn = readFileSync(new URL('../../supabase/functions/_shared/definition.ts', import.meta.url), 'utf8');
-    const web = readFileSync(new URL('../src/Function/customize/harnessDefinition.ts', import.meta.url), 'utf8');
+    const web = readFileSync(new URL('../src/AIP/harness/harnessDefinition.ts', import.meta.url), 'utf8');
     expect(web).toBe(fn);
   });
 });

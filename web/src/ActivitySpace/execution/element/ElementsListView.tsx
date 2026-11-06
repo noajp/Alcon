@@ -13,7 +13,7 @@ import { useElementSelection } from '@/ActivitySpace/execution/element/useElemen
 import { BulkActionBar } from '@/ActivitySpace/execution/element/BulkActionBar';
 import { pushUndo } from '@/Function/shared/element/bulkUndo';
 import { bulkSetAssignee } from '@/hooks/bulkAssign';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
@@ -26,7 +26,7 @@ import { useAssignableWorkers } from '@/hooks/useSupabase';
 import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { ListSection } from '@/Function/shared/listTable/shared';
-import { TabBar } from '@/shell/TabBar';
+import { TabBar } from '@/Frame/TabBar';
 import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';
 import {
@@ -50,7 +50,7 @@ function TabLoading() {
   return <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground">{t('Loading…')}</div>;
 }
 const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
-const CalendarView = dynamic(() => import('@/ActivitySpace/sustainment/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
+const CalendarView = dynamic(() => import('@/ActivitySpace/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
 const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
 
 

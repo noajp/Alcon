@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveSectionSelection } from '../src/ActivitySpace/sustainment/notebook/noteTree';
+import { resolveSectionSelection } from '../src/ActivitySpace/artifacts/notebook/noteTree';
 import type { NoteNode } from '../src/types/notes';
 
 const node = (id: string, type: NoteNode['type'], parentId: string | null): NoteNode => ({ id, type, name: id, parentId, linkedObjectId: null });

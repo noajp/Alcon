@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import JSZip from "jszip";
-import { exportPptx } from "@/ActivitySpace/sustainment/slides/kata/export/pptx";
-import { mixTokens } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
-import { LOOK_BY_ID } from "@/ActivitySpace/sustainment/slides/kata/theme/looks";
-import { effectiveRoles } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
+import { exportPptx } from "@/ActivitySpace/artifacts/slides/kata/export/pptx";
+import { mixTokens } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
+import { LOOK_BY_ID } from "@/ActivitySpace/artifacts/slides/kata/theme/looks";
+import { effectiveRoles } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
 import {
   addObject,
   cssColor,
@@ -19,8 +19,8 @@ import {
   setTextStyle,
   snapMove,
   textStyleCss,
-} from "@/ActivitySpace/sustainment/slides/kata/model/objects";
-import type { Deck, Slide } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+} from "@/ActivitySpace/artifacts/slides/kata/model/objects";
+import type { Deck, Slide } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 const base: Slide = { id: "s1", title: "主張", layout: "statement", content: { statement: { lead: "a", figure: "1" } } };
 
@@ -129,7 +129,7 @@ describe("自由に置くもの", () => {
   }, 30000);
 });
 
-import { changeItems } from "@/ActivitySpace/sustainment/slides/kata/model/items";
+import { changeItems } from "@/ActivitySpace/artifacts/slides/kata/model/items";
 describe("項目を減らすと、その項目の文字の上書きも消える", () => {
   it("claim3 の最後の点の見た目は残らない", () => {
     const s: Slide = {

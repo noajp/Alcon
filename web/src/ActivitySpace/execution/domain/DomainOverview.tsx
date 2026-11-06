@@ -9,7 +9,7 @@ import { Button } from '@/ui/button';
 import { PageHead, PageLayout } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
 import { RailRow } from '@/Function/shared/RailRow';
-import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { updateDomain, useDomainRole } from '@/hooks/domainData';
 import type { NavigationState } from '@/types/navigation';
 import { ViewOnlyBadge } from '@/Function/shared/ViewOnlyBadge';

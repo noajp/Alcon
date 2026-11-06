@@ -8,11 +8,11 @@ const NO_DIRECT_QUERY = { group: ["**/lib/supabase"], importNames: ["supabase"],
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Layers: ActivitySpace/ (surfaces) stands on Function/ and hooks/, never
-  // the other way. Widgets are the exception: a widget places a surface's
+  // Layers: ActivitySpace/ (surfaces) stands on Function/, AIP/ and hooks/,
+  // never the other way. Widgets are the exception: a widget places a surface's
   // section on a board.
   {
-    files: ["src/Function/**/*.{ts,tsx}", "src/hooks/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}", "src/providers/**/*.{ts,tsx}", "src/types/**/*.{ts,tsx}"],
+    files: ["src/Function/**/*.{ts,tsx}", "src/AIP/**/*.{ts,tsx}", "src/hooks/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}", "src/providers/**/*.{ts,tsx}", "src/types/**/*.{ts,tsx}"],
     ignores: ["src/Function/widget/widgets/**"],
     rules: {
       "no-restricted-imports": ["error", {
@@ -22,24 +22,24 @@ const eslintConfig = defineConfig([
   },
   // Surfaces read and write through hooks/, so a query has one home.
   // Slides keeps the data access Kata brought with it (ADR 0042). The same
-  // holds for every UI component outside ActivitySpace/: the shell and
-  // Function/'s .tsx parts. A later block with this rule replaces an earlier
+  // holds for every UI component outside ActivitySpace/: the Frame and
+  // Function/'s and AIP/'s .tsx parts. A later block with this rule replaces an earlier
   // one's options, so Function/'s UI states both of its restrictions at once.
   {
-    files: ["src/ActivitySpace/**/*.{ts,tsx}", "src/shell/**/*.tsx", "src/Function/widget/widgets/**/*.tsx"],
-    ignores: ["src/ActivitySpace/sustainment/slides/**"],
+    files: ["src/ActivitySpace/**/*.{ts,tsx}", "src/Frame/**/*.tsx", "src/Function/widget/widgets/**/*.tsx"],
+    ignores: ["src/ActivitySpace/artifacts/slides/**"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [NO_DIRECT_QUERY] }],
     },
   },
   {
-    files: ["src/Function/**/*.tsx"],
+    files: ["src/Function/**/*.tsx", "src/AIP/**/*.tsx"],
     ignores: [
       "src/Function/widget/widgets/**",
       // Settings and OAuth consent still query directly; each comes off this
       // list when its data moves into hooks/ (the layer rule above still holds).
       "src/Function/settings/{AccountSettings,ActivitySpaceSettings,ConnectWorkerAccountDialog,InviteUserDialog,MemberSettings,ProfileSettings,TeamSettings}.tsx",
-      "src/Function/oauth/OAuthConsentScreen.tsx",
+      "src/AIP/connectors/oauth/OAuthConsentScreen.tsx",
     ],
     rules: {
       "no-restricted-imports": ["error", { patterns: [NO_SURFACE_IMPORT, NO_DIRECT_QUERY] }],

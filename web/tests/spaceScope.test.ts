@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scopedView, settingsInScope, spaceScope, viewInScope } from '@/Function/space/spaceScope';
-import { MODE_META } from '@/shell/railApps';
+import { MODE_META } from '@/Frame/railApps';
 import { SETTINGS_NAV } from '@/Function/settings/settingsNav';
 
 // What an audit Space shows (ADR 0048): the Space, People and Audit — no

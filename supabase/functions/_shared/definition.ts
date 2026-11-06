@@ -6,7 +6,7 @@
 // text the agent follows, and checks a harness before it is used
 // (checkHarness). Pure, so run-agent, the Planner, the editor and the tests
 // read a harness the same way. The editor's copy,
-// web/src/Function/customize/harnessDefinition.ts, is this file byte for
+// web/src/AIP/harness/harnessDefinition.ts, is this file byte for
 // byte (a test keeps them equal): change this one and copy it over.
 //
 //   # 目的 / Goal              what the work is for

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deckRow, diffWorkspace, fileFromRow, mergeFolders, rowFromFile, sameStamp } from '@/ActivitySpace/sustainment/slides/sync';
-import type { KataFile } from '@/ActivitySpace/sustainment/slides/kata/model/types';
+import { deckRow, diffWorkspace, fileFromRow, mergeFolders, rowFromFile, sameStamp } from '@/ActivitySpace/artifacts/slides/sync';
+import type { KataFile } from '@/ActivitySpace/artifacts/slides/kata/model/types';
 
 const file = (id: string, name = id): KataFile => ({
   id, name, folderId: 'f1',

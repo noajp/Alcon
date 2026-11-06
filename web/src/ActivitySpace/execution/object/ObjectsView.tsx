@@ -3,7 +3,7 @@
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
-import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import React, { useEffect, useState } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';

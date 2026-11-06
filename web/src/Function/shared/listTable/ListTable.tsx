@@ -12,7 +12,7 @@ import { DisplayIdChip } from '@/Function/shared/element/DisplayIdChip';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter, pointerWithin, type DragEndEvent, type DragStartEvent, type DragMoveEvent, type CollisionDetection } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, NAME_MIN_WIDTH, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';

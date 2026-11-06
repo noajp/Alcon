@@ -12,7 +12,7 @@ import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { AgentOutput, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
 import type { useAgentRun } from '@/hooks/useSupabase';
 import { approvalRows, rememberChoices, sharedColumns } from './approvalView';
-import { useIsSpaceOwner } from '@/Function/integrations/data';
+import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
 // The agent on an Element (ADR 0027): one status line for the run, its

@@ -12,7 +12,7 @@ import { MenuShell } from '@/Function/shared/menu';
 import { PageLayout } from '@/Function/shared/PageHead';
 import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { constrainTabDrag } from '@/shell/tabDrag';
+import { constrainTabDrag } from '@/Frame/tabDrag';
 import { arrangeViews, nextViewTabState, parseViewTabState, type ViewTabState } from './viewTabs';
 import { IslandHeader, type IslandCrumb } from '@/Function/shared/MainIsland';
 

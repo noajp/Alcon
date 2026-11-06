@@ -14,7 +14,7 @@ import {
   type PlanElement,
   type PlanWorker,
   type Proposal,
-} from '@/ActivitySpace/sustainment/workload/workloadRebalance';
+} from '@/ActivitySpace/people/workload/workloadRebalance';
 
 const TODAY = '2026-10-05'; // a Monday
 

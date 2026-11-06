@@ -6,7 +6,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { fetchObjectDomainIds } from '@/hooks/objectData';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { objectDomainRoute } from '@/shell/navigationState';
+import { objectDomainRoute } from '@/Frame/navigationState';
 import type { NavigationState } from '@/types/navigation';
 
 /**

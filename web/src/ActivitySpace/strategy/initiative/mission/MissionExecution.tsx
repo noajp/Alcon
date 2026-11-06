@@ -9,7 +9,7 @@ import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { PageSection } from '@/Function/shared/PageHead';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { advanceFromElement, startElementRun } from '@/Function/copilot/agentData';
+import { advanceFromElement, startElementRun } from '@/AIP/ai/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';

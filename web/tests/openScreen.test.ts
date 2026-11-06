@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openScreenFrom } from '@/shell/openScreen';
+import { openScreenFrom } from '@/Frame/openScreen';
 
 const isView = (v: string) => ['inbox', 'strategy', 'settings', 'tables'].includes(v);
 

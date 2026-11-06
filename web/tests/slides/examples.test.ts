@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { fromKataJson } from "@/ActivitySpace/sustainment/slides/kata/model/kataFile";
-import { reviewDeck } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import { setLang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
-import { summaryPage } from "@/ActivitySpace/sustainment/slides/kata/model/deck";
+import { fromKataJson } from "@/ActivitySpace/artifacts/slides/kata/model/kataFile";
+import { reviewDeck } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import { setLang } from "@/ActivitySpace/artifacts/slides/kata/i18n";
+import { summaryPage } from "@/ActivitySpace/artifacts/slides/kata/model/deck";
 
 // 見本の資料（examples/）が、開けて、赤入れに引っかからず、日本語版と英語版の構成がそろっていること
 describe("見本：米国家安全保障戦略2025（日本語版・英語版）", () => {

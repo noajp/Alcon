@@ -10,7 +10,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { ElementTypeIcon } from '@/shell/icons';
+import { ElementTypeIcon } from '@/Frame/icons';
 import {
   type ListDisplay,
   type ListGroupBy,

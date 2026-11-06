@@ -5,7 +5,7 @@ import { isHumanAction } from '@/Function/shared/elementActionKinds';
 import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { advanceFromElement, sendBackToAgent } from '@/Function/copilot/agentData';
+import { advanceFromElement, sendBackToAgent } from '@/AIP/ai/agentData';
 import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/preferencesStore';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateElement } from '@/hooks/useSupabase';

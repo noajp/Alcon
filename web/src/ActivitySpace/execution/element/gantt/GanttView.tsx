@@ -7,7 +7,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { CalendarDays, ZoomIn, ZoomOut } from '@/ui/icons';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';

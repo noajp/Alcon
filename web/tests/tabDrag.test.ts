@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { constrainTabDrag } from '../src/shell/tabDrag';
+import { constrainTabDrag } from '../src/Frame/tabDrag';
 
 const drag = (x: number, left = 100, right = 180, stripRight = 400) => constrainTabDrag({
   transform: { x, y: 200, scaleX: 1, scaleY: 1 },

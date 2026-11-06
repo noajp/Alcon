@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { presetById } from '@/Function/integrations/catalog';
-import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/Function/integrations/oauthReturn';
+import { presetById } from '@/AIP/connectors/catalog';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/AIP/connectors/oauthReturn';
 
 // Google Drive over OAuth (ADR 0035): the pure parts of integration-oauth,
 // the token refresh in resolveCredential, and the Drive request builders.

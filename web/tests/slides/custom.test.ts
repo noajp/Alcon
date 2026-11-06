@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { paletteFromPixels, deriveTokens } from "@/ActivitySpace/sustainment/slides/kata/theme/custom";
-import { contrast, mixWarnings } from "@/ActivitySpace/sustainment/slides/kata/theme/mix";
+import { paletteFromPixels, deriveTokens } from "@/ActivitySpace/artifacts/slides/kata/theme/custom";
+import { contrast, mixWarnings } from "@/ActivitySpace/artifacts/slides/kata/theme/mix";
 
 type RGB = [number, number, number];
 const fill = (c: RGB, n: number): RGB[] => Array.from({ length: n }, () => c);

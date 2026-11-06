@@ -8,7 +8,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { updateObject } from '@/hooks/useSupabase';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import { useI18n } from '@/Function/i18n/I18nProvider';

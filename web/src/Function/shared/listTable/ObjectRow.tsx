@@ -5,7 +5,7 @@ import { memo } from 'react';
 import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
-import { ObjectIcon } from '@/shell/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
 import { OBJECT_DRAG_PREFIX, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, ROW_ROUND_TO_LAST, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED, selectionSquareClass, selectionSquareClassToLast } from './shared';
 import { ObjectCell } from './cells';

@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { setLang } from "@/ActivitySpace/sustainment/slides/kata/i18n";
-import { planDeck, pickFigure, extractAsks, toClaim, sectionText } from "@/ActivitySpace/sustainment/slides/kata/model/planner";
-import { isNumericHead } from "@/ActivitySpace/sustainment/slides/kata/model/figure";
-import { SAMPLES, SAMPLES_EN, samplesFor } from "@/ActivitySpace/sustainment/slides/kata/model/samples";
-import { SAMPLE_DECK, SAMPLE_DECK_EN, seedWorkspace } from "@/ActivitySpace/sustainment/slides/kata/model/seed";
-import { reviewDeck } from "@/ActivitySpace/sustainment/slides/kata/model/review";
-import type { Deck } from "@/ActivitySpace/sustainment/slides/kata/model/types";
+import { setLang } from "@/ActivitySpace/artifacts/slides/kata/i18n";
+import { planDeck, pickFigure, extractAsks, toClaim, sectionText } from "@/ActivitySpace/artifacts/slides/kata/model/planner";
+import { isNumericHead } from "@/ActivitySpace/artifacts/slides/kata/model/figure";
+import { SAMPLES, SAMPLES_EN, samplesFor } from "@/ActivitySpace/artifacts/slides/kata/model/samples";
+import { SAMPLE_DECK, SAMPLE_DECK_EN, seedWorkspace } from "@/ActivitySpace/artifacts/slides/kata/model/seed";
+import { reviewDeck } from "@/ActivitySpace/artifacts/slides/kata/model/review";
+import type { Deck } from "@/ActivitySpace/artifacts/slides/kata/model/types";
 
 const read = (f: string) => fs.readFileSync(`tests/slides/fixtures/${f}`, "utf8");
 const words = (t: string) => t.trim().split(/\s+/).length;
