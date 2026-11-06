@@ -163,10 +163,10 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
     const holder = folderIdOf ? folderById.get(folderIdOf) : undefined;
     if (tab === 'domain') {
       const d = domains.find((x) => x.id === holder?.domain_id);
-      return d ? <WhereCell icon={<ItemIcon icon={d.icon} color={d.color} size={14} fallback={<DomainIcon size={14} />} />} name={d.name} onOpen={() => go({ tab, domainId: d.id })} /> : null;
+      return d ? <WhereCell icon={<ItemIcon icon={d.icon} color={d.color} size={12} fallback={<DomainIcon size={12} />} />} name={d.name} onOpen={() => go({ tab, domainId: d.id })} /> : null;
     }
     const o = objects.find((x) => x.id === (holder?.object_id ?? objectId));
-    return o ? <WhereCell icon={<ItemIcon icon={o.icon} color={o.color} size={14} fallback={<ObjectIcon size={14} />} />} name={o.name} onOpen={() => go({ tab, objectId: o.id })} /> : null;
+    return o ? <WhereCell icon={<ItemIcon icon={o.icon} color={o.color} size={12} fallback={<ObjectIcon size={12} />} />} name={o.name} onOpen={() => go({ tab, objectId: o.id })} /> : null;
   };
   const total = shownFolders.length + shownNotebooks.length + shownDecks.length + shownFiles.length;
 
@@ -235,7 +235,7 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
 
   const iconBtn = 'flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40';
   return (
-    <MainIsland crumbs={crumbs} count={total} actions={<>
+    <MainIsland crumbs={crumbs} actions={<>
       {searching ? (
         <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
           <Search size={12} className="shrink-0 text-muted-foreground" />
@@ -383,11 +383,14 @@ function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.Re
   );
 }
 
-/** Whose a row is (a Domain or an Object): its mark and name, opening it. */
+/** Whose a row is (a Domain or an Object): its mark and name in the same
+ *  outlined pill as a list's Object and Label chips, opening it. */
 function WhereCell({ icon, name, onOpen }: { icon: React.ReactNode; name: string; onOpen: () => void }) {
   return (
-    <span role="link" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
-      className="flex min-w-0 cursor-pointer items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground">
+    // A span, not a button: it sits inside a row that is itself a button.
+    <span role="link" tabIndex={0} onClick={(e) => { e.stopPropagation(); onOpen(); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onOpen(); } }} title={name}
+      className="inline-flex h-[22px] cursor-pointer min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--border-default)] px-2 text-[12px] font-normal text-[var(--text-secondary)] transition-colors hover:bg-foreground/[0.05] hover:text-foreground">
       <span className="shrink-0">{icon}</span>
       <span className="truncate">{name}</span>
     </span>
