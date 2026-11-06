@@ -29,6 +29,7 @@ export {
   GuidingStar,
   Spearhead,
   Layers,
+  Tiers,
   Box,
   Component,
   MessageCircle,

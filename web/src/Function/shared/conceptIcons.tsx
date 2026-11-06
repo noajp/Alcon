@@ -1,9 +1,10 @@
-import { Layers, Box, Component, MessageCircle, Files } from '@/ui/icons';
+import { Tiers, Box, Component, MessageCircle, Files } from '@/ui/icons';
 
 /**
  * Canonical concept → glyph mapping for the Execution layer's three units.
  *
- *   Domain  → Layers        (the 3-layer stack — the top-level container)
+ *   Domain  → Tiers         (three bars narrowing downward — the broad
+ *                            top-level area holding narrower ones)
  *   Object  → Box           (the mid-level structural unit)
  *   Element → Component     (the smallest executable unit)
  *   Message → MessageCircle (anything someone said: a comment, a
@@ -24,7 +25,7 @@ import { Layers, Box, Component, MessageCircle, Files } from '@/ui/icons';
  */
 type ConceptIconProps = { size?: number; strokeWidth?: number; className?: string };
 
-const makeConceptIcon = (Glyph: typeof Layers, displayName: string) => {
+const makeConceptIcon = (Glyph: typeof Tiers, displayName: string) => {
   const ConceptIcon = ({ size = 16, strokeWidth = 2, className }: ConceptIconProps) => (
     <Glyph size={size} strokeWidth={strokeWidth} className={className} />
   );
@@ -32,7 +33,7 @@ const makeConceptIcon = (Glyph: typeof Layers, displayName: string) => {
   return ConceptIcon;
 };
 
-export const DomainIcon = makeConceptIcon(Layers, 'DomainIcon');
+export const DomainIcon = makeConceptIcon(Tiers, 'DomainIcon');
 export const ObjectIcon = makeConceptIcon(Box, 'ObjectIcon');
 export const ElementIcon = makeConceptIcon(Component, 'ElementIcon');
 
