@@ -426,6 +426,12 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
   const owner = ownerOf(file);
   const trash = useTrashFile(file);
   const [ref, size] = useElementSize<HTMLDivElement>();
+  // A file at the top of a tab sits in the tab's hidden root folder: say the
+  // tab, not the root's name.
+  const holder = useFolders('files').data.find((f) => f.id === file.folder_id);
+  const where = owner.kind === 'folder' && holder?.is_root
+    ? `${t('Artifacts')} · ${t(TABS.find((x) => x.id === TAB_OF[holder.scope])?.label ?? 'Space')}`
+    : `${t(OWNER_LABEL[owner.kind])} · ${file.owner_label ?? '—'}`;
   return (
     <aside className="flex w-[min(58%,880px)] shrink-0 flex-col border-l border-border/60">
       <div className="flex shrink-0 items-start gap-2 px-4 pb-2 pt-4">
@@ -434,7 +440,7 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
           <div className="truncate text-[14px] font-medium text-foreground" title={file.name}>{file.name}</div>
           <button type="button" onClick={() => openAttachmentOwner(file)} title={t('Open where it is attached')}
             className="group/owner mt-0.5 flex max-w-full items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground">
-            <span className="truncate">{t(OWNER_LABEL[owner.kind])} · {file.owner_label ?? '—'}</span>
+            <span className="truncate">{where}</span>
             <ArrowUpRight size={12} className="shrink-0 opacity-60 group-hover/owner:opacity-100" />
             <span className="shrink-0 text-muted-foreground/70">· {who} · {formatAge(file.created_at, true)}</span>
           </button>
@@ -470,7 +476,7 @@ function TrashList({ onBack }: { onBack: () => void }) {
   const { t } = useI18n();
   const { data: files, loading } = useSpaceAttachments(useActiveSpaceId(), true);
   return (
-    <MainIsland crumbs={[{ id: 'artifacts', label: t('Artifacts'), onClick: onBack }, { id: 'trash', label: t('Deleted') }]} count={files.length}
+    <MainIsland crumbs={[{ id: 'artifacts', label: t('Artifacts'), onClick: onBack }, { id: 'trash', label: t('Deleted') }]}
       actions={<span className="pr-1 text-[12px] text-muted-foreground">{t('Removed files can be restored for {days} days, then they are erased.', { days: TRASH_DAYS })}</span>}>
       <IslandColumns>
         <span className="min-w-0 flex-1">{t('Name')}</span>

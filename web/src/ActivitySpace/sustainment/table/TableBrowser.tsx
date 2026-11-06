@@ -36,7 +36,6 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
   const domainName = useSustainmentDomains().data.find((d) => d.id === domainId)?.name ?? '';
   const domainFolders = useFolders('tables', domainId).data;
   const folder = domainFolders.find((f) => f.id === browse.folderId) ?? null;
-  const folderCount = domainFolders.length;
   const inDomain = useMemo(() => (domainId ? tables.filter((tb) => tb.domain_id === domainId) : tables), [tables, domainId]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -70,7 +69,7 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
     </div>
   ));
   const listPage = (crumbs: IslandCrumb[], list: DataTableWithRowCount[], empty: string, actions?: React.ReactNode) => (
-    <MainIsland crumbs={crumbs} count={list.length} actions={actions}>
+    <MainIsland crumbs={crumbs} actions={actions}>
       <IslandColumns>
         <span className="min-w-0 flex-1">{t('Name')}</span>
         <span className="w-20 shrink-0 text-right">{t('Rows')}</span>
@@ -89,7 +88,7 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
   }
   if (browse.view === 'folders') {
     return (
-      <MainIsland crumbs={path({ id: 'folders', label: t('Folders') })} count={folderCount} actions={newFolder}>
+      <MainIsland crumbs={path({ id: 'folders', label: t('Folders') })} actions={newFolder}>
         <FolderList app="tables" domainId={domainId} counts={counts} onOpen={openFolder} />
       </MainIsland>
     );
