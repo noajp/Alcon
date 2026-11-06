@@ -82,11 +82,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     accepts: ['initiative', 'object'], zones: ['main', 'rail'], singleton: true, defaultSize: 'full',
     load: async () => (await import('./widgets/ApproachReferencesWidget')).ApproachReferencesWidget,
   },
-  'domain-objects': {
-    type: 'domain-objects', label: 'Objects', description: 'The Objects in this Domain', group: 'related',
-    accepts: ['domain'], zones: ['main'], singleton: true, defaultSize: 'full',
-    load: async () => (await import('./widgets/DomainObjectsWidget')).DomainObjectsWidget,
-  },
   'initiative-domains': {
     type: 'initiative-domains', label: 'Related Domains', description: 'The Domains whose Objects carry this Strategy', group: 'related',
     accepts: ['initiative'], zones: ['main'], singleton: true, defaultSize: 'full',

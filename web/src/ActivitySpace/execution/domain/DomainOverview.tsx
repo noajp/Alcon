@@ -17,6 +17,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import type { Domain } from '@/types/database';
 
+/** The Domain's Overview tab, under the Domain page's header and tabs
+ *  (DomainView): no header of its own, and "Add widget" goes to the tab bar. */
 export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   domainId: string | null;
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -42,23 +44,23 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     },
     onViewChange,
   };
-  // No header bar: it only repeated the Domain's name, which the page opens
-  // with, and held "Add widget", which now sits quietly above the widgets.
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+    {viewOnly && <div className="flex justify-end px-4 pt-2"><ViewOnlyBadge /></div>}
     <div className="min-h-0 flex-1 overflow-y-auto">
       <PageLayout rail={
         <RailCard title={t('Properties')}>
           <RailRow icon={domain.privacy === 'private' ? <Lock className="size-3.5 text-muted-foreground" /> : <Users className="size-3.5 text-muted-foreground" />}
             name={t('Access')} label={domain.privacy === 'private' ? t('Private') : 'Space'} dense />
           {domain.identifier && <RailRow icon={<Hash className="size-3.5 text-muted-foreground" />} name={t('Identifier')} label={domain.identifier} dense />}
-          <RailRow icon={<ObjectIcon size={14} />} name="Objects" label={String(explorer.objects.length)} dense />
+          <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>
+            <RailRow icon={<ObjectIcon size={14} />} name="Objects" label={String(explorer.objects.length)} dense />
+          </button>
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>
             <RailRow icon={<ElementIcon size={14} />} name="Elements" label={String(elements.length)} dense />
           </button>
           <RailRow icon={<NavStrategyIcon size={14} />} name="Strategies" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
         </RailCard>
       }>
-        {viewOnly && <div className="flex justify-end"><ViewOnlyBadge /></div>}
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>{t('Unable to refresh this Domain. Showing the last loaded data; drafts are retained.')}</p><Button variant="ghost" onClick={() => void query.refetch()}>{t('Retry')}</Button></div>}
         {/* The spine — icon, title, description — is what Element detail opens
             with; the Domain's own readings and relationships sit below it, its

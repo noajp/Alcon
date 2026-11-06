@@ -82,11 +82,6 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
   rail: [],
 };
 
-/** Domain identity is the spine; execution and strategic relationships are movable. */
-export const DOMAIN_OVERVIEW_BOARD: BoardLayout = {
-  band: [],
-  main: [
-    { id: 'domain-objects', type: 'domain-objects' },
-  ],
-  rail: [],
-};
+/** A Domain's Overview is its identity; its Objects are the All Objects tab.
+ *  Widgets are what someone adds. */
+export const DOMAIN_OVERVIEW_BOARD: BoardLayout = { band: [], main: [], rail: [] };
