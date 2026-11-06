@@ -605,7 +605,7 @@ function SortableDomainRow({
   );
 }
 
-export function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
+function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   // Domain is the size reference; the other sidebar glyphs are sized up to
   // match this concept icon. An uploaded image is a complete mark of its own;
   // otherwise the Domain's icon and colour are drawn as a Strategy's or an

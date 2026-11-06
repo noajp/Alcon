@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useId, useMemo, useRef, useState } from 'react';
 import {
   CalendarClock,
   ChevronDown,
@@ -53,7 +53,6 @@ import {
 import { applyProposals, planRebalance, proposalWorkers, type Proposal } from '@/ActivitySpace/sustainment/workload/workloadRebalance';
 import {
   WORKLOAD_RANGES,
-  publishWorkload,
   setWorkloadPlanOpen,
   setWorkloadRange,
   shiftWorkloadAnchor,
@@ -110,8 +109,6 @@ export interface ResourceViewProps {
   path?: IslandCrumb[];
   /** Clears `workerId`; shown as the × on the focus chip. */
   onClearWorker?: () => void;
-  /** The standalone surface publishes its readings for the People sidebar. */
-  publish?: boolean;
   /** Under the chart, with its own scroll — a focused Worker's profile. */
   below?: React.ReactNode;
 }
@@ -119,7 +116,7 @@ export interface ResourceViewProps {
 type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
 type LoadedRow = Row & { capacity: number[]; spans: WorkerAvailability[]; utilization: number | null; overDays: number; dueAway: number };
 
-export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, memberIds, path, onClearWorker, publish = false, below }: ResourceViewProps = {}) {
+export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', onElementClick, roster, workerId, memberIds, path, onClearWorker, below }: ResourceViewProps = {}) {
   const { t } = useI18n();
   const { contextKey, domains, selectedDomainIds, elements, loading, error, retry } = useWorkloadData(scopeOverride);
   const { range, anchor } = useWorkloadRange();
@@ -250,19 +247,6 @@ export function ResourceView({ scopeOverride, hideHeader, title = 'Resource', on
     return out;
   }, [preview, elements, workerById, days]);
 
-  // ---- Readings for the sidebar --------------------------------------------
-  const failedReading = Boolean(error || availabilityError);
-  useEffect(() => {
-    if (!publish) return;
-    publishWorkload(ready || failedReading ? {
-      people: ready ? allRows.map((r) => ({ worker: r.worker, utilization: r.utilization, overDays: r.overDays, awayDays: awayDayCount(r.capacity), dueAway: r.dueAway })) : [],
-      team,
-      ahead,
-      failed: failedReading,
-      proposals: fullPlan ? fullPlan.proposals.length : null,
-    } : null);
-  }, [publish, ready, failedReading, allRows, team, ahead, fullPlan]);
-  useEffect(() => () => { if (publish) publishWorkload(null); }, [publish]);
 
   // Per-Worker expansion. Clicking a row reveals its assigned
   // Elements as mini-rows on the same date axis below.
