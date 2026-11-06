@@ -3,8 +3,9 @@ import { Tiers, Box, Component, MessageCircle, Files } from '@/ui/icons';
 /**
  * Canonical concept → glyph mapping for the Execution layer's three units.
  *
- *   Domain  → Tiers         (three bars narrowing downward — the broad
- *                            top-level area holding narrower ones)
+ *   Domain  → Tiers         (three slabs narrowing downward, seen as Box
+ *                            is — the broad top-level area holding
+ *                            narrower ones)
  *   Object  → Box           (the mid-level structural unit)
  *   Element → Component     (the smallest executable unit)
  *   Message → MessageCircle (anything someone said: a comment, a

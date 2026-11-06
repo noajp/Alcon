@@ -97,14 +97,16 @@ export const Layers = glyph('Layers', {
   line: <path d="M3.5 8.1 8 10.6 12.5 8.1M3.5 11.35 8 13.85 12.5 11.35" />,
 });
 
-/** Three bars, the widest on top and each narrower below — a Domain: one
- *  broad area holding narrower ones. */
+/** Three slabs stacked, the widest on top and each narrower below, drawn
+ *  in the same three-quarter view as Box — a Domain: one broad area holding
+ *  narrower ones. */
 export const Tiers = glyph('Tiers', {
   solid: <>
-    <rect x="1.75" y="2.25" width="12.5" height="3" rx="1" />
-    <rect x="3.75" y="6.5" width="8.5" height="3" rx="1" />
-    <rect x="5.75" y="10.75" width="4.5" height="3" rx="1" />
+    <path d="M8 1.5 14.2 4.3V6.6L8 9.4 1.8 6.6V4.3Z" />
+    <path d="M8 6.6 12.6 8.7V10.6L8 12.7 3.4 10.6V8.7Z" />
+    <path d="M8 10.9 11 12.3V13.6L8 15 5 13.6V12.3Z" />
   </>,
+  cut: <path d="M1.8 4.3 8 7.1 14.2 4.3M8 7.1V9.4M1.8 6.6 8 9.4 14.2 6.6M3.4 10.6 8 12.7 12.6 10.6" />,
 });
 
 export const Box = glyph('Box', {
