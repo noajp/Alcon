@@ -460,6 +460,9 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Failed to save — try again.': ['保存できませんでした。もう一度お試しください。', '저장하지 못했습니다. 다시 시도하세요.', 'Échec de l’enregistrement — réessayez.', 'No se pudo guardar; inténtalo de nuevo.'],
   'Changes new Elements’ ids from here on ({from} → {to}). Existing Elements keep their current ids.': ['これから作る Element の ID を変更します（{from} → {to}）。既存の Element の ID はそのままです。', '앞으로 만드는 Element의 ID를 바꿉니다 ({from} → {to}). 기존 Element의 ID는 그대로입니다.', 'Modifie les identifiants des nouveaux Elements à partir de maintenant ({from} → {to}). Les Elements existants gardent leur identifiant.', 'Cambia los identificadores de los nuevos Elements a partir de ahora ({from} → {to}). Los Elements existentes conservan el suyo.'],
   'Changes new Elements’ ids from here on. Existing Elements keep their current ids.': ['これから作る Element の ID を変更します。既存の Element の ID はそのままです。', '앞으로 만드는 Element의 ID를 바꿉니다. 기존 Element의 ID는 그대로입니다.', 'Modifie les identifiants des nouveaux Elements à partir de maintenant. Les Elements existants gardent leur identifiant.', 'Cambia los identificadores de los nuevos Elements a partir de ahora. Los Elements existentes conservan el suyo.'],
+  // Domain Flow board — the columns an Element moves through
+  'To do': ['案', '할 일', 'À faire', 'Por hacer'],
+  'Waiting on you': ['判断待ち', '판단 대기', 'En attente de vous', 'Esperando tu decisión'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(EXECUTION_MESSAGES).map(([key, row]) => [key, row[index]]));
