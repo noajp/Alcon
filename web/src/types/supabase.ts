@@ -1448,6 +1448,7 @@ export type Database = {
       decks: {
         Row: {
           activity_space_id: string
+          artifact_folder_id: string | null
           chat: Json
           created_by: string | null
           deck: Json
@@ -1460,6 +1461,7 @@ export type Database = {
         }
         Insert: {
           activity_space_id: string
+          artifact_folder_id?: string | null
           chat?: Json
           created_by?: string | null
           deck: Json
@@ -1472,6 +1474,7 @@ export type Database = {
         }
         Update: {
           activity_space_id?: string
+          artifact_folder_id?: string | null
           chat?: Json
           created_by?: string | null
           deck?: Json
@@ -2477,8 +2480,13 @@ export type Database = {
           deleted_at: string | null
           domain_id: string | null
           id: string
+          is_root: boolean
           name: string
+          object_id: string | null
+          owner_id: string | null
+          parent_id: string | null
           position: number
+          scope: string
         }
         Insert: {
           activity_space_id: string
@@ -2488,8 +2496,13 @@ export type Database = {
           deleted_at?: string | null
           domain_id?: string | null
           id?: string
+          is_root?: boolean
           name: string
+          object_id?: string | null
+          owner_id?: string | null
+          parent_id?: string | null
           position?: number
+          scope?: string
         }
         Update: {
           activity_space_id?: string
@@ -2499,8 +2512,13 @@ export type Database = {
           deleted_at?: string | null
           domain_id?: string | null
           id?: string
+          is_root?: boolean
           name?: string
+          object_id?: string | null
+          owner_id?: string | null
+          parent_id?: string | null
           position?: number
+          scope?: string
         }
         Relationships: [
           {
@@ -3309,6 +3327,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          folder_id: string | null
           icon: string | null
           id: string
           linked_object_id: string | null
@@ -3321,6 +3340,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string
+          folder_id?: string | null
           icon?: string | null
           id?: string
           linked_object_id?: string | null
@@ -3333,6 +3353,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          folder_id?: string | null
           icon?: string | null
           id?: string
           linked_object_id?: string | null

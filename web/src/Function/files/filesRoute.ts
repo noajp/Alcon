@@ -1,14 +1,17 @@
-// Where the Files app is in a window tab, as Execution's sidebar has it:
-// every file in the Space; or a Domain — its home, its folders (or one
-// folder), its files; or the trash — and the file open beside a list. The
-// sidebar and the pages read and write the same route.
+// Where Artifacts is in a window tab: which tab (and its Domain or Object),
+// a folder of its tree (the top without one), or the trash — and the file
+// open beside the list.
 
 export interface FilesRoute {
-  /** A Domain's pages; without it, every file in the Space (or the trash). */
+  /** The trash; otherwise the folder tree. */
+  view?: 'trash';
+  /** Whose artifacts: the Space's (the default), a Domain's, an Object's, or yours. */
+  tab?: 'space' | 'domain' | 'object' | 'my';
+  /** The Domain open in the Domain tab. */
   domainId?: string | null;
-  /** The page: a Domain's home (the default), its folders or its files; the trash. */
-  view?: 'home' | 'folders' | 'files' | 'trash';
-  /** One folder: what is in it. */
+  /** The Object open in the Objects tab. */
+  objectId?: string | null;
+  /** The open folder; the top of the tree without one. */
   folderId?: string | null;
   /** The file open beside the list. */
   fileId?: string | null;

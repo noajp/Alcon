@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback, useSyncExternalStore } from 'react';
 import type React from 'react';
 import { GitCompare } from '@/ui/icons';
 import {
@@ -18,12 +17,9 @@ import {
 } from '@/shell/sidebar/NavIcons';
 import type { ViewId } from '@/shell/viewRegistry';
 
-// The ModeRail's top-level modes, and which of them are permanent.
-//
-// Workspace — Strategy and Execution in one sidebar — is the permanent rail
-// entry, opened by the Space's logo at the top. Inbox, Calendar and the AI sit
-// at the right of the status bar, Notebook and Slides at its left. Personal
-// pages are reached through the avatar; other tools use the launcher.
+// The app's top-level modes. Strategy and the tools sit at the top of the
+// sidebar; Inbox, Calendar and the AI at the right of the status bar, the
+// avatar (Profile) at its left. Notebook and Slides open from Artifacts.
 export type RailMode = 'personal' | 'inbox' | 'workspace' | 'reviews' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'audit' | 'ai';
 
 export interface ModeMeta {
@@ -39,7 +35,7 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   // Strategy and the Domains with their Objects and Elements. Strategy opens
   // first, the sidebar's top row; Phase stays routable but is not in the nav.
   workspace: { label: 'Workspace', icon: NavStrategyModeIcon, defaultView: 'strategy',
-    views: ['strategy', 'phase', 'objects', 'domain-elements', 'domains', 'domain-overview'] },
+    views: ['strategy', 'automation', 'phase', 'objects', 'domain-elements', 'domains', 'domain-overview'] },
   reviews:   { label: 'Reviews',   icon: GitCompare, defaultView: 'reviews', views: ['reviews'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
@@ -58,97 +54,8 @@ export function railModeOf(view: string): RailMode | null {
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
 
-/** The document tools at the left of the status bar. */
+/** The document tools, opened from Artifacts (and the command palette). */
 export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 
-// The launcher's catalog. Everything here is Sustainment — the tools of work
-// that keep the people doing the fighting able to keep going. The two groups
-// are a display split only: Tools serve any surface, Workload watches capacity.
-export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
-  { title: 'Tools', apps: ['tables', 'files', 'team'] },
-  { title: 'Sustainment', apps: ['audit', 'reviews'] },
-];
-
-const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);
-
-export const isAppMode = (mode: RailMode): boolean => APP_MODES.includes(mode);
-
-const RAIL_APPS_KEY = 'alcon:railApps';
-const RAIL_APPS_CHANGE_EVENT = 'alcon:rail-apps-change';
-
-function readRailApps(): RailMode[] {
-  if (typeof window === 'undefined') return EMPTY;
-  try {
-    const raw: unknown = JSON.parse(window.localStorage.getItem(RAIL_APPS_KEY) ?? '[]');
-    if (!Array.isArray(raw)) return EMPTY;
-    // Always catalog order, so the rail never depends on what was added first.
-    return APP_MODES.filter((m) => raw.includes(m));
-  } catch {
-    return EMPTY;
-  }
-}
-
-// ─── Shared store ─────────────────────────────────────────────────────────
-// The rail's added apps live in localStorage, which makes them an external
-// store, and reading one during render is what produced the hydration
-// mismatch: the server has no storage and renders an empty rail, while the
-// client's first render already knows the user added Workload. React answers
-// this with `getServerSnapshot`, which it uses for the server render AND the
-// hydrating one, then re-renders from the client snapshot once mounted — the
-// same shape `useListColumns` documents.
-//
-// The snapshot is cached because `getSnapshot` must return the same reference
-// until something actually changes; `readRailApps` builds a new array every
-// call, and returning that directly would spin.
-
-const EMPTY: RailMode[] = Object.freeze([]) as unknown as RailMode[];
-
-let snapshot: RailMode[] | null = null;
-const listeners = new Set<() => void>();
-let wired = false;
-
-function getSnapshot(): RailMode[] {
-  if (snapshot === null) snapshot = readRailApps();
-  return snapshot;
-}
-
-function getServerSnapshot(): RailMode[] {
-  return EMPTY;
-}
-
-function invalidate() {
-  snapshot = readRailApps();
-  listeners.forEach((fn) => fn());
-}
-
-/** `storage` fires for every key another tab writes — including the boards,
- *  which write on each drag. A null key means the store was cleared, which
- *  does concern us. */
-function onStorage(e: StorageEvent) {
-  if (e.key !== null && e.key !== RAIL_APPS_KEY) return;
-  invalidate();
-}
-
-function subscribe(listener: () => void): () => void {
-  if (!wired) {
-    wired = true;
-    window.addEventListener(RAIL_APPS_CHANGE_EVENT, invalidate);
-    window.addEventListener('storage', onStorage); // another tab wrote the key
-  }
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
-}
-
-/** The apps this user has added to the rail, plus the setter that toggles one. */
-export function useRailApps(): [RailMode[], (mode: RailMode, added: boolean) => void] {
-  const apps = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  const setApp = useCallback((mode: RailMode, added: boolean) => {
-    const current = readRailApps();
-    const next = APP_MODES.filter((m) => (m === mode ? added : current.includes(m)));
-    window.localStorage.setItem(RAIL_APPS_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent(RAIL_APPS_CHANGE_EVENT));
-  }, []);
-
-  return [apps, setApp];
-}
+/** The tools the command palette offers besides the document tools. */
+export const TOOL_MODES: RailMode[] = ['tables', 'files', 'team', 'audit', 'reviews'];

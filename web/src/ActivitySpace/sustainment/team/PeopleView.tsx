@@ -53,7 +53,6 @@ export function PeopleView({ workerId, unitId, onNavigate, onViewChange }: {
           memberIds={memberIds}
           onClearWorker={() => onNavigate({ workerId: null })}
           onElementClick={element => openElement(element.id)}
-          publish
           below={workerId ? <>
             <WorkerUnits workerId={workerId} onOpenUnit={openUnit} />
             <PersonProfile workerId={workerId} onOpenElement={openElement} />

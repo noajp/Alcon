@@ -1,15 +1,15 @@
 'use client';
 
 import { PanelLeft } from '@/ui/icons';
-import { MODE_META, railModeOf, BAR_TOOLS, type RailMode } from '@/shell/railApps';
+import { MODE_META, railModeOf, type RailMode } from '@/shell/railApps';
 import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
-// The strip along the foot of the window, as in VS Code. The tools for making
-// documents sit at the left; the right holds what stays at hand from any
+// The strip along the foot of the window, as in VS Code. Notebooks and slides
+// live in Artifacts, and the person at the foot of the sidebar; the right holds what stays at hand from any
 // screen — the sidebar's toggle, the inbox, the AI and the calendar.
 
 const btn = (active: boolean) =>
@@ -56,7 +56,6 @@ export function StatusBar({
   return (
     <ButtonAppearanceProvider appearance="navigation">
     <footer className="flex h-6 shrink-0 items-center gap-0.5 px-1.5">
-      {BAR_TOOLS.filter(inScope).map((mode) => modeButton(mode, true))}
 
       <div className="ml-auto flex items-center gap-0.5">
         {sidebar && (
