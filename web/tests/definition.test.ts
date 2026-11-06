@@ -135,6 +135,12 @@ describe('checking a harness', () => {
   it('reads how a Strategy is broken down', () => {
     expect(def.parseDefinition('# 目的\nx\n# 分け方\n- 画面ごとに Object を分ける\n').sections.breakdown).toBe('- 画面ごとに Object を分ける');
   });
+
+  it('reads who a person\'s task goes to', () => {
+    expect(def.parseDefinition('# 目的\nx\n# 担当の決め方\n- 契約まわりは法務の人\n').sections.assignment).toBe('- 契約まわりは法務の人');
+    expect(def.parseDefinition('# Goal\nx\n# Assignment\n- Design work goes to the designer\n').sections.assignment).toBe('- Design work goes to the designer');
+    expect(def.parseDefinition('# 目的\nx\n# 分け方\n- y\n').sections.assignment).toBe('');
+  });
 });
 
 describe('the web copy of the harness reader', () => {

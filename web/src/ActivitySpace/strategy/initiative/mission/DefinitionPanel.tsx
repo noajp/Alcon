@@ -16,6 +16,7 @@ import { DEFINITION_EXAMPLE, definitionParts, type DefinitionPart } from './defi
 const PART_LABEL: Record<DefinitionPart, string> = {
   goal: 'Goal', conditions: 'Conditions', metric: 'Metric (a loop)', procedure: 'Procedure',
   stop: 'Stop rules', checks: 'Checks', output: 'Output shape', connectors: 'Connectors', breakdown: 'Breakdown',
+  assignment: 'Assignment rule',
 };
 
 const NONE = '__none';

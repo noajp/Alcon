@@ -2,7 +2,7 @@
 // It is Markdown with known headings (stored in the `definitions` table);
 // this file reads the parts the engine itself enforces (the metric a loop
 // improves, the hard stops, how often to check, the output's shape, the
-// connectors it uses, how a Strategy is broken down) and leaves the rest as
+// connectors it uses, how a Strategy is broken down, who takes the work) and leaves the rest as
 // text the agent follows, and checks a harness before it is used
 // (checkHarness). Pure, so run-agent, the Planner, the editor and the tests
 // read a harness the same way. The editor's copy,
@@ -18,6 +18,7 @@
 //   # 成果物の型 / Output       a fenced block (md / html / csv / json) the output must follow
 //   # 使うコネクタ / Connectors "- GitHub": the connectors the work needs
 //   # 分け方 / Breakdown       how the Planner breaks a Strategy into Objects and Elements
+//   # 担当の決め方 / Assignment which person of the Space the Planner gives a person's task to
 
 export type OutputFormat = "markdown" | "html" | "csv" | "json";
 
@@ -36,7 +37,7 @@ export interface ParsedDefinition {
   connectors: string[];
 }
 
-export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown";
+export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown" | "assignment";
 
 const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["goal", /^(目的|ゴール|goal|purpose)/i],
@@ -48,6 +49,7 @@ const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["output", /^(成果物の型|出力の型|成果物|output)/i],
   ["connectors", /^(使うコネクタ|コネクタ|connectors?)/i],
   ["breakdown", /^(分け方|分解の仕方|分解|breakdown|decomposition)/i],
+  ["assignment", /^(担当の決め方|担当|assignment)/i],
 ];
 
 /** Pure. The section a heading names, or null for a heading of the author's own. */
@@ -68,7 +70,7 @@ function num(raw: string): number | null {
 }
 
 export function parseDefinition(body: string): ParsedDefinition {
-  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "" } as Record<SectionKey, string>;
+  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "", assignment: "" } as Record<SectionKey, string>;
   let current: SectionKey | null = null;
   let checksHeading = "";
   let inFence = false;

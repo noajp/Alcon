@@ -258,8 +258,12 @@ export const UNPLACED = 'b:';
 
 /** Pure. The draft laid over the Objects as they stand: its tasks join the
  *  Objects they name (dashed), the Objects it adds follow (dashed), and tasks
- *  it put nowhere gather in one column for the person to place. */
-export function draftFleet(current: readonly FleetObject[], measures: readonly MissionMeasureRow[], draft: PlanDraft): FleetObject[] {
+ *  it put nowhere gather in one column for the person to place. A person's
+ *  task the Planner gave to someone carries that person's name, from `people`. */
+export function draftFleet(
+  current: readonly FleetObject[], measures: readonly MissionMeasureRow[], draft: PlanDraft,
+  people: ReadonlyMap<string, string> = new Map(),
+): FleetObject[] {
   const objectiveTitle = new Map(draft.objectives.map((o) => [
     o.key, (o.measureId && measures.find((m) => m.id === o.measureId)?.title) || o.title,
   ]));
@@ -272,7 +276,8 @@ export function draftFleet(current: readonly FleetObject[], measures: readonly M
     const objective = t.objective ? objectiveTitle.get(t.objective) : undefined;
     added.set(column, [...(added.get(column) ?? []), {
       key: `t:${t.key}`, elementId: null, title: t.title, state: 'todo', draft: true,
-      assignee: t.assignee, action: t.action ?? null, assigneeName: null, assigneeWorker: null, status: 'todo', dueDate: null,
+      assignee: t.assignee, action: t.action ?? null,
+      assigneeName: (t.assigneeWorkerId && people.get(t.assigneeWorkerId)) || null, assigneeWorker: null, status: 'todo', dueDate: null,
       serves: objective ? [objective] : [],
       waitsOn: t.dependsOn.map((d) => taskTitle.get(d)!).filter(Boolean),
       ready: false, handable: false, model: null, costUsd: 0,
@@ -399,6 +404,9 @@ export interface PlanTask {
   weight?: AiWeight | null;
   /** What the task asks someone to do. */
   action?: ElementAction | null;
+  /** The person of the Space a person's task goes to, as the Planner chose by
+   *  the harness's assignment rule; null leaves it to whoever approves. */
+  assigneeWorkerId?: string | null;
 }
 
 export interface PlanDraft { summary: string; objectives: PlanObjective[]; objects: PlanObject[]; tasks: PlanTask[] }
@@ -408,11 +416,12 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 /** Pure. The Planner's answer as the screen may use it: keys unique, every
  *  reference pointing at something in the draft, measure ids only ones this
  *  Strategy has, Object ids only its Objects, Domain ids only the Space's,
+ *  a person's id only on a person's task and only one of the Space's people,
  *  dependencies without cycles. Anything else is dropped. */
 export function normalizePlan(
   raw: unknown,
   measureIds: ReadonlySet<string>,
-  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string>; definitionIds?: ReadonlySet<string> } = {},
+  known: { objects?: ReadonlyMap<string, string>; domainIds?: ReadonlySet<string>; definitionIds?: ReadonlySet<string>; workerIds?: ReadonlySet<string> } = {},
 ): PlanDraft {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const objectives: PlanObjective[] = [];
@@ -458,9 +467,11 @@ export function normalizePlan(
     const objective = typeof x.objective === 'string' && objectiveKeys.has(x.objective) ? x.objective : null;
     const object = typeof x.object === 'string' ? objectKey.get(x.object) ?? null : null;
     const dependsOn = (Array.isArray(x.dependsOn) ? x.dependsOn : []).filter((d): d is string => typeof d === 'string');
+    const assignee = x.assignee === 'human' ? 'human' : 'ai';
     tasks.push({
       key, title, description: text(x.description, 4000), objective, object, dependsOn,
-      assignee: x.assignee === 'human' ? 'human' : 'ai',
+      assignee,
+      assigneeWorkerId: assignee === 'human' && typeof x.assigneeWorkerId === 'string' && known.workerIds?.has(x.assigneeWorkerId) ? x.assigneeWorkerId : null,
       definitionId: typeof x.definitionId === 'string' && known.definitionIds?.has(x.definitionId) ? x.definitionId : null,
       weight: isAiWeight(x.weight) ? x.weight : null,
       action: isElementAction(x.action) ? x.action : null,
