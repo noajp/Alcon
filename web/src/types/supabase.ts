@@ -2480,9 +2480,13 @@ export type Database = {
           deleted_at: string | null
           domain_id: string | null
           id: string
+          is_root: boolean
           name: string
+          object_id: string | null
+          owner_id: string | null
           parent_id: string | null
           position: number
+          scope: string
         }
         Insert: {
           activity_space_id: string
@@ -2492,9 +2496,13 @@ export type Database = {
           deleted_at?: string | null
           domain_id?: string | null
           id?: string
+          is_root?: boolean
           name: string
+          object_id?: string | null
+          owner_id?: string | null
           parent_id?: string | null
           position?: number
+          scope?: string
         }
         Update: {
           activity_space_id?: string
@@ -2504,9 +2512,13 @@ export type Database = {
           deleted_at?: string | null
           domain_id?: string | null
           id?: string
+          is_root?: boolean
           name?: string
+          object_id?: string | null
+          owner_id?: string | null
           parent_id?: string | null
           position?: number
+          scope?: string
         }
         Relationships: [
           {

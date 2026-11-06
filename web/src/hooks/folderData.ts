@@ -15,7 +15,14 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
 /** Which app a folder belongs to. */
 export type FolderApp = 'files' | 'tables';
-export interface Folder { id: string; activity_space_id: string; domain_id: string | null; parent_id: string | null; app: FolderApp; name: string; position: number }
+/** Who sees an Artifacts folder: the Space, a Domain's people, an Object's, or only its owner. */
+export type FolderScope = 'space' | 'domain' | 'object' | 'my';
+export interface Folder {
+  id: string; activity_space_id: string; domain_id: string | null; parent_id: string | null; app: FolderApp; name: string; position: number;
+  scope: FolderScope; object_id: string | null; owner_id: string | null;
+  /** A tab's hidden top folder: what sits "at the top" of the tab is in it. */
+  is_root: boolean;
+}
 
 const key = (spaceId: string | null, app: FolderApp) => ['folders', spaceId, app] as const;
 
@@ -27,7 +34,7 @@ export function useFolders(app: FolderApp, domainId?: string | null) {
     queryKey: key(spaceId, app),
     enabled: !!spaceId,
     queryFn: async (): Promise<Folder[]> => {
-      const { data, error } = await supabase.from('folders').select('id, activity_space_id, domain_id, parent_id, app, name, position')
+      const { data, error } = await supabase.from('folders').select('id, activity_space_id, domain_id, parent_id, app, name, position, scope, object_id, owner_id, is_root')
         .eq('activity_space_id', spaceId!).eq('app', app).is('deleted_at', null).order('position').order('name');
       if (error) throw error;
       return (data ?? []) as Folder[];
@@ -53,7 +60,7 @@ export function useFolderActions(app: FolderApp, domainId: string | null = null,
       if (!spaceId) throw new Error(translate('Choose a Space first.'));
       const last = (qc.getQueryData<Folder[]>(key(spaceId, app)) ?? []).reduce((m, f) => Math.max(m, f.position), 0);
       const { data, error } = await supabase.from('folders').insert({ activity_space_id: spaceId, domain_id: domainId, parent_id: parentId, app, name: name.trim().slice(0, 200), position: last + 1 })
-        .select('id, activity_space_id, domain_id, parent_id, app, name, position').single();
+        .select('id, activity_space_id, domain_id, parent_id, app, name, position, scope, object_id, owner_id, is_root').single();
       if (error || !data) throw error ?? new Error('Could not create the folder.');
       return data as Folder;
     },

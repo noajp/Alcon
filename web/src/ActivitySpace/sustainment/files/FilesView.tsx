@@ -23,7 +23,11 @@ import { MoveToFolderItems } from '@/Function/shared/folders/FolderList';
 import { IslandColumns, MainIsland, type IslandCrumb } from '@/Function/shared/MainIsland';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { ARTIFACT_DECKS_KEY, useNotebooksAndDecks } from '@/hooks/artifactData';
+import { ARTIFACT_DECKS_KEY, createArtifactFolder, ensureArtifactRoot, useNotebooksAndDecks, type ArtifactPlace } from '@/hooks/artifactData';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { useObjects } from '@/Function/sync/explorerData';
+import { useCurrentUserId } from '@/providers/authContext';
+import { DomainIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import { NavNoteIcon, NavSlidesIcon } from '@/shell/sidebar/NavIcons';
 import { createDeckInFolder, openDeck } from '@/ActivitySpace/sustainment/slides/artifactDecks';
@@ -52,6 +56,11 @@ export function FilesView({ navigation, onNavigate, onViewChange }: {
   return <ArtifactsBrowser navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} />;
 }
 
+type ArtifactTab = NonNullable<FilesRoute['tab']>;
+const TABS: { id: ArtifactTab; label: string }[] = [
+  { id: 'space', label: 'Space' }, { id: 'domain', label: 'Domain' }, { id: 'object', label: 'Objects' }, { id: 'my', label: 'My' },
+];
+
 function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -59,29 +68,51 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
 }) {
   const { t } = useI18n();
   const route = navigation.files ?? {};
+  const tab: ArtifactTab = route.tab ?? 'space';
   const folderId = route.folderId ?? null;
   const spaceId = useActiveSpaceId();
+  const userId = useCurrentUserId();
   const { data: files, loading: filesLoading } = useSpaceAttachments(spaceId);
   const { data: folders } = useFolders('files');
   const { notebooks, decks, loading: othersLoading } = useNotebooksAndDecks(spaceId);
+  const domains = useSustainmentDomains().data;
+  const allObjects = useObjects().data.objects;
+  // This Space's Objects: those in one of its Domains.
+  const objects = useMemo(() => {
+    const mine = new Set(domains.map((d) => d.id));
+    return allObjects.filter((o) => o.domain_id && mine.has(o.domain_id));
+  }, [allObjects, domains]);
   const workers = useWorkers().data;
   const { openCreate } = useWorkspaceActions();
   const qc = useQueryClient();
 
   const go = (next: FilesRoute) => onNavigate({ files: next });
-  const folder = folders.find((f) => f.id === folderId) ?? null;
-  const actions = useFolderActions('files', null, folderId);
+  const here = (next: Partial<FilesRoute>) => go({ tab, domainId: route.domainId ?? null, objectId: route.objectId ?? null, ...next });
 
-  // The path from the top to the open folder.
+  // The place this tab is showing — null while choosing a Domain or an Object.
+  const place: ArtifactPlace | null = tab === 'space' ? { scope: 'space' }
+    : tab === 'my' ? (userId ? { scope: 'my', userId } : null)
+    : tab === 'domain' ? (route.domainId ? { scope: 'domain', domainId: route.domainId } : null)
+    : route.objectId ? { scope: 'object', objectId: route.objectId } : null;
+  const inPlace = (f: Folder) => !!place && f.scope === place.scope
+    && (place.scope !== 'domain' || f.domain_id === place.domainId)
+    && (place.scope !== 'object' || f.object_id === place.objectId)
+    && (place.scope !== 'my' || f.owner_id === place.userId);
+  const root = folders.find((f) => f.is_root && inPlace(f)) ?? null;
+  const folder = folders.find((f) => f.id === folderId) ?? null;
+  const atTop = !folder;
+  const parentKey = folder?.id ?? root?.id ?? '';
+
+  // The path from the tab's top to the open folder.
   const path = useMemo(() => {
     const out: Folder[] = [];
     let cur = folder;
     const seen = new Set<string>();
-    while (cur && !seen.has(cur.id)) { seen.add(cur.id); out.unshift(cur); cur = folders.find((f) => f.id === cur!.parent_id) ?? null; }
+    while (cur && !cur.is_root && !seen.has(cur.id)) { seen.add(cur.id); out.unshift(cur); cur = folders.find((f) => f.id === cur!.parent_id) ?? null; }
     return out;
   }, [folder, folders]);
 
-  // Search: names everywhere, and a file's text as well.
+  // Search: names everywhere you can see, and a file's text as well.
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
   useEffect(() => { if (spaceId) void indexSpaceFiles(spaceId); }, [spaceId, files.length]);
@@ -96,47 +127,89 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
   const q = settled.toLowerCase();
   const hit = (name: string) => name.toLowerCase().includes(q);
 
-  // What this folder holds — or, while searching, every match in the Space.
-  const shownFolders = q ? folders.filter((f) => hit(f.name)) : folders.filter((f) => (f.parent_id ?? null) === folderId);
-  const shownNotebooks = q ? notebooks.filter((n) => hit(n.name)) : notebooks.filter((n) => (n.folder_id ?? null) === folderId);
-  const shownDecks = q ? decks.filter((d) => hit(d.name)) : decks.filter((d) => (d.artifact_folder_id ?? null) === folderId);
-  const shownFiles = q
-    ? files.filter((f) => snippets.has(f.id) || hit(f.name) || hit(f.owner_label ?? ''))
-    : files.filter((f) => (f.folder_id ?? null) === folderId);
+  // What this place holds at this level. At a tab's top: what is in its root
+  // folder, and what was there before roots existed (Space's decks and
+  // folders, your notebooks); an Object's top also lists what is attached to
+  // it and its Elements.
+  const legacyTop = (f: Folder) => atTop && !f.is_root && f.parent_id === null && inPlace(f);
+  const shownFolders = q ? folders.filter((f) => !f.is_root && hit(f.name))
+    : place ? folders.filter((f) => !f.is_root && (f.parent_id === parentKey || legacyTop(f))) : [];
+  const shownNotebooks = q ? notebooks.filter((n) => hit(n.name))
+    : place ? notebooks.filter((n) => (n.folder_id && n.folder_id === parentKey) || (atTop && tab === 'my' && !n.folder_id)) : [];
+  const shownDecks = q ? decks.filter((d) => hit(d.name))
+    : place ? decks.filter((d) => (d.artifact_folder_id && d.artifact_folder_id === parentKey) || (atTop && tab === 'space' && !d.artifact_folder_id)) : [];
+  const shownFiles = q ? files.filter((f) => snippets.has(f.id) || hit(f.name) || hit(f.owner_label ?? ''))
+    : place ? files.filter((f) => (f.folder_id && f.folder_id === parentKey)
+      || (atTop && place.scope === 'object' && (f.object_id === place.objectId || f.element_object_id === place.objectId))) : [];
   const total = shownFolders.length + shownNotebooks.length + shownDecks.length + shownFiles.length;
 
   const open = files.find((f) => f.id === route.fileId) ?? null;
-  const select = (f: SpaceFile | null) => go({ folderId, fileId: f?.id ?? null });
+  const select = (f: SpaceFile | null) => here({ folderId, fileId: f?.id ?? null });
   const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
   const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
+  // Where something new goes: the open folder, else this tab's root.
+  const target = async () => folder?.id ?? await ensureArtifactRoot(spaceId!, place!);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['folders'] });
+    void qc.invalidateQueries({ queryKey: ['attachments-of'] });
+    void qc.invalidateQueries({ queryKey: ['artifact-notebooks'] });
+    void qc.invalidateQueries({ queryKey: ARTIFACT_DECKS_KEY });
+  };
   const newFolder = async () => {
     const name = await appDialog.prompt(t('Folder name'), t('New folder'));
     if (!name?.trim()) return;
-    actions.create.mutate(name, { onSuccess: (f) => go({ folderId: f.id }), onError: fail });
+    try { const f = await createArtifactFolder(spaceId!, await target(), name); refresh(); here({ folderId: f.id }); }
+    catch (e) { fail(e); }
   };
-  const newNotebook = () => { setNextNotebookFolder(folderId); openCreate('notebook'); };
-  const newDeck = () => {
-    onViewChange?.('slides');
-    void createDeckInFolder(folderId).then(() => qc.invalidateQueries({ queryKey: ARTIFACT_DECKS_KEY })).catch(fail);
+  const newNotebook = async () => {
+    try { setNextNotebookFolder(await target()); refresh(); openCreate('notebook'); } catch (e) { fail(e); }
+  };
+  const newDeck = async () => {
+    try {
+      const into = await target();
+      onViewChange?.('slides');
+      await createDeckInFolder(into);
+      refresh();
+    } catch (e) { fail(e); }
   };
   const openNotebook = (id: string) => { onNavigate({ noteFolderId: id, noteSectionId: null, noteId: null }); onViewChange?.('note'); };
   const openSlides = (id: string) => { onViewChange?.('slides'); void openDeck(id); };
 
-  // Files dropped on an open folder go into it.
-  const { upload } = useAttachmentActions({ kind: 'folder', id: folder?.id ?? '' });
+  // Uploads go into the open folder, or the tab's root.
+  const [uploadInto, setUploadInto] = useState<string | null>(null);
+  const { upload } = useAttachmentActions({ kind: 'folder', id: uploadInto ?? folder?.id ?? '' });
   const uploadInput = useRef<HTMLInputElement | null>(null);
+  const pending = useRef<File[]>([]);
+  useEffect(() => {
+    if (!uploadInto || !pending.current.length) return;
+    for (const f of pending.current) upload.mutate(f);
+    pending.current = [];
+  }, [uploadInto, upload]);
+  const drop = async (list: FileList) => {
+    const picked = Array.from(list);
+    if (!picked.length || !place) return;
+    try {
+      const into = await target();
+      if (into === (uploadInto ?? folder?.id)) { for (const f of picked) upload.mutate(f); return; }
+      pending.current = picked;
+      setUploadInto(into);
+    } catch (e) { fail(e); }
+  };
   const [dropping, setDropping] = useState(false);
-  const drop = (list: FileList) => { if (folder) for (const f of Array.from(list)) upload.mutate(f); };
 
+  const placeName = tab === 'domain' ? domains.find((d) => d.id === route.domainId)?.name
+    : tab === 'object' ? objects.find((o) => o.id === route.objectId)?.name : null;
   const crumbs: IslandCrumb[] = [
-    { id: 'artifacts', label: t('Artifacts'), onClick: folder ? () => go({}) : undefined },
-    ...path.map((f, i) => ({ id: f.id, label: f.name, onClick: i < path.length - 1 ? () => go({ folderId: f.id }) : undefined })),
+    { id: 'artifacts', label: t('Artifacts'), onClick: folder || placeName ? () => go({ tab }) : undefined },
+    ...(placeName ? [{ id: 'place', label: placeName, onClick: folder ? () => here({ folderId: null }) : undefined }] : []),
+    ...path.map((f, i) => ({ id: f.id, label: f.name, onClick: i < path.length - 1 ? () => here({ folderId: f.id }) : undefined })),
   ];
 
-  const iconBtn = 'flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+  const iconBtn = 'flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40';
+  const canAdd = !!place && !!spaceId;
   return (
-    <MainIsland crumbs={crumbs} count={total} actions={<>
+    <MainIsland crumbs={crumbs} count={place || q ? total : undefined} actions={<>
       {searching ? (
         <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
           <Search size={12} className="shrink-0 text-muted-foreground" />
@@ -149,37 +222,56 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
         <button type="button" className={iconBtn} title={t('Search artifacts')} aria-label={t('Search artifacts')} onClick={() => setSearching(true)}><Search size={14} /></button>
       )}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" className={iconBtn} title={t('Add')} aria-label={t('Add')}><Plus size={15} /></button>
+        <DropdownMenuTrigger asChild disabled={!canAdd}>
+          <button type="button" className={iconBtn} disabled={!canAdd} title={canAdd ? t('Add') : t('Choose where first')} aria-label={t('Add')}><Plus size={15} /></button>
         </DropdownMenuTrigger>
         <MenuShell as="dropdown" align="end">
           <DropdownMenuItem onSelect={() => void newFolder()} className="gap-2.5 text-[13px]"><FolderIcon size={14} />{t('New folder')}</DropdownMenuItem>
-          <DropdownMenuItem disabled={!folder} onSelect={() => uploadInput.current?.click()} className="gap-2.5 text-[13px]"
-            title={folder ? undefined : t('Open a folder to upload into it')}><Upload size={14} />{t('Upload files')}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => uploadInput.current?.click()} className="gap-2.5 text-[13px]"><Upload size={14} />{t('Upload files')}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={newNotebook} className="gap-2.5 text-[13px]"><NavNoteIcon size={14} />{t('Notebook')}</DropdownMenuItem>
-          <DropdownMenuItem onSelect={newDeck} className="gap-2.5 text-[13px]"><NavSlidesIcon size={14} />{t('Slide')}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void newNotebook()} className="gap-2.5 text-[13px]"><NavNoteIcon size={14} />{t('Notebook')}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void newDeck()} className="gap-2.5 text-[13px]"><NavSlidesIcon size={14} />{t('Slide')}</DropdownMenuItem>
         </MenuShell>
       </DropdownMenu>
-      <input ref={uploadInput} type="file" multiple hidden onChange={(e) => { const picked = e.target.files; if (picked) drop(picked); e.target.value = ''; }} />
+      <input ref={uploadInput} type="file" multiple hidden onChange={(e) => { const picked = e.target.files; if (picked) void drop(picked); e.target.value = ''; }} />
     </>}>
+    {/* Whose artifacts: who sees what is put here is the tab's. */}
+    <div role="tablist" aria-label={t('Whose artifacts')} className="flex shrink-0 items-center gap-0.5 border-b border-border/60 px-5 py-1.5">
+      {TABS.map((v) => (
+        <Button key={v.id} type="button" shape="tab" role="tab" aria-selected={tab === v.id}
+          variant={tab === v.id ? 'secondary' : 'ghost'} onClick={() => go({ tab: v.id })}>{t(v.label)}</Button>
+      ))}
+      <span className="ml-3 truncate text-[12px] text-muted-foreground">{t(TAB_HINT[tab])}</span>
+    </div>
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">
+        {!place && !q ? (
+          // Choosing the Domain or the Object whose artifacts to open.
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+            {(tab === 'domain' ? domains.map((d) => ({ id: d.id, name: d.name })) : objects.map((o) => ({ id: o.id, name: o.name }))).map((x) => (
+              <button key={x.id} type="button" onClick={() => go(tab === 'domain' ? { tab, domainId: x.id } : { tab, objectId: x.id })}
+                className="flex h-9 w-full items-center gap-2 rounded-md px-[18px] text-left hover:bg-foreground/[0.05]">
+                {tab === 'domain' ? <DomainIcon size={15} /> : <ObjectIcon size={15} />}
+                <span className="truncate text-[13.5px] text-foreground">{x.name}</span>
+              </button>
+            ))}
+          </div>
+        ) : <>
         <IslandColumns>
           <span className="min-w-0 flex-1">{t('Name')}</span>
-          {!open && <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>}
+          {!open && <span className="hidden w-56 shrink-0 md:block">{t('Kind')}</span>}
           {!open && <span className="hidden w-32 shrink-0 lg:block">{t('Added by')}</span>}
           <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
         </IslandColumns>
         <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-1 ${dropping ? 'bg-foreground/[0.04] outline-dashed outline-2 -outline-offset-4 outline-[var(--border-strong)]' : ''}`}
-          onDragOver={folder ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
-          onDragLeave={folder ? () => setDropping(false) : undefined}
-          onDrop={folder ? (e) => { e.preventDefault(); setDropping(false); drop(e.dataTransfer.files); } : undefined}>
+          onDragOver={place ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
+          onDragLeave={place ? () => setDropping(false) : undefined}
+          onDrop={place ? (e) => { e.preventDefault(); setDropping(false); void drop(e.dataTransfer.files); } : undefined}>
           {(filesLoading || othersLoading) && !total ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-            : !total ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{q ? t('Nothing matches.') : folder ? t('This folder is empty. Drop files here, or add something with +.') : t('No artifacts yet. Add a folder, a notebook or a slide with +.')}</p>
+            : !total ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{q ? t('Nothing matches.') : t('Nothing here yet. Drop files here, or add a folder, a notebook or a slide with +.')}</p>
             : <>
               {shownFolders.map((f) => (
-                <FolderRow key={f.id} folder={f} onOpen={() => go({ folderId: f.id })} />
+                <FolderRow key={f.id} folder={f} onOpen={() => go({ tab: TAB_OF[f.scope], domainId: f.domain_id, objectId: f.object_id, folderId: f.id })} />
               ))}
               {shownNotebooks.map((n) => (
                 <ItemRow key={n.id} icon={<NavNoteIcon size={15} />} name={n.name} kind={t('Notebook')} updated={n.updated_at} onOpen={() => openNotebook(n.id)} />
@@ -205,7 +297,7 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
                     </span>
                     {!open && (
                       <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
-                        {owner.kind === 'folder' ? '—' : <><span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}</>}
+                        {owner.kind === 'folder' ? t('File') : <><span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}</>}
                       </span>
                     )}
                     {!open && <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
@@ -214,14 +306,15 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
                 );
               })}
             </>}
-          {/* The trash, from the top of the tree. */}
-          {!folder && !q && (
+          {/* The trash, from the top of the Space tab. */}
+          {tab === 'space' && atTop && !q && (
             <button type="button" onClick={() => go({ view: 'trash' })}
               className="mt-2 flex h-9 w-full items-center gap-2 rounded-md px-[18px] text-left text-[13px] text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground">
               <Trash2 size={14} />{t('Deleted')}
             </button>
           )}
         </div>
+        </>}
       </div>
 
       {open && <FilePane file={open} who={who(open)} onClose={() => select(null)} />}
@@ -229,6 +322,14 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
     </MainIsland>
   );
 }
+
+const TAB_OF: Record<Folder['scope'], ArtifactTab> = { space: 'space', domain: 'domain', object: 'object', my: 'my' };
+const TAB_HINT: Record<ArtifactTab, string> = {
+  space: 'Everyone in the Space sees these.',
+  domain: 'Whoever sees the Domain sees these.',
+  object: 'Whoever sees the Object sees these.',
+  my: 'Only you see these.',
+};
 
 /** A folder in the list: opens on click; rename and delete from its "⋯". */
 function FolderRow({ folder, onOpen }: { folder: Folder; onOpen: () => void }) {

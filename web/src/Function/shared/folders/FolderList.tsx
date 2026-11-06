@@ -101,13 +101,18 @@ export function MoveToFolderItems({ app, domainId, current, onMove, allowNone = 
 }) {
   const { t } = useI18n();
   const { data: folders } = useFolders(app, domainId);
-  const others = folders.filter((f) => f.id !== current);
+  // Artifacts' folders: only those of the same place (moving a file to
+  // another tab would change who sees it), never a tab's hidden root.
+  const here = folders.find((f) => f.id === current);
+  const samePlace = (f: Folder) => !here || app !== 'files' || (f.scope === here.scope && f.domain_id === here.domain_id
+    && f.object_id === here.object_id && f.owner_id === here.owner_id);
+  const others = folders.filter((f) => f.id !== current && !f.is_root && samePlace(f));
   // Artifacts' folders nest: each is named by its path.
   const label = (f: Folder) => {
     const names = [f.name];
     const seen = new Set([f.id]);
     let up = folders.find((x) => x.id === f.parent_id);
-    while (up && !seen.has(up.id)) { seen.add(up.id); names.unshift(up.name); up = folders.find((x) => x.id === up!.parent_id); }
+    while (up && !up.is_root && !seen.has(up.id)) { seen.add(up.id); names.unshift(up.name); up = folders.find((x) => x.id === up!.parent_id); }
     return names.join(' / ');
   };
   return <>
