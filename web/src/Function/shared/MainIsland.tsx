@@ -73,7 +73,7 @@ export function MainIsland({ crumbs, count, after, actions, children }: {
 /** A list's column heads, as Execution's lists have them. */
 export function IslandColumns({ children }: { children: ReactNode }) {
   return (
-    <div className="flex shrink-0 items-center gap-3 py-2.5 pl-[30px] pr-6 text-[13px] text-muted-foreground">
+    <div className="flex shrink-0 items-center gap-3 py-2.5 pl-[30px] pr-[30px] text-[13px] text-muted-foreground">
       {children}
     </div>
   );

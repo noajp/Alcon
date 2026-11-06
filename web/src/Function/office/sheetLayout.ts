@@ -1,3 +1,4 @@
+import { needsRecalc, recalcMissing } from './sheetFormulas';
 import { readChart, type ChartData } from './chartLayout';
 import { desc, kid, kids, openPackage, relId, relOfType, SCHEME_ORDER, themeColors, breather } from './ooxml';
 
@@ -192,7 +193,7 @@ const BORDER_CSS: Record<string, string> = {
   thick: '3px solid', double: '3px double',
 };
 
-interface Raw { value: string | number | null; style: number; runs?: CellRun[] }
+interface Raw { value: string | number | null; style: number; runs?: CellRun[]; formula?: string }
 
 /** Reads a .xlsx's bytes into its sheets, as drawn. */
 export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
@@ -311,9 +312,16 @@ export async function readWorkbook(bytes: ArrayBuffer): Promise<WorkSheet[]> {
         : t === 'b' ? (v === '1' ? 'TRUE' : 'FALSE')
         : v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : v;
       const runs = t === 's' ? sharedRuns[Number(v)] : t === 'inlineStr' && kid(c, 'is') ? runsOf(kid(c, 'is')!) : undefined;
-      cells.set(c.getAttribute('r') ?? '', { value, style: Number(c.getAttribute('s') ?? 0), ...(runs ? { runs } : {}) });
+      const formula = kid(c, 'f')?.textContent || undefined;
+      cells.set(c.getAttribute('r') ?? '', { value, style: Number(c.getAttribute('s') ?? 0), ...(runs ? { runs } : {}), ...(formula ? { formula } : {}) });
     }
     rawBySheet.set(def.name, cells);
+  }
+
+  // Formulas saved without their results (Google Sheets exports do this) are
+  // worked out, so the cells and the charts reading them are not blank.
+  if (needsRecalc(rawBySheet)) {
+    try { await recalcMissing(rawBySheet); } catch { /* shown as saved: blank */ }
   }
 
   /** The values of a range like 'Sheet 1'!$D$2:$D$67, in order. */
