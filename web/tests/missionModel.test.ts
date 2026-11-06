@@ -96,6 +96,31 @@ describe('normalizePlan', () => {
     ]);
   });
 
+  it('keeps a person only on a person\'s task, and only one of the Space\'s people', () => {
+    const plan = normalizePlan({
+      tasks: [
+        { key: 't1', title: 'Sign', assignee: 'human', assigneeWorkerId: 'w1' },
+        { key: 't2', title: 'Review', assignee: 'human', assigneeWorkerId: 'made-up' },
+        { key: 't3', title: 'Draft', assignee: 'ai', assigneeWorkerId: 'w1' },
+        { key: 't4', title: 'Decide', assignee: 'human' },
+        { key: 't5', title: 'Odd', assignee: 'human', assigneeWorkerId: 42 },
+      ],
+    }, new Set(), { workerIds: new Set(['w1', 'w2']) });
+    expect(plan.tasks.map((t) => [t.key, t.assigneeWorkerId])).toEqual([
+      ['t1', 'w1'], ['t2', null], ['t3', null], ['t4', null], ['t5', null],
+    ]);
+    // With no people known, no id is trusted.
+    expect(normalizePlan({ tasks: [{ key: 't1', title: 'Sign', assignee: 'human', assigneeWorkerId: 'w1' }] }, new Set()).tasks[0].assigneeWorkerId).toBeNull();
+  });
+
+  it('names the chosen person on the draft card', () => {
+    const draft = normalizePlan({
+      tasks: [{ key: 't1', title: 'Sign', assignee: 'human', assigneeWorkerId: 'w1' }, { key: 't2', title: 'Decide', assignee: 'human' }],
+    }, new Set(), { workerIds: new Set(['w1']) });
+    const cards = draftFleet([], [], draft, new Map([['w1', 'Hanako']])).flatMap((o) => o.elements);
+    expect(cards.map((c) => c.assigneeName)).toEqual(['Hanako', null]);
+  });
+
   it('survives a malformed answer', () => {
     expect(normalizePlan(null, new Set())).toEqual({ summary: '', objectives: [], objects: [], tasks: [] });
   });

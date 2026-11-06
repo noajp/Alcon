@@ -329,6 +329,7 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Harness': ['ハーネス', '하네스', 'Harnais', 'Arnés'],
   'The Space’s default': ['Space の既定', 'Space 기본값', 'Le défaut du Space', 'El predeterminado del Space'],
   'Breakdown': ['分け方', '분해 방식', 'Découpage', 'División'],
+  'Assignment rule': ['担当の決め方', '담당 정하는 방식', 'Attribution', 'Asignación'],
   "The Strategy's": ['Strategy のもの', 'Strategy의 것', 'Celle de la Strategy', 'La de la Strategy'],
   'Hide': ['閉じる', '닫기', 'Masquer', 'Ocultar'],
   'Paste a new harness': ['新しいハーネスを貼り付ける', '새 하네스 붙여넣기', 'Coller un nouveau harnais', 'Pegar un nuevo arnés'],
