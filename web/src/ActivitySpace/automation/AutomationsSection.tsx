@@ -221,6 +221,7 @@ function NewAutomation({ spaceId, harnesses, objects, onCancel, onCreated }: {
           <span className="mb-1 block text-[12px] text-muted-foreground">{t('Put the work in')}</span>
           <OptionMenu label={t('Put the work in')} value={objectId} onChange={setObjectId}
             options={objects.map((o) => ({ value: o.id, label: o.name }))} />
+          <p className="mt-1 text-[11px] text-muted-foreground">{t('Choose an Object that belongs to a Strategy, so the AI can keep records in its Tables.')}</p>
         </div>
       </div>
       <div>
