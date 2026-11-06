@@ -6,7 +6,7 @@
 // Deferred definitions stay out of the cached prefix, so a search appends
 // and never invalidates the cache. Pure: index.ts and the tests share it.
 
-import type { ToolDef } from "../_shared/boardTools.ts";
+import type { ToolDef } from "./boardTools.ts";
 
 /** A tool as a run freezes it: whether it was deferred is part of the prefix. */
 export type RunToolDef = ToolDef & { defer?: boolean };

@@ -6,7 +6,7 @@
 // unchanged, and every tool_use gets exactly one tool_result in the single
 // user message that follows it.
 
-import type { ModelUsage } from "../_shared/aiPricing.ts";
+import type { ModelUsage } from "./aiPricing.ts";
 
 export type Block = { type: string; id?: string; name?: string; input?: unknown; text?: string; [k: string]: unknown };
 export type Msg = { role: "user" | "assistant"; content: string | Block[] };
@@ -53,6 +53,8 @@ export interface LoopDeps {
    * answer); { pass: false } sends the gaps back to the agent.
    */
   verify?(finish: FinishPayload): Promise<Verdict | null>;
+  /** What the model is told after a turn with neither text nor a tool call. */
+  nudge?: string;
 }
 
 export interface Verdict { pass: boolean; gaps: string[] }
@@ -149,7 +151,7 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       const text = textOf(turn.content);
       if (text) return { kind: "finished", finish: { outcome: "completed", summary: text.split("\n")[0].slice(0, 200), message: text } };
       if (state.nudges++ >= 2) return { kind: "finished", finish: { outcome: "blocked", summary: "応答がありませんでした", message: "エージェントが応答を返しませんでした。" } };
-      state.messages.push({ role: "user", content: "道具を使って作業を進め、終わったら finish を呼んでください。" });
+      state.messages.push({ role: "user", content: deps.nudge ?? "道具を使って作業を進め、終わったら finish を呼んでください。" });
       continue;
     }
 

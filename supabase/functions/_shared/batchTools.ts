@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "../_shared/boardTools.ts";
+import { normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
 
 // Several Elements under one Object in one write. Filing a list one
 // createElement at a time spent a tool call, an insert and an audit insert per

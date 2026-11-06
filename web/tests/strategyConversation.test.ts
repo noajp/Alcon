@@ -54,7 +54,7 @@ describe('definitionReading', () => {
 describe('the conversation run', () => {
   it('offers the Strategy reads and writes and the hand-over, never execution tools', () => {
     const names = conversation.conversationTools().map((t: { name: string }) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['getInitiative', 'addIntent', 'writeInitiativeDefinition', 'hand_to_planner', 'listElements']));
+    expect(names).toEqual(expect.arrayContaining(['getInitiative', 'addIntent', 'writeInitiativeDefinition', 'hand_to_planner', 'listElements', 'readFile', 'writeFile', 'readHarness']));
     for (const n of ['finish', 'createElement', 'updateElement', 'save_artifact']) expect(names).not.toContain(n);
     expect(new Set(names).size).toBe(names.length);
   });

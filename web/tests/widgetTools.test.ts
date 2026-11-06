@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SURFACE_SUBJECT } from '@/Function/widget/boardModel';
 // Edge Functions use Deno URL imports; load at runtime so the web compiler
 // does not attempt to resolve the separate server dependency graph.
-const { validateTablePatch, validateDataView, parseBoardKey, runWidgetTool } = await import(new URL('../../supabase/functions/alcon-copilot/widgetTools.ts', import.meta.url).pathname);
+const { validateTablePatch, validateDataView, parseBoardKey, runWidgetTool } = await import(new URL('../../supabase/functions/_shared/widgetTools.ts', import.meta.url).pathname);
 const tableId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 describe('Copilot widget and Table boundaries', () => {
   it('rejects ownership and scope reassignment through child patches', () => {

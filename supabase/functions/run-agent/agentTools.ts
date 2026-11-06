@@ -1,12 +1,14 @@
-import { BOARD_TOOLS, type ToolDef } from "../_shared/boardTools.ts";
+import type { ToolDef } from "../_shared/boardTools.ts";
 import { RECORD_TOOLS } from "./records.ts";
-import { STRATEGY_TOOLS } from "../_shared/strategyTools.ts";
-import type { ToolKind } from "./loop.ts";
+import { isCatalogTool, toolsFor } from "../_shared/catalog.ts";
+import type { RunToolDef } from "../_shared/toolLoading.ts";
+import type { ToolKind } from "../_shared/agentLoop.ts";
 
-// What an Element-executing agent can do. The board and strategy tools are
-// the same caller-scoped ones the Copilot and the MCP server use (RLS decides
-// what each call may touch); the internal tools are how the agent reports.
-// External services (integrations) add their own tools at run time.
+// What an Element-executing agent can do. Alcon's own operations come from the
+// one catalog under the Element policy (reads and writes, nothing that
+// removes) — the same tools and executor as the AI panel and a conversation,
+// with RLS deciding what each call may touch. The internal tools are how the
+// agent reports. External services (integrations) add their own at run time.
 
 export const INTERNAL_TOOLS: ToolDef[] = [
   {
@@ -99,14 +101,6 @@ export function webSteps(content: { type: string; name?: string; input?: unknown
   });
 }
 
-/** The board tools an agent may use: reads, and everyday writes. No deletes, no bulk writes. */
-export const AGENT_BOARD_TOOL_NAMES = [
-  "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",
-  "createElement", "updateElement", "addElementComment", "addElementAssignee", "setElementLabels",
-  "createSubelement", "toggleSubelementComplete",
-] as const;
-
-export const AGENT_STRATEGY_TOOL_NAMES = ["listInitiatives", "getInitiative"] as const;
 
 /** A round of a loop, for an Element whose definition names a metric. */
 export const ROUND_TOOL: ToolDef = {
@@ -127,12 +121,10 @@ export const ROUND_TOOL: ToolDef = {
 
 // Saving and reading the Strategy's Tables is the run's own work, like saving an artifact.
 const INTERNAL = new Set([...INTERNAL_TOOLS.map((t) => t.name), ROUND_TOOL.name, ...RECORD_TOOLS.map((t) => t.name)]);
-const BOARD = new Set<string>(AGENT_BOARD_TOOL_NAMES);
-const STRATEGY = new Set<string>(AGENT_STRATEGY_TOOL_NAMES);
 
-export function baseAgentTools(): ToolDef[] {
-  const pick = (defs: ToolDef[], names: Set<string>) => defs.filter((d) => names.has(d.name));
-  return [...INTERNAL_TOOLS, ...pick(BOARD_TOOLS, BOARD), ...pick(STRATEGY_TOOLS, STRATEGY)];
+/** The run's own tools, then the catalog's (its core loaded, the rest found by search). */
+export function baseAgentTools(): RunToolDef[] {
+  return [...INTERNAL_TOOLS, ...toolsFor("element")];
 }
 
 /** Integration tools are named `<prefix>__<tool>`; everything else is ours. */
@@ -141,12 +133,8 @@ export const INTEGRATION_SEPARATOR = "__";
 export function baseKindOf(name: string): ToolKind | null {
   if (name === "finish") return "finish";
   if (INTERNAL.has(name)) return "internal";
-  if (BOARD.has(name) || STRATEGY.has(name)) return "board";
+  if (isCatalogTool(name)) return "board";
   return null;
-}
-
-export function isStrategyTool(name: string): boolean {
-  return STRATEGY.has(name);
 }
 
 /** Pure. A tool-name prefix for an integration, stable across a run's slices (keyed on its id). */

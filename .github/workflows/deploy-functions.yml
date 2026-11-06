@@ -1,0 +1,99 @@
+# Edge Functions を、main に入った時点で本番に出す。
+#
+# 変わった関数だけを出す。_shared が変わったら、それを読む関数をすべて出す。
+# 手で出すときは Actions の画面から "Run workflow" を押し、names に関数名を
+# 空白区切りで書く（all ですべて）。
+#
+# 必要な Secret: SUPABASE_ACCESS_TOKEN（supabase.com › Account › Access Tokens）
+
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/**"
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "出す関数（空白区切り。all ですべて）"
+        required: true
+        default: "all"
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: rkugtcqztkkacvoylupw
+      # 自分で認証する関数（Webhook・OAuth の戻り先・cron・PC の実行役）。
+      # 本番の設定と同じにしておく。ここにない関数は JWT を求める。
+      NO_VERIFY_JWT: "dev-event integration-oauth audit-intake audit-grants audit-approvals asset-relay automations"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Decide what to deploy
+        id: pick
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          MANUAL: ${{ github.event.inputs.names }}
+        run: |
+          set -euo pipefail
+          all=$(find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name _shared -exec basename {} \; | sort)
+          if [ -n "${MANUAL:-}" ]; then
+            if [ "$MANUAL" = "all" ]; then names="$all"; else names="$MANUAL"; fi
+          else
+            if [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              changed=$(git diff --name-only HEAD~1 HEAD -- supabase/functions)
+            else
+              changed=$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions)
+            fi
+            names=$(echo "$changed" | awk -F/ 'NF>3 {print $3}' | grep -v '^_shared$' | sort -u || true)
+            shared=$(echo "$changed" | grep '^supabase/functions/_shared/' || true)
+            if [ -n "$shared" ]; then
+              for fn in $all; do
+                if grep -rqs '_shared/' "supabase/functions/$fn"; then names="$names $fn"; fi
+              done
+            fi
+          fi
+          # 消えた関数は出さない。
+          keep=""
+          for fn in $(echo $names | tr ' ' '\n' | sort -u); do
+            if [ -f "supabase/functions/$fn/index.ts" ]; then keep="$keep $fn"; fi
+          done
+          echo "names=$(echo $keep)" >> "$GITHUB_OUTPUT"
+          echo "Deploying: ${keep:-(nothing)}"
+
+      - name: Deploy
+        if: steps.pick.outputs.names != ''
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN が Secrets にありません"
+            exit 1
+          fi
+          failed=""
+          for fn in ${{ steps.pick.outputs.names }}; do
+            flag=""
+            case " $NO_VERIFY_JWT " in *" $fn "*) flag="--no-verify-jwt" ;; esac
+            echo "::group::$fn $flag"
+            if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api $flag; then
+              failed="$failed $fn"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::デプロイに失敗した関数:$failed"
+            exit 1
+          fi

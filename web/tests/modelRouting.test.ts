@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizePlan } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 
 const cfg = await import(new URL('../../supabase/functions/run-agent/agentConfig.ts', import.meta.url).pathname);
-const tl = await import(new URL('../../supabase/functions/run-agent/toolLoading.ts', import.meta.url).pathname);
+const tl = await import(new URL('../../supabase/functions/_shared/toolLoading.ts', import.meta.url).pathname);
 
 const plain = { name: 'Claude', ai_config: null, ai_model: null };
 

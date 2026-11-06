@@ -11,9 +11,9 @@
 // when the person asks for a plan, and the person adopts the draft.
 
 import type { ToolDef } from "../_shared/boardTools.ts";
-import { STRATEGY_TOOLS, STRATEGY_WRITE_TOOLS } from "../_shared/strategyTools.ts";
-import { BOARD_TOOLS } from "../_shared/boardTools.ts";
-import type { ToolKind } from "./loop.ts";
+import { toolsFor } from "../_shared/catalog.ts";
+import type { RunToolDef } from "../_shared/toolLoading.ts";
+import type { ToolKind } from "../_shared/agentLoop.ts";
 
 export const PLANNER_TOOL: ToolDef = {
   name: "hand_to_planner",
@@ -29,27 +29,15 @@ export const PLANNER_TOOL: ToolDef = {
   },
 };
 
-/** The board reads the conversation may use: it looks at the work, it does not do it. */
-const BOARD_READS = new Set(["listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers"]);
-
-export function conversationTools(): ToolDef[] {
-  return [
-    ...STRATEGY_TOOLS,
-    ...STRATEGY_WRITE_TOOLS,
-    ...BOARD_TOOLS.filter((t) => BOARD_READS.has(t.name)),
-    PLANNER_TOOL,
-  ];
+/** The catalog's tools under the conversation's policy (it reads anything,
+ *  and writes the Strategy's record and files), and the hand-over to the Planner. */
+export function conversationTools(): RunToolDef[] {
+  return [PLANNER_TOOL, ...toolsFor("conversation")];
 }
-
-const STRATEGY_NAMES = new Set([...STRATEGY_TOOLS, ...STRATEGY_WRITE_TOOLS].map((t) => t.name));
 
 /** Pure. How the loop treats a conversation's tool: all run at once, none needs approval. */
 export function conversationKindOf(name: string): ToolKind {
   return name === PLANNER_TOOL.name ? "internal" : "board";
-}
-
-export function isConversationStrategyTool(name: string): boolean {
-  return STRATEGY_NAMES.has(name);
 }
 
 export interface ConversationContext {
@@ -79,6 +67,7 @@ export function conversationSystemPrompt(agentName: string): string {
   - 意思決定（選んだこと、捨てた選択肢）→ addIntent kind=decision
   - 筋道（目的を勝ち取る下位の Strategy）→ createInitiative
   - 仕事の進め方・止める条件・人に引き継ぐ所・成果物の型 → writeInitiativeDefinition
+- 添付ファイルや資料が話に出たら、listFiles と readFile で読んでから話す。Space のハーネス（listHarnesses / readHarness）に合うものがあれば、進め方を決めるときに使う。
 - 分解（Object と Element に割ること）はしない。それは Planner の仕事。計画を求められたら、または目的と成功条件が決まって分解できる状態になったら、hand_to_planner で渡す。
 - 人がすでに明確に言っていることは聞き返さずに記録する。決まっていない所だけを聞く。
 
