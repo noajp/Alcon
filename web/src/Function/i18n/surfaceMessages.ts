@@ -36,7 +36,6 @@ const SURFACE_MESSAGES: Record<string, Row> = {
   'Saving layout…': ['配置を保存中…', '배치 저장 중…', 'Enregistrement de la disposition…', 'Guardando la disposición…'],
   'How each Domain says its work contributes': ['各 Domain が自分の仕事でどう貢献するか', '각 Domain이 자신의 일로 어떻게 기여하는지', 'Comment chaque Domain dit que son travail contribue', 'Cómo dice cada Domain que su trabajo contribuye'],
   'How this Domain says its work contributes to each Strategy': ['この Domain の仕事が各 Strategy にどう貢献するか', '이 Domain의 일이 각 Strategy에 어떻게 기여하는지', 'Comment le travail de ce Domain contribue à chaque Strategy', 'Cómo contribuye el trabajo de este Domain a cada Strategy'],
-  'The Objects in this Domain': ['この Domain の Object', '이 Domain의 Object', 'Les Objects de ce Domain', 'Los Objects de este Domain'],
   'The Domains whose Objects carry this Strategy': ['この Strategy を担う Object がある Domain', '이 Strategy를 맡은 Object가 있는 Domain', 'Les Domains dont les Objects portent cette Strategy', 'Los Domains cuyos Objects llevan esta Strategy'],
   'The Strategies this Domain’s Objects contribute to': ['この Domain の Object が貢献する Strategy', '이 Domain의 Object가 기여하는 Strategy', 'Les Strategies auxquelles contribuent les Objects de ce Domain', 'Las Strategies a las que contribuyen los Objects de este Domain'],
   // ── Widget names ──────────────────────────────────────────────

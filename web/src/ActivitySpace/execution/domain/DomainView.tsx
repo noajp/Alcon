@@ -64,8 +64,9 @@ const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custo
 const DOMAIN_TAB_PREFIX = 'domain:activeTabType:';
 const DOMAIN_VISIBLE_TABS_PREFIX = 'domain:visibleTabs:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
-const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
-const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['elements'];
+const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
+// A Domain always has its Overview and its Objects; other views are added.
+const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
@@ -102,6 +103,11 @@ function loadVisibleTabs(key: string, fallback: ObjectTabType[]): ObjectTabType[
   }
 }
 
+/** The Domain's own two tabs lead, whatever else was added. */
+function withDomainTabs(types: ObjectTabType[]): ObjectTabType[] {
+  return [...DEFAULT_DOMAIN_TAB_TYPES, ...types.filter((t) => !DEFAULT_DOMAIN_TAB_TYPES.includes(t))];
+}
+
 function saveVisibleTabs(key: string, tabs: ObjectTabType[]) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(key, JSON.stringify(tabs));
@@ -115,6 +121,9 @@ interface DomainViewProps {
   /** Switch the active top-level activity — e.g. the Object Overview's
    *  "Strategy" property row jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
+  /** The tab to open on: Overview from the Domain itself, All Objects from
+   *  its Objects row. Without it, the tab last used in this Domain. */
+  landOn?: ObjectTabType;
 }
 
 /**
@@ -123,7 +132,7 @@ interface DomainViewProps {
  * Calendar, etc. are now Domain-scoped views, with the same tab choice
  * carrying through when the user drills into a specific Object.
  */
-export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
+export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange, landOn }: DomainViewProps) {
   const explorerData = useExplorerData();
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -147,7 +156,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   });
   const [objectActiveType, setObjectActiveType] = useState<ObjectTabType>('overview');
   const [domainVisibleTypes, setDomainVisibleTypes] = useState<ObjectTabType[]>(() =>
-    loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${activeDomainId ?? 'none'}`, DEFAULT_DOMAIN_TAB_TYPES)
+    withDomainTabs(loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${activeDomainId ?? 'none'}`, DEFAULT_DOMAIN_TAB_TYPES))
   );
   const [objectVisibleTypesById, setObjectVisibleTypesById] = useState<Record<string, ObjectTabType[]>>({});
 
@@ -157,8 +166,9 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem(`${DOMAIN_TAB_PREFIX}${domainKey}`);
     setDomainActiveType(saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB);
-    setDomainVisibleTypes(loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${domainKey}`, DEFAULT_DOMAIN_TAB_TYPES));
-  }, [domainKey]);
+    setDomainVisibleTypes(withDomainTabs(loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${domainKey}`, DEFAULT_DOMAIN_TAB_TYPES)));
+    if (landOn) setDomainActiveType(landOn);
+  }, [domainKey, landOn]);
 
   useEffect(() => {
     setObjectActiveType('overview');
@@ -391,7 +401,10 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
           }}
           onTabClose={(id) => {
             const t = tabs.find(x => x.id === id);
-            if (t && t.tab_type !== 'elements') removeVisibleTab(t.tab_type);
+            if (!t || t.tab_type === 'elements') return;
+            // The Domain's Overview stays; an Object's can be closed.
+            if (!selectedObject && t.tab_type === 'overview') return;
+            removeVisibleTab(t.tab_type);
           }}
           onTabCreate={(type) => ensureVisibleTab(type)}
           rightSlot={
