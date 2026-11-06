@@ -5,7 +5,6 @@ import { ExplorerDataProvider } from '@/Function/shared/ExplorerDataContext';
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
-import { ModeRail, railModeOf } from '@/shell/ModeRail';
 import { StatusBar } from '@/shell/StatusBar';
 import { useUserPreferences } from '@/Function/settings/useUserPreferences';
 import { DiscoverModal } from '@/shell/DiscoverModal';
@@ -377,12 +376,8 @@ function WorkspaceContent({
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the strip's reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
-  // Profile (reached from the avatar; Now / My Elements / My Notes / AI are
-  // its tabs) has nothing to list, so it takes the whole width.
-  // Slides brings its own deck list, so it takes the whole width too.
-  const personalMode = railModeOf(activeTab.activeView) === 'personal';
+  // Every screen keeps the sidebar: it is the only way between surfaces.
   const aiScreen = activeTab.activeView === 'ai';
-  const noSidebar = personalMode;
   const [discoverOpen, setDiscoverOpen] = useState(false);
   // The AI pop-up — open state shared by the status bar's button, ⌘L and the
   // pop-up's own close. It starts closed, so the work has the whole page
@@ -572,16 +567,10 @@ function WorkspaceContent({
       }}
     >
       <div className="relative flex-1 flex overflow-hidden">
-        {/* The rail and the pinned sidebar share one frame, divided by a
-            line, as in VS Code. Not positioned, so the sidebar's drawer
+        {/* The sidebar's frame. Not positioned, so the sidebar's drawer
             (absolute, measured from the row) escapes its clipping. */}
         <div className="mt-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
-        <ModeRail
-          scope={scope}
-          activeView={activeTab.activeView}
-          onViewChange={handleSidebarViewChange}
-        />
-        {!noSidebar && <AppSidebar
+        <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
@@ -594,10 +583,10 @@ function WorkspaceContent({
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
           onSearch={scope === 'full' ? () => setDiscoverOpen(true) : undefined}
-        />}
+        />
         </div>
 
-        {!noSidebar && sidebarCollapsed && sidebarOverlay && (
+        {sidebarCollapsed && sidebarOverlay && (
           <div
             className="absolute inset-0 z-40 bg-black/45"
             onClick={() => setSidebarOverlay(false)}
@@ -658,7 +647,7 @@ function WorkspaceContent({
         scope={scope}
         activeView={activeTab.activeView}
         onViewChange={handleSidebarViewChange}
-        sidebar={noSidebar ? undefined : { visible: !sidebarCollapsed || sidebarOverlay, onToggle: handleSidebarToggle }}
+        sidebar={{ visible: !sidebarCollapsed || sidebarOverlay, onToggle: handleSidebarToggle }}
         ai={{ open: copilotOpen || aiScreen, onToggle: aiScreen ? handleMinimizeAi : () => handleCopilotOpenChange(!copilotOpen) }}
       />
 

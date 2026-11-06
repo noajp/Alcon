@@ -48,7 +48,8 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
-import { railModeOf } from '@/shell/ModeRail';
+import { MODE_META, railModeOf } from '@/shell/railApps';
+import { viewInScope } from '@/Function/space/spaceScope';
 import type { RailMode } from '@/shell/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAddElementLauncher';
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
@@ -88,8 +89,11 @@ interface AppSidebarProps {
   onSearch?: () => void;
 }
 
-// The ModeRail picks a top-level mode; the sidebar renders only that mode's
-// surfaces.
+/** The tools under Strategy at the top of the sidebar. */
+const SIDEBAR_TOOLS: RailMode[] = ['files', 'reviews', 'audit', 'team', 'tables'];
+
+// The sidebar's top is fixed (Strategy and the tools); under it, the open
+// surface's own list.
 
 // Workspace — Strategy and Execution in one sidebar, a section each.
 // Strategy is what we're trying to achieve and how we intend to win: one
@@ -372,8 +376,7 @@ export function AppSidebar({
         className={`app-sidebar flex flex-col flex-shrink-0 overflow-hidden ${
           collapsed
             ? 'absolute inset-y-0 left-0 z-50 h-full bg-background shadow-xl'
-            // Pinned, it shares the rail's frame, a line between them, as in VS Code.
-            : 'relative border-l border-border'
+            : 'relative'
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Header — fixed; only the navigation under it scrolls. The same
@@ -429,12 +432,23 @@ export function AppSidebar({
               a list in the main island where their nesting shows), then
               Execution (the Domains, where
               the work is done). */}
+          {/* The fixed top of every sidebar: Strategy, then the tools. What
+              sits under it is the open surface's own list — the Domains for
+              the Workspace, the tables for Table, and so on. */}
+          <div className="mt-5">
+            {viewInScope('strategy', spaceScope) && (
+              <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
+                onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
+            )}
+            {SIDEBAR_TOOLS.filter((mode) => viewInScope(MODE_META[mode].defaultView, spaceScope)).map((mode) => {
+              const { label, icon: Icon, defaultView } = MODE_META[mode];
+              return <SidebarRow key={mode} active={railMode === mode} icon={<Icon size={16} />} label={t(label)}
+                onClick={() => { if (railMode !== mode) onViewChange(defaultView); }} />;
+            })}
+          </div>
+
           {railMode === 'workspace' && (
           <>
-          <div className="mt-5">
-            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
-              onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
-          </div>
 
           <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
             if (f.domainId) setActiveDomainId(f.domainId);

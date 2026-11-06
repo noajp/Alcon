@@ -6,10 +6,12 @@ import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
+import { useMemo } from 'react';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
-// The strip along the foot of the window, as in VS Code. The tools for making
-// documents sit at the left; the right holds what stays at hand from any
+// The strip along the foot of the window, as in VS Code. The person's avatar
+// and the tools for making documents sit at the left; the right holds what stays at hand from any
 // screen — the sidebar's toggle, the inbox, the AI and the calendar.
 
 const btn = (active: boolean) =>
@@ -30,7 +32,10 @@ export function StatusBar({
   ai: { open: boolean; onToggle: () => void };
 }) {
   const { t } = useI18n();
-  const { user } = useAuthContext();
+  const { user, profile } = useAuthContext();
+  const name = profile?.display_name || user?.email?.split('@')[0] || null;
+  const avatarUrl = profile?.avatar_url;
+  const me = useMemo(() => ({ name, avatar_url: avatarUrl }), [name, avatarUrl]);
   const { unreadCount } = useNotifications(user?.id ?? null);
   const activeMode = railModeOf(activeView);
   const inScope = (mode: RailMode) => viewInScope(MODE_META[mode].defaultView, scope);
@@ -56,6 +61,12 @@ export function StatusBar({
   return (
     <ButtonAppearanceProvider appearance="navigation">
     <footer className="flex h-6 shrink-0 items-center gap-0.5 px-1.5">
+      {/* The person first: the avatar opens the Profile, with Now, My
+          Elements and the rest as its tabs. */}
+      <Button variant="ghost" size="sm" onClick={() => go('personal')} aria-pressed={activeMode === 'personal'}
+        title={name ?? t('Profile')} aria-label={t('Profile')} className={btn(activeMode === 'personal')}>
+        <WorkerAvatar worker={me} size={14} />
+      </Button>
       {BAR_TOOLS.filter(inScope).map((mode) => modeButton(mode, true))}
 
       <div className="ml-auto flex items-center gap-0.5">
