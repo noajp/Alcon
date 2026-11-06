@@ -26,7 +26,6 @@ const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeSc
 const NotebookSurface = dynamic(() => import('@/ActivitySpace/sustainment/notebook/NotebookSurface').then(m => m.NotebookSurface), { ssr: false, loading: viewLoading });
 const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
 const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
-const DomainOverview = dynamic(() => import('@/ActivitySpace/execution/domain/DomainOverview').then(m => m.DomainOverview), { ssr: false, loading: viewLoading });
 const DomainView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainView').then(m => m.DomainView), { ssr: false, loading: viewLoading });
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
@@ -159,8 +158,17 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
+          {/* The Domain itself: its page with the Overview and All Objects tabs,
+              opening on Overview. */}
           {activeActivity === 'domain-overview' && (
-            <DomainOverview key={activeDomainId} domainId={activeDomainId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />
+            <DomainView
+              navigation={{ ...navigation, objectId: null }}
+              onNavigate={(nav) => { onNavigate(nav); if (nav.objectId) onViewChange?.('objects'); }}
+              onRefresh={onRefresh}
+              activeDomainId={activeDomainId}
+              onViewChange={onViewChange}
+              landOn="overview"
+            />
           )}
 
           {activeActivity === 'domain-elements' && (
@@ -205,6 +213,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               onRefresh={onRefresh}
               activeDomainId={activeDomainId}
               onViewChange={onViewChange}
+              landOn="elements"
             />
           )}
 

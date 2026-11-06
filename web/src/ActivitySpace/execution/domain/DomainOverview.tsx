@@ -1,8 +1,7 @@
 'use client';
 
-import { IslandHeader } from '@/Function/shared/MainIsland';
 import { useDomainOverview } from '@/hooks/useDomainOverview';
-import { useBoard, WidgetSurface, WidgetZone, WidgetActionSlotProvider, WidgetActionSlotTarget, type WidgetHost } from '@/Function/widget';
+import { useBoard, WidgetSurface, WidgetZone, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
 import { DomainIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { Hash, Lock, Users } from '@/ui/icons';
@@ -18,6 +17,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import type { Domain } from '@/types/database';
 
+/** The Domain's Overview tab, under the Domain page's header and tabs
+ *  (DomainView): no header of its own, and "Add widget" goes to the tab bar. */
 export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   domainId: string | null;
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -43,12 +44,8 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
     },
     onViewChange,
   };
-  return <WidgetActionSlotProvider><div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
-    <IslandHeader crumbs={[{ id: 'domain', label: domain.name }]} actions={<>
-      {viewOnly && <ViewOnlyBadge />}
-      {/* "Add widget" is page chrome: it sits in the header, as on Element detail. */}
-      <WidgetActionSlotTarget className="flex items-center gap-1" />
-    </>} />
+  return <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+    {viewOnly && <div className="flex justify-end px-4 pt-2"><ViewOnlyBadge /></div>}
     <div className="min-h-0 flex-1 overflow-y-auto">
       <PageLayout rail={
         <RailCard title={t('Properties')}>
@@ -80,7 +77,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
         </WidgetSurface>
       </PageLayout>
     </div>
-  </div></WidgetActionSlotProvider>;
+  </div>;
 }
 
 /** The Domain's icon and colour at the head of its page, picked as a
