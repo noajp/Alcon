@@ -280,10 +280,10 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
         <>
         <IslandColumns>
           <span className="min-w-0 flex-1">{t('Name')}</span>
-          {across && <span className="w-44 shrink-0">{tab === 'domain' ? t('Domain') : t('Object')}</span>}
-          {!open && <span className="hidden w-56 shrink-0 md:block">{t('Kind')}</span>}
-          {!open && <span className="hidden w-32 shrink-0 lg:block">{t('Added by')}</span>}
-          <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
+          {across && <span className="w-40 shrink-0">{tab === 'domain' ? t('Domain') : t('Object')}</span>}
+          {!open && <span className="hidden w-36 shrink-0 md:block">{t('Kind')}</span>}
+          {!open && <span className="hidden w-24 shrink-0 lg:block">{t('Added by')}</span>}
+          <span className="w-16 shrink-0 text-right">{t('Updated')}</span>
         </IslandColumns>
         <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-1 ${dropping ? 'bg-foreground/[0.04] outline-dashed outline-2 -outline-offset-4 outline-[var(--border-strong)]' : ''}`}
           onDragOver={place ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
@@ -317,14 +317,14 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
                         <span className="mt-0.5 block truncate pl-6 text-[12px] text-muted-foreground">{snippets.get(f.id)}</span>
                       )}
                     </span>
-                    {across && <span className="w-44 shrink-0" onClick={(e) => e.stopPropagation()}>{whereOf(f.folder_id, f.object_id ?? f.element_object_id)}</span>}
+                    {across && <span className="w-40 shrink-0" onClick={(e) => e.stopPropagation()}>{whereOf(f.folder_id, f.object_id ?? f.element_object_id)}</span>}
                     {!open && (
-                      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+                      <span className="hidden w-36 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
                         {owner.kind === 'folder' ? t('File') : <><span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}</>}
                       </span>
                     )}
-                    {!open && <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
-                    <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
+                    {!open && <span className="hidden w-24 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
+                    <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
                   </button>
                 );
               })}
@@ -365,7 +365,7 @@ function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.Re
         <FolderIcon size={15} className="shrink-0 text-muted-foreground" />
         <span className="truncate text-[13.5px] text-foreground">{folder.name}</span>
       </button>
-      {where !== undefined && <span className="w-44 shrink-0">{where}</span>}
+      {where !== undefined && <span className="w-40 shrink-0">{where}</span>}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" aria-label={t('More')} className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover/row:opacity-100 data-[state=open]:opacity-100">
@@ -405,10 +405,10 @@ function ItemRow({ icon, name, kind, updated, where, onOpen }: { icon: React.Rea
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         <span className="truncate text-[13.5px] text-foreground">{name}</span>
       </span>
-      {where !== undefined && <span className="w-44 shrink-0" onClick={(e) => e.stopPropagation()}>{where}</span>}
-      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">{kind}</span>
-      <span className="hidden w-32 shrink-0 lg:block" />
-      <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(updated, true)}</span>
+      {where !== undefined && <span className="w-40 shrink-0" onClick={(e) => e.stopPropagation()}>{where}</span>}
+      <span className="hidden w-36 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">{kind}</span>
+      <span className="hidden w-24 shrink-0 lg:block" />
+      <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(updated, true)}</span>
     </button>
   );
 }
