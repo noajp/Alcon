@@ -227,7 +227,7 @@ Deno.serve(async (req: Request) => {
           kindOf: () => "board",
           needsApproval: () => false,
           execute: async (call) => {
-            const r = await runCatalogTool(supabase, call.name, call.input, actor);
+            const r = await runCatalogTool(supabase, call.name, call.input, actor, { entry: "panel" });
             send("tool_result", { name: call.name, ok: r.ok, rows: r.ok ? r.meta?.rows : undefined, error: r.ok ? undefined : r.error });
             return r.ok ? { content: JSON.stringify(r.data).slice(0, 100_000) } : { content: JSON.stringify({ error: r.error }), is_error: true };
           },

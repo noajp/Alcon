@@ -59,15 +59,35 @@ export function isCatalogTool(name: string): boolean {
   return BY_NAME.has(name);
 }
 
+/** Tools that take an action argument; each call's effect is its action's. */
+const ACTION_TOOLS = new Set(["tableData", "widgetBoard", "campaignMeasure"]);
+const READ_ACTIONS = new Set(["list", "get", "campaigns"]);
+
+/** Pure. What one call does. A multi-action tool's call is a read, a write or
+ *  a delete by its action; an unknown action counts as a delete. */
+export function effectOfCall(tool: CatalogTool, input: Record<string, unknown>): ToolEffect {
+  if (!ACTION_TOOLS.has(tool.name)) return tool.effect;
+  const action = typeof input.action === "string" ? input.action : "";
+  if (READ_ACTIONS.has(action)) return "read";
+  if (action === "create" || action === "update") return "write";
+  return "delete";
+}
+
 // ── Entries ─────────────────────────────────────────────────────────────────
 
 export type Entry = "panel" | "conversation" | "element";
+
+/** allow: runs now. approve: runs once the person who started the run approves
+ *  exactly this call. deny: the entry may not run it. */
+export type Decision = "allow" | "approve" | "deny";
 
 export interface EntryPolicy {
   /** Effects allowed in every area. */
   effects: ToolEffect[];
   /** Areas where writes are allowed, when "write" is not in effects. */
   writeAreas?: ToolArea[];
+  /** Areas where a write runs only after approval. */
+  approveAreas?: ToolArea[];
   /** Further tools allowed by name. */
   also?: string[];
   /** Loaded up front; the rest load when the model searches for them. */
@@ -91,27 +111,57 @@ export const ENTRY_POLICIES: Record<Entry, EntryPolicy> = {
     also: ["removeIntent"],
     core: [...READ_CORE, "updateInitiative", "createInitiative", "addIntent", "updateIntent", "removeIntent", "writeInitiativeDefinition", "readHarness"],
   },
-  // An Element's run (started by a person or an automation): reads and
-  // writes; nothing that removes.
+  // An Element's run (started by a person or an automation, possibly on
+  // input from outside): it reads anything and does the work on the board
+  // and in files. A change to a Strategy — the purpose, the success
+  // conditions the verifier checks, the harness the run follows — waits for
+  // the person's approval. It never removes anything, and Tables and boards
+  // it changes only through its own save_records.
   element: {
-    effects: ["read", "write"],
+    effects: ["read"],
+    writeAreas: ["execution", "files"],
+    approveAreas: ["strategy"],
     core: [...READ_CORE.filter((n) => n !== "listHarnesses"), "createElement", "updateElement", "addElementComment", "createSubelement", "toggleSubelementComplete"],
   },
 };
 
-/** Pure. True when the entry's policy allows the tool. */
-export function allowedIn(entry: Entry, tool: CatalogTool): boolean {
+/** Pure. What the entry does with one call. */
+export function decideCall(entry: Entry, tool: CatalogTool, input: Record<string, unknown>): Decision {
   const p = ENTRY_POLICIES[entry];
-  if (p.effects.includes(tool.effect)) return true;
-  if (tool.effect === "write" && p.writeAreas?.includes(tool.area)) return true;
-  return p.also?.includes(tool.name) ?? false;
+  if (p.also?.includes(tool.name)) return "allow";
+  const effect = effectOfCall(tool, input);
+  if (p.effects.includes(effect)) return "allow";
+  if (effect === "write" && p.writeAreas?.includes(tool.area)) return "allow";
+  if (effect === "write" && p.approveAreas?.includes(tool.area)) return "approve";
+  return "deny";
+}
+
+/** Pure. True when some call of the tool may be allowed or approved in the
+ *  entry — the tools the entry offers. A multi-action tool is offered for its
+ *  reads; its writes and deletes are decided call by call. */
+export function offeredIn(entry: Entry, tool: CatalogTool): boolean {
+  if (ACTION_TOOLS.has(tool.name)) return decideCall(entry, tool, { action: "list" }) !== "deny";
+  return decideCall(entry, tool, {}) !== "deny";
+}
+
+/** Pure. True when a call of the tool may have to wait for approval in the entry. */
+export function mayNeedApproval(entry: Entry, name: string): boolean {
+  const tool = BY_NAME.get(name);
+  return !!tool && tool.effect !== "read" && (ENTRY_POLICIES[entry].approveAreas?.includes(tool.area) ?? false);
 }
 
 /** Pure. The catalog tools an entry offers, its core loaded and the rest deferred. */
 export function toolsFor(entry: Entry): (RunToolDef & { area: ToolArea; effect: ToolEffect })[] {
   const core = new Set(ENTRY_POLICIES[entry].core);
-  const allowed = CATALOG.filter((t) => allowedIn(entry, t));
-  return [...allowed.filter((t) => core.has(t.name)), ...allowed.filter((t) => !core.has(t.name)).map((t) => ({ ...t, defer: true }))];
+  const offered = CATALOG.filter((t) => offeredIn(entry, t));
+  return [...offered.filter((t) => core.has(t.name)), ...offered.filter((t) => !core.has(t.name)).map((t) => ({ ...t, defer: true }))];
+}
+
+/** Pure. One line for an approval card or a log: the operation and what it is about. */
+export function catalogOperation(name: string, input: Record<string, unknown>): string {
+  const about = ["name", "title", "body"].map((k) => input[k]).find((v) => typeof v === "string" && v.trim()) as string | undefined;
+  const action = typeof input.action === "string" ? ` ${input.action}` : "";
+  return `${name}${action}${about ? `「${about.trim().replace(/\s+/g, " ").slice(0, 60)}」` : ""}`;
 }
 
 /** Pure. A tool's one line: its description up to the first sentence's end. */
@@ -137,10 +187,20 @@ export function catalogIndex(tools: (RunToolDef & { area?: ToolArea })[]): strin
 
 // ── Executor ────────────────────────────────────────────────────────────────
 
-/** Runs one catalog tool with the caller's client. Never throws. */
-export async function runCatalogTool(db: SupabaseClient, name: string, input: Record<string, unknown>, actor: BoardActor): Promise<ToolResult> {
+/**
+ * Runs one catalog tool with the caller's client, under the entry's policy:
+ * a call the entry may not run is refused, and one that needs approval runs
+ * only when `approved` says the person approved this call. Never throws.
+ */
+export async function runCatalogTool(
+  db: SupabaseClient, name: string, input: Record<string, unknown>, actor: BoardActor,
+  under: { entry: Entry; approved?: boolean },
+): Promise<ToolResult> {
   const tool = BY_NAME.get(name);
   if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
+  const decision = decideCall(under.entry, tool, input);
+  if (decision === "deny") return { ok: false, error: `この操作（${catalogOperation(name, input)}）はここからは実行できません。必要なら人に頼んでください。` };
+  if (decision === "approve" && !under.approved) return { ok: false, error: `この操作（${catalogOperation(name, input)}）は承認を受けてから実行されます。` };
   try {
     if (name === "campaignMeasure") return await runMeasureTool(db, input);
     if (name === "createElements") return await runBatchTool(db, input, actor);

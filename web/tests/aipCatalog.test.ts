@@ -24,12 +24,53 @@ describe('the tool catalog', () => {
   });
 
   it('keeps each entry inside its permission', () => {
-    const effects = (entry: string) => new Set<string>(catalog.toolsFor(entry).map((t: T) => `${t.effect}:${t.name}`));
-    expect([...effects('element')].some((e) => e.startsWith('delete:'))).toBe(false);
-    const conv = catalog.toolsFor('conversation') as T[];
-    expect(conv.filter((t) => t.effect === 'delete').map((t) => t.name)).toEqual(['removeIntent']);
-    expect(conv.filter((t) => t.effect === 'write').every((t) => t.area === 'strategy' || t.area === 'files')).toBe(true);
-    expect(names(catalog.toolsFor('panel'))).toEqual(expect.arrayContaining(['deleteInitiative', 'deleteElement', 'tableData', 'widgetBoard']));
+    const offered = (entry: string) => catalog.toolsFor(entry) as T[];
+    // Tools that only delete are never offered where deletes are not allowed.
+    expect(offered('element').some((t) => t.effect === 'delete')).toBe(false);
+    expect(offered('conversation').filter((t) => t.effect === 'delete').map((t) => t.name)).toEqual(['removeIntent']);
+    expect(names(offered('panel'))).toEqual(expect.arrayContaining(['deleteInitiative', 'deleteElement', 'tableData', 'widgetBoard']));
+  });
+
+  it('decides each call of a multi-action tool by its action', () => {
+    const tool = (n: string) => catalog.catalogTool(n);
+    expect(catalog.effectOfCall(tool('tableData'), { action: 'list', entity: 'row' })).toBe('read');
+    expect(catalog.effectOfCall(tool('tableData'), { action: 'update', entity: 'row' })).toBe('write');
+    expect(catalog.effectOfCall(tool('tableData'), { action: 'delete', entity: 'table' })).toBe('delete');
+    expect(catalog.effectOfCall(tool('campaignMeasure'), { action: 'campaigns' })).toBe('read');
+    // An action nobody knows counts as the most dangerous one.
+    expect(catalog.effectOfCall(tool('widgetBoard'), { action: 'purge' })).toBe('delete');
+    expect(catalog.effectOfCall(tool('createElement'), { action: 'delete' })).toBe('write');
+  });
+
+  it('lets an Element run work, asks before it changes a Strategy, and never lets it delete', () => {
+    const d = (n: string, input: Record<string, unknown> = {}) => catalog.decideCall('element', catalog.catalogTool(n), input);
+    expect(d('createElement')).toBe('allow');
+    expect(d('writeFile')).toBe('allow');
+    expect(d('readFile')).toBe('allow');
+    for (const n of ['createInitiative', 'updateInitiative', 'addIntent', 'updateIntent', 'writeInitiativeDefinition']) expect(d(n), n).toBe('approve');
+    expect(d('campaignMeasure', { action: 'update' })).toBe('approve');
+    expect(d('campaignMeasure', { action: 'list' })).toBe('allow');
+    for (const n of ['deleteElement', 'deleteObject', 'bulkDeleteElements', 'removeIntent', 'deleteInitiative']) expect(d(n), n).toBe('deny');
+    expect(d('campaignMeasure', { action: 'delete' })).toBe('deny');
+    expect(d('tableData', { action: 'delete', entity: 'row' })).toBe('deny');
+    expect(d('tableData', { action: 'create', entity: 'row' })).toBe('deny');
+    expect(d('tableData', { action: 'get', entity: 'row' })).toBe('allow');
+    expect(d('widgetBoard', { action: 'update' })).toBe('deny');
+    expect(catalog.mayNeedApproval('element', 'addIntent')).toBe(true);
+    expect(catalog.mayNeedApproval('element', 'createElement')).toBe(false);
+    expect(catalog.mayNeedApproval('panel', 'addIntent')).toBe(false);
+  });
+
+  it('lets a conversation write the Strategy\'s record and files, nothing else', () => {
+    const d = (n: string, input: Record<string, unknown> = {}) => catalog.decideCall('conversation', catalog.catalogTool(n), input);
+    for (const n of ['addIntent', 'updateInitiative', 'createInitiative', 'writeInitiativeDefinition', 'removeIntent', 'writeFile']) expect(d(n), n).toBe('allow');
+    for (const n of ['createElement', 'updateElement', 'deleteInitiative', 'createElements']) expect(d(n), n).toBe('deny');
+    expect(d('campaignMeasure', { action: 'delete' })).toBe('deny');
+    expect(d('tableData', { action: 'update', entity: 'cell' })).toBe('deny');
+  });
+
+  it('lets the panel run everything the person can', () => {
+    for (const t of catalog.CATALOG) expect(catalog.decideCall('panel', t, { action: 'delete' }), t.name).toBe('allow');
   });
 
   it('loads each entry\'s core up front and defers the rest, core first', () => {
@@ -59,15 +100,25 @@ describe('the tool catalog', () => {
   });
 
   it('refuses a tool it does not have', async () => {
-    const r = await catalog.runCatalogTool({} as never, 'dropDatabase', {}, { agent: 'x', userId: null });
+    const r = await catalog.runCatalogTool({} as never, 'dropDatabase', {}, { agent: 'x', userId: null }, { entry: 'panel' });
     expect(r).toMatchObject({ ok: false });
+  });
+
+  it('refuses at run time what the entry may not run, before touching the database', async () => {
+    const db = { from: () => { throw new Error('the database was reached'); } };
+    const denied = await catalog.runCatalogTool(db as never, 'tableData', { action: 'delete', entity: 'table', id: 'x' }, { agent: 'x', userId: null }, { entry: 'element' });
+    expect(denied).toMatchObject({ ok: false });
+    expect(denied.error).toContain('ここからは実行できません');
+    const waiting = await catalog.runCatalogTool(db as never, 'addIntent', { initiativeId: 'x', kind: 'decision', title: 't' }, { agent: 'x', userId: null }, { entry: 'element' });
+    expect(waiting).toMatchObject({ ok: false });
+    expect(waiting.error).toContain('承認');
   });
 
   it('routes a Strategy delete to strategies only', async () => {
     const tables: string[] = [];
     const chain = { eq: () => chain, select: async () => ({ data: [{ id: 'x' }], error: null }) };
     const db = { from: (t: string) => { tables.push(t); return { delete: () => chain }; } };
-    const r = await catalog.runCatalogTool(db as never, 'deleteInitiative', { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }, { agent: 'x', userId: null });
+    const r = await catalog.runCatalogTool(db as never, 'deleteInitiative', { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }, { agent: 'x', userId: null }, { entry: 'panel' });
     expect(r.ok).toBe(true);
     expect(tables).toEqual(['strategies']);
   });

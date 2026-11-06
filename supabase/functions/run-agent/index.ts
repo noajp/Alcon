@@ -51,7 +51,7 @@ import { RECORD_TOOLS } from "./records.ts";
 import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type RecordScope } from "./recordStore.ts";
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
-import { catalogIndex, catalogTool, runCatalogTool } from "../_shared/catalog.ts";
+import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, type ConversationContext } from "./conversation.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
@@ -567,6 +567,9 @@ async function execute(a: ExecArgs): Promise<void> {
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
     const base = baseKindOf(name);
+    // A catalog tool whose calls may wait for approval (a Strategy write) goes
+    // through the approval path; needsApproval decides each call.
+    if (base === "board" && mayNeedApproval("element", name)) return "write";
     if (base) return base;
     // The runner only reads unless its owner started it to write; a
     // disposable machine changes nothing outside itself.
@@ -656,7 +659,7 @@ async function execute(a: ExecArgs): Promise<void> {
     return { content: "PC のブラウザから時間内に答えがありませんでした（PC が眠っているか、実行役が止まっている可能性）。", is_error: true };
   };
 
-  const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
+  const executeCall = async (call: ToolCall, approved = false): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
     const input = call.input;
     switch (call.name) {
       case "record_plan": {
@@ -749,8 +752,8 @@ async function execute(a: ExecArgs): Promise<void> {
     if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
     if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
     if (baseKindOf(call.name) === "board") {
-      const r = await runCatalogTool(userDb, call.name, input, actor);
-      await addStep(admin, run.id, "action", `Alcon: ${call.name}`, r.ok ? null : r.error);
+      const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved });
+      await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
       return r.ok ? { content: JSON.stringify(r.data).slice(0, 20_000) } : { content: r.error, is_error: true };
     }
     const it = integrationTools.get(call.name);
@@ -822,7 +825,9 @@ async function execute(a: ExecArgs): Promise<void> {
   if (pending && !pending.approved && !a.body.decision) {
     const { data: open } = await admin.from("agent_actions").select("id").eq("run_id", run.id).eq("status", "pending").maybeSingle();
     if (!open) {
-      const display = pending.calls.map((c) => ({ id: c.id, integration: c.name.split(INTEGRATION_SEPARATOR)[0], operation: c.name.split(INTEGRATION_SEPARATOR).slice(1).join(INTEGRATION_SEPARATOR) || c.name }));
+      const display = pending.calls.map((c) => isCatalogTool(c.name)
+        ? { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input) }
+        : { id: c.id, integration: c.name.split(INTEGRATION_SEPARATOR)[0], operation: c.name.split(INTEGRATION_SEPARATOR).slice(1).join(INTEGRATION_SEPARATOR) || c.name });
       await admin.from("agent_actions").insert({
         run_id: run.id, element_id: run.element_id, tool_use_id: pending.calls[0].id, tool: pending.calls.length === 1 ? pending.calls[0].name : "batch",
         input: { calls: pending.calls, display }, input_hash: await sha256(canonicalCalls(pending.calls)), summary: approvalSummary(display),
@@ -895,7 +900,7 @@ async function execute(a: ExecArgs): Promise<void> {
         return;
       }
       let r: { content: string; is_error?: boolean };
-      try { r = await executeCall(call); } catch (e) { r = { content: `Error: ${errorMessage(e)}`, is_error: true }; }
+      try { r = await executeCall(call, true); } catch (e) { r = { content: `Error: ${errorMessage(e)}`, is_error: true }; }
       results.push({ type: "tool_result", tool_use_id: call.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
       await saveTranscript({ ...pending, results });
     }
@@ -1013,6 +1018,11 @@ async function execute(a: ExecArgs): Promise<void> {
     },
     kindOf,
     needsApproval: (call) => {
+      // Alcon's own operations: the Element entry's policy decides each call.
+      if (isCatalogTool(call.name)) {
+        const tool = catalogTool(call.name);
+        return !!tool && decideCall("element", tool, call.input) === "approve";
+      }
       if (kindOf(call.name) !== "write") return false;
       const it = integrationTools.get(call.name);
       // A rule on the arguments decides under any delegation; otherwise the
@@ -1049,6 +1059,7 @@ async function execute(a: ExecArgs): Promise<void> {
       const calls = outcome.pending.calls;
       const display = calls.map((c) => {
         const it = integrationTools.get(c.name);
+        if (!it && isCatalogTool(c.name)) return { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input) };
         return { id: c.id, integration: it?.integration.name ?? c.name, operation: operationOf(it, c.input) };
       });
       const summary = approvalSummary(display);
@@ -1171,7 +1182,7 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
       await addStep(admin, run.id, "plan_request", "計画を Planner に渡す準備をしました", guidance || null);
       return { content: "会話に「計画を作る」カードを出しました。人が押すと Execution タブで Planner が下書きを作ります。下書きは人が確かめて採用します。ここで計画の中身を作らないでください。" };
     }
-    const r = await runCatalogTool(userDb, call.name, call.input, actor);
+    const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "conversation" });
     const writes = (catalogTool(call.name)?.effect ?? "read") !== "read";
     // The page draws the conversation from these steps: what was done, about what, and whether it failed.
     await addStep(admin, run.id, !r.ok ? "error" : writes ? "write" : "action", `Alcon: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);

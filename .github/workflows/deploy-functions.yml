@@ -1,18 +1,20 @@
-# Edge Functions を、main に入った時点で本番に出す。
+# Edge Functions を、main の CI が通った後に本番に出す。
 #
-# 変わった関数だけを出す。_shared が変わったら、それを読む関数をすべて出す。
+# 出すのは、その変更で変わった関数だけ。_shared が変わったら、それを読む関数を
+# すべて出す。出す前に関数ごとに型を検査し、通らない関数は出さない。
 # 手で出すときは Actions の画面から "Run workflow" を押し、names に関数名を
-# 空白区切りで書く（all ですべて）。
+# 空白区切りで書く（all ですべて）。Secret を入れる前に失敗した関数や、途中で
+# 失敗した関数は、後の変更では出し直されないので、all で出し直す。
 #
 # 必要な Secret: SUPABASE_ACCESS_TOKEN（supabase.com › Account › Access Tokens）
 
 name: Deploy Edge Functions
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths:
-      - "supabase/functions/**"
   workflow_dispatch:
     inputs:
       names:
@@ -26,27 +28,35 @@ concurrency:
 
 jobs:
   deploy:
+    # main への push で CI が通ったとき、または手で起動したときだけ。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: rkugtcqztkkacvoylupw
-      # 自分で認証する関数（Webhook・OAuth の戻り先・cron・PC の実行役）。
-      # 本番の設定と同じにしておく。ここにない関数は JWT を求める。
-      NO_VERIFY_JWT: "dev-event integration-oauth audit-intake audit-grants audit-approvals asset-relay automations"
+      # ゲートウェイの JWT 検査を外す関数。どれも自分で認証する（PAT・OAuth の
+      # トークン、Webhook のトークン、cron の共有秘密、OAuth の戻り先、PC の
+      # 実行役）。ここにない関数は、ゲートウェイが Supabase の JWT を求める。
+      NO_VERIFY_JWT: "alcon-api alcon-mcp asset-relay audit-approvals audit-grants audit-intake automations dev-event integration-oauth"
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       - name: Decide what to deploy
         id: pick
         env:
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
           MANUAL: ${{ github.event.inputs.names }}
         run: |
           set -euo pipefail
@@ -54,11 +64,9 @@ jobs:
           if [ -n "${MANUAL:-}" ]; then
             if [ "$MANUAL" = "all" ]; then names="$all"; else names="$MANUAL"; fi
           else
-            if [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-              changed=$(git diff --name-only HEAD~1 HEAD -- supabase/functions)
-            else
-              changed=$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions)
-            fi
+            # The change that reached main: a merge commit against its first
+            # parent, or a single commit against the one before it.
+            changed=$(git diff --name-only HEAD^1 HEAD -- supabase/functions)
             names=$(echo "$changed" | awk -F/ 'NF>3 {print $3}' | grep -v '^_shared$' | sort -u || true)
             shared=$(echo "$changed" | grep '^supabase/functions/_shared/' || true)
             if [ -n "$shared" ]; then
@@ -67,13 +75,27 @@ jobs:
               done
             fi
           fi
-          # 消えた関数は出さない。
+          # Functions that no longer exist are not deployed.
           keep=""
           for fn in $(echo $names | tr ' ' '\n' | sort -u); do
             if [ -f "supabase/functions/$fn/index.ts" ]; then keep="$keep $fn"; fi
           done
           echo "names=$(echo $keep)" >> "$GITHUB_OUTPUT"
           echo "Deploying: ${keep:-(nothing)}"
+
+      - name: Type-check
+        if: steps.pick.outputs.names != ''
+        run: |
+          set -euo pipefail
+          echo '{"nodeModulesDir":"auto"}' > "$RUNNER_TEMP/deno.json"
+          failed=""
+          for fn in ${{ steps.pick.outputs.names }}; do
+            if ! deno check --config "$RUNNER_TEMP/deno.json" "supabase/functions/$fn/index.ts"; then failed="$failed $fn"; fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::型の検査に通らない関数:$failed（どれも出していません）"
+            exit 1
+          fi
 
       - name: Deploy
         if: steps.pick.outputs.names != ''
@@ -94,6 +116,17 @@ jobs:
             echo "::endgroup::"
           done
           if [ -n "$failed" ]; then
-            echo "::error::デプロイに失敗した関数:$failed"
+            echo "::error::デプロイに失敗した関数:$failed（all で出し直してください）"
+            exit 1
+          fi
+
+      # alcon-api は GET / をトークンなしで答える。ゲートウェイの JWT 検査が
+      # 残っていると 401 になり、PAT と OAuth での呼び出しがすべて断られる。
+      - name: Smoke test
+        if: contains(format(' {0} ', steps.pick.outputs.names), ' alcon-api ')
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT_REF.supabase.co/functions/v1/alcon-api/")
+          if [ "$code" != "200" ]; then
+            echo "::error::alcon-api の GET / が $code を返しました（200 のはず）"
             exit 1
           fi
