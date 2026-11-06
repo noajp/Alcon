@@ -12,6 +12,7 @@ import { useElementSize } from '@/Function/office/officeViewParts';
 import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { setActiveDomainId } from '@/Function/space/domainsStore';
 import { TRASH_DAYS, indexSpaceFiles, ownerOf, searchAttachments, trashDaysLeft, useAttachmentActions, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
@@ -156,17 +157,23 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
       || (atTop && place.scope === 'object' && (f.object_id === place.objectId || f.element_object_id === place.objectId))) : [];
 
   // Whose a row is, in Domain and Objects across: the Domain's (or Object's)
-  // mark and name, which opens it.
+  // mark and name, which opens that Domain's (or Object's) own page.
+  const openDomainPage = (id: string) => { setActiveDomainId(id); onNavigate({ objectId: null }); onViewChange?.('domain-overview'); };
+  const openObjectPage = (id: string, domainId: string | null) => {
+    if (domainId) setActiveDomainId(domainId);
+    onNavigate({ objectId: id, objectDomainId: domainId ?? undefined });
+    onViewChange?.('objects');
+  };
   const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
   const whereOf = (folderIdOf: string | null, objectId?: string | null): React.ReactNode => {
     if (!across) return undefined;
     const holder = folderIdOf ? folderById.get(folderIdOf) : undefined;
     if (tab === 'domain') {
       const d = domains.find((x) => x.id === holder?.domain_id);
-      return d ? <WhereCell icon={<ItemIcon icon={d.icon} color={d.color} size={12} fallback={<DomainIcon size={12} />} />} name={d.name} onOpen={() => go({ tab, domainId: d.id })} /> : null;
+      return d ? <WhereCell icon={<ItemIcon icon={d.icon} color={d.color} size={12} fallback={<DomainIcon size={12} />} />} name={d.name} onOpen={() => openDomainPage(d.id)} /> : null;
     }
     const o = objects.find((x) => x.id === (holder?.object_id ?? objectId));
-    return o ? <WhereCell icon={<ItemIcon icon={o.icon} color={o.color} size={12} fallback={<ObjectIcon size={12} />} />} name={o.name} onOpen={() => go({ tab, objectId: o.id })} /> : null;
+    return o ? <WhereCell icon={<ItemIcon icon={o.icon} color={o.color} size={12} fallback={<ObjectIcon size={12} />} />} name={o.name} onOpen={() => openObjectPage(o.id, o.domain_id ?? null)} /> : null;
   };
   const total = shownFolders.length + shownNotebooks.length + shownDecks.length + shownFiles.length;
 
@@ -384,7 +391,7 @@ function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.Re
 }
 
 /** Whose a row is (a Domain or an Object): its mark and name in the same
- *  outlined pill as a list's Object and Label chips, opening it. */
+ *  outlined pill as a list's Object and Label chips, opening its page. */
 function WhereCell({ icon, name, onOpen }: { icon: React.ReactNode; name: string; onOpen: () => void }) {
   return (
     // A span, not a button: it sits inside a row that is itself a button.
