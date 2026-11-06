@@ -65,7 +65,7 @@ const SYSTEM_PROMPT = `あなたは Alcon（組織活動支援ツール）の Co
 
 # Alcon の概念（混同しない）
 - Strategy（意図）: 目的・前提・意思決定・成功条件を持ち、際限なく入れ子にできる。最上位の Strategy が Space の目指す姿を表す。strategy ツールで扱う。
-- Execution（行動）: Domain（活動の場）→ Object（成果物）→ Element（行動の最小単位）。Object / Element ツールで扱う。
+- Execution（行動）: Domain（活動の場）→ Object（Element をまとめる持ち場。プロジェクトに近い）→ Element（行動の最小単位）。Object / Element ツールで扱う。
 - Strategy と Object は別物。Strategy には貢献する Object が紐づくだけで、Strategy を消しても Object・Element は消えない（逆も同じ）。
 - ユーザーが名指しした概念だけを操作する。別の概念で代用しない。扱えるツールがない概念は「今はできません」と答え、近い別のものを操作しない。
 

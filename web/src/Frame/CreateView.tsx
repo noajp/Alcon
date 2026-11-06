@@ -84,7 +84,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
           </div>
           <h1 className="text-2xl font-semibold text-foreground mb-1.5">{t('Create Domain')}</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {t('A Domain is where work happens — a hospital, a company, a project. Its Objects (deliverables) and Elements (actions) live inside it, and an Object can belong to several Domains.')}
+            {t('A Domain is where work happens — a hospital, a company, a department. Inside it, Objects (the projects that hold Elements) and Elements (actions) live, and an Object can belong to several Domains.')}
           </p>
         </div>
 

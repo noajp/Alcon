@@ -51,7 +51,7 @@ const ja: StarterContent = {
       description: 'Alcon が組織の活動をどう捉えるかを知る。',
       elements: [
         { title: 'Strategy・Execution・Sustainment の 3 分類を知る', description: 'Strategy は「何を達成し、どう勝つか」、Execution は「実際の行動」、Sustainment は「仕事道具」です。左端のレールで切り替えます。' },
-        { title: 'Domain → Object → Element の階層を理解する', description: 'Domain は活動の場、Object は成果物、Element は行動の最小単位です。いま見ているこの行が Element です。' },
+        { title: 'Domain → Object → Element の階層を理解する', description: 'Domain は活動の場、Object は Element をまとめる持ち場（プロジェクトに近い）、Element は行動の最小単位です。いま見ているこの行が Element です。' },
         { title: 'この Element を完了にしてみる', description: 'ステータスを変更すると、Object の進捗に反映されます。' },
         { title: '⌘K でコマンドパレットを開く', description: '検索と画面の移動は ⌘K からまとめて行えます。' },
       ],
@@ -140,7 +140,7 @@ const en: StarterContent = {
       description: 'How Alcon models an organisation\'s activity.',
       elements: [
         { title: 'Learn the three areas: Strategy, Execution, Sustainment', description: 'Strategy is what to achieve and how to win, Execution is the actual work, and Sustainment is the tools for the job. Switch between them on the left rail.' },
-        { title: 'Understand Domain → Object → Element', description: 'A Domain is where work happens, an Object is a deliverable, and an Element is the smallest unit of action. This row is an Element.' },
+        { title: 'Understand Domain → Object → Element', description: 'A Domain is where work happens, an Object holds the Elements of one project, and an Element is the smallest unit of action. This row is an Element.' },
         { title: 'Mark this Element as done', description: 'Changing the status updates the Object\'s progress.' },
         { title: 'Open the command palette with ⌘K', description: 'Search and navigation both live behind ⌘K.' },
       ],
