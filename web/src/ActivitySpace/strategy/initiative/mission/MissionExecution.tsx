@@ -73,11 +73,16 @@ function StateBadge({ state }: { state: ActionState }) {
 }
 
 /** One count of the summary line: quiet at zero, coloured when it asks for something. */
+/** One count of the summary: the number over its label, so every count
+ *  shares one baseline. A count that asks for something takes its tone;
+ *  zero stays quiet. */
 function Fact({ label, n, tone }: { label: string; n: number; tone?: 'warning' | 'danger' }) {
   const color = n > 0 && tone ? `var(--status-${tone})` : undefined;
   return (
-    <span style={color ? { color } : undefined}>
-      <span className={n > 0 ? 'font-medium text-foreground' : ''} style={color ? { color } : undefined}>{n}</span> {label}
+    <span className="flex flex-col">
+      <span className={cn('text-[15px] font-medium leading-5 tabular-nums', n > 0 ? 'text-foreground' : 'text-muted-foreground')}
+        style={color ? { color } : undefined}>{n}</span>
+      <span className="text-[11px] leading-4 text-muted-foreground">{label}</span>
     </span>
   );
 }
@@ -139,7 +144,7 @@ function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDrag
       <div className="mt-2.5 flex items-center gap-1.5 text-[12px] tabular-nums text-muted-foreground">
         <Clock size={12} className="shrink-0" />
         <span style={tally.stopped > 0 ? { color: 'var(--status-danger)' } : undefined}>{footer}</span>
-        <span className="ml-auto text-foreground">${object.costUsd.toFixed(2)}</span>
+        <span className="ml-auto text-[11px] text-muted-foreground/80">${object.costUsd.toFixed(2)}</span>
       </div>
       {selected && (
         <span aria-hidden className="absolute -right-[5px] top-1/2 hidden h-2.5 w-2.5 -translate-y-1/2 rounded-full border-[1.5px] border-[var(--accent-default)] bg-card md:block" />
@@ -183,7 +188,11 @@ function WeightPick({ value, onChange }: { value: AiWeight | null; onChange: (w:
 /** What the Execution tab adds under a card's title: what it delivers,
  *  what it waits on, the model that ran it and what that cost, and a hand-off
  *  to Claude Code. */
-function MissionLines({ element, busy, onHandOver, rounds, definitionPick }: { element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode }) {
+function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickSet = false }: {
+  element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode;
+  /** A definition or weight other than the default is chosen: its row stays in view. */
+  pickSet?: boolean;
+}) {
   const { t } = useI18n();
   const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
   // A loop's progress: how many rounds, the latest value and the best.
@@ -203,10 +212,17 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick }: { e
         <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
       )}
       {loop && <div className="tabular-nums">{loop}</div>}
-      {definitionPick && <div className="flex min-w-0 flex-wrap items-center gap-x-3">{definitionPick}</div>}
+      {/* How the AI runs it is a setting, not the work: shown only while the
+          card is hovered or focused, unless something other than the
+          default is chosen. */}
+      {definitionPick && (
+        <div className={cn('min-w-0 flex-wrap items-center gap-x-3', pickSet ? 'flex' : 'hidden group-hover/card:flex group-focus-within/card:flex has-[[data-state=open]]:flex')}>
+          {definitionPick}
+        </div>
+      )}
       {(meta || onHandOver) && (
         <div className="flex items-center gap-2 tabular-nums">
-          {meta && <span className="truncate">{meta}</span>}
+          {meta && <span className="truncate text-[11px] text-muted-foreground/70">{meta}</span>}
           {onHandOver && (
             <Button variant="ghost" size="xs" className="ml-auto" onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); onHandOver(); }} disabled={busy}>
@@ -540,24 +556,27 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
       </>
     ) : undefined}>
       <div className="space-y-3">
-        {/* How it stands, as one line: how far along, then only the counts
-            that ask for something, then what the AI has cost. */}
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-            <span className="flex items-baseline gap-2">
-              <span className="text-[22px] font-semibold tabular-nums text-foreground">{summary.progress}%</span>
-              <span className="text-[12px] text-muted-foreground">{t('{done} of {all} actions', { done: summary.done, all: summary.actions })}</span>
+        {/* How it stands: how far along, large; then the counts that may ask
+            for something, each number over its label; what the AI has used
+            sits apart and quieter — it is bookkeeping, not the work. */}
+        <div className="space-y-2.5">
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+            <span className="flex flex-col">
+              <span className="text-[28px] font-semibold leading-8 tracking-tight tabular-nums text-foreground">{summary.progress}%</span>
+              <span className="text-[11px] leading-4 text-muted-foreground">{t('{done} of {all} actions', { done: summary.done, all: summary.actions })}</span>
             </span>
-            <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px] tabular-nums text-muted-foreground">
+            <span className="flex items-end gap-6">
               <Fact label={t('Running')} n={summary.running} />
               <Fact label={t('Waiting on a person')} n={summary.waiting} tone="warning" />
               <Fact label={t('Blocked or failed')} n={summary.blocked + summary.failed} tone="danger" />
-              <span title={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })}>
-                {`$${summary.costUsd.toFixed(2)} · ${t('{n} tokens', { n: compact(summary.inputTokens + summary.outputTokens) })}`}
-              </span>
+            </span>
+            <span className="ml-auto flex flex-col items-end text-[11px] leading-4 tabular-nums text-muted-foreground/80"
+              title={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })}>
+              <span>{t('AI cost')} ${summary.costUsd.toFixed(2)}</span>
+              <span>{t('{n} tokens', { n: compact(summary.inputTokens + summary.outputTokens) })}</span>
             </span>
           </div>
-          <SegmentedProgress value={summary.progress} className="max-w-md" />
+          <SegmentedProgress value={summary.progress} />
         </div>
 
         {/* What the work is judged on: each success condition, its actual
@@ -760,6 +779,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                         </span>
                       ) : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                        pickSet={!!details.get(e.elementId)?.definition_id || (e.assignee === 'ai' && isAiWeight(details.get(e.elementId)?.ai_weight) && details.get(e.elementId)?.ai_weight !== 'standard')}
                         definitionPick={ctx.canEdit ? (
                           <>
                             <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
