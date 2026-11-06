@@ -4,11 +4,11 @@
 
 ## 作りの三層
 
-| 層 | 手本 | 中身 |
-|---|---|---|
-| 操作画面 | Palantir Maven Smart System | 仕事が流れていくのを見て、人は判断と評価だけをする |
-| AIP | Meta Muse | モデルは差し替え可能。ハーネス（仕事のやり方）とコネクタ（外とのつながり）を増やして使う。止める条件と承認はエンジンが守らせる |
-| データ | Supabase | Postgres・RLS・Edge Functions・Vault・Realtime |
+| 層 | 中身 |
+|---|---|
+| 操作画面 | 仕事が流れていくのを見て、人は判断と評価だけをする |
+| AIP | モデルは差し替え可能。ハーネス（仕事のやり方）とコネクタ（外とのつながり）を増やして使う。止める条件と承認はエンジンが守らせる |
+| データ | Supabase（Postgres・RLS・Edge Functions・Vault・Realtime） |
 
 ## 概念モデル
 
