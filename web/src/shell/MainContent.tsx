@@ -27,6 +27,7 @@ const NotebookSurface = dynamic(() => import('@/ActivitySpace/sustainment/notebo
 const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
 const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
 const DomainOverview = dynamic(() => import('@/ActivitySpace/execution/domain/DomainOverview').then(m => m.DomainOverview), { ssr: false, loading: viewLoading });
+const AutomationView = dynamic(() => import('@/ActivitySpace/strategy/automation/AutomationView').then(m => m.AutomationView), { ssr: false, loading: viewLoading });
 const DomainView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainView').then(m => m.DomainView), { ssr: false, loading: viewLoading });
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/sustainment/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
@@ -89,6 +90,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <MyCalendarView initialScope={activeActivity === 'schedule' ? 'space' : 'mine'} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} activeObjectId={navigation.objectId} />
             </div>
+          )}
+
+          {activeActivity === 'automation' && (
+            <AutomationView onOpenStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }} />
           )}
 
           {activeActivity === 'strategy' && (

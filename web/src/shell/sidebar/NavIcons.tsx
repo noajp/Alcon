@@ -16,6 +16,7 @@ import {
   CompassRose,
   Users,
   AiGraph,
+  Zap,
 } from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 
@@ -43,6 +44,8 @@ export const NavStrategyIcon = ({ size = 20, className }: { size?: number; class
 export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartNoAxesColumn size={size} strokeWidth={2} />;
 export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} />;
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} />;
+// Automation — what runs on its own.
+export const NavAutomationIcon = ({ size = 20 }: { size?: number }) => <Zap size={size} strokeWidth={2} />;
 // The Workspace mode's mark (command palette, mode metadata).
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <CompassRose size={size} />;
 // Phase — a Domain's period, reachable from a Strategy rather than the nav.

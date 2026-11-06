@@ -9,11 +9,9 @@ import { Input } from '@/ui/input';
 import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
-import { ReviewsSidebar } from '@/ActivitySpace/execution/code/ReviewsSidebar';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { useActiveSpaceScope } from '@/Function/space/data';
-import { NavStrategyIcon } from './sidebar/NavIcons';
-import { NotebookTree } from './sidebar/NotebookTree';
+import { NavAutomationIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
@@ -47,7 +45,6 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/Function/space/domainsStore';
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
-import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { MODE_META, railModeOf } from '@/shell/railApps';
 import { viewInScope } from '@/Function/space/spaceScope';
 import type { RailMode } from '@/shell/railApps';
@@ -55,18 +52,9 @@ import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/shell/QuickAdd
 import { useCalendarDay } from '@/ActivitySpace/sustainment/calendar/calendarStore';
 import { SettingsSidebarPanel } from '@/Function/settings/SettingsSidebarPanel';
 import { TeamSettings } from '@/Function/settings/TeamSettings';
-import { GroupTree } from '@/Function/shared/folders/GroupTree';
-import type { SidebarDomain } from '@/ActivitySpace/sustainment/files/FilesSidebar';
-import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
-import { Folder as FolderIcon } from '@/ui/icons';
-import { FilesSidebar } from '@/ActivitySpace/sustainment/files/FilesSidebar';
-import { AuditSidebar } from '@/ActivitySpace/sustainment/audit/AuditSidebar';
-import { AiSidebar } from '@/ActivitySpace/home/ai/AiSidebar';
-import { SlidesSidebar, createDeckHere, createFolderHere, pickDeckFile } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
+import { SidebarRow } from '@/Function/shared/SidebarRow';
+import { createDeckHere, createFolderHere, pickDeckFile } from '@/ActivitySpace/sustainment/slides/SlidesSidebar';
 import { useSlidesReady } from '@/ActivitySpace/sustainment/slides/sync';
-import { InboxList } from '@/ActivitySpace/home/InboxList';
-import { CalendarSidebar } from '@/ActivitySpace/sustainment/calendar/CalendarSidebar';
-import { PeopleSidebar } from '@/ActivitySpace/sustainment/team/PeopleSidebar';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -106,58 +94,7 @@ const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 
 
-// Names the mode the sidebar is currently showing — one quiet label at the top
-// of every mode, no affordance of its own.
-function SidebarModeLabel({ label }: { label: string }) {
-  return (
-    <div className="px-2.5 h-7 mt-5 mb-0.5 flex items-center text-[12px] font-medium text-muted-foreground/80">
-      {label}
-    </div>
-  );
-}
 
-
-// Table mode's sidebar — the list of the user's Tables. Picking one opens it
-// in the main pane (columns + rows); the "+" fires an event the TableView
-// listens for to open its New Table dialog. The main pane shows a placeholder
-// until a table is chosen here.
-function TableSidebar({
-  activeTableId,
-  browse,
-  domains,
-  onNavigate,
-  onViewChange,
-}: {
-  activeTableId: string | null;
-  browse: NonNullable<NavigationState['tableBrowse']>;
-  domains: SidebarDomain[];
-  onNavigate: (nav: Partial<NavigationState>) => void;
-  onViewChange: (view: string) => void;
-}) {
-  const { t } = useI18n();
-
-  // As Execution's: every Table in the Space, then each Domain unfolding
-  // onto its Folders and Tables, each a page of the main pane (a Table opens
-  // from those pages).
-  const go = (next: NonNullable<NavigationState['tableBrowse']>) => { onViewChange('tables'); onNavigate({ tableId: null, tableBrowse: next }); };
-  const page = activeTableId ? null : !browse.domainId ? 'all' : browse.folderId ? 'folders' : browse.view ?? 'home';
-  return (
-    <div className="mt-1">
-      <SidebarSectionLabel>{t('Table')}</SidebarSectionLabel>
-      <div className="mt-1">
-        <SidebarRow active={page === 'all'} icon={<NavTableIcon size={16} />} label={t('All Tables')} onClick={() => go({})} />
-        {domains.map((d) => (
-          <GroupTree key={d.id} name={d.name} mark={d.mark} defaultOpen={browse.domainId === d.id}
-            homeActive={browse.domainId === d.id && page === 'home'} onOpenHome={() => go({ domainId: d.id })}
-            items={[
-              { id: 'folders', label: t('Folders'), icon: FolderIcon, active: browse.domainId === d.id && page === 'folders', onClick: () => go({ domainId: d.id, view: 'folders' }) },
-              { id: 'tables', label: t('Tables'), icon: NavTableIcon, active: browse.domainId === d.id && page === 'tables', onClick: () => go({ domainId: d.id, view: 'tables' }) },
-            ]} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function AppSidebar({
   navigation,
@@ -178,8 +115,6 @@ export function AppSidebar({
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
-  // The Domains as Files and Table list them, each with its mark, as Execution does.
-  const sidebarDomains = useMemo<SidebarDomain[]>(() => domains.map((d) => ({ id: d.id, name: d.name, mark: <DomainMark domain={d} size={16} /> })), [domains]);
   const refetchDomains = useCallback(async () => {
     await Promise.all([refetchMemberDomains(), refetchVisibleDomains()]);
   }, [refetchMemberDomains, refetchVisibleDomains]);
@@ -440,6 +375,10 @@ export function AppSidebar({
               <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
                 onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
             )}
+            {viewInScope('automation', spaceScope) && (
+              <SidebarRow active={activeView === 'automation'} icon={<NavAutomationIcon size={16} />} label={t('Automation')}
+                onClick={() => onViewChange('automation')} />
+            )}
             {SIDEBAR_TOOLS.filter((mode) => viewInScope(MODE_META[mode].defaultView, spaceScope)).map((mode) => {
               const { label, icon: Icon, defaultView } = MODE_META[mode];
               return <SidebarRow key={mode} active={railMode === mode} icon={<Icon size={16} />} label={t(label)}
@@ -447,9 +386,9 @@ export function AppSidebar({
             })}
           </div>
 
-          {railMode === 'workspace' && (
+          {/* Under it, always the Workspace: what you follow, then the
+              Domains. Each tool's own list is in the main pane. */}
           <>
-
           <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
             if (f.domainId) setActiveDomainId(f.domainId);
             if (f.kind === 'element') requestElementDetail(f.id); else requestObjectPage();
@@ -509,49 +448,7 @@ export function AppSidebar({
           </SidebarFold>
 
           </>
-          )}
 
-          {/* ── Notebook mode ── the notebook list lives here; the main pane
-              opens the chosen notebook. */}
-          {railMode === 'notebook' && (
-            <NotebookTree
-              activeFolderId={navigation.noteFolderId ?? null}
-              activeSectionId={navigation.noteSectionId ?? null}
-              activeFileId={navigation.noteId ?? null}
-              onNavigate={onNavigate}
-              onViewChange={onViewChange}
-            />
-          )}
-          {/* ── Table mode ── the table list lives here; the main pane opens
-              the chosen table. */}
-          {railMode === 'tables' && (
-            <TableSidebar
-              activeTableId={navigation.tableId ?? null}
-              browse={navigation.tableBrowse ?? {}}
-              domains={sidebarDomains}
-              onNavigate={onNavigate}
-              onViewChange={onViewChange}
-            />
-          )}
-          {/* ── Workload ── the team's load, the plan that fixes it, and
-              each person, narrowing the chart to them. */}
-          {/* ── Team ── a single full surface in the main pane. */}
-          {/* ── Inbox ── the notification list; the main pane reads the open one. */}
-          {railMode === 'inbox' && <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />}
-          {/* ── Calendar ── today, a mini month that moves the grid, and who is shown. */}
-          {railMode === 'calendar' && <><SidebarModeLabel label={t('Calendar')} /><CalendarSidebar /></>}
-          {railMode === 'team' && (spaceScope === 'audit'
-            ? <SidebarModeLabel label={t('People')} />
-            : <PeopleSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'team' && activeView !== 'workload') onViewChange('team'); }} />)}
-          {railMode === 'files' && <FilesSidebar navigation={navigation} onNavigate={onNavigate} domains={sidebarDomains} />}
-          {/* ── Reviews ── the Space's pull requests; the main pane reviews the open one. */}
-          {railMode === 'reviews' && <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />}
-          {/* ── Audit ── what needs a person, the workflows, and the log. */}
-          {railMode === 'audit' && <AuditSidebar navigation={navigation} onNavigate={onNavigate} />}
-          {/* ── AI ── this person's conversations, in folders. */}
-          {railMode === 'ai' && <AiSidebar onOpen={() => { if (activeView !== 'ai') onViewChange('ai'); }} />}
-          {/* ── Slides ── the Space's deck folders; the main pane edits the open deck. */}
-          {railMode === 'slides' && <SlidesSidebar onOpen={() => { if (activeView !== 'slides') onViewChange('slides'); }} />}
           </>
           )}
         </nav></ButtonAppearanceProvider>
@@ -708,7 +605,7 @@ function SortableDomainRow({
   );
 }
 
-function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
+export function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   // Domain is the size reference; the other sidebar glyphs are sized up to
   // match this concept icon. An uploaded image is a complete mark of its own;
   // otherwise the Domain's icon and colour are drawn as a Strategy's or an

@@ -5,6 +5,7 @@ import { ExplorerDataProvider } from '@/Function/shared/ExplorerDataContext';
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
+import { ModePanel } from '@/shell/ModePanel';
 import { StatusBar } from '@/shell/StatusBar';
 import { useUserPreferences } from '@/Function/settings/useUserPreferences';
 import { DiscoverModal } from '@/shell/DiscoverModal';
@@ -599,7 +600,14 @@ function WorkspaceContent({
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
         <div className="flex-1 flex overflow-hidden gap-1.5">
-          <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
+          <div className="flex-1 flex overflow-hidden bg-white dark:bg-card rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
+            {/* The open tool's own list (Tables, Artifacts, People …), left
+                of what it opens; the Workspace has none. */}
+            {!createType && (
+              <ModePanel activeView={scopedView(activeTab.activeView, scope)} navigation={activeTab.navigation}
+                onNavigate={handleSidebarNavigate} onViewChange={handleSidebarViewChange} />
+            )}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
             {createType ? (
               <CreateView
                 type={createType}
@@ -635,6 +643,7 @@ function WorkspaceContent({
                 );
               })
             )}
+            </div>
           </div>
           {!aiScreen && (
             <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null}
