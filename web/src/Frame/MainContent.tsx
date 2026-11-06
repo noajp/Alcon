@@ -92,7 +92,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'automation' && (
-            <AutomationView onOpenStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }} />
+            <AutomationView onOpenStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }}
+              onOpenElement={(id) => { onNavigate({ elementId: id }); onViewChange?.('domain-elements'); }} />
           )}
 
           {activeActivity === 'strategy' && (
