@@ -147,7 +147,7 @@ async function candidates(db, domain) {
   const rows = await db.get(
     'elements?select=id,display_id,title,status,priority,labels,claimed_by,claim_expires_at,phase_id,created_at,'
     + 'objects!inner(domain_id),element_assignees(role,workers(ai_config))'
-    + `&objects.domain_id=eq.${domain}&labels=cs.{${DISPATCH_LABEL}}&status=in.(todo,in_progress)`,
+    + `&objects.domain_id=eq.${domain}&labels=cs.${encodeURIComponent(JSON.stringify([DISPATCH_LABEL]))}&status=in.(todo,in_progress)`,
   )
   return rows.map((r) => ({
     ...r,
