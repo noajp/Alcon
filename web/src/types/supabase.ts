@@ -1448,6 +1448,7 @@ export type Database = {
       decks: {
         Row: {
           activity_space_id: string
+          artifact_folder_id: string | null
           chat: Json
           created_by: string | null
           deck: Json
@@ -1460,6 +1461,7 @@ export type Database = {
         }
         Insert: {
           activity_space_id: string
+          artifact_folder_id?: string | null
           chat?: Json
           created_by?: string | null
           deck: Json
@@ -1472,6 +1474,7 @@ export type Database = {
         }
         Update: {
           activity_space_id?: string
+          artifact_folder_id?: string | null
           chat?: Json
           created_by?: string | null
           deck?: Json
@@ -2478,6 +2481,7 @@ export type Database = {
           domain_id: string | null
           id: string
           name: string
+          parent_id: string | null
           position: number
         }
         Insert: {
@@ -2489,6 +2493,7 @@ export type Database = {
           domain_id?: string | null
           id?: string
           name: string
+          parent_id?: string | null
           position?: number
         }
         Update: {
@@ -2500,6 +2505,7 @@ export type Database = {
           domain_id?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
           position?: number
         }
         Relationships: [
@@ -3309,6 +3315,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          folder_id: string | null
           icon: string | null
           id: string
           linked_object_id: string | null
@@ -3321,6 +3328,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string
+          folder_id?: string | null
           icon?: string | null
           id?: string
           linked_object_id?: string | null
@@ -3333,6 +3341,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          folder_id?: string | null
           icon?: string | null
           id?: string
           linked_object_id?: string | null

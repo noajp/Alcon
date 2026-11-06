@@ -19,7 +19,7 @@ import type { ViewId } from '@/shell/viewRegistry';
 
 // The app's top-level modes. Strategy and the tools sit at the top of the
 // sidebar; Inbox, Calendar and the AI at the right of the status bar, the
-// avatar (Profile), Notebook and Slides at its left.
+// avatar (Profile) at its left. Notebook and Slides open from Artifacts.
 export type RailMode = 'personal' | 'inbox' | 'workspace' | 'reviews' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'audit' | 'ai';
 
 export interface ModeMeta {
@@ -54,7 +54,7 @@ export function railModeOf(view: string): RailMode | null {
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
 
-/** The document tools at the left of the status bar. */
+/** The document tools, opened from Artifacts (and the command palette). */
 export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 
 /** The tools the command palette offers besides the document tools. */

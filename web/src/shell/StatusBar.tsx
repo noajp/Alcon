@@ -1,7 +1,7 @@
 'use client';
 
 import { PanelLeft } from '@/ui/icons';
-import { MODE_META, railModeOf, BAR_TOOLS, type RailMode } from '@/shell/railApps';
+import { MODE_META, railModeOf, type RailMode } from '@/shell/railApps';
 import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
 // The strip along the foot of the window, as in VS Code. The person's avatar
-// and the tools for making documents sit at the left; the right holds what stays at hand from any
+// sits at the left (notebooks and slides live in Artifacts); the right holds what stays at hand from any
 // screen — the sidebar's toggle, the inbox, the AI and the calendar.
 
 const btn = (active: boolean) =>
@@ -67,7 +67,6 @@ export function StatusBar({
         title={name ?? t('Profile')} aria-label={t('Profile')} className={btn(activeMode === 'personal')}>
         <WorkerAvatar worker={me} size={14} />
       </Button>
-      {BAR_TOOLS.filter(inScope).map((mode) => modeButton(mode, true))}
 
       <div className="ml-auto flex items-center gap-0.5">
         {sidebar && (

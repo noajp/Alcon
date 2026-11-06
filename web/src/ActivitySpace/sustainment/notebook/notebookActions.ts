@@ -1,5 +1,6 @@
 import type { NoteNodeType, NoteNode } from '@/types/notes';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { placeNotebook } from '@/hooks/artifactData';
 
 type CreateNode = (type: NoteNodeType, name: string, parentId: string | null) => Promise<NoteNode>;
 type DeleteNode = (id: string) => Promise<void>;
@@ -27,4 +28,19 @@ export async function seedNotebook(
     try { await deleteNode(folder.id); } catch { /* best-effort */ }
     throw e;
   }
+}
+
+// The Artifacts folder the next notebook made through the Notebook card goes
+// in: Artifacts sets it before opening the card, the card's submit places
+// what it made, and closing the card forgets it.
+let nextFolder: string | null = null;
+
+export function setNextNotebookFolder(folderId: string | null) {
+  nextFolder = folderId;
+}
+
+export async function placeNewNotebook(notebookId: string): Promise<void> {
+  const folderId = nextFolder;
+  nextFolder = null;
+  if (folderId) await placeNotebook(notebookId, folderId);
 }

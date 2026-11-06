@@ -21,7 +21,7 @@ import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/ActivitySpace/execution/object/QuickAddObjectPopup';
 import { QuickAddNotebookPopup } from '@/ActivitySpace/sustainment/notebook/QuickAddNotebookPopup';
-import { seedNotebook } from '@/ActivitySpace/sustainment/notebook/notebookActions';
+import { placeNewNotebook, seedNotebook, setNextNotebookFolder } from '@/ActivitySpace/sustainment/notebook/notebookActions';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
@@ -678,9 +678,11 @@ function WorkspaceContent({
           and Table cards live in their surfaces. */}
       <QuickAddNotebookPopup
         open={notebookPopupOpen}
-        onClose={() => setNotebookPopupOpen(false)}
+        onClose={() => { setNotebookPopupOpen(false); setNextNotebookFolder(null); }}
         onSubmit={async (name) => {
           const { folder, page } = await seedNotebook(createNoteNode, deleteNoteNode, name);
+          // Made from an Artifacts folder: it goes in that folder.
+          await placeNewNotebook(folder.id);
           setActiveView('note');
           setActiveNavigation({ noteFolderId: folder.id, noteSectionId: null, noteId: page.id });
         }}

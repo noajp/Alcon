@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, FolderInput, Loader2, RotateCcw, Search, Trash2, X } from '@/ui/icons';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowUpRight, Folder as FolderIcon, FolderInput, Loader2, MoreHorizontal, Plus, RotateCcw, Search, Trash2, Upload, X } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AttachmentPreview } from '@/Function/shared/attachments/AttachmentList';
@@ -17,14 +17,17 @@ import { useWorkers } from '@/hooks/teamData';
 import type { NavigationState } from '@/types/navigation';
 import { FileImportActions, canImport } from '@/ActivitySpace/execution/element/FileImportActions';
 import { useTrashFile } from './useTrashFile';
-import { AttachButton } from '@/Function/shared/attachments/AttachButton';
-import { useFolders } from '@/hooks/folderData';
+import { useFolderActions, useFolders, type Folder } from '@/hooks/folderData';
 import { moveFileToFolder } from '@/hooks/attachmentData';
-import { FolderList, MoveToFolderItems, NewFolderButton } from '@/Function/shared/folders/FolderList';
+import { MoveToFolderItems } from '@/Function/shared/folders/FolderList';
 import { IslandColumns, MainIsland, type IslandCrumb } from '@/Function/shared/MainIsland';
-import { DropdownMenu, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
-import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { ARTIFACT_DECKS_KEY, useNotebooksAndDecks } from '@/hooks/artifactData';
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+import { NavNoteIcon, NavSlidesIcon } from '@/shell/sidebar/NavIcons';
+import { createDeckInFolder, openDeck } from '@/ActivitySpace/sustainment/slides/artifactDecks';
+import { setNextNotebookFolder } from '@/ActivitySpace/sustainment/notebook/notebookActions';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 
 const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
@@ -34,112 +37,53 @@ const OWNER_LABEL: Record<AttachmentOwnerKind, string> = {
 const nameOf = (f: SpaceFile) => { const dot = f.name.lastIndexOf('.'); return dot > 0 ? f.name.slice(0, dot) : f.name; };
 
 /**
- * Files, laid out as Execution is: every file in the Space; each Domain's
- * home (its folders and its latest files), its Folders (each opening onto
- * what it holds) and its Files (those in its folders and those attached to
- * its Elements and Objects); and the trash. A file stays where it is (a
- * folder's, or the evidence of what it is attached to, seen by whoever can
- * see that); a row opens it beside the list (Word and Excel editable, with
- * versions).
+ * Artifacts: one folder tree per Space. Folders nest without limit and hold
+ * files, notebooks and slide decks; at the top sit the folders, and the files
+ * attached to Elements, Objects and Strategies (each says what it is attached
+ * to). A file opens beside the list; a notebook or a deck opens in its editor.
  */
-export function FilesView({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
-  const route = useMemo(() => navigation.files ?? {}, [navigation.files]);
-  const go = (next: FilesRoute) => onNavigate({ files: next });
-  // A folder opened from elsewhere (search, a file's owner) names only the
-  // folder: fill in its Domain, so the page and the sidebar sit under it.
-  const folderDomain = useFolders('files').data.find((f) => f.id === route.folderId)?.domain_id ?? null;
-  useEffect(() => {
-    if (route.folderId && !route.domainId && folderDomain) onNavigate({ files: { ...route, domainId: folderDomain } });
-  }, [route, folderDomain, onNavigate]);
-  if (route.view === 'trash') return <TrashList />;
-  if (!route.domainId || route.folderId || route.view === 'files') return <FileList navigation={navigation} onNavigate={onNavigate} />;
-  if (route.view === 'folders') return <FoldersPage domainId={route.domainId} go={go} />;
-  return <FilesHome domainId={route.domainId} go={go} />;
+export function FilesView({ navigation, onNavigate, onViewChange }: {
+  navigation: NavigationState;
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
+}) {
+  const route = navigation.files ?? {};
+  if (route.view === 'trash') return <TrashList onBack={() => onNavigate({ files: {} })} />;
+  return <ArtifactsBrowser navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} />;
 }
 
-/** A Domain's name, for titles. */
-function useDomainName(domainId: string | null | undefined) {
-  return useSustainmentDomains().data.find((d) => d.id === domainId)?.name ?? '';
-}
-
-/** The path's first step: the Domain, opening its home. */
-function useDomainCrumb(domainId: string, go: (next: FilesRoute) => void): IslandCrumb {
-  return { id: 'domain', label: useDomainName(domainId), onClick: () => go({ domainId }) };
-}
-
-function FoldersPage({ domainId, go }: { domainId: string; go: (next: FilesRoute) => void }) {
-  const { t } = useI18n();
-  const domain = useDomainCrumb(domainId, go);
-  const open = (id: string) => go({ domainId, folderId: id });
-  return (
-    <MainIsland crumbs={[domain, { id: 'folders', label: t('Folders') }]} count={useFolders('files', domainId).data.length}
-      actions={<NewFolderButton app="files" domainId={domainId} onOpen={open} />}>
-      <FolderList app="files" domainId={domainId} counts={useFolderCounts()} onOpen={open} />
-    </MainIsland>
-  );
-}
-
-/** How many live files each folder holds. */
-function useFolderCounts() {
-  const { data: files } = useSpaceAttachments(useActiveSpaceId());
-  return useMemo(() => {
-    const m = new Map<string, number>();
-    for (const f of files) if (f.folder_id) m.set(f.folder_id, (m.get(f.folder_id) ?? 0) + 1);
-    return m;
-  }, [files]);
-}
-
-/** A Domain's home in Files: its folders, and its files added last. */
-function FilesHome({ domainId, go }: { domainId: string; go: (next: FilesRoute) => void }) {
-  const { t } = useI18n();
-  const spaceId = useActiveSpaceId();
-  const name = useDomainName(domainId);
-  const files = useSpaceAttachments(spaceId).data.filter((f) => f.domain_id === domainId);
-  const counts = useFolderCounts();
-  return (
-    <MainIsland crumbs={[{ id: 'domain', label: name }]}
-      actions={<NewFolderButton app="files" domainId={domainId} onOpen={(id) => go({ domainId, folderId: id })} />}>
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="px-3 pb-8 pt-5">
-        <div className="flex items-center gap-2 px-[18px]">
-          <button type="button" onClick={() => go({ domainId, view: 'folders' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Folders')}</button>
-        </div>
-        <div className="mt-1"><FolderList app="files" domainId={domainId} counts={counts} onOpen={(id) => go({ domainId, folderId: id })} compact /></div>
-        <div className="mt-8 flex items-center gap-2 px-[18px]">
-          <button type="button" onClick={() => go({ domainId, view: 'files' })} className="text-[13px] font-medium text-foreground hover:underline">{t('Recent artifacts')}</button>
-        </div>
-        <div className="mt-1">
-          {files.slice(0, 8).map((f) => (
-            <button key={f.id} type="button" onClick={() => go({ domainId, view: 'files', fileId: f.id })}
-              className="flex h-9 w-full items-center gap-3 rounded-md px-[18px] text-left hover:bg-foreground/[0.05]">
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                <FileTypeIcon name={f.name} mime={f.mime_type} />
-                <span className="truncate text-[13.5px] text-foreground">{nameOf(f)}</span>
-              </span>
-              <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
-                <span className="text-muted-foreground/70">{t(OWNER_LABEL[ownerOf(f).kind])} · </span>{f.owner_label ?? '—'}
-              </span>
-              <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
-            </button>
-          ))}
-          {!files.length && <p className="px-[18px] py-4 text-[13px] text-muted-foreground">{t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects or Strategies.')}</p>}
-        </div>
-      </div>
-    </div>
-    </MainIsland>
-  );
-}
-
-function FileList({ navigation, onNavigate }: { navigation: NavigationState; onNavigate: (nav: Partial<NavigationState>) => void }) {
+function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
+  navigation: NavigationState;
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
+}) {
   const { t } = useI18n();
   const route = navigation.files ?? {};
+  const folderId = route.folderId ?? null;
   const spaceId = useActiveSpaceId();
-  const { data: files, loading } = useSpaceAttachments(spaceId);
+  const { data: files, loading: filesLoading } = useSpaceAttachments(spaceId);
+  const { data: folders } = useFolders('files');
+  const { notebooks, decks, loading: othersLoading } = useNotebooksAndDecks(spaceId);
   const workers = useWorkers().data;
+  const { openCreate } = useWorkspaceActions();
+  const qc = useQueryClient();
+
+  const go = (next: FilesRoute) => onNavigate({ files: next });
+  const folder = folders.find((f) => f.id === folderId) ?? null;
+  const actions = useFolderActions('files', null, folderId);
+
+  // The path from the top to the open folder.
+  const path = useMemo(() => {
+    const out: Folder[] = [];
+    let cur = folder;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) { seen.add(cur.id); out.unshift(cur); cur = folders.find((f) => f.id === cur!.parent_id) ?? null; }
+    return out;
+  }, [folder, folders]);
+
+  // Search: names everywhere, and a file's text as well.
+  const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
-  // The search reads a file's text as well as its name and owner. Files not
-  // read yet are read in the background while Files is open; the search
-  // waits for a pause in typing.
   useEffect(() => { if (spaceId) void indexSpaceFiles(spaceId); }, [spaceId, files.length]);
   const [settled, setSettled] = useState('');
   useEffect(() => { const id = setTimeout(() => setSettled(query.trim()), 250); return () => clearTimeout(id); }, [query]);
@@ -149,48 +93,78 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
     queryFn: () => searchAttachments(spaceId!, settled, 100),
   });
   const snippets = useMemo(() => new Map((found.data ?? []).map((h) => [h.id, h.snippet])), [found.data]);
+  const q = settled.toLowerCase();
+  const hit = (name: string) => name.toLowerCase().includes(q);
 
-  const shown = useMemo(() => {
-    const q = settled.toLowerCase();
-    const matches = (f: SpaceFile) => !q || snippets.has(f.id) || f.name.toLowerCase().includes(q) || (f.owner_label ?? '').toLowerCase().includes(q);
-    return files.filter((f) => (!route.domainId || f.domain_id === route.domainId) && (!route.folderId || f.folder_id === route.folderId) && matches(f));
-  }, [files, settled, snippets, route.domainId, route.folderId]);
+  // What this folder holds — or, while searching, every match in the Space.
+  const shownFolders = q ? folders.filter((f) => hit(f.name)) : folders.filter((f) => (f.parent_id ?? null) === folderId);
+  const shownNotebooks = q ? notebooks.filter((n) => hit(n.name)) : notebooks.filter((n) => (n.folder_id ?? null) === folderId);
+  const shownDecks = q ? decks.filter((d) => hit(d.name)) : decks.filter((d) => (d.artifact_folder_id ?? null) === folderId);
+  const shownFiles = q
+    ? files.filter((f) => snippets.has(f.id) || hit(f.name) || hit(f.owner_label ?? ''))
+    : files.filter((f) => (f.folder_id ?? null) === folderId);
+  const total = shownFolders.length + shownNotebooks.length + shownDecks.length + shownFiles.length;
+
   const open = files.find((f) => f.id === route.fileId) ?? null;
-  const select = (f: SpaceFile | null) => onNavigate({ files: { ...route, fileId: f?.id ?? null } });
-  const folder = useFolders('files').data.find((f) => f.id === route.folderId) ?? null;
-
-  const { upload } = useAttachmentActions({ kind: 'folder', id: folder?.id ?? '' });
-  // A folder takes files dropped on its list, as well as through the paperclip.
-  const [dropping, setDropping] = useState(false);
-  const drop = (list: FileList) => {
-    if (!folder) return;
-    for (const f of Array.from(list)) upload.mutate(f);
-  };
+  const select = (f: SpaceFile | null) => go({ folderId, fileId: f?.id ?? null });
   const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
-  const go = (next: FilesRoute) => onNavigate({ files: next });
-  const domainName = useDomainName(route.domainId);
-  const crumbs: IslandCrumb[] = !route.domainId ? [{ id: 'all', label: t('All artifacts') }] : [
-    { id: 'domain', label: domainName, onClick: () => go({ domainId: route.domainId }) },
-    ...(folder ? [{ id: 'folders', label: t('Folders'), onClick: () => go({ domainId: route.domainId, view: 'folders' as const }) }, { id: 'folder', label: folder.name }]
-      : [{ id: 'files', label: t('Artifacts') }]),
+  const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
+  const newFolder = async () => {
+    const name = await appDialog.prompt(t('Folder name'), t('New folder'));
+    if (!name?.trim()) return;
+    actions.create.mutate(name, { onSuccess: (f) => go({ folderId: f.id }), onError: fail });
+  };
+  const newNotebook = () => { setNextNotebookFolder(folderId); openCreate('notebook'); };
+  const newDeck = () => {
+    onViewChange?.('slides');
+    void createDeckInFolder(folderId).then(() => qc.invalidateQueries({ queryKey: ARTIFACT_DECKS_KEY })).catch(fail);
+  };
+  const openNotebook = (id: string) => { onNavigate({ noteFolderId: id, noteSectionId: null, noteId: null }); onViewChange?.('note'); };
+  const openSlides = (id: string) => { onViewChange?.('slides'); void openDeck(id); };
+
+  // Files dropped on an open folder go into it.
+  const { upload } = useAttachmentActions({ kind: 'folder', id: folder?.id ?? '' });
+  const uploadInput = useRef<HTMLInputElement | null>(null);
+  const [dropping, setDropping] = useState(false);
+  const drop = (list: FileList) => { if (folder) for (const f of Array.from(list)) upload.mutate(f); };
+
+  const crumbs: IslandCrumb[] = [
+    { id: 'artifacts', label: t('Artifacts'), onClick: folder ? () => go({}) : undefined },
+    ...path.map((f, i) => ({ id: f.id, label: f.name, onClick: i < path.length - 1 ? () => go({ folderId: f.id }) : undefined })),
   ];
 
+  const iconBtn = 'flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
   return (
-    <MainIsland crumbs={crumbs} count={shown.length} actions={<>
-      {folder && (
-        <AttachButton owner={{ kind: 'folder', id: folder.id }} size={14}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+    <MainIsland crumbs={crumbs} count={total} actions={<>
+      {searching ? (
+        <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
+          <Search size={12} className="shrink-0 text-muted-foreground" />
+          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search artifacts')}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); setSearching(false); } }}
+            className="min-w-0 flex-1 bg-transparent outline-none" />
+          <button type="button" aria-label={t('Close')} onClick={() => { setQuery(''); setSearching(false); }} className="text-muted-foreground hover:text-foreground"><X size={12} /></button>
+        </label>
+      ) : (
+        <button type="button" className={iconBtn} title={t('Search artifacts')} aria-label={t('Search artifacts')} onClick={() => setSearching(true)}><Search size={14} /></button>
       )}
-      <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
-        <Search size={12} className="shrink-0 text-muted-foreground" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search names and contents')} aria-label={t('Search artifacts')}
-          className="min-w-0 flex-1 bg-transparent outline-none" />
-      </label>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className={iconBtn} title={t('Add')} aria-label={t('Add')}><Plus size={15} /></button>
+        </DropdownMenuTrigger>
+        <MenuShell as="dropdown" align="end">
+          <DropdownMenuItem onSelect={() => void newFolder()} className="gap-2.5 text-[13px]"><FolderIcon size={14} />{t('New folder')}</DropdownMenuItem>
+          <DropdownMenuItem disabled={!folder} onSelect={() => uploadInput.current?.click()} className="gap-2.5 text-[13px]"
+            title={folder ? undefined : t('Open a folder to upload into it')}><Upload size={14} />{t('Upload files')}</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={newNotebook} className="gap-2.5 text-[13px]"><NavNoteIcon size={14} />{t('Notebook')}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={newDeck} className="gap-2.5 text-[13px]"><NavSlidesIcon size={14} />{t('Slide')}</DropdownMenuItem>
+        </MenuShell>
+      </DropdownMenu>
+      <input ref={uploadInput} type="file" multiple hidden onChange={(e) => { const picked = e.target.files; if (picked) drop(picked); e.target.value = ''; }} />
     </>}>
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Column heads; the list scrolls under them. */}
         <IslandColumns>
           <span className="min-w-0 flex-1">{t('Name')}</span>
           {!open && <span className="hidden w-56 shrink-0 md:block">{t('Attached to')}</span>}
@@ -201,41 +175,101 @@ function FileList({ navigation, onNavigate }: { navigation: NavigationState; onN
           onDragOver={folder ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
           onDragLeave={folder ? () => setDropping(false) : undefined}
           onDrop={folder ? (e) => { e.preventDefault(); setDropping(false); drop(e.dataTransfer.files); } : undefined}>
-          {loading ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
-            : !shown.length ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{folder ? t('This folder is empty. Drop files here, or add them with the paperclip.') : files.length ? t('No files match.') : t('No artifacts yet. Make a folder and drop files into it, or attach them to Elements, Objects or Strategies.')}</p>
-            : shown.map((f) => {
-              const owner = ownerOf(f);
-              const active = open?.id === f.id;
-              return (
-                <button key={f.id} type="button" onClick={() => select(active ? null : f)} aria-pressed={active}
-                  className={`flex min-h-9 w-full items-center gap-3 rounded-md px-[18px] py-1.5 text-left transition-colors ${active ? 'bg-foreground/[0.08]' : 'hover:bg-foreground/[0.05]'}`}>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <FileTypeIcon name={f.name} mime={f.mime_type} />
-                      <span className="truncate text-[13.5px] text-foreground" title={f.name}>{nameOf(f)}</span>
-                      {f.versions > 1 && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">v{f.versions}</span>}
+          {(filesLoading || othersLoading) && !total ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+            : !total ? <p className="px-[18px] py-6 text-[13px] text-muted-foreground">{q ? t('Nothing matches.') : folder ? t('This folder is empty. Drop files here, or add something with +.') : t('No artifacts yet. Add a folder, a notebook or a slide with +.')}</p>
+            : <>
+              {shownFolders.map((f) => (
+                <FolderRow key={f.id} folder={f} onOpen={() => go({ folderId: f.id })} />
+              ))}
+              {shownNotebooks.map((n) => (
+                <ItemRow key={n.id} icon={<NavNoteIcon size={15} />} name={n.name} kind={t('Notebook')} updated={n.updated_at} onOpen={() => openNotebook(n.id)} />
+              ))}
+              {shownDecks.map((d) => (
+                <ItemRow key={d.id} icon={<NavSlidesIcon size={15} />} name={d.name} kind={t('Slide')} updated={d.updated_at} onOpen={() => openSlides(d.id)} />
+              ))}
+              {shownFiles.map((f) => {
+                const owner = ownerOf(f);
+                const active = open?.id === f.id;
+                return (
+                  <button key={f.id} type="button" onClick={() => select(active ? null : f)} aria-pressed={active}
+                    className={`flex min-h-9 w-full items-center gap-3 rounded-md px-[18px] py-1.5 text-left transition-colors ${active ? 'bg-foreground/[0.08]' : 'hover:bg-foreground/[0.05]'}`}>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <FileTypeIcon name={f.name} mime={f.mime_type} />
+                        <span className="truncate text-[13.5px] text-foreground" title={f.name}>{nameOf(f)}</span>
+                        {f.versions > 1 && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">v{f.versions}</span>}
+                      </span>
+                      {settled && snippets.get(f.id) && (
+                        <span className="mt-0.5 block truncate pl-6 text-[12px] text-muted-foreground">{snippets.get(f.id)}</span>
+                      )}
                     </span>
-                    {/* Where the search matched inside the file. */}
-                    {settled && snippets.get(f.id) && (
-                      <span className="mt-0.5 block truncate pl-6 text-[12px] text-muted-foreground">{snippets.get(f.id)}</span>
+                    {!open && (
+                      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+                        {owner.kind === 'folder' ? '—' : <><span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}</>}
+                      </span>
                     )}
-                  </span>
-                  {!open && (
-                    <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
-                      <span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}
-                    </span>
-                  )}
-                  {!open && <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
-                  <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
-                </button>
-              );
-            })}
+                    {!open && <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
+                    <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
+                  </button>
+                );
+              })}
+            </>}
+          {/* The trash, from the top of the tree. */}
+          {!folder && !q && (
+            <button type="button" onClick={() => go({ view: 'trash' })}
+              className="mt-2 flex h-9 w-full items-center gap-2 rounded-md px-[18px] text-left text-[13px] text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground">
+              <Trash2 size={14} />{t('Deleted')}
+            </button>
+          )}
         </div>
       </div>
 
       {open && <FilePane file={open} who={who(open)} onClose={() => select(null)} />}
     </div>
     </MainIsland>
+  );
+}
+
+/** A folder in the list: opens on click; rename and delete from its "⋯". */
+function FolderRow({ folder, onOpen }: { folder: Folder; onOpen: () => void }) {
+  const { t } = useI18n();
+  const { rename, remove } = useFolderActions('files');
+  const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
+  return (
+    <div className="group/row flex h-9 items-center gap-3 rounded-md px-[18px] hover:bg-foreground/[0.05]">
+      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <FolderIcon size={15} className="shrink-0 text-muted-foreground" />
+        <span className="truncate text-[13.5px] text-foreground">{folder.name}</span>
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label={t('More')} className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover/row:opacity-100 data-[state=open]:opacity-100">
+            <MoreHorizontal size={14} />
+          </button>
+        </DropdownMenuTrigger>
+        <MenuShell as="dropdown" align="end">
+          <DropdownMenuItem className="text-[13px]" onSelect={() => void appDialog.prompt(t('Folder name'), folder.name).then((name) => {
+            if (name?.trim() && name.trim() !== folder.name) rename.mutate({ id: folder.id, name }, { onError: fail });
+          })}>{t('Rename')}</DropdownMenuItem>
+          <DropdownMenuItem className="text-[13px] text-[var(--status-danger)]" onSelect={() => remove.mutate(folder.id, { onError: fail })}>{t('Delete')}</DropdownMenuItem>
+        </MenuShell>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+/** A notebook or a deck in the list: opens in its editor. */
+function ItemRow({ icon, name, kind, updated, onOpen }: { icon: React.ReactNode; name: string; kind: string; updated: string; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="flex h-9 w-full items-center gap-3 rounded-md px-[18px] text-left hover:bg-foreground/[0.05]">
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="shrink-0 text-muted-foreground">{icon}</span>
+        <span className="truncate text-[13.5px] text-foreground">{name}</span>
+      </span>
+      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">{kind}</span>
+      <span className="hidden w-32 shrink-0 lg:block" />
+      <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(updated, true)}</span>
+    </button>
   );
 }
 
@@ -285,11 +319,11 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
 /** The trash: every file removed in the Space and still inside its days,
  *  most recently removed first, each with Restore — wherever it was
  *  attached, so there is one place to look. */
-function TrashList() {
+function TrashList({ onBack }: { onBack: () => void }) {
   const { t } = useI18n();
   const { data: files, loading } = useSpaceAttachments(useActiveSpaceId(), true);
   return (
-    <MainIsland crumbs={[{ id: 'trash', label: t('Deleted') }]} count={files.length}
+    <MainIsland crumbs={[{ id: 'artifacts', label: t('Artifacts'), onClick: onBack }, { id: 'trash', label: t('Deleted') }]} count={files.length}
       actions={<span className="pr-1 text-[12px] text-muted-foreground">{t('Removed files can be restored for {days} days, then they are erased.', { days: TRASH_DAYS })}</span>}>
       <IslandColumns>
         <span className="min-w-0 flex-1">{t('Name')}</span>

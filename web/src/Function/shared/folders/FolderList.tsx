@@ -6,7 +6,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/menu';
-import { useFolderActions, useFolders, type FolderApp } from '@/hooks/folderData';
+import { useFolderActions, useFolders, type Folder, type FolderApp } from '@/hooks/folderData';
 import { IslandColumns } from '@/Function/shared/MainIsland';
 
 
@@ -102,9 +102,17 @@ export function MoveToFolderItems({ app, domainId, current, onMove, allowNone = 
   const { t } = useI18n();
   const { data: folders } = useFolders(app, domainId);
   const others = folders.filter((f) => f.id !== current);
+  // Artifacts' folders nest: each is named by its path.
+  const label = (f: Folder) => {
+    const names = [f.name];
+    const seen = new Set([f.id]);
+    let up = folders.find((x) => x.id === f.parent_id);
+    while (up && !seen.has(up.id)) { seen.add(up.id); names.unshift(up.name); up = folders.find((x) => x.id === up!.parent_id); }
+    return names.join(' / ');
+  };
   return <>
     <MenuSectionLabel>{t('Move to')}</MenuSectionLabel>
-    {others.map((f) => <DropdownMenuItem key={f.id} onSelect={() => onMove(f.id)}><FolderIcon size={13} />{f.name}</DropdownMenuItem>)}
+    {others.map((f) => <DropdownMenuItem key={f.id} onSelect={() => onMove(f.id)}><FolderIcon size={13} />{label(f)}</DropdownMenuItem>)}
     {allowNone && current && <DropdownMenuItem onSelect={() => onMove(null)}>{t('Out of the folder')}</DropdownMenuItem>}
     {!others.length && !(allowNone && current) && <div className="px-2 py-1.5 text-[12px] text-muted-foreground">{t('No other folders.')}</div>}
   </>;

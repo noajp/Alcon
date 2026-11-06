@@ -227,7 +227,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'files' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <FilesView navigation={navigation} onNavigate={onNavigate} />
+              <FilesView navigation={navigation} onNavigate={onNavigate} onViewChange={onViewChange} />
             </div>
           )}
 

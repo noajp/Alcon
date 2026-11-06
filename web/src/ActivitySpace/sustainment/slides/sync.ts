@@ -61,7 +61,7 @@ export function fileFromRow(row: DeckRow): KataFile {
 // types are the shape. The two crossings below are the only place that changes.
 type DeckJson = Deck | MixState | ChatMessage[];
 const jsonOf = (value: DeckJson): Json => value as unknown as Json;
-export const deckRow = (row: Omit<TableRow<'decks'>, 'created_by' | 'updated_by'>): DeckRow => row as unknown as DeckRow;
+export const deckRow = (row: Omit<TableRow<'decks'>, 'created_by' | 'updated_by' | 'artifact_folder_id'>): DeckRow => row as unknown as DeckRow;
 
 export function rowFromFile(file: KataFile, spaceId: string) {
   return {
