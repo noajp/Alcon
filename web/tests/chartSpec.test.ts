@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseChartSpec, splitAnswer } from '@/AIP/copilot/chartSpec';
+import { parseChartSpec, splitAnswer } from '@/AIP/ai/chartSpec';
 
 describe('AI chart blocks', () => {
   it('reads a spec and keeps only finite numbers as series', () => {

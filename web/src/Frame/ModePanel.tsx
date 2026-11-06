@@ -5,7 +5,7 @@ import { NotebookTree } from './sidebar/NotebookTree';
 import { railModeOf } from '@/Frame/railApps';
 import { SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { AuditSidebar } from '@/ActivitySpace/audit/AuditSidebar';
-import { AiSidebar } from '@/AIP/copilot/AiSidebar';
+import { AiSidebar } from '@/AIP/ai/AiSidebar';
 import { SlidesSidebar } from '@/ActivitySpace/artifacts/slides/SlidesSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
 import { CalendarSidebar } from '@/ActivitySpace/calendar/CalendarSidebar';

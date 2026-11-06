@@ -5,7 +5,7 @@ import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, MessageSqu
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
-import { useCopilotConversation } from '@/AIP/copilot/CopilotProvider';
+import { useCopilotConversation } from '@/AIP/ai/CopilotProvider';
 import type { AiSessionSummary } from '@/hooks/useAiConversations';
 import { RenameInput } from '@/Function/shared/RenameInput';
 import {

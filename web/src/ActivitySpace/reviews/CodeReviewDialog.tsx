@@ -9,7 +9,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { formatDisplayName, getCachedDisplayNames } from '@/Function/settings/preferencesStore';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
-import { isAgentRunOpen, useAgentRun } from '@/AIP/copilot/agentData';
+import { isAgentRunOpen, useAgentRun } from '@/AIP/ai/agentData';
 import {
   buildFileTree, changeSize, iteratePrompt, matchFile, readGuide, readIntentCheck, reviewState, splitPath, treeOrder,
 } from '@/Function/codeReview/diffModel';

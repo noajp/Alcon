@@ -23,7 +23,7 @@ import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { isAgentRunOpen } from '@/AIP/copilot/agentData';
+import { isAgentRunOpen } from '@/AIP/ai/agentData';
 import { AgentRunPanel, DelegateToAiForm } from './agent';
 import { useRegisterPageCommand } from '@/Function/shared/pageCommands';
 import {

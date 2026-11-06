@@ -9,7 +9,7 @@ import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { NavHomeIcon } from '@/Frame/sidebar/NavIcons';
 import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
 import { NowScreen } from '@/ActivitySpace/home/now/NowScreen';
-import { ProfileAI } from '@/AIP/copilot/ProfileAI';
+import { ProfileAI } from '@/AIP/ai/ProfileAI';
 import { useSelfWorker } from '@/hooks/teamData';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';

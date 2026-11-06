@@ -1,6 +1,6 @@
 'use client';
 
-import { AlconCopilotPanel } from '@/AIP/copilot/AlconCopilotPanel';
+import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
 import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';

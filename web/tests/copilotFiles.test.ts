@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachKind, toolVerb } from '@/AIP/copilot/copilotFiles';
+import { attachKind, toolVerb } from '@/AIP/ai/copilotFiles';
 
 describe('AI attachments', () => {
   it('reads PDF, Markdown and text — by type, or by name when the browser leaves it untyped', () => {

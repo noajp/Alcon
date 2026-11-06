@@ -6,7 +6,7 @@ import { Textarea } from '@/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { openInApp } from '@/Function/shared/appNavigation';
-import { startElementRun } from '@/AIP/copilot/agentData';
+import { startElementRun } from '@/AIP/ai/agentData';
 import { createElement, useDomains, useObjects } from '@/hooks/useSupabase';
 import { setElementDefinition, type Definition } from '@/hooks/definitionData';
 
