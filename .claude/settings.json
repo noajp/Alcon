@@ -15,6 +15,35 @@
             "command": "PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"; d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; [ -f \"$d/.claude/ops/stall-check.mjs\" ] || exit 0; command -v node >/dev/null 2>&1 || exit 0; LOOP_HOOK=1 exec node \"$d/.claude/ops/stall-check.mjs\" >/dev/null 2>&1",
             "async": true,
             "timeout": 86400
+          },
+          {
+            "type": "command",
+            "command": "PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"; d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; [ -f \"$d/.claude/ops/dispatch.mjs\" ] || exit 0; command -v node >/dev/null 2>&1 || exit 0; LOOP_HOOK=1 exec node \"$d/.claude/ops/dispatch.mjs\" >/dev/null 2>&1",
+            "async": true,
+            "timeout": 86400
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"; d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; [ -f \"$d/.claude/ops/hooks/git-guard.mjs\" ] || exit 0; command -v node >/dev/null 2>&1 || exit 0; exec node \"$d/.claude/ops/hooks/git-guard.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"; d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; [ -f \"$d/.claude/ops/hooks/check-on-stop.mjs\" ] || exit 0; command -v node >/dev/null 2>&1 || exit 0; exec node \"$d/.claude/ops/hooks/check-on-stop.mjs\"",
+            "timeout": 300
           }
         ]
       }
