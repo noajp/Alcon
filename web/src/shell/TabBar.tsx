@@ -39,19 +39,20 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   overview:    { title: 'Overview',   Icon: ClipboardList },
   gantt:       { title: 'Gantt',      Icon: GanttChart },
   calendar:    { title: 'Calendar',   Icon: Calendar },
-  workers:     { title: 'Workers',    Icon: Users },
-  resource:    { title: 'Resource',   Icon: BarChart3 },
+  workers:     { title: 'People',     Icon: Users },
+  resource:    { title: 'People',     Icon: Users },
   board:       { title: 'Board',      Icon: Kanban },
   custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
 };
 
 // Order of the "+" create-tab menu. 'summary'/'elements' are structural
-// (auto-created, not user-addable); 'note' is omitted because its UX flow
+// (auto-created, not user-addable); 'resource' is People ('workers') now;
+// 'note' is omitted because its UX flow
 // (open NotePicker → persist note_id → render embed) isn't wired here yet —
 // the type stays in the union for the Element detail's Note link.
 const CREATE_TAB_ORDER: ObjectTabType[] = [
-  'overview', 'board', 'gantt', 'calendar', 'workers', 'resource', 'custom_view',
+  'overview', 'board', 'gantt', 'calendar', 'workers', 'custom_view',
 ];
 
 interface ContextMenu {

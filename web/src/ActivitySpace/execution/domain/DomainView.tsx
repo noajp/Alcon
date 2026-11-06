@@ -66,7 +66,7 @@ const DOMAIN_VISIBLE_TABS_PREFIX = 'domain:visibleTabs:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
 // A Domain always has its Overview and its Objects; other views are added.
-const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
+const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'gantt', 'workers'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
@@ -74,8 +74,9 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   overview: { domainTitle: 'Overview', objectTitle: 'Overview' },
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
-  workers: { domainTitle: 'Workers', objectTitle: 'Workers' },
-  resource: { domainTitle: 'Resource', objectTitle: 'Resource' },
+  // Resource and Workers are one view: People.
+  workers: { domainTitle: 'People', objectTitle: 'People' },
+  resource: { domainTitle: 'People', objectTitle: 'People' },
   custom_view: { domainTitle: 'CustomView', objectTitle: 'CustomView' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
@@ -105,7 +106,9 @@ function loadVisibleTabs(key: string, fallback: ObjectTabType[]): ObjectTabType[
 
 /** The Domain's own two tabs lead, whatever else was added. */
 function withDomainTabs(types: ObjectTabType[]): ObjectTabType[] {
-  return [...DEFAULT_DOMAIN_TAB_TYPES, ...types.filter((t) => !DEFAULT_DOMAIN_TAB_TYPES.includes(t))];
+  // The Objects list is not a Domain tab (the sidebar's Objects row opens it),
+  // and Resource is People now.
+  return [...DEFAULT_DOMAIN_TAB_TYPES, ...types.filter((t) => !DEFAULT_DOMAIN_TAB_TYPES.includes(t) && t !== 'elements' && t !== 'resource')];
 }
 
 function saveVisibleTabs(key: string, tabs: ObjectTabType[]) {
@@ -199,8 +202,10 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   };
 
   const rawVisibleTabTypes = selectedObject
-    ? objectVisibleTypesById[selectedObject.id] ?? DEFAULT_OBJECT_TAB_TYPES
-    : domainVisibleTypes;
+    ? (objectVisibleTypesById[selectedObject.id] ?? DEFAULT_OBJECT_TAB_TYPES).map((t) => (t === 'resource' ? 'workers' : t))
+      .filter((t, i, all) => all.indexOf(t) === i)
+    // Opened from the sidebar's Objects row, the Domain shows its list too.
+    : landOn === 'elements' ? [...domainVisibleTypes, 'elements' as ObjectTabType] : domainVisibleTypes;
   const sanitizedVisibleTabTypes = rawVisibleTabTypes.filter((type) => ALL_TAB_TYPES.includes(type));
   const visibleTabTypes = sanitizedVisibleTabTypes.length > 0
     ? sanitizedVisibleTabTypes
@@ -579,10 +584,11 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
     );
   }
 
-  if (activeType === 'resource') {
+  // People: everyone working in the Domain, with their load.
+  if (activeType === 'resource' || activeType === 'workers') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Workload" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+        <ElementDrilldown key={domainId} label="People" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
           {openElement => <ResourceView
             scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
             onElementClick={element => openElement(element.id)}
@@ -606,19 +612,7 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
     );
   }
 
-  // Workers — placeholder for now; per-Object Workers tab still works
-  return (
-    <div className="flex-1 flex items-center justify-center p-12 text-center">
-      <div>
-        <p className="text-[13px] text-muted-foreground mb-1">
-          Domain-level Workers view is coming soon.
-        </p>
-        <p className="text-[12px] text-muted-foreground/70">
-          Open an Object to see its Workers tab.
-        </p>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 // Adapter: turn an Object into the Element-shaped row GanttView expects.

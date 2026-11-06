@@ -195,7 +195,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
           { type: 'elements', title: 'All' },
-          { type: 'workers',  title: 'Members' },
+          { type: 'workers',  title: 'People' },
         ];
         for (let i = 0; i < defaults.length; i++) {
           await createObjectTab({
@@ -609,8 +609,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {/* Members tab (uses tab_type='workers' so no schema/enum migration
             is needed). The display title is set via the tab record itself —
             defaults / backfill use 'Members'. */}
-        {activeTab?.tab_type === 'workers' && (
-          <ObjectMembersPanel objectId={object.id} domainId={object.domain_id} />
+        {/* People: who is on this Object, then their load on it (what was
+            the Resource tab). */}
+        {(activeTab?.tab_type === 'workers' || activeTab?.tab_type === 'resource') && (
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-card">
+            <ObjectMembersPanel objectId={object.id} domainId={object.domain_id} />
+            <div className="min-h-[360px] flex-1 border-t border-border/60">
+              <ResourceView
+                scopeOverride={{ objectIds: [object.id] }}
+                onElementClick={element => setDetailElementId(element.id)}
+                hideHeader
+              />
+            </div>
+          </div>
         )}
 
         {/* CustomView Tab Content */}
@@ -625,16 +636,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           </div>
         )}
 
-        {/* Resource Tab Content — per-Worker capacity for this Object */}
-        {activeTab?.tab_type === 'resource' && (
-          <div className="flex-1 overflow-hidden bg-card">
-            <ResourceView
-              scopeOverride={{ objectIds: [object.id] }}
-              onElementClick={element => setDetailElementId(element.id)}
-              hideHeader
-            />
-          </div>
-        )}
 
       </div>
 
