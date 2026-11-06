@@ -12,6 +12,7 @@ import { useElementSize } from '@/Function/office/officeViewParts';
 import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { setActiveDomainId } from '@/Function/space/domainsStore';
 import { TRASH_DAYS, indexSpaceFiles, ownerOf, searchAttachments, trashDaysLeft, useAttachmentActions, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
@@ -156,17 +157,23 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
       || (atTop && place.scope === 'object' && (f.object_id === place.objectId || f.element_object_id === place.objectId))) : [];
 
   // Whose a row is, in Domain and Objects across: the Domain's (or Object's)
-  // mark and name, which opens it.
+  // mark and name, which opens that Domain's (or Object's) own page.
+  const openDomainPage = (id: string) => { setActiveDomainId(id); onNavigate({ objectId: null }); onViewChange?.('domain-overview'); };
+  const openObjectPage = (id: string, domainId: string | null) => {
+    if (domainId) setActiveDomainId(domainId);
+    onNavigate({ objectId: id, objectDomainId: domainId ?? undefined });
+    onViewChange?.('objects');
+  };
   const folderById = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
   const whereOf = (folderIdOf: string | null, objectId?: string | null): React.ReactNode => {
     if (!across) return undefined;
     const holder = folderIdOf ? folderById.get(folderIdOf) : undefined;
     if (tab === 'domain') {
       const d = domains.find((x) => x.id === holder?.domain_id);
-      return d ? <WhereCell icon={<ItemIcon icon={d.icon} color={d.color} size={14} fallback={<DomainIcon size={14} />} />} name={d.name} onOpen={() => go({ tab, domainId: d.id })} /> : null;
+      return d ? <WhereCell icon={<ItemIcon icon={d.icon} color={d.color} size={12} fallback={<DomainIcon size={12} />} />} name={d.name} onOpen={() => openDomainPage(d.id)} /> : null;
     }
     const o = objects.find((x) => x.id === (holder?.object_id ?? objectId));
-    return o ? <WhereCell icon={<ItemIcon icon={o.icon} color={o.color} size={14} fallback={<ObjectIcon size={14} />} />} name={o.name} onOpen={() => go({ tab, objectId: o.id })} /> : null;
+    return o ? <WhereCell icon={<ItemIcon icon={o.icon} color={o.color} size={12} fallback={<ObjectIcon size={12} />} />} name={o.name} onOpen={() => openObjectPage(o.id, o.domain_id ?? null)} /> : null;
   };
   const total = shownFolders.length + shownNotebooks.length + shownDecks.length + shownFiles.length;
 
@@ -235,7 +242,7 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
 
   const iconBtn = 'flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40';
   return (
-    <MainIsland crumbs={crumbs} count={total} actions={<>
+    <MainIsland crumbs={crumbs} actions={<>
       {searching ? (
         <label className="flex h-7 w-56 items-center gap-1.5 rounded-md bg-muted/50 px-2 text-[12.5px] focus-within:bg-muted">
           <Search size={12} className="shrink-0 text-muted-foreground" />
@@ -280,10 +287,10 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
         <>
         <IslandColumns>
           <span className="min-w-0 flex-1">{t('Name')}</span>
-          {across && <span className="w-44 shrink-0">{tab === 'domain' ? t('Domain') : t('Object')}</span>}
-          {!open && <span className="hidden w-56 shrink-0 md:block">{t('Kind')}</span>}
-          {!open && <span className="hidden w-32 shrink-0 lg:block">{t('Added by')}</span>}
-          <span className="w-20 shrink-0 text-right">{t('Updated')}</span>
+          {across && <span className="w-40 shrink-0">{tab === 'domain' ? t('Domain') : t('Object')}</span>}
+          {!open && <span className="hidden w-36 shrink-0 md:block">{t('Kind')}</span>}
+          {!open && <span className="hidden w-24 shrink-0 lg:block">{t('Added by')}</span>}
+          <span className="w-16 shrink-0 text-right">{t('Updated')}</span>
         </IslandColumns>
         <div className={`min-h-0 flex-1 overflow-y-auto px-3 py-1 ${dropping ? 'bg-foreground/[0.04] outline-dashed outline-2 -outline-offset-4 outline-[var(--border-strong)]' : ''}`}
           onDragOver={place ? (e) => { e.preventDefault(); setDropping(true); } : undefined}
@@ -317,14 +324,14 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
                         <span className="mt-0.5 block truncate pl-6 text-[12px] text-muted-foreground">{snippets.get(f.id)}</span>
                       )}
                     </span>
-                    {across && <span className="w-44 shrink-0" onClick={(e) => e.stopPropagation()}>{whereOf(f.folder_id, f.object_id ?? f.element_object_id)}</span>}
+                    {across && <span className="w-40 shrink-0" onClick={(e) => e.stopPropagation()}>{whereOf(f.folder_id, f.object_id ?? f.element_object_id)}</span>}
                     {!open && (
-                      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
+                      <span className="hidden w-36 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">
                         {owner.kind === 'folder' ? t('File') : <><span className="text-muted-foreground/70">{t(OWNER_LABEL[owner.kind])} · </span>{f.owner_label ?? '—'}</>}
                       </span>
                     )}
-                    {!open && <span className="hidden w-32 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
-                    <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
+                    {!open && <span className="hidden w-24 shrink-0 truncate text-[12.5px] text-muted-foreground lg:block">{who(f)}</span>}
+                    <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(f.created_at, true)}</span>
                   </button>
                 );
               })}
@@ -365,7 +372,7 @@ function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.Re
         <FolderIcon size={15} className="shrink-0 text-muted-foreground" />
         <span className="truncate text-[13.5px] text-foreground">{folder.name}</span>
       </button>
-      {where !== undefined && <span className="w-44 shrink-0">{where}</span>}
+      {where !== undefined && <span className="w-40 shrink-0">{where}</span>}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" aria-label={t('More')} className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover/row:opacity-100 data-[state=open]:opacity-100">
@@ -383,11 +390,14 @@ function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.Re
   );
 }
 
-/** Whose a row is (a Domain or an Object): its mark and name, opening it. */
+/** Whose a row is (a Domain or an Object): its mark and name in the same
+ *  outlined pill as a list's Object and Label chips, opening its page. */
 function WhereCell({ icon, name, onOpen }: { icon: React.ReactNode; name: string; onOpen: () => void }) {
   return (
-    <span role="link" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}
-      className="flex min-w-0 cursor-pointer items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground">
+    // A span, not a button: it sits inside a row that is itself a button.
+    <span role="link" tabIndex={0} onClick={(e) => { e.stopPropagation(); onOpen(); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onOpen(); } }} title={name}
+      className="inline-flex h-[22px] cursor-pointer min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--border-default)] px-2 text-[12px] font-normal text-[var(--text-secondary)] transition-colors hover:bg-foreground/[0.05] hover:text-foreground">
       <span className="shrink-0">{icon}</span>
       <span className="truncate">{name}</span>
     </span>
@@ -402,10 +412,10 @@ function ItemRow({ icon, name, kind, updated, where, onOpen }: { icon: React.Rea
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         <span className="truncate text-[13.5px] text-foreground">{name}</span>
       </span>
-      {where !== undefined && <span className="w-44 shrink-0" onClick={(e) => e.stopPropagation()}>{where}</span>}
-      <span className="hidden w-56 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">{kind}</span>
-      <span className="hidden w-32 shrink-0 lg:block" />
-      <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(updated, true)}</span>
+      {where !== undefined && <span className="w-40 shrink-0" onClick={(e) => e.stopPropagation()}>{where}</span>}
+      <span className="hidden w-36 shrink-0 truncate text-[12.5px] text-muted-foreground md:block">{kind}</span>
+      <span className="hidden w-24 shrink-0 lg:block" />
+      <span className="w-16 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(updated, true)}</span>
     </button>
   );
 }
