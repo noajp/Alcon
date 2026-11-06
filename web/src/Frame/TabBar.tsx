@@ -5,7 +5,7 @@ import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, close
 import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { constrainTabDrag } from './tabDrag';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from '@/ui/icons';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag, Columns3 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
@@ -44,6 +44,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   board:       { title: 'Board',      Icon: Kanban },
   custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
+  flow:        { title: 'Flow',       Icon: Columns3 },
 };
 
 // Order of the "+" create-tab menu. 'summary'/'elements' are structural
@@ -52,7 +53,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
 // (open NotePicker → persist note_id → render embed) isn't wired here yet —
 // the type stays in the union for the Element detail's Note link.
 const CREATE_TAB_ORDER: ObjectTabType[] = [
-  'overview', 'board', 'gantt', 'calendar', 'workers', 'custom_view',
+  'overview', 'flow', 'board', 'gantt', 'calendar', 'workers', 'custom_view',
 ];
 
 interface ContextMenu {

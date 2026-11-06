@@ -30,6 +30,7 @@ import {
   type ListControlsState,
 } from '@/Function/shared/listControls';
 import { DomainOverview } from './DomainOverview';
+import { FlowBoard } from './flow/FlowBoard';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
@@ -65,8 +66,8 @@ const DOMAIN_TAB_PREFIX = 'domain:activeTabType:';
 const DOMAIN_VISIBLE_TABS_PREFIX = 'domain:visibleTabs:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
-// A Domain always has its Overview and its Objects; other views are added.
-const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'gantt', 'workers'];
+// A Domain always has its Overview, its Flow and its People; other views are added.
+const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'flow', 'gantt', 'workers'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
@@ -80,8 +81,11 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   custom_view: { domainTitle: 'CustomView', objectTitle: 'CustomView' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
+  flow: { domainTitle: 'Flow', objectTitle: 'Flow' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
+// Flow is a Domain's view; an Object's tabs offer the rest.
+const OBJECT_CREATE_TAB_TYPES: ObjectTabType[] = ALL_TAB_TYPES.filter((t) => t !== 'flow');
 // Object tabs that show its Elements through the Elements tab's Filter / Display.
 const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar'];
 
@@ -412,6 +416,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             removeVisibleTab(t.tab_type);
           }}
           onTabCreate={(type) => ensureVisibleTab(type)}
+          createOptions={selectedObject ? OBJECT_CREATE_TAB_TYPES : undefined}
           rightSlot={
             <>
               {objListControlsNode}
@@ -561,6 +566,16 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
       <div className="flex-1 overflow-hidden">
         <ElementDrilldown key={domainId} label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
           {openElement => <CalendarView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+        </ElementDrilldown>
+      </div>
+    );
+  }
+
+  if (activeType === 'flow') {
+    return (
+      <div className="flex-1 overflow-hidden">
+        <ElementDrilldown key={domainId} label="Flow" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+          {openElement => <FlowBoard elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
     );

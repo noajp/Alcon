@@ -128,7 +128,7 @@ export interface ApplyPlanInput {
   dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
   objects: { key: string; objectId: string | null; name: string; domainId: string | null }[];
-  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null; weight?: AiWeight | null; action?: string | null }[];
+  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null; weight?: AiWeight | null; action?: string | null; assigneeWorkerId?: string | null }[];
 }
 
 export interface ApplyPlanResult {
@@ -142,8 +142,9 @@ export interface ApplyPlanResult {
  *  Strategy; new objectives as measures (when the viewer may); each task an
  *  Element in its Object, bound with 'delivers' to the measure it serves,
  *  its predecessors as depends_on edges, ai tasks assigned to the AI Worker
- *  and a person's tasks to whoever approved the draft — so each lands in
- *  someone's queue. A step that fails is reported by name, not thrown; the rest go on. */
+ *  and a person's tasks to the person the Planner chose (normalizePlan keeps
+ *  only the Space's people), else to whoever approved the draft — so each
+ *  lands in someone's queue. A step that fails is reported by name, not thrown; the rest go on. */
 /** The signed-in person's own Worker, or null when they have none. */
 async function approverWorkerId(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -180,7 +181,7 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       failed.push(o.title);
     }
   }
-  const humanWorkerId = input.tasks.some((t) => t.assignee === 'human') ? await approverWorkerId() : null;
+  const approverId = input.tasks.some((t) => t.assignee === 'human' && !t.assigneeWorkerId) ? await approverWorkerId() : null;
   const elementFor = new Map<string, string>();
   for (const t of input.tasks) {
     const objectId = t.object ? objectFor.get(t.object) : input.fallbackObjectId;
@@ -203,7 +204,7 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       if (measureId) {
         await addIntentBinding({ intent_id: measureId, target_type: 'element', target_id: el.id, relationship_type: 'delivers' });
       }
-      const workerId = t.assignee === 'ai' ? input.aiWorkerId : humanWorkerId;
+      const workerId = t.assignee === 'ai' ? input.aiWorkerId : t.assigneeWorkerId || approverId;
       if (workerId) {
         const { error } = await supabase.from('element_assignees').insert({ element_id: el.id, worker_id: workerId, role: 'assignee' });
         if (error) throw new Error(error.message);

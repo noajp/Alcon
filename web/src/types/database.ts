@@ -753,6 +753,7 @@ export type ObjectTabType =
   | 'custom_view'
   | 'board'
   | 'note'
+  | 'flow'
 
 export interface ObjectTab {
   id: string

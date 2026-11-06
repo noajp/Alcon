@@ -91,6 +91,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
         objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id, icon: o.icon ?? null, color: o.color ?? null }))}
         domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}
+        people={workers.filter((w) => w.type === 'human' && w.status !== 'inactive')}
         ensureRoot={intent?.ensureRoot ?? (() => Promise.reject(new Error('no intent')))} />
     );
   }

@@ -251,7 +251,7 @@ function DraftCard({ element, draggable }: { element: FleetElement; draggable: b
       </div>
       <MissionLines element={element} busy={false} />
       <div className="mt-2 flex items-center justify-end gap-1.5 text-[12px] text-muted-foreground">
-        {element.assignee === 'human' ? t('A person') : t('AI')}
+        {element.assignee === 'human' ? <span className="truncate">{element.assigneeName ?? t('A person')}</span> : t('AI')}
         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border">
           <ElementIcon size={11} />
         </span>
@@ -328,7 +328,7 @@ function Connectors({ root, objectCards, fromKey, elementCards, elements }: {
   );
 }
 
-export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, ensureRoot }: {
+export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot }: {
   ctx: MissionContext;
   /** The written Elements, by id, as the shared Element card reads them. */
   details: ReadonlyMap<string, ElementWithDetails>;
@@ -337,6 +337,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   /** The Space's Domains — where a new Object can go. */
   domains: { id: string; name: string }[];
   aiWorkers: Worker[];
+  /** The Space's people — whom the Planner may give a person's task to. */
+  people: Worker[];
   /** The Strategy's root intent; new objectives hang under it. */
   ensureRoot: () => Promise<string>;
 }) {
@@ -364,12 +366,13 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const placeIn = fallbackObjectId || objects[0]?.id || '';
   const newObjectsIn = fallbackDomainId || objects.find((o) => o.domain_id)?.domain_id || domains[0]?.id || '';
   const domainName = useMemo(() => new Map(domains.map((d) => [d.id, d.name])), [domains]);
+  const personName = useMemo(() => new Map(people.map((w) => [w.id, w.name])), [people]);
 
   const current = useMemo(() => buildFleet({
     objects, elements: ctx.elements, measures: ctx.measures, bindings: ctx.bindings,
     edges: ctx.mission.edges, runs: ctx.mission.runs,
   }), [objects, ctx.elements, ctx.measures, ctx.bindings, ctx.mission.edges, ctx.mission.runs]);
-  const fleet = useMemo(() => (draft ? draftFleet(current, ctx.measures, draft) : current), [draft, current, ctx.measures]);
+  const fleet = useMemo(() => (draft ? draftFleet(current, ctx.measures, draft, personName) : current), [draft, current, ctx.measures, personName]);
   // The column the person chose, else the first that needs a look, else the first.
   const focus = fleet.find((o) => o.key === selected)
     ?? fleet.find((o) => o.draft || o.tally.stopped > 0 || o.tally.waiting > 0)
@@ -400,6 +403,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         objects: new Map(objects.map((o) => [o.id, o.name])),
         domainIds: new Set(domains.map((d) => d.id)),
         definitionIds: new Set(definitions.data.map((d) => d.id)),
+        workerIds: new Set(personName.keys()),
       });
       if (next.tasks.length === 0) setError(t('The Planner returned no tasks. Add guidance and try again.'));
       else { setDraft(next); setSelected(null); }
