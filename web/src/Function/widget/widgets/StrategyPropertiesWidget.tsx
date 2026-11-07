@@ -13,7 +13,7 @@ import { useSpaceRole } from '@/Function/space/data';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateStrategy, useStrategies, useWorkers } from '@/hooks/useSupabase';
-import { useDefinitions } from '@/hooks/definitionData';
+import { setStrategyDefinition, useDefinitions } from '@/hooks/definitionData';
 import { useInitiativeIntentContext } from '@/ActivitySpace/strategy/initiative/InitiativeIntent';
 import { measureStateOf } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import type { StrategyDelegation } from '@/types/database';
@@ -25,6 +25,9 @@ import type { WidgetHost } from '../types';
 // met, what happens when an AI finishes, the harness its work follows, and
 // when it was made and last changed. The same rail island an Object has.
 // =============================================================
+
+/** The harness picker's value for "no harness of its own". */
+const SPACE_DEFAULT = '__space';
 
 export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
   const { t } = useI18n();
@@ -46,6 +49,11 @@ export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
   const canEdit = canEditInitiative(user?.id ?? null, strategy.created_by, ownsItsSpace);
   const owner = workers.find((w) => w.user_id && w.user_id === strategy.created_by) ?? null;
   const harness = library.data.find((d) => d.id === strategy.definition_id) ?? null;
+  const setHarness = async (definitionId: string | null) => {
+    await setStrategyDefinition(strategy.id, definitionId);
+    await refetch();
+    host.onRefresh?.();
+  };
   const setDelegation = async (delegation: StrategyDelegation) => {
     await updateStrategy(strategy.id, { delegation });
     await refetch();
@@ -75,8 +83,11 @@ export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
             { value: 'auto' as StrategyDelegation, label: t('Verified results go on to the next step'), hint: t("Stops at a person's Element, an approval or a blocked run.") },
           ]} />
       } />
-      <RailRow name={t('Harness')} placeholder={!harness}
-        label={harness?.name ?? t("The Space's default")} />
+      <RailRow name={t('Harness')} label={
+        <OptionMenu label={t('Harness')} value={harness?.id ?? SPACE_DEFAULT} disabled={!canEdit}
+          onChange={(v) => void setHarness(v === SPACE_DEFAULT ? null : v)}
+          options={[{ value: SPACE_DEFAULT, label: t("The Space's default") }, ...library.data.map((d) => ({ value: d.id, label: d.name }))]} />
+      } />
       <RailRow name={t('Created')} label={formatRelative(strategy.created_at)} />
       <RailRow name={t('Updated')} label={formatRelative(strategy.updated_at)} />
     </div>

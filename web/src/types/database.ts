@@ -415,8 +415,6 @@ export function normalizeDirection(raw: unknown): ElementDirection | null {
 /** How heavy an Element's work is for an AI (supabase/functions/run-agent/agentConfig.ts). */
 export type AiWeight = 'light' | 'standard' | 'heavy'
 
-export const AI_WEIGHTS: readonly AiWeight[] = ['light', 'standard', 'heavy']
-
 export function isAiWeight(v: unknown): v is AiWeight {
   return v === 'light' || v === 'standard' || v === 'heavy'
 }

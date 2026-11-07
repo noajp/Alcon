@@ -6,7 +6,6 @@ import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
-import { PageSection } from '@/Function/shared/PageHead';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { advanceFromElement, startElementRun } from '@/AIP/ai/agentData';
@@ -14,33 +13,30 @@ import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import { createIntent } from '@/hooks/strategyData';
-import { AI_WEIGHTS, isAiWeight, type AgentRunStatus, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
+import { type AgentRunStatus, type ElementWithDetails, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
-import { FLOW_COLUMNS, FLOW_COLUMN_LABEL, flowColumnOf, type FlowColumn } from '@/ActivitySpace/execution/domain/flow/flowColumn';
+import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
+import { waitsOnPerson } from '@/ActivitySpace/execution/chain/waiting';
+import { Chip, WaitingChip } from '@/ActivitySpace/execution/element/board/BoardColumn';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { ActionTag } from '@/Function/shared/elementAction';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
-  answeredQuestions, buildFleet, draftFleet, handOverLabels, measureStateOf, missionSummary, normalizePlan, normalizeQuestions, plannerSources,
-  startableTasks, UNPLACED, yourTurn,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, normalizePlan, normalizeQuestions, plannerSources,
+  startableTasks, UNPLACED,
   type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlannerSource, type PlanQuestion,
 } from './missionModel';
-import { STATE_LABEL, compact, stateColor, type MissionContext } from './MissionPanels';
-import { YourTurnTray } from './YourTurnTray';
-import { measureStateLabel } from '../initiativeMeasureModel';
-import { DefinitionPanel } from './DefinitionPanel';
+import { STATE_LABEL, stateColor, type MissionContext } from './MissionPanels';
 import { listenForPlanRequests } from './plannerRequest';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
-import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
+import { useDefinitions, useRunRounds, type RoundSummary } from '@/hooks/definitionData';
 
-// The Strategy's Execution Chain: every action under its Objects in a column
-// for where it stands — To do, Waiting on you, In progress, To review, Done —
-// left to right, as a Domain's Flow board reads them, each card saying which
-// Object it belongs to, who carries it out, what it delivers and what it
-// waits on. The Planner's draft waits, dashed, in the first column until the
-// person creates it; then its actions move along the chain like the rest.
+// The Strategy's Execution Chain: every action under its Objects in the
+// Board's Status columns, each card saying which Object it belongs to, the
+// verb it asks for, whether it waits on a person, what it delivers and what
+// it waits on. The Planner's draft waits, dashed, in To Do until the person
+// creates it; then its actions move along like the rest.
 
 /** The card ground, as the Board's Element cards draw it. */
 const CARD = 'rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)]';
@@ -67,21 +63,6 @@ function StateBadge({ state }: { state: ActionState }) {
   );
 }
 
-/** One count of the summary line: quiet at zero, coloured when it asks for something. */
-/** One count of the summary: the number over its label, so every count
- *  shares one baseline. A count that asks for something takes its tone;
- *  zero stays quiet. */
-function Fact({ label, n, tone }: { label: string; n: number; tone?: 'warning' | 'danger' }) {
-  const color = n > 0 && tone ? `var(--status-${tone})` : undefined;
-  return (
-    <span className="flex flex-col">
-      <span className={cn('text-[15px] font-medium leading-5 tabular-nums', n > 0 ? 'text-foreground' : 'text-muted-foreground')}
-        style={color ? { color } : undefined}>{n}</span>
-      <span className="text-[11px] leading-4 text-muted-foreground">{label}</span>
-    </span>
-  );
-}
-
 /** Whether the card's state comes from an AI run rather than the Element's
  *  Status — the one case the card still needs a badge for. */
 function runOnlyState(state: ActionState, status: string | null): boolean {
@@ -97,45 +78,11 @@ function DraftTag() {
 }
 
 
-const STRATEGY_DEFINITION = '__strategy';
-
-/** The Element's own definition, chosen on its card: its output shape and its
- *  loop are enforced for it (a Strategy's definition only directs). */
-function DefinitionPick({ value, definitions, onChange }: { value: string | null; definitions: Definition[]; onChange: (id: string | null) => void }) {
-  const { t } = useI18n();
-  if (definitions.length === 0 && !value) return null;
-  return (
-    <span className="flex min-w-0 items-center gap-0.5">
-      <span className="shrink-0">{t('Harness')}</span>
-      <OptionMenu label={t('Harness')} value={value ?? STRATEGY_DEFINITION}
-        options={[{ value: STRATEGY_DEFINITION, label: t('The Strategy\'s') }, ...definitions.map((d) => ({ value: d.id, label: d.name }))]}
-        onChange={(v) => onChange(v === STRATEGY_DEFINITION ? null : v)} />
-    </span>
-  );
-}
-
-const WEIGHT_LABEL: Record<AiWeight, string> = { light: 'Light (small model)', standard: 'Standard', heavy: 'Heavy (large model)' };
-
-/** How heavy the work is for an AI: the model a run picks when no setting names one. */
-function WeightPick({ value, onChange }: { value: AiWeight | null; onChange: (w: AiWeight | null) => void }) {
-  const { t } = useI18n();
-  return (
-    <span className="flex min-w-0 items-center gap-0.5">
-      <span className="shrink-0">{t('Weight')}</span>
-      <OptionMenu label={t('Weight')} value={value ?? 'standard'}
-        options={AI_WEIGHTS.map((w) => ({ value: w, label: t(WEIGHT_LABEL[w]) }))}
-        onChange={(w) => onChange(w === 'standard' ? null : w)} />
-    </span>
-  );
-}
-
 /** What the Execution tab adds under a card's title: what it delivers,
  *  what it waits on, the model that ran it and what that cost, and a hand-off
  *  to Claude Code. */
-function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickSet = false }: {
-  element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode;
-  /** A definition or weight other than the default is chosen: its row stays in view. */
-  pickSet?: boolean;
+function MissionLines({ element, busy, onHandOver, rounds }: {
+  element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary;
 }) {
   const { t } = useI18n();
   const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
@@ -146,7 +93,7 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickS
       best: rounds.values.length ? Math.max(...rounds.values) : '—',
     })
     : null;
-  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop && !definitionPick) return null;
+  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop) return null;
   return (
     <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
       {element.serves.length > 0 && (
@@ -156,14 +103,6 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickS
         <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
       )}
       {loop && <div className="tabular-nums">{loop}</div>}
-      {/* How the AI runs it is a setting, not the work: shown only while the
-          card is hovered or focused, unless something other than the
-          default is chosen. */}
-      {definitionPick && (
-        <div className={cn('min-w-0 flex-wrap items-center gap-x-3', pickSet ? 'flex' : 'hidden group-hover/card:flex group-focus-within/card:flex has-[[data-state=open]]:flex')}>
-          {definitionPick}
-        </div>
-      )}
       {(meta || onHandOver) && (
         <div className="flex items-center gap-2 tabular-nums">
           {meta && <span className="truncate text-[11px] text-muted-foreground/70">{meta}</span>}
@@ -181,14 +120,23 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickS
 
 /** A task of the Planner's draft, drawn as the Element card it will become —
  *  dashed, and not editable until it is created. */
-function DraftCard({ element }: { element: FleetElement }) {
+function DraftCard({ element, object }: { element: FleetElement; object: FleetObject }) {
   const { t } = useI18n();
   return (
     <div className={cn(CARD, 'border-dashed border-border px-3 py-2.5')}>
       <div className="flex items-start gap-2">
+        {/* Where a written card has its Status mark: not created yet. */}
+        <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 rounded-full border border-dashed border-muted-foreground/60" />
         <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground line-clamp-3 break-words">{element.title}</p>
-        {element.action && <ActionTag action={element.action} className="mt-0.5" />}
+        {element.action && <Chip className="mt-px"><ActionTag action={element.action} /></Chip>}
         <DraftTag />
+      </div>
+      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+        <Chip title={object.name} className="max-w-full">
+          <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
+          <span className="truncate">{object.name}</span>
+          {object.draft && <span className="shrink-0 text-muted-foreground/70">· {t('new')}</span>}
+        </Chip>
       </div>
       <MissionLines element={element} busy={false} />
       <div className="mt-2 flex items-center justify-end gap-1.5 text-[12px] text-muted-foreground">
@@ -244,14 +192,11 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   }), [objects, ctx.elements, ctx.measures, ctx.bindings, ctx.mission.edges, ctx.mission.runs]);
   const fleet = useMemo(() => (draft ? draftFleet(current, ctx.measures, draft, personName) : current), [draft, current, ctx.measures, personName]);
 
-  const summary = missionSummary({ elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts });
   // Before the dependencies are read every AI Element would look ready.
   const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
   const rounds = useRunRounds(ctx.elements.map((e) => e.id));
   const definitions = useDefinitions(ctx.spaceId);
-  const turns = useMemo(() => yourTurn({ fleet: current, elements: ctx.elements, runs: ctx.mission.runs, actions: ctx.mission.actions }),
-    [current, ctx.elements, ctx.mission.runs, ctx.mission.actions]);
 
   const plan = async (opts: { answers?: { question: string; answer: string }[]; noQuestions?: boolean; guidance?: string } = {}) => {
     setPlanning(true); setError(null); setNotice(null);
@@ -374,12 +319,13 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const chain = useMemo(() => {
     const latest = new Map<string, AgentRunStatus>();
     for (const r of [...ctx.mission.runs].sort((a, b) => a.created_at.localeCompare(b.created_at))) latest.set(r.element_id, r.status);
-    const columns = Object.fromEntries(FLOW_COLUMNS.map((c) => [c, [] as { element: FleetElement; object: FleetObject }[]])) as Record<FlowColumn, { element: FleetElement; object: FleetObject }[]>;
+    const columns = emptyChain<{ element: FleetElement; object: FleetObject; waiting: boolean }>();
     for (const o of fleet) {
       for (const e of o.elements) {
         const written = e.elementId ? details.get(e.elementId) : undefined;
-        const column = written ? flowColumnOf(written, latest.get(written.id) ?? null) : e.draft ? 'todo' : null;
-        if (column) columns[column].push({ element: e, object: o });
+        // A written Element by its Status, as on the Board; a draft task is not created yet.
+        const column: ChainStatus | null = written ? chainStatusOf(written.status) : e.draft ? 'todo' : null;
+        if (column) columns[column].push({ element: e, object: o, waiting: !!written && waitsOnPerson(written, latest.get(written.id) ?? null) });
       }
     }
     // The draft's tasks first in their column: they are what is new.
@@ -387,9 +333,10 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     return columns;
   }, [fleet, details, ctx.mission.runs]);
 
-  const cardFor = (e: FleetElement) => (
+  const cardFor = (e: FleetElement, o: FleetObject, waiting = false) => (
 e.elementId && details.get(e.elementId) ? (
                     <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
+                      object={{ name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft }}
                       onOpen={() => ctx.onOpenElement(e.elementId!)}
                       // The Element's Status, as every list shows it: the mark
                       // opens the status menu, so work an agent left for
@@ -402,31 +349,18 @@ e.elementId && details.get(e.elementId) ? (
                       ) : (
                         <ElementProgressMark status={details.get(e.elementId)!.status} progress={getElementProgress(details.get(e.elementId)!)} size={16} />
                       )}
-                      // Only what the Status cannot say: an AI run that is
-                      // going, waiting on someone, or has failed.
-                      // What it asks someone to do, then only what the Status
-                      // cannot say: an AI run going, waiting or failed.
-                      badge={(e.action || runOnlyState(e.state, details.get(e.elementId)!.status)) ? (
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          {e.action && <ActionTag action={e.action} className="mt-0.5" />}
+                      // The card shows the verb itself; beside it, only what
+                      // the Status cannot say: an AI run going, waiting or failed.
+                      badge={waiting || runOnlyState(e.state, details.get(e.elementId)!.status) ? (
+                        <span className="flex shrink-0 items-center gap-1">
+                          {waiting && <WaitingChip />}
                           {runOnlyState(e.state, details.get(e.elementId)!.status) && <StateBadge state={e.state} />}
                         </span>
                       ) : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
-                        pickSet={!!details.get(e.elementId)?.definition_id || (e.assignee === 'ai' && isAiWeight(details.get(e.elementId)?.ai_weight) && details.get(e.elementId)?.ai_weight !== 'standard')}
-                        definitionPick={ctx.canEdit ? (
-                          <>
-                            <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
-                              onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
-                            {e.assignee === 'ai' && (
-                              <WeightPick value={isAiWeight(details.get(e.elementId)?.ai_weight) ? details.get(e.elementId)!.ai_weight as AiWeight : null}
-                                onChange={(w) => void setElementAiWeight(e.elementId!, w).then(() => ctx.refetch())} />
-                            )}
-                          </>
-                        ) : undefined}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (
-                    <DraftCard element={e} />
+                    <DraftCard element={e} object={o} />
                   )
   );
 
@@ -438,89 +372,8 @@ e.elementId && details.get(e.elementId) ? (
   const canApply = (!unplaced || !!placeIn) && (!domainless || !!newObjectsIn);
 
   return (
-    <PageSection title={t('Execution')} action={!draft && (ready.length > 0 || handable.length > 0) ? (
-      <>
-        {handable.length > 0 && (
-          <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
-            {t('Hand {n} to Claude Code', { n: handable.length })}
-          </Button>
-        )}
-        {ready.length > 0 && (
-          <Button variant="primary" size="sm" onClick={() => void runReady()} disabled={busy !== null}>
-            {t('Run {n} ready with AI', { n: ready.length })}
-          </Button>
-        )}
-      </>
-    ) : undefined}>
+    <div>
       <div className="space-y-3">
-        {/* How it stands: how far along, large; then the counts that may ask
-            for something, each number over its label; what the AI has used
-            sits apart and quieter — it is bookkeeping, not the work. */}
-        <div className="space-y-2.5">
-          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-            <span className="flex flex-col">
-              <span className="text-[28px] font-semibold leading-8 tracking-tight tabular-nums text-foreground">{summary.progress}%</span>
-              <span className="text-[11px] leading-4 text-muted-foreground">{t('{done} of {all} actions', { done: summary.done, all: summary.actions })}</span>
-            </span>
-            <span className="flex items-end gap-6">
-              <Fact label={t('Running')} n={summary.running} />
-              <Fact label={t('Waiting on a person')} n={summary.waiting} tone="warning" />
-              <Fact label={t('Blocked or failed')} n={summary.blocked + summary.failed} tone="danger" />
-            </span>
-            <span className="ml-auto flex flex-col items-end text-[11px] leading-4 tabular-nums text-muted-foreground/80"
-              title={t('in {input} · out {output}', { input: compact(summary.inputTokens), output: compact(summary.outputTokens) })}>
-              <span>{t('AI cost')} ${summary.costUsd.toFixed(2)}</span>
-              <span>{t('{n} tokens', { n: compact(summary.inputTokens + summary.outputTokens) })}</span>
-            </span>
-          </div>
-          <SegmentedProgress value={summary.progress} />
-        </div>
-
-        {/* What the work is judged on: each success condition, its actual
-            against its target. Work done is not the same as the Strategy won. */}
-        {ctx.measures.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[12px] text-muted-foreground">
-              {t('Success conditions')} <span className="tabular-nums">{summary.measuresMet} / {summary.measures}</span>
-            </p>
-            <ul className="space-y-1">
-              {ctx.measures.map((m) => {
-                const state = measureStateOf(m);
-                return (
-                  <li key={m.id} className="flex items-center gap-2 text-[13px]">
-                    <span className="min-w-0 flex-1 truncate text-foreground">{m.title}</span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {m.actual_value ?? '—'}{m.target_value != null ? ` / ${m.target_value}` : ''}{m.unit ?? ''}
-                    </span>
-                    <span className="w-24 shrink-0 text-right text-[11px]"
-                      style={{ color: state === 'met' ? 'var(--status-success)' : state === 'missed' ? 'var(--status-danger)' : 'var(--muted-foreground)' }}>
-                      {measureStateLabel(state)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {ctx.missionLoaded && (
-          <YourTurnTray items={turns} canEdit={ctx.canEdit} onOpen={ctx.onOpenElement} onChanged={ctx.refetch} />
-        )}
-
-        {/* How the AI works here: two settings, each one line. */}
-        <div className="space-y-1 text-[12px] text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-x-2">
-            <span className="w-36 shrink-0">{t('When an AI finishes')}</span>
-            <OptionMenu label={t('When an AI finishes')} value={ctx.delegation} disabled={!ctx.canEdit}
-              onChange={(v) => void ctx.setDelegation(v)}
-              options={[
-                { value: 'manual' as StrategyDelegation, label: t('A person reviews each result'), hint: t('Nothing starts until you approve the result.') },
-                { value: 'auto' as StrategyDelegation, label: t('Verified results go on to the next step'), hint: t("Stops at a person's Element, an approval or a blocked run.") },
-              ]} />
-          </div>
-          <DefinitionPanel spaceId={ctx.spaceId} definitionId={ctx.definitionId} canEdit={ctx.canEdit} onChange={ctx.setDefinition} />
-        </div>
-
         {/* Breaking it down: the Planner drafts Objects and Elements, and
             nothing is created until the draft is approved. Guidance is
             optional, so its field waits behind a link. */}
@@ -539,6 +392,21 @@ e.elementId && details.get(e.elementId) ? (
               <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setGuidanceOpen(true)}>
                 {t('Add guidance')}
               </Button>
+            )}
+            {/* The work ready to go, started from here. */}
+            {!draft && (ready.length > 0 || handable.length > 0) && (
+              <span className="ml-auto flex items-center gap-2">
+                {handable.length > 0 && (
+                  <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
+                    {t('Hand {n} to Claude Code', { n: handable.length })}
+                  </Button>
+                )}
+                {ready.length > 0 && (
+                  <Button variant="primary" size="sm" onClick={() => void runReady()} disabled={busy !== null}>
+                    {t('Run {n} ready with AI', { n: ready.length })}
+                  </Button>
+                )}
+              </span>
             )}
           </div>
           {guidanceOpen && (
@@ -640,39 +508,11 @@ e.elementId && details.get(e.elementId) ? (
         ) : (
           // The chain: every action in the column for where it stands, left
           // to right. The draft's actions wait, dashed, in the first.
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {FLOW_COLUMNS.map((column) => {
-              const waiting = column === 'waiting';
-              const items = chain[column];
-              return (
-                <section key={column} aria-label={t(FLOW_COLUMN_LABEL[column])}
-                  className={cn('flex w-[272px] shrink-0 flex-col rounded-lg border', waiting ? '' : 'border-transparent bg-muted/40')}
-                  style={waiting ? { borderColor: 'color-mix(in srgb, var(--status-warning) 45%, transparent)', background: 'color-mix(in srgb, var(--status-warning) 8%, transparent)' } : undefined}>
-                  <header className="flex items-center gap-2 px-3 pb-2 pt-2.5 text-[12px] font-medium">
-                    <span className={waiting ? '' : 'text-foreground'} style={waiting ? { color: 'var(--status-warning)' } : undefined}>{t(FLOW_COLUMN_LABEL[column])}</span>
-                    <span className="tabular-nums text-muted-foreground">{items.length}</span>
-                  </header>
-                  <div className="flex flex-col gap-2 px-2 pb-2">
-                    {items.length === 0 ? (
-                      <p className="px-1 py-2 text-[12px] text-muted-foreground">{t('No Elements')}</p>
-                    ) : items.map(({ element: e, object: o }) => (
-                      <div key={e.key} className="min-w-0">
-                        <p className="mb-1 flex items-center gap-1 truncate px-0.5 text-[11px] text-muted-foreground">
-                          <ItemIcon icon={o.icon ?? null} color={o.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
-                          <span className="truncate">{o.name}</span>
-                          {o.draft && <span className="shrink-0">· {t('new')}</span>}
-                        </p>
-                        {cardFor(e)}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+          <ExecutionChain className="flex gap-3 overflow-x-auto pb-2"
+            columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, waiting }) => ({ key: e.key, node: cardFor(e, o, waiting) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
         )}
       </div>
-    </PageSection>
+    </div>
   );
 }
 

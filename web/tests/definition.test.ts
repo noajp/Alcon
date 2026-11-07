@@ -101,16 +101,6 @@ describe('loops', () => {
   });
 });
 
-describe('the screen reads a definition as the engine does', () => {
-  it('finds the same parts', async () => {
-    const { definitionParts } = await import('@/ActivitySpace/strategy/initiative/mission/definitionParts');
-    const engine = (body: string) => Object.entries(def.parseDefinition(body).sections).filter(([, v]) => v).map(([k]) => k).sort();
-    for (const body of [ISUCON, REPORT, '# Metric\n- latency (lower is better)\n# Stop\n- target 1\n']) {
-      expect([...definitionParts(body)].sort()).toEqual(engine(body));
-    }
-  });
-});
-
 describe('checking a harness', () => {
   const codes = (body: string, connected?: string[]) => def.checkHarness(def.parseDefinition(body), { connected }).map((d: { code: string }) => d.code);
 

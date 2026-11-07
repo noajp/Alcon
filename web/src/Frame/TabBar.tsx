@@ -44,7 +44,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   board:       { title: 'Board',      Icon: Kanban },
   custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
-  flow:        { title: 'Flow',       Icon: Columns3 },
+  flow:        { title: 'Execution Chain', Icon: Columns3 },
 };
 
 // Order of the "+" create-tab menu. 'summary'/'elements' are structural
