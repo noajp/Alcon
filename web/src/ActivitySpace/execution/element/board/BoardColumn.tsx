@@ -6,9 +6,9 @@ import { Hand } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 
-// One column of Element cards, as the Board draws it: a mark and a name, the
-// count as a chip, then the cards. The Board and a Strategy's Execution Chain
-// both use it, so the two read the same.
+// One column of Element cards: a mark and a name, the count as a chip,
+// then the cards. Every Execution Chain — a Strategy's and a Domain's —
+// draws its columns with it, so the two read the same.
 
 /** A small rounded label — a count, an Object, a verb — the way every card
  *  and column shows them. */
@@ -32,7 +32,7 @@ const DANGER = 'var(--status-danger)';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 /** The chip's short label for a reason: why this card waits, in the words
- *  the Strategy strip's segments use. A person's verb needs no second word —
+ *  the chain strips' segments use. A person's verb needs no second word —
  *  the verb chip beside it already says which. */
 function reasonLabel(reason: WaitingReason, t: Translate): string {
   switch (reason.kind) {
@@ -47,19 +47,11 @@ function reasonLabel(reason: WaitingReason, t: Translate): string {
   }
 }
 
-/** On a card that waits — in whatever column it sits. Without a reason
- *  (the Board) it is the person's chip it has always been; with one (the
- *  Strategy chain) it says why: warning-toned when a person's act unblocks
- *  it, danger for blocked, muted when it waits on work, not a person. */
-export function WaitingChip({ reason }: { reason?: WaitingReason | null }) {
+/** On a card that waits — in whatever column it sits. It says why:
+ *  warning-toned when a person's act unblocks it, danger for blocked,
+ *  muted when it waits on work, not a person. */
+export function WaitingChip({ reason }: { reason: WaitingReason }) {
   const { t } = useI18n();
-  if (!reason) {
-    return (
-      <Chip className="mt-px border-transparent" style={{ color: WARNING, background: `color-mix(in srgb, ${WARNING} 14%, transparent)` }}>
-        <Hand size={11} className="shrink-0" />{t('Waiting on you')}
-      </Chip>
-    );
-  }
   if (!reason.needsPerson) {
     return <Chip className="mt-px" title={reason.detail ?? undefined}>{reasonLabel(reason, t)}</Chip>;
   }
@@ -77,7 +69,7 @@ export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, em
   mark?: React.ReactNode;
   label: string;
   count: number;
-  /** At the header's right — the Board's "+". */
+  /** At the header's right — the chain's "+". */
   action?: React.ReactNode;
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;

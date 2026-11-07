@@ -32,7 +32,7 @@ import {
 import { DomainOverview } from './DomainOverview';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
-import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
+import { DomainChain } from './DomainChain';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { ObjectIcon } from '@/Frame/icons';
 import { IslandHeader } from '@/Function/shared/MainIsland';
@@ -455,6 +455,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             objListControls={objListControls}
             domainId={activeDomainId ?? null}
             domainName={activeDomain?.name ?? null}
+            canEdit={!viewOnly}
             onNavigate={onNavigate}
             onViewChange={onViewChange}
           />
@@ -508,13 +509,16 @@ interface DomainTabContentProps {
   /** Named on the breadcrumb of an Element opened from the Execution
    *  Chain / Calendar / Workload. */
   domainName?: string | null;
+  /** False for a Domain viewer, who reads: the Execution Chain's drops
+   *  and adds are then off. */
+  canEdit?: boolean;
   /** The tools' Element detail borrows these to reach an Object or an
    *  Strategy — the one-click round trip the List tab already has. */
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }
 
-function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, canEdit = true, onNavigate, onViewChange }: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -577,7 +581,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     return (
       <div className="flex-1 overflow-hidden">
         <ElementDrilldown key={domainId} label="Execution Chain" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
-          {openElement => <ElementBoardView elements={allElements} objects={objects} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+          {openElement => <DomainChain elements={allElements} objects={objects ?? []} domainId={domainId ?? null} canEdit={canEdit} onRefresh={onRefresh} onOpenElement={openElement} />}
         </ElementDrilldown>
       </div>
     );

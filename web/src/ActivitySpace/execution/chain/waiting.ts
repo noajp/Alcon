@@ -1,4 +1,3 @@
-import type { AgentRunStatus, Element } from '@/types/database';
 import { isElementAction, isHumanAction } from '@/Function/shared/elementActionKinds';
 import {
   latestRuns,
@@ -8,13 +7,9 @@ import {
 // Why an Element waits, as one pure reading of the facts the chain already
 // has: the Element's own status and verb, its latest run (status, verdict's
 // held readings, its own words), and the predecessors still open. The card's
-// chip, the Strategy strip's "Waiting on you" count and the chain's filters
+// chip, the chain strips' "Waiting on you" count and the chain's filters
 // all read this one function, so a count and the cards it counts can never
 // disagree.
-//
-// waitsOnPerson below is the same definition at the shallower depth the
-// Board has (an Element and its latest run's *status* only): one
-// definition, two depths of input.
 
 export type WaitingReasonKind =
   | 'approval'    // latest run is awaiting_approval
@@ -104,18 +99,4 @@ export function waitingReasonsByElement(
   return out;
 }
 
-/** Pure. True when the Element waits on a person — waitingReason at the
- *  depth the Board call site has: no blockers, no readings, the latest
- *  run's status only (a status-only stub; the run-derived reasons it can
- *  still name are approval / answer / review / paused). */
-export function waitsOnPerson(
-  element: Pick<Element, 'status' | 'action'>,
-  latestRun: AgentRunStatus | null | undefined,
-): boolean {
-  const stub: MissionRunRow | null = latestRun == null ? null : {
-    id: '', element_id: '', status: latestRun, input_tokens: 0, output_tokens: 0,
-    cost_usd: 0, summary: null, error: null, created_at: '', verdict: null, proposed_readings: null,
-  };
-  const action = isElementAction(element.action) ? element.action : null;
-  return waitingReason({ element: { status: element.status, action }, latestRun: stub, blockers: [] })?.needsPerson ?? false;
-}
+

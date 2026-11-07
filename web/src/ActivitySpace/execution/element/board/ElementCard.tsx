@@ -28,7 +28,7 @@ import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { Chip } from './BoardColumn';
 
-// The Element card: the Board and every Execution Chain draw the same one.
+// The Element card: every Execution Chain draws the same one.
 // Top to bottom: past its due date, said first; the chips — the verb it asks
 // for, its priority, and what the Status cannot say (waiting on a person, an
 // AI run); the Status mark (it opens the status menu) and the title across
@@ -38,7 +38,7 @@ import { Chip } from './BoardColumn';
 // is the Activity signal's tooltip, not a second date on the card.
 // Title, due date, priority and assignee are edited on the card; the card
 // drags with the Element's id ('text/id'), and the host decides what a drop
-// means (a status on the Board).
+// means.
 
 // A card title reads at most two lines — beyond that it ellipsises (the
 // whole title lives on the Element's own view), and the inline rename box

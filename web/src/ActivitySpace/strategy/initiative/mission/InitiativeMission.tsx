@@ -1,17 +1,14 @@
 'use client';
 
-import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { useMemo } from 'react';
 import { useInitiativeMission } from '@/hooks/initiativeMissionData';
 import { useDomains, useWorkers } from '@/hooks/useSupabase';
-import { runsInClaudeCode } from '@/Function/team/agentModel';
-import { liveLease } from '@/Function/shared/element/lease';
 import { useNowMinute } from '@/Function/shared/useNow';
 import { useInitiativeIntentContext } from '../InitiativeIntent';
 import { MissionEvaluatePanel, type MissionContext } from './MissionPanels';
 import { MissionExecutionPanel } from './MissionExecution';
 import type { ElementWithDetails, StrategyDelegation } from '@/types/database';
-import type { MissionElementRow, MissionMeasureRow } from './missionModel';
+import { missionElementRow, type MissionElementRow, type MissionMeasureRow } from './missionModel';
 
 // The mission part of one Strategy tab (Execution or Evaluate). Reads the Strategy's intents from
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
@@ -40,20 +37,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   // Ticks, so a lease that lapses while the tab is open stops reading as running.
   const now = useNowMinute(true);
   const elements = useMemo<MissionElementRow[]>(() => {
-    return objects.flatMap((o) => (o.elements ?? []).map((e) => {
-      const doer = (e.assignees ?? []).find((a) => a.role !== 'reviewer' && a.worker)?.worker;
-      return {
-      id: e.id, title: e.title, status: e.status, display_id: e.display_id ?? null, object_id: o.id,
-      labels: e.labels ?? null,
-      assignee: doer ? (doer.type === 'ai_agent' ? 'ai' as const : 'human' as const) : null,
-      action: isElementAction(e.action) ? e.action : null,
-      assigneeName: doer?.name ?? null,
-      assigneeWorker: doer ?? null,
-      due_date: e.due_date ?? null,
-      claudeCode: (e.assignees ?? []).some((a) => a.role !== 'reviewer' && runsInClaudeCode(a.worker?.ai_config)),
-      leased: !!liveLease({ claimed_by: e.claimed_by ?? null, claim_expires_at: e.claim_expires_at ?? null, branch: e.branch ?? null }, now),
-      };
-    }));
+    return objects.flatMap((o) => (o.elements ?? []).map((e) => missionElementRow(e, o.id, now)));
   }, [objects, now]);
   const elementIds = useMemo(() => elements.map((e) => e.id), [elements]);
   // The Elements as the shared card reads them, for the Execution tab.
