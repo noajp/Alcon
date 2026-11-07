@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
-  exceptionReason, flowObservation, grantChanges, grantConnectors, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
-  type ChainStep, type WorkflowRunRecord, type WorkflowStepRecord,
+  agentRunEvents, agentRunNeedsPerson, agentRunOutcome, auditShowsSample, exceptionReason, flowObservation, grantChanges, grantConnectors,
+  mergeAuditTimeline, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
+  type AgentRunRecord, type ChainStep, type LedgerRun, type RunVerdict, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
 import { buildAuditSample } from '@/Function/audit/auditSample';
 
@@ -203,5 +204,116 @@ describe('the sample', () => {
       const full = sample.steps.filter(s => s.run_id === run.id);
       expect(run.steps.map(s => [s.seq, s.result])).toEqual(full.map(s => [s.seq, s.result]));
     }
+  });
+});
+
+const verdictFixture = (result: 'pass' | 'fail' | 'unchecked'): RunVerdict => ({
+  v: 1, result, source: result === 'unchecked' ? 'none' : 'verifier', model: 'claude-test', gaps: [], revisions: 0,
+  checkedAt: '2026-11-07T01:00:00Z', outcome: 'completed', reason: null, evidence: { verifyStepIdx: 3, artifactIds: [] },
+});
+
+function agentRun(patch: Partial<AgentRunRecord>): AgentRunRecord {
+  return {
+    id: 'ar1', element_id: 'e1', domain_id: null, worker_id: null, status: 'running', mode: 'execute',
+    summary: null, error: null, started_at: '2026-11-06T01:00:00Z', finished_at: null, created_at: '2026-11-06T01:00:00Z',
+    cost_usd: 0, verdict: null, proposed_readings: null, elementTitle: '経費処理', elementStatus: 'todo', objectName: null,
+    pendingActions: 0, ...patch,
+  };
+}
+
+describe('agentRunOutcome', () => {
+  it('reads standing states in their own vocabulary', () => {
+    expect(agentRunOutcome(agentRun({ status: 'queued' }))).toBe('running');
+    expect(agentRunOutcome(agentRun({ status: 'running' }))).toBe('running');
+    expect(agentRunOutcome(agentRun({ status: 'awaiting_input' }))).toBe('waiting');
+    expect(agentRunOutcome(agentRun({ status: 'awaiting_approval', pendingActions: 2 }))).toBe('waiting');
+    expect(agentRunOutcome(agentRun({ status: 'paused' }))).toBe('waiting');
+    expect(agentRunOutcome(agentRun({ status: 'awaiting_review' }))).toBe('review');
+    expect(agentRunOutcome(agentRun({ status: 'failed' }))).toBe('failed');
+    expect(agentRunOutcome(agentRun({ status: 'cancelled' }))).toBe('cancelled');
+  });
+
+  it('reads a completed run by its verdict: pass, fail, or honestly unchecked', () => {
+    expect(agentRunOutcome(agentRun({ status: 'completed', verdict: verdictFixture('pass') }))).toBe('passed');
+    expect(agentRunOutcome(agentRun({ status: 'completed', verdict: verdictFixture('fail') }))).toBe('unpassed');
+    expect(agentRunOutcome(agentRun({ status: 'completed', verdict: verdictFixture('unchecked') }))).toBe('completed');
+    expect(agentRunOutcome(agentRun({ status: 'completed', verdict: null }))).toBe('completed');
+  });
+});
+
+describe('agentRunNeedsPerson', () => {
+  it('asks a person only for approval, review and failure — paused is not attention', () => {
+    expect(agentRunNeedsPerson(agentRun({ status: 'awaiting_approval', pendingActions: 1 }))).toBe(true);
+    expect(agentRunNeedsPerson(agentRun({ status: 'awaiting_review' }))).toBe(true);
+    expect(agentRunNeedsPerson(agentRun({ status: 'failed' }))).toBe(true);
+    for (const status of ['queued', 'running', 'awaiting_input', 'paused', 'completed', 'cancelled'] as const) {
+      expect(agentRunNeedsPerson(agentRun({ status }))).toBe(false);
+    }
+  });
+});
+
+describe('mergeAuditTimeline', () => {
+  const ledgerRun = (id: string, started_at: string, steps: WorkflowStepRecord[] = []): LedgerRun => ({
+    id, deployment_id: 'd1', external_id: id, template_version: 1, subject_ref: null, subject_digest: null, started_at,
+    steps: steps.map(s => ({ seq: s.seq, step_key: s.step_key, kind: s.kind, connector: s.connector, operation: s.operation, result: s.result, reason: s.reason, outside_grant: s.outside_grant })),
+  });
+
+  it('interleaves both sources newest-first, keys them apart, and flags who needs a person', () => {
+    const merged = mergeAuditTimeline(
+      [ledgerRun('l1', '2026-11-06T02:00:00Z'), ledgerRun('l2', '2026-11-06T00:00:00Z', [step({ kind: 'exception' })])],
+      [agentRun({ id: 'a1', started_at: '2026-11-06T03:00:00Z' }), agentRun({ id: 'a2', started_at: null, created_at: '2026-11-06T01:00:00Z', status: 'awaiting_review' })],
+    );
+    expect(merged.map(e => e.key)).toEqual(['agent:a1', 'ledger:l1', 'agent:a2', 'ledger:l2']);
+    expect(merged.map(e => e.needsPerson)).toEqual([false, false, true, true]);
+  });
+
+  it('lets the ledger win a tie — it carries the stronger record', () => {
+    const merged = mergeAuditTimeline(
+      [ledgerRun('l1', '2026-11-06T01:00:00Z')],
+      [agentRun({ id: 'a1', started_at: '2026-11-06T01:00:00Z' })],
+    );
+    expect(merged.map(e => e.key)).toEqual(['ledger:l1', 'agent:a1']);
+  });
+});
+
+describe('agentRunEvents', () => {
+  const steps = [
+    { idx: 2, type: 'result', title: '完了', detail: '3 件処理', created_at: '2026-11-06T01:02:00Z' },
+    { idx: 0, type: 'plan', title: '計画', detail: null, created_at: '2026-11-06T01:00:00Z' },
+    { idx: 1, type: 'error', title: '失敗', detail: '接続できませんでした', created_at: '2026-11-06T01:01:00Z' },
+  ];
+  it('maps steps in idx order, errors as exceptions, and never invents chain fields', () => {
+    const events = agentRunEvents(steps, []);
+    expect(events.map(e => [e.seq, e.step_key, e.kind, e.result])).toEqual([
+      [0, 'plan', 'step', 'ok'],
+      [1, 'error', 'exception', 'failed'],
+      [2, 'result', 'step', 'ok'],
+    ]);
+    expect(events[1].reason).toBe('接続できませんでした');
+    expect(events.every(e => e.connector === null && e.operation === 'none' && e.outside_grant === false)).toBe(true);
+  });
+
+  it('interleaves approvals by time, steps first on a tie, with each status read as its result', () => {
+    const events = agentRunEvents(steps, [
+      { status: 'approved', summary: '送信を承認', created_at: '2026-11-06T01:01:00Z' },
+      { status: 'pending', summary: '削除の承認待ち', created_at: '2026-11-06T01:03:00Z' },
+      { status: 'rejected', summary: '却下された送信', created_at: '2026-11-06T00:59:00Z' },
+    ]);
+    expect(events.map(e => [e.kind, e.result, e.reason])).toEqual([
+      ['approval', 'returned', '却下された送信'],
+      ['step', 'ok', null],
+      ['exception', 'failed', '接続できませんでした'],
+      ['approval', 'approved', '送信を承認'],
+      ['step', 'ok', '3 件処理'],
+      ['approval', 'waiting', '削除の承認待ち'],
+    ]);
+  });
+});
+
+describe('auditShowsSample', () => {
+  it('shows the sample only while the Space has no AI work at all', () => {
+    expect(auditShowsSample(0, 0)).toBe(true);
+    expect(auditShowsSample(1, 0)).toBe(false);
+    expect(auditShowsSample(0, 3)).toBe(false);
   });
 });

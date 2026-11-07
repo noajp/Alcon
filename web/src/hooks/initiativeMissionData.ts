@@ -8,6 +8,7 @@ import { createObject } from './objectData';
 import { addIntentBinding, createIntent } from './strategyData';
 import { setElementDependency } from './coordinationData';
 import { setElementAiWeight, setElementDefinition } from './definitionData';
+import { parseProposedReadings, parseRunVerdict, type ProposedReading, type RunVerdict } from '@/Function/audit/auditModel';
 
 // =============================================================
 // A Strategy's mission, read and written: the runs, artifacts, approvals
@@ -28,15 +29,22 @@ export interface MissionRun {
   error: string | null;
   created_at: string;
   finished_at: string | null;
+  /** The verifier's record of the finish that stood, parsed at this boundary. */
+  verdict: RunVerdict | null;
+  /** The readings the finish proposed, and which of them landed. */
+  proposed_readings: ProposedReading[] | null;
 }
 
 export interface MissionArtifact { id: string; element_id: string; title: string; format: string; content: string; author_name: string | null; updated_at: string }
 export interface MissionAction { id: string; element_id: string; summary: string; status: string; decision_note: string | null; decided_at: string | null; created_at: string }
 export interface MissionEdge { from_element: string; to_element: string }
+/** One row of a measure's reading history — the shape missionModel's
+ *  MissionReadingRow describes; kept here so hooks never import the view layer. */
+export interface MissionReading { intent_id: string; value: number | null; measured_at: string | null; source: string; recorded_by_name: string | null; recorded_at: string }
 
-export interface MissionData { runs: MissionRun[]; artifacts: MissionArtifact[]; actions: MissionAction[]; edges: MissionEdge[] }
+export interface MissionData { runs: MissionRun[]; artifacts: MissionArtifact[]; actions: MissionAction[]; edges: MissionEdge[]; readings: MissionReading[] }
 
-const EMPTY: MissionData = { runs: [], artifacts: [], actions: [], edges: [] };
+const EMPTY: MissionData = { runs: [], artifacts: [], actions: [], edges: [], readings: [] };
 const CHUNK = 100;
 
 async function inChunks<T>(ids: string[], read: (chunk: string[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
@@ -49,30 +57,41 @@ async function inChunks<T>(ids: string[], read: (chunk: string[]) => PromiseLike
   return out;
 }
 
-async function fetchMission(elementIds: string[]): Promise<MissionData> {
-  if (elementIds.length === 0) return EMPTY;
-  const [runs, artifacts, actions, edges] = await Promise.all([
-    inChunks<MissionRun>(elementIds, (c) => supabase.from('agent_runs')
-      .select('id, element_id, status, model, input_tokens, output_tokens, cost_usd, summary, error, created_at, finished_at')
+type MissionRunRaw = Omit<MissionRun, 'verdict' | 'proposed_readings'> & { verdict: unknown; proposed_readings: unknown };
+
+async function fetchMission(elementIds: string[], measureIds: string[]): Promise<MissionData> {
+  if (elementIds.length === 0 && measureIds.length === 0) return EMPTY;
+  const [rawRuns, artifacts, actions, edges, readings] = await Promise.all([
+    elementIds.length === 0 ? [] : inChunks<MissionRunRaw>(elementIds, (c) => supabase.from('agent_runs')
+      .select('id, element_id, status, model, input_tokens, output_tokens, cost_usd, summary, error, created_at, finished_at, verdict, proposed_readings')
       .in('element_id', c).order('created_at', { ascending: false })),
-    inChunks<MissionArtifact>(elementIds, (c) => supabase.from('agent_artifacts')
+    elementIds.length === 0 ? [] : inChunks<MissionArtifact>(elementIds, (c) => supabase.from('agent_artifacts')
       .select('id, element_id, title, format, content, author_name, updated_at').in('element_id', c).order('updated_at', { ascending: false })),
-    inChunks<MissionAction>(elementIds, (c) => supabase.from('agent_actions')
+    elementIds.length === 0 ? [] : inChunks<MissionAction>(elementIds, (c) => supabase.from('agent_actions')
       .select('id, element_id, summary, status, decision_note, decided_at, created_at').in('element_id', c).order('created_at', { ascending: false })),
-    inChunks<MissionEdge>(elementIds, (c) => supabase.from('element_edges')
+    elementIds.length === 0 ? [] : inChunks<MissionEdge>(elementIds, (c) => supabase.from('element_edges')
       .select('from_element, to_element').eq('edge_type', 'depends_on').in('to_element', c)),
+    // The latest reading per measure of this Strategy: the history table is
+    // indexed (intent_id, recorded_at desc) for exactly this read; the
+    // reduction to latest-per-measure happens in measureOutcomes.
+    measureIds.length === 0 ? [] : inChunks<MissionReading>(measureIds, (c) => supabase.from('intent_measure_readings')
+      .select('intent_id, value, measured_at, source, recorded_by_name, recorded_at')
+      .in('intent_id', c).order('recorded_at', { ascending: false })),
   ]);
-  return { runs, artifacts, actions, edges };
+  const runs: MissionRun[] = rawRuns.map((r) => ({
+    ...r, verdict: parseRunVerdict(r.verdict), proposed_readings: parseProposedReadings(r.proposed_readings),
+  }));
+  return { runs, artifacts, actions, edges, readings };
 }
 
 const OPEN: AgentRunStatus[] = ['queued', 'running'];
 
-/** The mission's rows for these Elements. Re-read every 5s while any run is working. */
-export function useInitiativeMission(initiativeId: string, elementIds: string[]) {
-  const key = ['initiative-mission', initiativeId, [...elementIds].sort().join(',')];
+/** The mission's rows for these Elements and measures. Re-read every 5s while any run is working. */
+export function useInitiativeMission(initiativeId: string, elementIds: string[], measureIds: string[] = []) {
+  const key = ['initiative-mission', initiativeId, [...elementIds].sort().join(','), [...measureIds].sort().join(',')];
   const query = useQuery({
     queryKey: key,
-    queryFn: () => fetchMission(elementIds),
+    queryFn: () => fetchMission(elementIds, measureIds),
     staleTime: 5_000,
     refetchInterval: (q) => ((q.state.data as MissionData | undefined)?.runs.some((r) => OPEN.includes(r.status)) ? 5_000 : false),
   });

@@ -1,6 +1,21 @@
 'use client';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import type { AgentAction, AgentOutput, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep } from '@/types/database';
+import { parseProposedReadings, parseRunVerdict, type ProposedReading, type RunVerdict } from '@/Function/audit/auditModel';
+
+/**
+ * An agent run as components see it: the row, with its verdict and proposed
+ * readings narrowed from jsonb at the fetch boundary — raw Json never
+ * reaches a component. The parsed fields live on this type, not on the
+ * hand-written AgentRun row type, whose shape src/types/db.ts pins to the
+ * generated schema.
+ */
+export type ParsedAgentRun = AgentRun & {
+  /** The verifier's judgement of the finish that stood; null when no record was kept. */
+  verdict: RunVerdict | null;
+  /** The readings the finish proposed, and whether each landed; null when it proposed none. */
+  proposed_readings: ProposedReading[] | null;
+};
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ============================================
@@ -41,10 +56,22 @@ const STUCK_QUEUED_MS = 30_000;
 // the continuation token, which stay with the Edge Function (they can hold
 // data read with the starter's permissions).
 const AGENT_RUN_COLUMNS =
-  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count';
+  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count, verdict, proposed_readings';
+
+/** A run row at the fetch boundary: its verdict / readings jsonb is narrowed
+ *  to the parsed shapes here, so raw Json never reaches a component. */
+function parseAgentRun(row: unknown): ParsedAgentRun | null {
+  if (!row || typeof row !== 'object') return null;
+  const r = row as Record<string, unknown>;
+  return {
+    ...(r as unknown as AgentRun),
+    verdict: parseRunVerdict(r.verdict),
+    proposed_readings: parseProposedReadings(r.proposed_readings),
+  };
+}
 
 // Latest run for an Element (any status), or null if it's never been run.
-async function fetchLatestAgentRun(elementId: string): Promise<AgentRun | null> {
+async function fetchLatestAgentRun(elementId: string): Promise<ParsedAgentRun | null> {
   const { data, error } = await supabase
     .from('agent_runs')
     .select(AGENT_RUN_COLUMNS)
@@ -53,7 +80,7 @@ async function fetchLatestAgentRun(elementId: string): Promise<AgentRun | null> 
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return (data as AgentRun) ?? null;
+  return parseAgentRun(data);
 }
 
 async function fetchAgentRunSteps(runId: string): Promise<AgentRunStep[]> {
@@ -103,6 +130,25 @@ async function invokeEngine(body: Record<string, unknown>): Promise<void> {
   }
 }
 
+const EMPTY_MEASURE_LABELS: Map<string, { title: string; unit: string | null }> = new Map();
+
+/** Titles and units for the measures a run's proposed readings name. */
+export function useMeasureLabels(ids: readonly string[]): Map<string, { title: string; unit: string | null }> {
+  const key = [...new Set(ids)].sort().join(',');
+  const [fetched, setFetched] = useState<{ key: string; map: Map<string, { title: string; unit: string | null }> }>({ key: '', map: EMPTY_MEASURE_LABELS });
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from('intents').select('id, title, unit').in('id', key.split(','));
+      if (cancelled || !data) return;
+      setFetched({ key, map: new Map((data as { id: string; title: string; unit: string | null }[]).map((r) => [r.id, { title: r.title, unit: r.unit }])) });
+    })();
+    return () => { cancelled = true; };
+  }, [key]);
+  return key && fetched.key === key ? fetched.map : EMPTY_MEASURE_LABELS;
+}
+
 // Start a run for an Element: create the queued row, then hand it to the
 // engine. One open run per Element — an open one is returned instead, with
 // `existing: true`, so the caller can say so rather than drop the request.
@@ -116,7 +162,7 @@ interface StartOptions {
   replyTo?: string | null;
 }
 
-async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run: AgentRun; existing: boolean }> {
+async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run: ParsedAgentRun; existing: boolean }> {
   const userId = await getCurrentUserId();
   const { data: existing } = await supabase
     .from('agent_runs')
@@ -126,7 +172,7 @@ async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run
     .order('created_at', { ascending: false })
     .limit(1);
   if (existing && existing.length > 0) {
-    const open = existing[0] as AgentRun;
+    const open = parseAgentRun(existing[0]) as ParsedAgentRun;
     // A queued run whose hand-off was lost would block the Element for good:
     // its person hands it over again (the engine's claim makes this safe).
     if (open.status === 'queued' && open.triggered_by === userId
@@ -154,7 +200,7 @@ async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run
   // Another start won the race (one open run per Element): return its run.
   if (error?.code === '23505' && !retried) return startAgentRun(opts, true);
   if (error) throw error;
-  const run = data as unknown as AgentRun;
+  const run = parseAgentRun(data) as ParsedAgentRun;
   // The engine answers 202 at once and works in the background. If the
   // hand-off fails, the queued row is closed so it doesn't hold the Element.
   try {
@@ -244,7 +290,7 @@ export function useAgentRun(
   opts?: { autoLoad?: boolean },
 ) {
   const autoLoad = opts?.autoLoad ?? true;
-  const [run, setRun] = useState<AgentRun | null>(null);
+  const [run, setRun] = useState<ParsedAgentRun | null>(null);
   const [steps, setSteps] = useState<AgentRunStep[]>([]);
   const [pending, setPending] = useState<AgentAction | null>(null);
   const [outputs, setOutputs] = useState<AgentOutput[]>([]);

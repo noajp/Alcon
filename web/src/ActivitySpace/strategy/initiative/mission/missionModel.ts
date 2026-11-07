@@ -11,6 +11,7 @@
 import { isAiWeight, type AgentRunStatus, type AiWeight, type Worker } from '@/types/database';
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
 import { isElementAction, type ElementAction } from '@/Function/shared/elementActionKinds';
+import type { ProposedReading, RunVerdict } from '@/Function/audit/auditModel';
 
 export interface MissionElementRow {
   id: string;
@@ -57,9 +58,12 @@ export interface MissionMeasureRow {
   actual_value: number | null;
   unit: string | null;
   direction: 'at_least' | 'at_most' | null;
+  /** When the current value was measured (intents.measured_at); null when never. */
+  measured_at: string | null;
 }
 
 export interface MissionRunRow {
+  id: string;
   element_id: string;
   model?: string | null;
   status: AgentRunStatus;
@@ -69,6 +73,20 @@ export interface MissionRunRow {
   summary: string | null;
   error: string | null;
   created_at: string;
+  /** The verifier's record of the finish that stood; null when none was written. */
+  verdict: RunVerdict | null;
+  /** The readings the finish proposed, and which of them landed. */
+  proposed_readings: ProposedReading[] | null;
+}
+
+/** One row of a measure's reading history (intent_measure_readings). */
+export interface MissionReadingRow {
+  intent_id: string;
+  value: number | null;
+  measured_at: string | null;
+  source: string;
+  recorded_by_name: string | null;
+  recorded_at: string;
 }
 
 export interface MissionBindingRow { intent_id: string; target_type: string; target_id: string; relationship_type: string }
@@ -136,6 +154,8 @@ export interface FleetElement {
   assigneeWorker: MissionWorker | null;
   /** The Element's own status; a draft task is 'todo'. */
   status: string;
+  /** Its latest run's verdict — an overlay on the state, never a state. */
+  verdict: RunVerdict | null;
   dueDate: string | null;
   /** The measures it delivers, by title. */
   serves: string[];
@@ -165,6 +185,8 @@ export interface FleetObject {
   draft: boolean;
   elements: FleetElement[];
   tally: FleetTally;
+  /** Its Elements' latest verdicts, tallied the same way. */
+  verdicts: VerdictTally;
   /** The state that most needs a look: stopped, then waiting, running, open, done. */
   state: ActionState;
   costUsd: number;
@@ -197,9 +219,12 @@ function objectState(t: FleetTally, elements: readonly FleetElement[]): ActionSt
   return 'todo';
 }
 
-function withTally(o: Omit<FleetObject, 'tally' | 'state' | 'costUsd'>): FleetObject {
+function withTally(o: Omit<FleetObject, 'tally' | 'verdicts' | 'state' | 'costUsd'>): FleetObject {
   const tally = tallyOf(o.elements);
-  return { ...o, tally, state: objectState(tally, o.elements), costUsd: roundCost(o.elements.reduce((n, e) => n + e.costUsd, 0)) };
+  return {
+    ...o, tally, verdicts: countVerdicts(o.elements.map((e) => e.verdict)),
+    state: objectState(tally, o.elements), costUsd: roundCost(o.elements.reduce((n, e) => n + e.costUsd, 0)),
+  };
 }
 
 /** Pure. The Strategy's Objects in their order, each with its Elements —
@@ -241,6 +266,7 @@ export function buildFleet(input: {
       serves: serves.get(e.id) ?? [], waitsOn,
       ready: open && !e.claudeCode && e.assignee !== 'human' && waitsOn.length === 0,
       handable: !!e.claudeCode && s === 'todo' && !isHandedOver(e),
+      verdict: run?.verdict ?? null,
       model: run?.model ?? null, costUsd: roundCost(costs.get(e.id) ?? 0),
     };
   };
@@ -277,7 +303,7 @@ export function draftFleet(
     added.set(column, [...(added.get(column) ?? []), {
       key: `t:${t.key}`, elementId: null, title: t.title, state: 'todo', draft: true,
       assignee: t.assignee, action: t.action ?? null,
-      assigneeName: (t.assigneeWorkerId && people.get(t.assigneeWorkerId)) || null, assigneeWorker: null, status: 'todo', dueDate: null,
+      assigneeName: (t.assigneeWorkerId && people.get(t.assigneeWorkerId)) || null, assigneeWorker: null, status: 'todo', verdict: null, dueDate: null,
       serves: objective ? [objective] : [],
       waitsOn: t.dependsOn.map((d) => taskTitle.get(d)!).filter(Boolean),
       ready: false, handable: false, model: null, costUsd: 0,
@@ -295,6 +321,108 @@ export function draftFleet(
   return out;
 }
 
+// ── Verdicts and measure outcomes ────────────────────────────────────────
+// Attribution, read-side: a verdict says whether the finish that stood was
+// checked; a measure's history says where its current number came from.
+// Both are tallied over the latest run per Element only — a re-run
+// supersedes the run before it, in outcomes as in readings.
+
+export type VerdictTally = { pass: number; fail: number; unchecked: number; none: number };
+
+function countVerdicts(verdicts: readonly (RunVerdict | null)[]): VerdictTally {
+  const tally: VerdictTally = { pass: 0, fail: 0, unchecked: 0, none: 0 };
+  for (const v of verdicts) {
+    if (!v) tally.none += 1;
+    else tally[v.result] += 1;
+  }
+  return tally;
+}
+
+/** Verdicts of the latest run per Element. 'none' = no verdict recorded
+ *  (no finished run, or a run from before verdicts). */
+export function verdictTallyOf(runs: readonly MissionRunRow[]): VerdictTally {
+  return countVerdicts([...latestRuns(runs).values()].map((r) => r.verdict));
+}
+
+export type MeasureFreshness = 'fresh' | 'aging' | 'stale' | 'never';
+
+const DAY_MS = 86_400_000;
+
+/** Pure. How old a measure's current value is, against an injected now:
+ *  'fresh' ≤ freshDays, 'aging' ≤ agingDays, 'stale' beyond, 'never' when
+ *  it was never measured. Ages are computed from timestamps, not dates. */
+function measureFreshness(measuredAt: string | null, now: Date, freshDays = 7, agingDays = 30): MeasureFreshness {
+  if (!measuredAt) return 'never';
+  const age = now.getTime() - Date.parse(measuredAt);
+  if (age <= freshDays * DAY_MS) return 'fresh';
+  if (age <= agingDays * DAY_MS) return 'aging';
+  return 'stale';
+}
+
+/** One measure with its outcome context: where its value stands, how fresh
+ *  it is, where the last reading came from, and the work beneath it. */
+export interface MeasureOutcome {
+  measure: MissionMeasureRow;
+  state: MeasureState;
+  freshness: MeasureFreshness;
+  /** Latest history row: who/what wrote the current value, when. */
+  lastReading: { value: number | null; source: string; recordedByName: string | null; recordedAt: string } | null;
+  /** Applied readings that came from agent runs, newest first — the
+   *  attribution link from the number back to the run that produced it. */
+  agentReadings: { runId: string; elementId: string; value: number; appliedAt: string }[];
+  /** The Elements that deliver this measure, with their latest verdicts. */
+  serves: { elementId: string; title: string; verdict: RunVerdict | null; state: ActionState }[];
+}
+
+/** Pure. Each measure of the Strategy with its outcome context. */
+export function measureOutcomes(input: {
+  measures: readonly MissionMeasureRow[];
+  bindings: readonly MissionBindingRow[];
+  elements: readonly MissionElementRow[];
+  runs: readonly MissionRunRow[];
+  readings: readonly MissionReadingRow[];
+  now: Date;
+  freshWithinDays?: number;
+  agingWithinDays?: number;
+}): MeasureOutcome[] {
+  const latest = latestRuns(input.runs);
+  const elementOf = new Map(input.elements.map((e) => [e.id, e]));
+  const lastByIntent = new Map<string, MissionReadingRow>();
+  for (const r of input.readings) {
+    const seen = lastByIntent.get(r.intent_id);
+    if (!seen || r.recorded_at > seen.recorded_at) lastByIntent.set(r.intent_id, r);
+  }
+  return input.measures.map((measure) => {
+    const agentReadings = input.runs
+      .flatMap((run) => (run.proposed_readings ?? [])
+        .filter((p) => p.applied && p.measureId === measure.id && p.appliedAt !== null)
+        .map((p) => ({ runId: run.id, elementId: run.element_id, value: p.value, appliedAt: p.appliedAt as string })))
+      .sort((a, b) => (a.appliedAt < b.appliedAt ? 1 : a.appliedAt > b.appliedAt ? -1 : 0));
+    const serves = input.bindings
+      .filter((b) => b.intent_id === measure.id && b.target_type === 'element' && b.relationship_type === 'delivers')
+      .flatMap((b) => {
+        const element = elementOf.get(b.target_id);
+        if (!element) return [];
+        const run = latest.get(element.id);
+        return [{
+          elementId: element.id,
+          title: element.display_id ? `${element.display_id} ${element.title}` : element.title,
+          verdict: run?.verdict ?? null,
+          state: actionState(element, run),
+        }];
+      });
+    const last = lastByIntent.get(measure.id);
+    return {
+      measure,
+      state: measureStateOf(measure),
+      freshness: measureFreshness(measure.measured_at, input.now, input.freshWithinDays, input.agingWithinDays),
+      lastReading: last ? { value: last.value, source: last.source, recordedByName: last.recorded_by_name, recordedAt: last.recorded_at } : null,
+      agentReadings,
+      serves,
+    };
+  });
+}
+
 // ── Tallies ────────────────────────────────────────────────────────────────
 
 export interface MissionSummary {
@@ -308,6 +436,10 @@ export interface MissionSummary {
   progress: number;
   measures: number;
   measuresMet: number;
+  /** Latest-run verdicts across the Strategy (Elements that never ran count as none). */
+  verdicts: VerdictTally;
+  /** Measures nobody has refreshed (stale or never measured) that are not met. */
+  measuresStale: number;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
@@ -320,12 +452,18 @@ export function missionSummary(input: {
   measures: readonly MissionMeasureRow[];
   runs: readonly MissionRunRow[];
   artifacts: readonly MissionArtifactRow[];
+  /** For measure freshness; defaults to the moment of the call. */
+  now?: Date;
 }): MissionSummary {
   const runs = latestRuns(input.runs);
   const states = input.elements.map((e) => actionState(e, runs.get(e.id)));
   const count = (s: ActionState) => states.filter((x) => x === s).length;
   const live = states.filter((s) => s !== 'cancelled').length;
   const done = count('done');
+  const now = input.now ?? new Date();
+  const verdicts = verdictTallyOf(input.runs);
+  const ran = new Set(input.runs.map((r) => r.element_id));
+  verdicts.none += input.elements.filter((e) => !ran.has(e.id)).length;
   return {
     actions: live,
     done,
@@ -336,6 +474,12 @@ export function missionSummary(input: {
     progress: live === 0 ? 0 : Math.round((done / live) * 100),
     measures: input.measures.length,
     measuresMet: input.measures.filter((m) => measureStateOf(m) === 'met').length,
+    verdicts,
+    measuresStale: input.measures.filter((m) => {
+      if (measureStateOf(m) === 'met') return false;
+      const freshness = measureFreshness(m.measured_at, now);
+      return freshness === 'stale' || freshness === 'never';
+    }).length,
     inputTokens: input.runs.reduce((n, r) => n + (r.input_tokens || 0), 0),
     outputTokens: input.runs.reduce((n, r) => n + (r.output_tokens || 0), 0),
     costUsd: Math.round(input.runs.reduce((n, r) => n + Number(r.cost_usd || 0), 0) * 100) / 100,

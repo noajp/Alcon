@@ -515,6 +515,26 @@ const APP_MESSAGES: Record<string, Row> = {
   'No default harness — Strategies use Alcon’s built-in way': ['デフォルトのハーネスはありません — Strategy は Alcon の組み込みの進め方で進みます', '기본 하네스가 없습니다 — Strategy는 Alcon의 기본 방식으로 진행됩니다', 'Aucun harnais par défaut — les Strategies suivent la méthode intégrée d’Alcon', 'Sin arnés predeterminado — las Strategies usan el método integrado de Alcon'],
   'Passed': ['合格', '통과', 'Réussi', 'Superado'],
   'Action needed': ['対応が必要です', '조치가 필요합니다', 'Action requise', 'Acción necesaria'],
+  // The verifier's verdict on a run, and the readings its finish proposed.
+  'Verifier: passed': ['検証：合格', '검증: 통과', 'Vérificateur : réussi', 'Verificador: superado'],
+  'after {n} revisions': ['{n} 回の差し戻しの後', '{n}회 반려 후', 'après {n} révisions', 'tras {n} revisiones'],
+  'Verifier: not passed — the run ended after the revision limit': ['検証：不合格 — 差し戻しの上限に達して実行が終わりました', '검증: 불합격 — 반려 한도에 도달해 실행이 종료되었습니다', 'Vérificateur : non réussi — l’exécution s’est terminée à la limite de révisions', 'Verificador: no superado — la ejecución terminó al llegar al límite de revisiones'],
+  'Not verified': ['未検証', '미검증', 'Non vérifié', 'Sin verificar'],
+  'The check could not run': ['検証を実行できませんでした', '검사를 실행할 수 없었습니다', 'La vérification n’a pas pu s’exécuter', 'La verificación no pudo ejecutarse'],
+  'Partial or blocked work is not checked': ['一部完了・ブロックの仕事は検証されません', '부분 완료·차단된 작업은 검사하지 않습니다', 'Le travail partiel ou bloqué n’est pas vérifié', 'El trabajo parcial o bloqueado no se verifica'],
+  'Runs on an external model are not checked': ['外部モデルの実行は検証されません', '외부 모델의 실행은 검사하지 않습니다', 'Les exécutions sur un modèle externe ne sont pas vérifiées', 'Las ejecuciones en un modelo externo no se verifican'],
+  'Recorded': ['記録済み', '기록됨', 'Enregistré', 'Registrado'],
+  'Waiting for acceptance': ['承認待ち', '승인 대기 중', 'En attente d’acceptation', 'En espera de aceptación'],
+  'Not recorded — the check did not pass': ['未記録 — 検証が通りませんでした', '기록되지 않음 — 검사를 통과하지 못했습니다', 'Non enregistré — la vérification n’a pas réussi', 'No registrado — la verificación no se superó'],
+  'Not recorded — not a measure this run serves': ['未記録 — この実行が仕える成功条件ではありません', '기록되지 않음 — 이 실행이 담당하는 성공 조건이 아닙니다', 'Non enregistré — ce n’est pas une mesure desservie par cette exécution', 'No registrado — no es una medida que atienda esta ejecución'],
+  'Recording failed': ['記録に失敗しました', '기록에 실패했습니다', 'Échec de l’enregistrement', 'Error al registrar'],
+  'Superseded by a later run': ['後の実行に置き換えられました', '이후 실행으로 대체되었습니다', 'Remplacé par une exécution ultérieure', 'Sustituido por una ejecución posterior'],
+  // The outcome rollup on a Strategy: verdict tallies and measure attribution.
+  'passed {n}': ['合格 {n}', '통과 {n}', 'réussies {n}', 'superadas {n}'],
+  'not passed {n}': ['不合格 {n}', '불합격 {n}', 'non réussies {n}', 'no superadas {n}'],
+  'Agent run': ['エージェントの実行', '에이전트 실행', 'Exécution d’agent', 'Ejecución de agente'],
+  'Stale': ['古くなっています', '오래되었습니다', 'Périmé', 'Obsoleto'],
+  'No work delivers this measure yet.': ['この成功条件に紐づく仕事はまだありません。', '이 성공 조건에 연결된 작업이 아직 없습니다.', 'Aucun travail ne sert encore cette mesure.', 'Todavía no hay trabajo que atienda esta medida.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

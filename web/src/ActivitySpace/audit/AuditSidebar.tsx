@@ -32,7 +32,7 @@ export function AuditSidebar({ navigation, onNavigate }: {
       onChange: next => { scoped.setScope(next); go({ view: 'overview' }); },
     }}
     queue={[{
-      id: 'attention', label: t('Needs a person'), icon: CircleAlert, count: scoped.attention.length,
+      id: 'attention', label: t('Needs a person'), icon: CircleAlert, count: scoped.attentionEntries.length,
       active: route.view === 'log' && !!route.attention,
       onClick: () => go({ view: 'log', attention: true }),
     }]}

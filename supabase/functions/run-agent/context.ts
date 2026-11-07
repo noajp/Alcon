@@ -26,6 +26,9 @@ export interface TaskContext {
   objectName: string | null;
   subElements: { id: string; title: string; done: boolean }[];
   initiatives: { name: string; description: string | null; intents: { kind: string | null; title: string; status: string | null }[] }[];
+  /** The measures of the Strategies this Element serves — the only ones a
+   *  finish may report readings for. Absent/empty when it serves none. */
+  measures?: { id: string; title: string; strategyName: string; unit: string | null; target: number | null; current: number | null }[];
   comments: { author: string; kind: string; content: string; at: string }[];
   previousRuns: { at: string; status: string; summary: string | null }[];
   artifacts: string[];
@@ -122,7 +125,10 @@ ${bullet(subs)}
 
 # 関連する Initiative（目的・成功条件）
 ${bullet(inits)}
-
+${(ctx.measures ?? []).length ? `
+# 報告できる成功条件（finish の readings で、実際に測った値だけを報告できる）
+${(ctx.measures ?? []).map((m) => `- ${m.title}（${m.strategyName}）: 現在 ${m.current ?? "未計測"}${m.unit ?? ""} / 目標 ${m.target ?? "—"}${m.unit ?? ""}（id: ${m.id}）`).join("\n")}
+` : ""}
 # 最近のコメント（古い順）
 ${bullet(comments)}
 

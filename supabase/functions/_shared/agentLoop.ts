@@ -18,6 +18,13 @@ export interface FinishPayload {
   outcome: "completed" | "partial" | "blocked";
   summary: string;
   message: string;
+  /**
+   * Readings this finish proposes for the measures of the Strategies the
+   * run serves. Copied through unvalidated; the gate
+   * (_shared/readingsGate.ts) validates them at finish time, when the
+   * bound set and the verdict are both known.
+   */
+  readings?: { measureId: string; value: number }[];
 }
 
 /**

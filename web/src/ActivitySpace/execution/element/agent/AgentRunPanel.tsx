@@ -10,6 +10,8 @@ import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { AgentOutput, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
+import type { ProposedReading, RunVerdict } from '@/Function/audit/auditModel';
+import { useMeasureLabels } from '@/AIP/ai/agentData';
 import type { useAgentRun } from '@/hooks/useSupabase';
 import { approvalRows, rememberChoices, sharedColumns } from './approvalView';
 import { CRITICAL_CLASS_LABELS } from '@/AIP/connectors/catalog';
@@ -247,6 +249,87 @@ function ApprovalCard({ agent }: { agent: Agent }) {
   );
 }
 
+const VERDICT_UNCHECKED_REASON: Record<string, string> = {
+  'verify-unavailable': 'The check could not run',
+  'outcome-not-completed': 'Partial or blocked work is not checked',
+  'external-model': 'Runs on an external model are not checked',
+};
+
+/**
+ * The verifier's judgement of the finish that stood, under the agent's own
+ * report: a checked pass, a fail the run ended on anyway, or an honest
+ * "not verified". A run with no record (before verdicts existed) shows
+ * nothing rather than a false "not verified".
+ */
+function VerdictLine({ verdict }: { verdict: RunVerdict }) {
+  const { t } = useI18n();
+  if (verdict.result === 'pass') {
+    return (
+      <div className="mt-1 flex items-center gap-2 px-1 text-[12px]">
+        <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />
+        <span className="text-foreground/90">{t('Verifier: passed')}</span>
+        {verdict.revisions > 0 && <span className="text-muted-foreground">{t('after {n} revisions', { n: verdict.revisions })}</span>}
+      </div>
+    );
+  }
+  if (verdict.result === 'fail') {
+    return (
+      <div className="mt-1 px-1 text-[12px]">
+        <div className="flex items-center gap-2">
+          <ShieldCheck size={13} className="shrink-0 text-[var(--status-danger)]" />
+          <span className="text-foreground/90">{t('Verifier: not passed — the run ended after the revision limit')}</span>
+        </div>
+        {verdict.gaps.length > 0 && (
+          <ul className="mt-0.5 space-y-px pl-5 text-muted-foreground">
+            {verdict.gaps.map((g, i) => <li key={i}>{g}</li>)}
+          </ul>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-1 flex items-center gap-2 px-1 text-[12px]">
+      <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />
+      <span className="text-foreground/90">{t('Not verified')}</span>
+      {verdict.reason && VERDICT_UNCHECKED_REASON[verdict.reason] && (
+        <span className="text-muted-foreground">{t(VERDICT_UNCHECKED_REASON[verdict.reason])}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The readings this run proposed for its Strategies' measures, and what
+ * became of each: recorded, waiting for this review's acceptance, or
+ * refused with the reason. Renders nothing when the run proposed none —
+ * under manual review this block is part of what the reviewer accepts.
+ */
+function ReadingsBlock({ readings }: { readings: readonly ProposedReading[] }) {
+  const { t } = useI18n();
+  const labels = useMeasureLabels(readings.map((r) => r.measureId));
+  if (!readings.length) return null;
+  const stateOf = (r: ProposedReading): string =>
+    r.applied ? t('Recorded')
+      : r.heldReason === 'awaiting-acceptance' ? t('Waiting for acceptance')
+      : r.heldReason === 'verdict-not-pass' ? t('Not recorded — the check did not pass')
+      : r.heldReason === 'not-bound' ? t('Not recorded — not a measure this run serves')
+      : t('Recording failed');
+  return (
+    <div className="mt-1 space-y-0.5 px-1 text-[12px]">
+      {readings.map((r) => {
+        const label = labels.get(r.measureId);
+        return (
+          <p key={r.measureId} className="flex flex-wrap items-baseline gap-x-2 leading-snug">
+            <span className="text-foreground/90">{label?.title ?? r.measureId}</span>
+            <span className="text-foreground/90">{r.value}{label?.unit ? ` ${label.unit}` : ''}</span>
+            <span className="text-muted-foreground">{stateOf(r)}</span>
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function FragmentRow({ children, open, colSpan, raw, rawLabel }: { children: React.ReactNode; open: boolean; colSpan: number; raw: Record<string, unknown>; rawLabel: string }) {
   return (
     <>
@@ -347,6 +430,8 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
           <div className="px-1">
             <Workpad steps={agent.steps} />
           </div>
+          <ReadingsBlock readings={run.proposed_readings ?? []} />
+          {run.verdict && <VerdictLine verdict={run.verdict} />}
           <ApprovalCard agent={agent} />
         </div>
       )}

@@ -42,7 +42,7 @@ export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
   const progress = useMemo(() => completionOf(host.elements), [host.elements]);
   const measures = (intent?.data?.subs ?? []).filter((i) => i.kind === 'measure');
   const met = measures.filter((m) => measureStateOf({
-    id: m.id, title: m.title, target_value: m.target_value, actual_value: m.actual_value, unit: m.unit, direction: m.direction,
+    id: m.id, title: m.title, target_value: m.target_value, actual_value: m.actual_value, unit: m.unit, direction: m.direction, measured_at: m.measured_at ?? null,
   }) === 'met').length;
 
   if (!strategy) return null;

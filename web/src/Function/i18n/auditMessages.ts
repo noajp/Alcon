@@ -169,12 +169,25 @@ const AUDIT_MESSAGES: Record<string, Row> = {
   // The on-screen sample
   'Sample': ['サンプル', '샘플', 'Exemple', 'Ejemplo'],
   'You are looking at sample data': ['サンプルのデータを表示しています', '샘플 데이터를 보고 있습니다', 'Vous regardez des données d’exemple', 'Estás viendo datos de ejemplo'],
-  'There is no AI workflow in this Space that you can see yet, so Audit shows two made-up ones. The sample is not saved anywhere and disappears as soon as a workflow you can see is registered.': [
-    'この Space には、あなたが見られる AI のワークフローがまだないので、架空の2つを表示しています。サンプルはどこにも保存されず、見られるワークフローが登録されるとすぐに消えます。',
-    '이 Space에는 아직 볼 수 있는 AI 워크플로가 없어 가상의 두 개를 보여 줍니다. 샘플은 어디에도 저장되지 않으며 볼 수 있는 워크플로가 등록되면 바로 사라집니다.',
-    'Aucun workflow d’IA de ce Space ne vous est encore visible : Audit en montre deux inventés. L’exemple n’est enregistré nulle part et disparaît dès qu’un workflow visible pour vous est enregistré.',
-    'Aún no hay en este Space ningún flujo de IA que puedas ver, así que Audit muestra dos inventados. El ejemplo no se guarda en ningún sitio y desaparece en cuanto se registra un flujo que puedas ver.',
+  'There is no AI work in this Space that you can see yet, so Audit shows two made-up workflows. The sample is not saved anywhere and disappears as soon as a workflow is registered or an agent runs.': [
+    'この Space には、あなたが見られる AI の仕事がまだないので、架空のワークフローを2つ表示しています。サンプルはどこにも保存されず、ワークフローが登録されるかエージェントが実行されるとすぐに消えます。',
+    '이 Space에는 아직 볼 수 있는 AI 작업이 없어 가상의 워크플로 두 개를 보여 줍니다. 샘플은 어디에도 저장되지 않으며 워크플로가 등록되거나 에이전트가 실행되면 바로 사라집니다.',
+    'Aucun travail d’IA de ce Space ne vous est encore visible : Audit en montre deux inventés. L’exemple n’est enregistré nulle part et disparaît dès qu’un workflow est enregistré ou qu’un agent s’exécute.',
+    'Aún no hay en este Space ningún trabajo de IA que puedas ver, así que Audit muestra dos flujos inventados. El ejemplo no se guarda en ningún sitio y desaparece en cuanto se registra un flujo o se ejecuta un agente.',
   ],
+  // Agent runs in the timeline: their own outcomes, and the standing
+  // statement that they are not part of the hash-chained ledger.
+  'Agent run · not hash-chained': ['エージェントの実行 · ハッシュチェーン外', '에이전트 실행 · 해시 체인 아님', 'Exécution d’agent · hors chaîne de hachage', 'Ejecución de agente · fuera de la cadena de hashes'],
+  'This run is recorded in the app database and is not part of the hash-chained ledger.': ['この実行はアプリのデータベースに記録されたもので、ハッシュチェーン化された台帳の一部ではありません。', '이 실행은 앱 데이터베이스에 기록된 것으로, 해시 체인 원장의 일부가 아닙니다.', 'Cette exécution est enregistrée dans la base de données de l’application et ne fait pas partie du registre en chaîne de hachage.', 'Esta ejecución está registrada en la base de datos de la aplicación y no forma parte del registro encadenado por hashes.'],
+  'Verifier: not passed': ['検証：不合格', '검증: 불합격', 'Vérificateur : non réussi', 'Verificador: no superado'],
+  'Awaiting review': ['レビュー待ち', '검토 대기 중', 'En attente de révision', 'En espera de revisión'],
+  'Approval': ['承認', '승인', 'Approbation', 'Aprobación'],
+  'Summary': ['要約', '요약', 'Résumé', 'Resumen'],
+  'Finished at': ['終了', '종료 시각', 'Terminé à', 'Finalizó a las'],
+  'Cost': ['コスト', '비용', 'Coût', 'Coste'],
+  'Checked at': ['検証日時', '검사 시각', 'Vérifié à', 'Verificado a las'],
+  'Showing the latest {n} agent runs of the last {d} days.': ['直近 {d} 日のうち、新しい {n} 件のエージェントの実行を表示しています。', '최근 {d}일 중 최신 에이전트 실행 {n}건을 표시합니다.', 'Affichage des {n} exécutions d’agent les plus récentes des {d} derniers jours.', 'Se muestran las {n} ejecuciones de agente más recientes de los últimos {d} días.'],
+  '{n} agent runs need a person': ['エージェントの実行 {n} 件が人の対応を待っています', '에이전트 실행 {n}건이 사람의 대응을 기다리고 있습니다', '{n} exécutions d’agent attendent une personne', '{n} ejecuciones de agente requieren a una persona'],
   'Sales desk': ['営業事務', '영업 사무', 'Administration des ventes', 'Administración de ventas'],
   'Accounting': ['経理', '경리', 'Comptabilité', 'Contabilidad'],
   'Order agent': ['受注エージェント', '수주 에이전트', 'Agent des commandes', 'Agente de pedidos'],

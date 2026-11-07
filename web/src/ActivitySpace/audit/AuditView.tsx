@@ -32,10 +32,12 @@ export function AuditView({ navigation, onNavigate }: {
   const deployment = route.view === 'workflow' && route.deploymentId ? scoped.deploymentOf.get(route.deploymentId) ?? null : null;
   if (deployment) {
     const tab = route.tab ?? 'overview';
+    // The workflow page is ledger-only and speaks in bare run ids; the
+    // route carries entry keys, so the prefix is added and stripped here.
     return <AuditWorkflowPage source={source} deployment={deployment} summary={scoped.summaries.get(deployment.id)}
-      tab={tab} runId={route.runId ?? null}
+      tab={tab} runId={route.runId?.replace(/^ledger:/, '') ?? null}
       onTab={next => go({ ...route, tab: next, runId: next === 'runs' ? route.runId : null })}
-      onOpenRun={id => go({ ...route, tab: 'runs', runId: id })}
+      onOpenRun={id => go({ ...route, tab: 'runs', runId: `ledger:${id}` })}
       onCloseRun={() => go({ ...route, runId: null })} />;
   }
 
