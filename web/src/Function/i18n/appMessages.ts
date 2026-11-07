@@ -532,6 +532,10 @@ const APP_MESSAGES: Record<string, Row> = {
   // The outcome rollup on a Strategy: verdict tallies and measure attribution.
   'passed {n}': ['合格 {n}', '통과 {n}', 'réussies {n}', 'superadas {n}'],
   'not passed {n}': ['不合格 {n}', '불합격 {n}', 'non réussies {n}', 'no superadas {n}'],
+  // The Execution Chain's summary strip and Object index.
+  'Checks not passed': ['検証不合格', '검사 불합격', 'Contrôles non réussis', 'Controles no superados'],
+  '{n} unrefreshed': ['{n} 件が未更新', '{n}개 미갱신', '{n} non actualisées', '{n} sin actualizar'],
+  'Clear filter': ['フィルターを解除', '필터 해제', 'Effacer le filtre', 'Borrar el filtro'],
   'Agent run': ['エージェントの実行', '에이전트 실행', 'Exécution d’agent', 'Ejecución de agente'],
   'Stale': ['古くなっています', '오래되었습니다', 'Périmé', 'Obsoleto'],
   'No work delivers this measure yet.': ['この成功条件に紐づく仕事はまだありません。', '이 성공 조건에 연결된 작업이 아직 없습니다.', 'Aucun travail ne sert encore cette mesure.', 'Todavía no hay trabajo que atienda esta medida.'],

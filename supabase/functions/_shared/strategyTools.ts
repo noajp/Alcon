@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { errorMessage, type ToolDef, type ToolResult } from "./boardTools.ts";
 import { definitionReading, parseDefinition } from "./definition.ts";
+import { actionStateOf, barriersOf, type ExecutionRunRow } from "./executionState.ts";
 
 // Strategy reads — Initiatives with their intent (success conditions,
 // premises, decisions) and the Objects that execute them, so an agent can
@@ -30,6 +31,16 @@ export const STRATEGY_TOOLS: ToolDef[] = [
   {
     name: "getInitiative",
     description: "Initiative の意図（成功条件・前提・意思決定などの intents）、配下の Object、子 Initiative を返す。Element に着手する前に、それが何のためにあるかを確かめるのに使う。",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Initiative UUID" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "getInitiativeExecution",
+    description: "Strategy の実行状態を返す: Object ごとの Element（状態・担当・動詞）、各 Element の最新の実行（状態・要約・エラー・検証結果と不足点・保留中の指標報告）、未完了の依存、全体の集計。実行について聞かれたら推測せずこれで読む。",
     input_schema: {
       type: "object",
       properties: { id: { type: "string", description: "Initiative UUID" } },
@@ -112,6 +123,142 @@ export async function runStrategyTool(
             intents: intents.data ?? [],
             objects,
             childInitiativeIds: (children.data ?? []).map((c: { child_strategy_id: string }) => c.child_strategy_id),
+          },
+        };
+      }
+
+      case "getInitiativeExecution": {
+        let id = String(input.id ?? "").trim();
+        if (!id) return { ok: false, error: "id is required" };
+        if (!UUID.test(id)) {
+          const { data: named, error: nameError } = await supabase.from("strategies").select("id, name").ilike("name", id).limit(2);
+          if (nameError) throw nameError;
+          if (!named?.length) return { ok: false, error: `「${id}」という Initiative は見つかりません。listInitiatives で id を確かめてください。` };
+          if (named.length > 1) return { ok: false, error: `「${id}」という名前の Initiative が複数あります。listInitiatives で id を確かめてください。` };
+          id = named[0].id as string;
+        }
+        const { data: initiative, error } = await supabase.from("strategies").select("id, name").eq("id", id).maybeSingle();
+        if (error) throw error;
+        if (!initiative) return { ok: false, error: "Initiative not found" };
+        const links = await supabase.from("strategy_objects").select("object_id").eq("strategy_id", id);
+        if (links.error) throw links.error;
+        const objectIds = (links.data ?? []).map((l: { object_id: string }) => l.object_id);
+        const objectRows = (objectIds.length
+          ? (await supabase.from("objects").select("id, name").in("id", objectIds).is("archived_at", null)).data ?? []
+          : []) as { id: string; name: string }[];
+        const { data: elementData, error: elementError } = objectRows.length
+          ? await supabase.from("elements")
+            .select("id, title, status, object_id, action, claimed_by, claim_expires_at")
+            .in("object_id", objectRows.map((o) => o.id)).is("parent_id", null).limit(300)
+          : { data: [], error: null };
+        if (elementError) throw elementError;
+        const elementRows = (elementData ?? []) as unknown as {
+          id: string; title: string; status: string | null; object_id: string;
+          action: unknown; claimed_by: string | null; claim_expires_at: string | null;
+        }[];
+        const elementIds = elementRows.map((e) => e.id);
+        const empty = { data: [], error: null };
+        const [assigneesRes, edgesRes, runsRes] = await Promise.all([
+          elementIds.length ? supabase.from("element_assignees").select("element_id, role, workers(type, ai_config)").in("element_id", elementIds) : empty,
+          elementIds.length ? supabase.from("element_edges").select("from_element, to_element").in("to_element", elementIds).eq("edge_type", "depends_on") : empty,
+          elementIds.length ? supabase.from("agent_runs").select("id, element_id, status, summary, error, verdict, proposed_readings, created_at").in("element_id", elementIds).order("created_at", { ascending: false }).limit(1000) : empty,
+        ]);
+        if (assigneesRes.error) throw assigneesRes.error;
+        if (edgesRes.error) throw edgesRes.error;
+        if (runsRes.error) throw runsRes.error;
+
+        type AssigneeRow = { element_id: string; role: string | null; workers: { type: string | null; ai_config: unknown } | null };
+        const assigneesByElement = new Map<string, AssigneeRow[]>();
+        for (const a of (assigneesRes.data ?? []) as unknown as AssigneeRow[]) {
+          assigneesByElement.set(a.element_id, [...(assigneesByElement.get(a.element_id) ?? []), a]);
+        }
+        const now = Date.now();
+        const execElements = elementRows.map((e) => {
+          const mine = assigneesByElement.get(e.id) ?? [];
+          const doer = mine.find((a) => a.role !== "reviewer" && a.workers);
+          return {
+            id: e.id, title: e.title, status: e.status, object_id: e.object_id,
+            action: typeof e.action === "string" ? e.action : null,
+            assignee: (doer ? (doer.workers!.type === "ai_agent" ? "ai" : "human") : null) as "ai" | "human" | null,
+            claudeCode: mine.some((a) => a.role !== "reviewer" && (a.workers?.ai_config as { runner?: unknown } | null)?.runner === "claude-code"),
+            leased: !!e.claimed_by && !!e.claim_expires_at && Date.parse(e.claim_expires_at) > now,
+          };
+        });
+        type RunRow = ExecutionRunRow & { id: string; verdict: unknown; proposed_readings: unknown };
+        const runRows = (runsRes.data ?? []) as unknown as RunRow[];
+        const latestFull = new Map<string, RunRow>();
+        for (const r of runRows) {
+          const seen = latestFull.get(r.element_id);
+          if (!seen || r.created_at > seen.created_at) latestFull.set(r.element_id, r);
+        }
+        const stateOf = new Map(execElements.map((e) => [e.id, actionStateOf(e, latestFull.get(e.id))]));
+        const elementById = new Map(execElements.map((e) => [e.id, e]));
+        const edges = (edgesRes.data ?? []) as { from_element: string; to_element: string }[];
+        const blockersOf = (elementId: string) => edges
+          .filter((edge) => edge.to_element === elementId && elementById.has(edge.from_element))
+          .map((edge) => ({ title: elementById.get(edge.from_element)!.title, state: stateOf.get(edge.from_element)! }))
+          .filter((b) => b.state !== "done" && b.state !== "cancelled");
+
+        const verdictOf = (raw: unknown): { result: string; gaps: string[] } | null => {
+          if (!raw || typeof raw !== "object") return null;
+          const v = raw as { result?: unknown; gaps?: unknown };
+          if (v.result !== "pass" && v.result !== "fail" && v.result !== "unchecked") return null;
+          return { result: v.result, gaps: Array.isArray(v.gaps) ? v.gaps.filter((g): g is string => typeof g === "string").slice(0, 5) : [] };
+        };
+        const heldOf = (raw: unknown): { measureId: string; value: number }[] => {
+          if (!Array.isArray(raw)) return [];
+          return raw
+            .filter((r) => !!r && typeof r === "object" && typeof (r as { measureId?: unknown }).measureId === "string" && (r as { applied?: unknown }).applied === false)
+            .map((r) => {
+              const held = r as { measureId: string; value?: unknown };
+              return { measureId: held.measureId, value: typeof held.value === "number" ? held.value : 0 };
+            });
+        };
+        const heldIds = new Set<string>();
+        for (const r of latestFull.values()) for (const h of heldOf(r.proposed_readings)) heldIds.add(h.measureId);
+        const measureTitles = new Map<string, string>();
+        if (heldIds.size) {
+          const { data: measures } = await supabase.from("intents").select("id, title").in("id", [...heldIds]);
+          for (const m of (measures ?? []) as { id: string; title: string }[]) measureTitles.set(m.id, m.title);
+        }
+
+        const tallies = { total: 0, done: 0, running: 0, waiting: 0, blocked: 0, failed: 0, verdicts: { pass: 0, fail: 0, unchecked: 0 } };
+        for (const e of execElements) {
+          const state = stateOf.get(e.id)!;
+          if (state !== "cancelled") tallies.total += 1;
+          if (state === "done") tallies.done += 1;
+          else if (state === "running") tallies.running += 1;
+          else if (state === "waiting") tallies.waiting += 1;
+          else if (state === "blocked") tallies.blocked += 1;
+          else if (state === "failed") tallies.failed += 1;
+          const v = verdictOf(latestFull.get(e.id)?.verdict);
+          if (v) tallies.verdicts[v.result as "pass" | "fail" | "unchecked"] += 1;
+        }
+        const cut = (s: string | null): string | null => (s && s.length > 500 ? s.slice(0, 500) : s);
+        return {
+          ok: true,
+          data: {
+            strategyId: id,
+            name: initiative.name,
+            tallies,
+            objects: objectRows.map((o) => ({
+              name: o.name,
+              elements: execElements.filter((e) => e.object_id === o.id).map((e) => {
+                const run = latestFull.get(e.id);
+                return {
+                  id: e.id, title: e.title, status: e.status, action: e.action, assignee: e.assignee,
+                  state: stateOf.get(e.id),
+                  blockers: blockersOf(e.id),
+                  latestRun: run ? {
+                    id: run.id,
+                    status: run.status, summary: cut(run.summary), error: cut(run.error),
+                    verdict: verdictOf(run.verdict),
+                    heldReadings: heldOf(run.proposed_readings).map((h) => ({ measureTitle: measureTitles.get(h.measureId) ?? h.measureId, value: h.value })),
+                  } : null,
+                };
+              }),
+            })),
+            barriers: barriersOf(execElements, runRows),
           },
         };
       }

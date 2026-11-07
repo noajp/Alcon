@@ -5,7 +5,8 @@ import { Button } from '@/ui/button';
 import { useEffect, useRef, useState } from 'react';
 import { X, Maximize2, Minimize2, Paperclip } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
-import { type CopilotAttachment, type CopilotContext } from './useAlconCopilot';
+import { buildCopilotContext, type CopilotAttachment, type CopilotContext, type CopilotSubject } from './useAlconCopilot';
+import { useStrategies } from '@/hooks/strategyData';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
 import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
 import { AlconFilePicker } from './AlconFilePicker';
@@ -50,9 +51,13 @@ export interface AlconCopilotPanelProps {
    *  panel's own close all flip the same boolean. Ignored on the AI screen. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** What the screen is about, when the panel should speak to it rather than
-   *  to Alcon at large — 'slides' makes it the open deck's assistant. */
-  subject?: 'slides' | null;
+  /** What the screen is about, when the panel should speak to it rather
+   *  than to Alcon at large: slides makes it the open deck's assistant; a
+   *  strategy is context for the next send only — the panel's entry and
+   *  its bounds do not change with the subject. The copilot is one
+   *  conversation by design: switching the open Strategy mid-conversation
+   *  changes the next send's context, never resets the conversation. */
+  subject?: CopilotSubject;
   /** floating: a pop-up above the corner button, moved by its title bar and
    *  sized from any edge. page: the AI screen, the whole island. */
   variant?: 'floating' | 'page';
@@ -63,9 +68,11 @@ export interface AlconCopilotPanelProps {
 }
 
 /**
- * The AI. One conversation (CopilotProvider) shown as a pop-up or a screen of
- * its own; on Slides the pop-up is the open deck's assistant. Phase 1 ships
- * read-only tools.
+ * The AI. One conversation (CopilotProvider) shown as a pop-up or a screen
+ * of its own; on Slides the pop-up is the open deck's assistant. Its tools
+ * are the catalog's panel entry, run under the caller's own JWT — RLS
+ * bounds what they may see and change, and deletes are confirmed in the
+ * chat. A subject scopes the next send's context; it grants nothing.
  */
 export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant = 'floating', onExpand, onMinimize }: AlconCopilotPanelProps) {
   const { t } = useI18n();
@@ -182,10 +189,18 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
   const startEdge = (e: React.PointerEvent<HTMLDivElement>) => startFloat(e, e.currentTarget.dataset.edge as Edge);
 
-  const contextNow = (): CopilotContext => ({
-    viewLabel: 'Alcon',
-    domainId: activeDomainId ?? undefined,
-    spaceId: getActiveSpaceId() ?? undefined,
+  // A Strategy subject's name, from the same source the Strategy picker
+  // reads; unresolved, the context calls it 'Strategy'.
+  const { data: strategies } = useStrategies();
+  const strategyName = subject?.kind === 'strategy'
+    ? strategies?.find((s) => s.id === subject.id)?.name ?? null
+    : null;
+
+  const contextNow = (): CopilotContext => buildCopilotContext({
+    subject,
+    strategyName,
+    domainId: activeDomainId,
+    spaceId: getActiveSpaceId(),
     today: toDateOnlyString(new Date()),
   });
 
@@ -254,9 +269,10 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
         className={`flex flex-shrink-0 items-center gap-2 bg-card ${floating ? 'h-12 cursor-grab pl-4 pr-2 active:cursor-grabbing' : 'h-[50px] px-3 border-b border-border/60'}`}
       >
         <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
-        {subject === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
+        {subject?.kind === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
+        {subject?.kind === 'strategy' && <span className="max-w-40 truncate text-[12px] text-muted-foreground">· {strategyName ?? t('Strategy')}</span>}
         <div className="flex-1" />
-        {subject !== 'slides' && messages.length > 0 && (
+        {subject?.kind !== 'slides' && messages.length > 0 && (
           <Button size="sm" type="button" variant="ghost" onClick={() => newConversation()} title={t('Start a new conversation')}>
             {t('New conversation')}
           </Button>
@@ -283,7 +299,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
 
       {/* One AI panel across the app: on Slides it is the open deck's
           assistant (its conversation and composer), elsewhere Alcon's. */}
-      {subject === 'slides' ? <SlidesAssistant /> : <>
+      {subject?.kind === 'slides' ? <SlidesAssistant /> : <>
       {/* Conversation — empty state is intentionally blank; the placeholder
           in the composer is the only nudge. */}
       <div ref={listRef} className={`flex-1 overflow-y-auto pb-4 pt-3 text-[12.5px] leading-relaxed ${page ? 'px-8' : 'px-3'}`}>

@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { AlertCircle, ArrowRight, Check, CheckCircle2, Copy, FileText, Flag, Hand, ListChecks, Loader2, MessageSquare, Pause, ShieldCheck, Wrench, CircleDot } from '@/ui/icons';
+import { Check, Copy, FileText, Hand, Loader2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { cn } from '@/lib/utils';
 import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
-import type { AgentOutput, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
-import type { ProposedReading, RunVerdict } from '@/Function/audit/auditModel';
+import { traceFromRunSteps } from '@/Function/shared/workTrace';
+import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared/WorkTrace';
+import type { AgentOutput } from '@/types/database';
+import type { ProposedReading } from '@/Function/audit/auditModel';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
 import type { useAgentRun } from '@/hooks/useSupabase';
 import { approvalRows, rememberChoices, sharedColumns } from './approvalView';
@@ -19,97 +21,16 @@ import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useNow } from '@/Function/shared/useNow';
 
-// The agent on an Element (ADR 0027): one status line for the run, its
-// Workpad as compact tool rows, the approval card when it waits on a
-// person, and the deliverables it saved. Shapes follow the Task Rows / Tool
-// Chips / Approval Card patterns, drawn with Alcon's own tokens.
+// The agent on an Element (ADR 0027): the run's shared work trace
+// (Function/shared/WorkTrace) — its headline, its steps as compact rows,
+// its completion — the approval card when it waits on a person, and the
+// deliverables it saved. Shapes follow the Task Rows / Tool Chips /
+// Approval Card patterns, drawn with Alcon's own tokens.
 
 type Agent = ReturnType<typeof useAgentRun>;
 
-const STATUS: Record<AgentRunStatus, { label: string; tone: string }> = {
-  queued: { label: 'Queued', tone: 'text-muted-foreground' },
-  running: { label: 'Working', tone: 'text-[var(--accent-default)]' },
-  awaiting_input: { label: 'Waiting for you', tone: 'text-foreground' },
-  awaiting_approval: { label: 'Awaiting approval', tone: 'text-[var(--accent-default)]' },
-  paused: { label: 'Paused', tone: 'text-muted-foreground' },
-  awaiting_review: { label: 'Awaiting review', tone: 'text-foreground' },
-  completed: { label: 'Completed', tone: 'text-foreground' },
-  failed: { label: 'Failed', tone: 'text-[var(--status-danger)]' },
-  cancelled: { label: 'Stopped', tone: 'text-muted-foreground' },
-};
-
-type Glyph = React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
-const STEP_ICON: Record<AgentRunStepType, Glyph> = {
-  plan: ListChecks, thought: CircleDot, action: Wrench, subelement: CheckCircle2, comment: MessageSquare,
-  status: ArrowRight, result: Flag, error: AlertCircle, approval: ShieldCheck, artifact: FileText,
-  message: MessageSquare, reply: MessageSquare, write: FileText, plan_request: ListChecks,
-};
-
-function StatusGlyph({ status }: { status: AgentRunStatus }) {
-  if (status === 'queued' || status === 'running') return <Loader2 size={15} className="animate-spin text-[var(--accent-default)]" />;
-  if (status === 'awaiting_approval') return <Hand size={15} className="text-[var(--accent-default)]" />;
-  if (status === 'paused' || status === 'cancelled') return <Pause size={15} className="text-muted-foreground" />;
-  if (status === 'failed') return <AlertCircle size={15} className="text-[var(--status-danger)]" />;
-  return <CheckCircle2 size={15} className="text-foreground" />;
-}
-
-/** "Echo Test: POST /notify" → label "Echo Test", chip "POST /notify". */
-function splitStepTitle(title: string): { label: string; chip: string | null } {
-  const i = title.indexOf(': ');
-  if (i <= 0 || i > 40) return { label: title, chip: null };
-  return { label: title.slice(0, i), chip: title.slice(i + 2) };
-}
-
 function Chip({ children }: { children: React.ReactNode }) {
   return <span className="max-w-full truncate rounded-md border border-border bg-muted/40 px-1.5 py-px font-mono text-[11px] text-foreground/80">{children}</span>;
-}
-
-function StepRow({ step }: { step: AgentRunStep }) {
-  const [open, setOpen] = useState(false);
-  const Icon = STEP_ICON[step.type] ?? CircleDot;
-  const { label, chip } = splitStepTitle(step.title);
-  const hasDetail = !!step.detail;
-  return (
-    <li>
-      <button
-        type="button"
-        disabled={!hasDetail}
-        aria-expanded={hasDetail ? open : undefined}
-        onClick={() => setOpen((o) => !o)}
-        className={cn('flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left text-[12px]', hasDetail && 'hover:bg-muted/40')}
-      >
-        <Icon size={13} strokeWidth={2} className={step.type === 'error' ? 'shrink-0 text-[var(--status-danger)]' : 'shrink-0 text-muted-foreground'} />
-        <span className="shrink-0 text-foreground/90">{label}</span>
-        {chip && <Chip>{chip}</Chip>}
-        {hasDetail && <DisclosureTriangle open={open} className="ml-auto text-muted-foreground" />}
-      </button>
-      {open && step.detail && (
-        <div className="mb-1 ml-6 mt-0.5 rounded-md bg-muted/30 px-2 py-1.5">
-          <MarkdownLite text={step.detail} className="text-[12px]" />
-        </div>
-      )}
-    </li>
-  );
-}
-
-const VISIBLE_STEPS = 5;
-
-function Workpad({ steps }: { steps: AgentRunStep[] }) {
-  const { t } = useI18n();
-  const [all, setAll] = useState(false);
-  if (!steps.length) return null;
-  const shown = all ? steps : steps.slice(-VISIBLE_STEPS);
-  return (
-    <div className="mt-1">
-      {steps.length > VISIBLE_STEPS && (
-        <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="mb-0.5 flex items-center gap-1 px-1 text-[12px] text-muted-foreground hover:text-foreground">
-          <DisclosureTriangle open={all} />
-          {all ? t('Show fewer steps') : t('Show all {n} steps', { n: steps.length })}
-        </button>
-      )}
-      <ul className="space-y-px">{shown.map((s) => <StepRow key={s.id} step={s} />)}</ul>
-    </div>
-  );
 }
 
 function ApprovalCard({ agent }: { agent: Agent }) {
@@ -249,55 +170,6 @@ function ApprovalCard({ agent }: { agent: Agent }) {
   );
 }
 
-const VERDICT_UNCHECKED_REASON: Record<string, string> = {
-  'verify-unavailable': 'The check could not run',
-  'outcome-not-completed': 'Partial or blocked work is not checked',
-  'external-model': 'Runs on an external model are not checked',
-};
-
-/**
- * The verifier's judgement of the finish that stood, under the agent's own
- * report: a checked pass, a fail the run ended on anyway, or an honest
- * "not verified". A run with no record (before verdicts existed) shows
- * nothing rather than a false "not verified".
- */
-function VerdictLine({ verdict }: { verdict: RunVerdict }) {
-  const { t } = useI18n();
-  if (verdict.result === 'pass') {
-    return (
-      <div className="mt-1 flex items-center gap-2 px-1 text-[12px]">
-        <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />
-        <span className="text-foreground/90">{t('Verifier: passed')}</span>
-        {verdict.revisions > 0 && <span className="text-muted-foreground">{t('after {n} revisions', { n: verdict.revisions })}</span>}
-      </div>
-    );
-  }
-  if (verdict.result === 'fail') {
-    return (
-      <div className="mt-1 px-1 text-[12px]">
-        <div className="flex items-center gap-2">
-          <ShieldCheck size={13} className="shrink-0 text-[var(--status-danger)]" />
-          <span className="text-foreground/90">{t('Verifier: not passed — the run ended after the revision limit')}</span>
-        </div>
-        {verdict.gaps.length > 0 && (
-          <ul className="mt-0.5 space-y-px pl-5 text-muted-foreground">
-            {verdict.gaps.map((g, i) => <li key={i}>{g}</li>)}
-          </ul>
-        )}
-      </div>
-    );
-  }
-  return (
-    <div className="mt-1 flex items-center gap-2 px-1 text-[12px]">
-      <ShieldCheck size={13} className="shrink-0 text-muted-foreground" />
-      <span className="text-foreground/90">{t('Not verified')}</span>
-      {verdict.reason && VERDICT_UNCHECKED_REASON[verdict.reason] && (
-        <span className="text-muted-foreground">{t(VERDICT_UNCHECKED_REASON[verdict.reason])}</span>
-      )}
-    </div>
-  );
-}
-
 /**
  * The readings this run proposed for its Strategies' measures, and what
  * became of each: recorded, waiting for this review's acceptance, or
@@ -386,30 +258,28 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
   const { t } = useI18n();
   const now = useNow();
   const run = agent.run;
+  // The run told the shared way (workTrace): headline, steps, completion.
+  const trace = useMemo(
+    () => traceFromRunSteps(
+      run ? { ...run, pendingSummary: agent.pending?.summary ?? null } : null,
+      agent.steps,
+    ),
+    [run, agent.steps, agent.pending],
+  );
   if (!run && !agent.outputs.length && !agent.error) return null;
-  const status = run ? STATUS[run.status] ?? STATUS.completed : null;
   const finished = run && ['awaiting_review', 'completed', 'failed', 'cancelled'].includes(run.status);
-  const cost = run ? Number(run.cost_usd || 0) : 0;
   const lastStep = agent.steps.at(-1);
   const lastActivity = lastStep?.created_at ?? run?.started_at ?? run?.created_at;
   const stuckRunning = run?.status === 'running' && !!lastActivity
     && now - new Date(lastActivity).getTime() > STALE_RUNNING_MS;
-  const line = (run?.status === 'awaiting_approval' && agent.pending?.summary)
-    || run?.summary
-    || (run && ['queued', 'running'].includes(run.status) ? lastStep?.title : null)
-    || (status ? t(status.label) : '');
 
   return (
     <section className="space-y-2">
       {agent.error && <p className="px-1 text-[12px] text-[var(--status-danger)]">{agent.error}</p>}
-      {run && status && (
+      {run && (
         <div>
-          <div role="status" aria-live="polite" className="flex min-h-9 items-center gap-2.5 px-1 py-1.5">
-            <StatusGlyph status={run.status} />
-            <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{line}</span>
-            {cost > 0 && <span className="shrink-0 font-mono text-[11px] text-muted-foreground">${cost.toFixed(2)}</span>}
-            <span className={cn('shrink-0 text-[12px]', status.tone)}>{t(status.label)}</span>
-            {agent.isActive || run.status === 'awaiting_approval' ? (
+          <TraceHeadline trace={trace} controls={
+            agent.isActive || run.status === 'awaiting_approval' ? (
               <>
                 {stuckRunning && agent.isMine && (
                   <Button variant="secondary" size="xs" onClick={() => void agent.resume()}>{t('Resume')}</Button>
@@ -422,16 +292,18 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
               <Button variant="ghost" size="xs" disabled={agent.starting} onClick={onRunAgain}>
                 {run.mode === 'reply' ? t('Work on the Element') : t('Run again')}
               </Button>
-            ) : null}
-          </div>
-          {(run.status === 'failed' || run.status === 'paused') && run.error && (
+            ) : null
+          } />
+          {/* A stopped run's error sits under the header while it can still
+              resume; a finished run's error belongs to its completion. */}
+          {(run.status === 'failed' || run.status === 'paused') && run.error && !trace.completion && (
             <p className="mt-1 px-1 text-[12px] text-muted-foreground">{run.error}</p>
           )}
           <div className="px-1">
-            <Workpad steps={agent.steps} />
+            <TraceStepList steps={trace.steps} foldAfter={5} fromEnd />
           </div>
           <ReadingsBlock readings={run.proposed_readings ?? []} />
-          {run.verdict && <VerdictLine verdict={run.verdict} />}
+          <TraceCompletion trace={trace} />
           <ApprovalCard agent={agent} />
         </div>
       )}

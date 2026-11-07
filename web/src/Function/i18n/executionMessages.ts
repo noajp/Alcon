@@ -463,6 +463,11 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   // Domain Flow board — the columns an Element moves through
   'To do': ['案', '할 일', 'À faire', 'Por hacer'],
   'Waiting on you': ['判断待ち', '판단 대기', 'En attente de vous', 'Esperando tu decisión'],
+  'Waiting: approval': ['承認待ち', '승인 대기', 'En attente : approbation', 'Esperando: aprobación'],
+  'Waiting: your answer': ['回答待ち', '답변 대기', 'En attente : votre réponse', 'Esperando: tu respuesta'],
+  'Waiting: review': ['レビュー待ち', '검토 대기', 'En attente : relecture', 'Esperando: revisión'],
+  'Accept to record {n} readings': ['承認して {n} 件の報告を記録', '{n}개 보고 기록 승인', 'Accepter pour enregistrer {n} relevés', 'Aceptar para registrar {n} lecturas'],
+  'Waiting on work': ['他の作業待ち', '다른 작업 대기', 'En attente d’un autre travail', 'Esperando otro trabajo'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(EXECUTION_MESSAGES).map(([key, row]) => [key, row[index]]));

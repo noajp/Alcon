@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, Clock, Flag, Hand, Pause, ShieldCheck } from '@/ui/icons';
+import { AlertTriangle, Check, Flag, Hand, Pause, Plus } from '@/ui/icons';
 import { Button } from '@/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
@@ -10,22 +11,24 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { advanceFromElement, startElementRun } from '@/AIP/ai/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
-import { updateElement } from '@/hooks/useSupabase';
+import { createElement, updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import { createIntent } from '@/hooks/strategyData';
-import { type AgentRunStatus, type ElementWithDetails, type Worker } from '@/types/database';
+import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
-import { waitsOnPerson } from '@/ActivitySpace/execution/chain/waiting';
+import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
+import { traceHeadline, traceStatusWord, VERDICT_FAIL_WORD } from '@/Function/shared/workTrace';
+import { CARD_FLAT, FONT, STATUS } from '@/shared/designTokens';
 import { Chip, WaitingChip } from '@/ActivitySpace/execution/element/board/BoardColumn';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { ActionTag } from '@/Function/shared/elementAction';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
-  answeredQuestions, buildFleet, draftFleet, handOverLabels, normalizePlan, normalizeQuestions, plannerSources,
+  answeredQuestions, buildFleet, chainCardMatches, draftFleet, handOverLabels, latestRuns, missionSummary, normalizePlan, normalizeQuestions, plannerSources,
   startableTasks, UNPLACED,
-  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlannerSource, type PlanQuestion,
+  type ActionState, type ChainFilter, type FleetElement, type FleetObject, type FleetObjectRow, type MissionRunRow, type MissionSummary, type PlanDraft, type PlannerSource, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, stateColor, type MissionContext } from './MissionPanels';
 import { listenForPlanRequests } from './plannerRequest';
@@ -37,9 +40,6 @@ import { useDefinitions, useRunRounds, type RoundSummary } from '@/hooks/definit
 // verb it asks for, whether it waits on a person, what it delivers and what
 // it waits on. The Planner's draft waits, dashed, in To Do until the person
 // creates it; then its actions move along like the rest.
-
-/** The card ground, as the Board's Element cards draw it. */
-const CARD = 'rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)]';
 
 function StateIcon({ state }: { state: ActionState }) {
   switch (state) {
@@ -64,7 +64,10 @@ function StateBadge({ state }: { state: ActionState }) {
 }
 
 /** Whether the card's state comes from an AI run rather than the Element's
- *  Status — the one case the card still needs a badge for. */
+ *  Status — the one case the card still needs a badge for. The column shows
+ *  the Element's Status, the record a person sets; actionState is that same
+ *  record read with the latest run, and the badge shows it only when the
+ *  run adds something the Status cannot say. */
 function runOnlyState(state: ActionState, status: string | null): boolean {
   if (state === 'failed') return true;
   if (state === 'running') return status !== 'in_progress';
@@ -78,14 +81,17 @@ function DraftTag() {
 }
 
 
-/** What the Execution tab adds under a card's title: what it delivers,
- *  what it waits on, the model that ran it and what that cost, and a hand-off
- *  to Claude Code. */
-function MissionLines({ element, busy, onHandOver, rounds }: {
+/** What the Execution tab adds under a card's title: the latest run's one
+ *  line (the shared trace headline), what it delivers, the work it waits
+ *  on (each blocker with where it stands, opening it on click), a loop's
+ *  progress, and a hand-off to Claude Code. The run's model and cost are
+ *  not here: they are run bookkeeping, shown by the run panel and the
+ *  trace's completion. */
+function MissionLines({ element, busy, onHandOver, rounds, onOpenElement, latestRun }: {
   element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary;
+  onOpenElement?: (elementId: string) => void; latestRun?: MissionRunRow | null;
 }) {
   const { t } = useI18n();
-  const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
   // A loop's progress: how many rounds, the latest value and the best.
   const loop = rounds && rounds.rounds > 0
     ? t('{n} rounds · latest {last} · best {best}', {
@@ -93,31 +99,44 @@ function MissionLines({ element, busy, onHandOver, rounds }: {
       best: rounds.values.length ? Math.max(...rounds.values) : '—',
     })
     : null;
-  // Only a failed check is card-worthy: unchecked is the common case and
-  // would be noise here (it lives in the run panel and the Audit log).
-  const verdictFail = element.verdict?.result === 'fail';
-  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop && !verdictFail) return null;
+  // The run's one line, from the shared trace model. Its words of its own
+  // (the verdict's, the status words) translate; a run's summary or error
+  // is data and stands as written.
+  const headline = traceHeadline(latestRun);
+  const headlineText = headline
+    ? (headline.text === VERDICT_FAIL_WORD || headline.text === traceStatusWord('running') || headline.text === traceStatusWord('queued')
+      ? t(headline.text) : headline.text)
+    : null;
+  if (!element.serves.length && !element.blockers.length && !onHandOver && !loop && !headline) return null;
   return (
     <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
-      {verdictFail && (
-        <div className="flex min-w-0 items-center gap-1.5 text-[var(--status-danger)]"><ShieldCheck size={12} className="shrink-0" /><span className="truncate">{t('Verifier: not passed')}</span></div>
+      {headline && (
+        <div className={cn('flex min-w-0 items-center gap-1.5', headline.tone === 'danger' && 'text-[var(--status-danger)]', headline.tone === 'working' && 'text-[var(--accent-default)]')}><span className="truncate">{headlineText}</span></div>
       )}
       {element.serves.length > 0 && (
         <div className="flex min-w-0 items-center gap-1.5"><Flag size={12} className="shrink-0" /><span className="truncate">{element.serves.join(', ')}</span></div>
       )}
-      {element.waitsOn.length > 0 && (
-        <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
-      )}
-      {loop && <div className="tabular-nums">{loop}</div>}
-      {(meta || onHandOver) && (
-        <div className="flex items-center gap-2 tabular-nums">
-          {meta && <span className="truncate text-[11px] text-muted-foreground/70">{meta}</span>}
-          {onHandOver && (
-            <Button variant="ghost" size="xs" className="ml-auto" onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); onHandOver(); }} disabled={busy}>
-              {t('Hand to Claude Code')}
-            </Button>
+      {element.blockers.map((b, i) => (
+        <div key={`${b.elementId ?? 'draft'}:${b.title}:${i}`} className="flex min-w-0 items-center gap-1.5">
+          <span className="inline-flex shrink-0" style={{ color: stateColor(b.state) }}><StateIcon state={b.state} /></span>
+          {b.elementId && onOpenElement ? (
+            <button type="button" className="min-w-0 truncate text-left hover:text-foreground hover:underline"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onOpenElement(b.elementId!); }}>
+              {b.title}
+            </button>
+          ) : (
+            <span className="truncate">{b.title}</span>
           )}
+        </div>
+      ))}
+      {loop && <div className="tabular-nums">{loop}</div>}
+      {onHandOver && (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="xs" className="ml-auto" onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onHandOver(); }} disabled={busy}>
+            {t('Hand to Claude Code')}
+          </Button>
         </div>
       )}
     </div>
@@ -129,7 +148,7 @@ function MissionLines({ element, busy, onHandOver, rounds }: {
 function DraftCard({ element, object }: { element: FleetElement; object: FleetObject }) {
   const { t } = useI18n();
   return (
-    <div className={cn(CARD, 'border-dashed border-border px-3 py-2.5')}>
+    <div className={cn(CARD_FLAT, 'border-dashed px-3 py-2.5')}>
       <div className="flex items-start gap-2">
         {/* Where a written card has its Status mark: not created yet. */}
         <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 rounded-full border border-dashed border-muted-foreground/60" />
@@ -155,6 +174,134 @@ function DraftCard({ element, object }: { element: FleetElement; object: FleetOb
   );
 }
 
+
+/** A column's "+": the Board knows its Object; the chain spans Objects, so
+ *  the one extra question this host must ask is which Object the new
+ *  Element belongs to. Only written Objects are offered. */
+function AddElementMenu({ status, objects, onAdd }: {
+  status: ChainStatus;
+  objects: FleetObjectRow[];
+  onAdd: (status: ChainStatus, objectId: string) => void;
+}) {
+  const { t } = useI18n();
+  const label = t('Add Element to {column}', { column: t(STATUS[status].label) });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-xs" type="button" title={label} aria-label={label}>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[160px]">
+        {objects.map((o) => (
+          <DropdownMenuItem key={o.id} onClick={() => onAdd(status, o.id)} className="gap-2 text-[13px]">
+            <ItemIcon icon={o.icon ?? null} color={o.color ?? null} size={12} fallback={<ObjectIcon size={12} />} />
+            <span className="truncate">{o.name}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** The chain's orientation: one quiet row over the board — how far along,
+ *  what waits on a person, what is stuck, what failed its check, and the
+ *  measures and cost for context. Every count is a filter, and every count
+ *  comes from the same helpers the cards' chips read, so the two agree.
+ *  A zero count is dimmed and not a button. */
+function ChainSummary({ summary, waitingOnYou, filter, onFilter }: {
+  summary: MissionSummary;
+  /** Elements whose waitingReason needs a person — the strip's own count,
+   *  not missionSummary.waiting (which counts states, not the queue). */
+  waitingOnYou: number;
+  filter: ChainFilter;
+  onFilter: (next: ChainFilter) => void;
+}) {
+  const { t } = useI18n();
+  const seg = (target: NonNullable<ChainFilter>, label: string, n: number) => {
+    const active = filter?.kind === target.kind;
+    if (n === 0 && !active) {
+      return (
+        <span key={target.kind} className="flex items-baseline gap-1.5 text-muted-foreground/60">
+          <span className={FONT.label}>{label}</span>
+          <span className="tabular-nums">{n}</span>
+        </span>
+      );
+    }
+    return (
+      <button key={target.kind} type="button" aria-pressed={active}
+        onClick={() => onFilter(active ? null : target)}
+        className={cn('flex items-baseline gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5',
+          active ? 'bg-[var(--accent-default)]/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+        <span className={FONT.label}>{label}</span>
+        <span className="tabular-nums text-foreground">{n}</span>
+      </button>
+    );
+  };
+  return (
+    <div className={cn(CARD_FLAT, 'flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-2 text-[12px]')}>
+      <span className="flex items-baseline gap-1.5">
+        <span className={FONT.label}>{t('Progress')}</span>
+        <span className="tabular-nums text-foreground">{summary.done}/{summary.actions}</span>
+        <span className="tabular-nums text-muted-foreground">{summary.progress}%</span>
+      </span>
+      {seg({ kind: 'waiting' }, t('Waiting on you'), waitingOnYou)}
+      {seg({ kind: 'blocked' }, t('Blocked'), summary.blocked)}
+      {seg({ kind: 'failed' }, t('Failed'), summary.failed)}
+      {seg({ kind: 'verdict-fail' }, t('Checks not passed'), summary.verdicts.fail)}
+      <span className="flex items-baseline gap-1.5">
+        <span className={FONT.label}>{t('Measures')}</span>
+        <span className="tabular-nums text-foreground">{summary.measuresMet}/{summary.measures}</span>
+        {summary.measuresStale > 0 && <span className="text-muted-foreground">· {t('{n} unrefreshed', { n: summary.measuresStale })}</span>}
+      </span>
+      <span className="flex items-baseline gap-1.5">
+        <span className={FONT.label}>{t('Cost')}</span>
+        <span className="tabular-nums text-foreground">${summary.costUsd.toFixed(2)}</span>
+      </span>
+      {filter && (
+        <button type="button" onClick={() => onFilter(null)} className="ml-auto text-muted-foreground hover:text-foreground">
+          ✕ {t('Clear filter')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** One row per Object under the strip: where it stands, how much of it is
+ *  done, its checked outcomes and its cost. A click reads the chain
+ *  through that Object alone. Shown when the Strategy has more than one
+ *  Object, or when a single Object carries verdicts worth saying. */
+function ChainObjectIndex({ fleet, filter, onFilter }: {
+  fleet: FleetObject[];
+  filter: ChainFilter;
+  onFilter: (next: ChainFilter) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className={cn(CARD_FLAT, 'divide-y divide-border/60 px-3')}>
+      {fleet.map((o) => {
+        const active = filter?.kind === 'object' && filter.objectKey === o.key;
+        return (
+          <button key={o.key} type="button" aria-pressed={active}
+            onClick={() => onFilter(active ? null : { kind: 'object', objectKey: o.key })}
+            className={cn('flex w-full min-w-0 items-center gap-3 py-1.5 text-left text-[12px]', active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: stateColor(o.state) }} />
+            <span className="min-w-0 flex-1 truncate text-foreground/90">{o.name}</span>
+            <span className="tabular-nums">{o.tally.done}/{o.tally.total}</span>
+            {o.verdicts.pass + o.verdicts.fail > 0 && (
+              <span className="flex shrink-0 items-baseline gap-1.5">
+                {o.verdicts.pass > 0 && <span className="text-[var(--status-success)]">✓ {t('passed {n}', { n: o.verdicts.pass })}</span>}
+                {o.verdicts.fail > 0 && <span className="text-[var(--status-danger)]">{t('not passed {n}', { n: o.verdicts.fail })}</span>}
+              </span>
+            )}
+            <span className="tabular-nums">${o.costUsd.toFixed(2)}</span>
+            {active && <span aria-hidden className="shrink-0">✕</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot }: {
   ctx: MissionContext;
@@ -184,6 +331,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [chainFilter, setChainFilter] = useState<ChainFilter>(null);
   const [aiWorkerId, setAiWorkerId] = useState('');
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
@@ -197,6 +345,14 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     edges: ctx.mission.edges, runs: ctx.mission.runs,
   }), [objects, ctx.elements, ctx.measures, ctx.bindings, ctx.mission.edges, ctx.mission.runs]);
   const fleet = useMemo(() => (draft ? draftFleet(current, ctx.measures, draft, personName) : current), [draft, current, ctx.measures, personName]);
+  const latestRunRows = useMemo(() => latestRuns(ctx.mission.runs), [ctx.mission.runs]);
+  // The strip and the filter read the same two computations the cards do:
+  // the mission summary, and each written Element's waiting reason.
+  const summary = useMemo(() => missionSummary({
+    elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts,
+  }), [ctx.elements, ctx.measures, ctx.mission.runs, ctx.mission.artifacts]);
+  const reasonMap = useMemo(() => waitingReasonsByElement(current, ctx.mission.runs), [current, ctx.mission.runs]);
+  const waitingOnYou = useMemo(() => [...reasonMap.values()].filter((r) => r?.needsPerson).length, [reasonMap]);
 
   // Before the dependencies are read every AI Element would look ready.
   const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
@@ -319,27 +475,59 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     ctx.refetch();
   };
 
+  // A card dropped on a column takes the StatusPicker's own path — write
+  // the Status, let acceptance land when the work closes, refetch — so a
+  // drag and a menu pick can never diverge. Enabled only for an editor
+  // with no Planner draft open (the fleet is hypothetical then).
+  const dropToStatus = async (status: ChainStatus, elementId: string) => {
+    const written = details.get(elementId);
+    if (!written || written.status === status) return;
+    setError(null);
+    try {
+      await updateElement(elementId, { status });
+      if (status === 'done' || status === 'cancelled') await advanceFromElement(elementId);
+      ctx.refetch();
+    } catch {
+      setError(t('Could not move {title}', { title: written.title }));
+    }
+  };
+
+  const addToColumn = async (status: ChainStatus, objectId: string) => {
+    setError(null);
+    try {
+      await createElement({ title: t('Untitled'), status, object_id: objectId });
+      ctx.refetch();
+    } catch {
+      setError(t('Could not add an Element here.'));
+    }
+  };
+
   // Where each action stands: a written Element by its Status, its action and
   // its latest AI run, as on a Domain's Flow board; a draft task is not
-  // created yet, so it waits in the first column.
+  // created yet, so it waits in the first column. Why a card waits comes
+  // from the same waitingReason map the strip counts. A filter is a
+  // written-work lens: while one is on, the Planner's draft overlay is
+  // suspended; clearing the filter restores it.
   const chain = useMemo(() => {
-    const latest = new Map<string, AgentRunStatus>();
-    for (const r of [...ctx.mission.runs].sort((a, b) => a.created_at.localeCompare(b.created_at))) latest.set(r.element_id, r.status);
-    const columns = emptyChain<{ element: FleetElement; object: FleetObject; waiting: boolean }>();
-    for (const o of fleet) {
+    const source = chainFilter ? current : fleet;
+    const columns = emptyChain<{ element: FleetElement; object: FleetObject; reason: WaitingReason | null }>();
+    for (const o of source) {
       for (const e of o.elements) {
         const written = e.elementId ? details.get(e.elementId) : undefined;
         // A written Element by its Status, as on the Board; a draft task is not created yet.
         const column: ChainStatus | null = written ? chainStatusOf(written.status) : e.draft ? 'todo' : null;
-        if (column) columns[column].push({ element: e, object: o, waiting: !!written && waitsOnPerson(written, latest.get(written.id) ?? null) });
+        if (!column) continue;
+        const reason = e.elementId ? reasonMap.get(e.elementId) ?? null : null;
+        if (!chainCardMatches(e, o.key, reason, chainFilter)) continue;
+        columns[column].push({ element: e, object: o, reason });
       }
     }
     // The draft's tasks first in their column: they are what is new.
     columns.todo.sort((a, b) => Number(b.element.draft) - Number(a.element.draft));
     return columns;
-  }, [fleet, details, ctx.mission.runs]);
+  }, [fleet, current, chainFilter, details, reasonMap]);
 
-  const cardFor = (e: FleetElement, o: FleetObject, waiting = false) => (
+  const cardFor = (e: FleetElement, o: FleetObject, reason: WaitingReason | null = null) => (
 e.elementId && details.get(e.elementId) ? (
                     <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
                       object={{ name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft }}
@@ -355,15 +543,18 @@ e.elementId && details.get(e.elementId) ? (
                       ) : (
                         <ElementProgressMark status={details.get(e.elementId)!.status} progress={getElementProgress(details.get(e.elementId)!)} size={16} />
                       )}
-                      // The card shows the verb itself; beside it, only what
-                      // the Status cannot say: an AI run going, waiting or failed.
-                      badge={waiting || runOnlyState(e.state, details.get(e.elementId)!.status) ? (
+                      // The card shows the verb itself; beside it, why it
+                      // waits (when it waits) and only what the Status
+                      // cannot say: an AI run going, waiting or failed.
+                      badge={reason || runOnlyState(e.state, details.get(e.elementId)!.status) ? (
                         <span className="flex shrink-0 items-center gap-1">
-                          {waiting && <WaitingChip />}
+                          {reason && <WaitingChip reason={reason} />}
                           {runOnlyState(e.state, details.get(e.elementId)!.status) && <StateBadge state={e.state} />}
                         </span>
                       ) : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                        onOpenElement={ctx.onOpenElement}
+                        latestRun={latestRunRows.get(e.elementId) ?? null}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (
                     <DraftCard element={e} object={o} />
@@ -509,18 +700,15 @@ e.elementId && details.get(e.elementId) ? (
         {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
 
-        {/* Each Object's checked outcomes, tallied quietly over its
-            Elements' latest runs — only where a check passed or failed. */}
-        {!draft && fleet.some((o) => o.verdicts.pass + o.verdicts.fail > 0) && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-            {fleet.filter((o) => o.verdicts.pass + o.verdicts.fail > 0).map((o) => (
-              <span key={o.key} className="flex items-baseline gap-1.5">
-                <span className="text-foreground/80">{o.name}</span>
-                {o.verdicts.pass > 0 && <span className="text-[var(--status-success)]">✓ {t('passed {n}', { n: o.verdicts.pass })}</span>}
-                {o.verdicts.fail > 0 && <span className="text-[var(--status-danger)]">{t('not passed {n}', { n: o.verdicts.fail })}</span>}
-              </span>
-            ))}
-          </div>
+        {/* Orientation: the summary strip and the Object index, whose
+            counts are the chain's filters. Hidden under a Planner draft —
+            the fleet is hypothetical then, and the draft panel explains
+            itself. The per-Object verdict tallies live in the index rows. */}
+        {!draft && current.length > 0 && (
+          <ChainSummary summary={summary} waitingOnYou={waitingOnYou} filter={chainFilter} onFilter={setChainFilter} />
+        )}
+        {!draft && (current.length >= 2 || current.some((o) => o.verdicts.pass + o.verdicts.fail > 0)) && (
+          <ChainObjectIndex fleet={current} filter={chainFilter} onFilter={setChainFilter} />
         )}
 
         {fleet.length === 0 ? (
@@ -529,7 +717,9 @@ e.elementId && details.get(e.elementId) ? (
           // The chain: every action in the column for where it stands, left
           // to right. The draft's actions wait, dashed, in the first.
           <ExecutionChain className="flex gap-3 overflow-x-auto pb-2"
-            columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, waiting }) => ({ key: e.key, node: cardFor(e, o, waiting) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
+            onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
+            columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
+            columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
         )}
       </div>
     </div>

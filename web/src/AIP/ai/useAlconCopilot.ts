@@ -56,11 +56,42 @@ export interface CopilotContext {
   viewLabel?: string;
   elementId?: string;
   objectId?: string;
+  /** The Strategy the person has open, when the panel's subject is one:
+   *  scope for the next send, never powers. */
+  strategyId?: string;
   domainId?: string;
   /** The Space a Space-wide tool should read. */
   spaceId?: string;
   /** The person's business date (local), so date-based tools agree with the UI. */
   today?: string;
+}
+
+/** What the panel is speaking to, when it speaks to something rather than
+ *  to Alcon at large: the open deck (a body swap — the deck's own
+ *  assistant), or the open Strategy (context only; the conversation and
+ *  its bounds are unchanged). */
+export type CopilotSubject = { kind: 'slides' } | { kind: 'strategy'; id: string } | null;
+
+/** Pure. The context one send carries: where the person is (Space,
+ *  Domain, their business date) and, for a Strategy subject, which
+ *  Strategy is open — its name as the view's label, 'Strategy' until the
+ *  name resolves. Subject-less and slides contexts are exactly what the
+ *  panel has always sent. */
+export function buildCopilotContext(input: {
+  subject: CopilotSubject;
+  strategyName?: string | null;
+  domainId?: string | null;
+  spaceId?: string | null;
+  today: string;
+}): CopilotContext {
+  const base: CopilotContext = {
+    viewLabel: 'Alcon',
+    domainId: input.domainId ?? undefined,
+    spaceId: input.spaceId ?? undefined,
+    today: input.today,
+  };
+  if (input.subject?.kind !== 'strategy') return base;
+  return { ...base, viewLabel: input.strategyName ?? 'Strategy', strategyId: input.subject.id };
 }
 
 interface SendOptions {

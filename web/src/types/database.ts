@@ -1183,6 +1183,11 @@ export type AgentRunStepType =
   | 'reply'
   | 'write'
   | 'plan_request'
+  // The conversation's proposals: runs it asks the person to start, and an
+  // answer it asks them to send to a waiting run. The person presses; the
+  // conversation itself starts and answers nothing.
+  | 'start_request'
+  | 'answer_request'
 
 export interface AgentRun {
   id: string

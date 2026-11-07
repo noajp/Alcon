@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  actionState, buildFleet, draftFleet, latestRuns, measureOutcomes, moveDraftTask, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan, verdictTallyOf,
-  type MissionElementRow, type MissionMeasureRow, type MissionRunRow, handOverLabels, isHandedOver
+  actionState, buildFleet, chainCardMatches, draftFleet, latestRuns, measureOutcomes, moveDraftTask, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan, verdictTallyOf,
+  type ChainFilter, type FleetElement, type MissionElementRow, type MissionMeasureRow, type MissionRunRow, handOverLabels, isHandedOver
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
+import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import type { RunVerdict } from '@/Function/audit/auditModel';
 
 const el = (id: string, status: string | null = 'todo'): MissionElementRow => ({ id, title: `Task ${id}`, status, display_id: null, object_id: 'o1' });
@@ -373,5 +374,123 @@ describe('missionSummary verdicts and staleness', () => {
     expect(s.verdicts).toEqual({ pass: 1, fail: 1, unchecked: 0, none: 1 });
     expect(s.measuresStale).toBe(2);
     expect(s).toMatchObject({ actions: 3, measures: 4, measuresMet: 1 });
+  });
+});
+
+describe('actionState — a run waiting for an answer', () => {
+  it('reads awaiting_input as waiting, like approval and paused', () => {
+    expect(actionState(el('a'), run('a', 'awaiting_input', '1'))).toBe('waiting');
+    expect(actionState(el('a', 'in_progress'), run('a', 'awaiting_input', '1'))).toBe('waiting');
+    const s = missionSummary({ elements: [el('a')], measures: [], runs: [run('a', 'awaiting_input', '1')], artifacts: [] });
+    expect(s.waiting).toBe(1);
+  });
+});
+
+describe('buildFleet blockers', () => {
+  it('carries each unmet predecessor with its id, title and state; done and cancelled are not blockers', () => {
+    const fleet = buildFleet({
+      objects: [{ id: 'o1', name: 'Site', domain_id: 'd1' }],
+      elements: [el('a'), el('b'), el('c', 'done'), el('d', 'cancelled'), el('e')],
+      measures: [], bindings: [],
+      edges: [
+        { from_element: 'a', to_element: 'b' },
+        { from_element: 'c', to_element: 'b' },
+        { from_element: 'd', to_element: 'b' },
+        { from_element: 'e', to_element: 'b' },
+      ],
+      runs: [run('e', 'failed', '1')],
+    });
+    const b = fleet[0].elements.find((x) => x.key === 'b')!;
+    expect(b.blockers).toEqual([
+      { elementId: 'a', title: 'Task a', state: 'todo' },
+      { elementId: 'e', title: 'Task e', state: 'failed' },
+    ]);
+    // The title-only list the draft overlay reads is the same set.
+    expect(b.waitsOn).toEqual(['Task a', 'Task e']);
+  });
+
+  it('gives a draft task blockers that are not written yet', () => {
+    const draft = normalizePlan({
+      tasks: [
+        { key: 't1', title: 'First' },
+        { key: 't2', title: 'Second', dependsOn: ['t1'] },
+      ],
+    }, new Set());
+    const cards = draftFleet([], [], draft).flatMap((o) => o.elements);
+    const second = cards.find((c) => c.key === 't:t2')!;
+    expect(second.blockers).toEqual([{ elementId: null, title: 'First', state: 'todo' }]);
+    expect(second.waitsOn).toEqual(['First']);
+  });
+});
+
+describe('chainCardMatches', () => {
+  const card = (extra: Partial<FleetElement> = {}): FleetElement => ({
+    key: 'x', elementId: 'x', title: 'Task x', state: 'todo', draft: false, assignee: 'ai', action: null,
+    assigneeName: null, assigneeWorker: null, status: 'todo', verdict: null, dueDate: null,
+    serves: [], waitsOn: [], blockers: [], ready: false, handable: false, model: null, costUsd: 0, ...extra,
+  });
+  const reason = (needsPerson: boolean): WaitingReason => ({
+    kind: needsPerson ? 'verb' : 'dependency', needsPerson, runId: null, heldReadings: 0, detail: null,
+  });
+
+  it('admits everything under no filter, drafts included', () => {
+    expect(chainCardMatches(card(), 'o1', null, null)).toBe(true);
+    expect(chainCardMatches(card({ draft: true, elementId: null }), 'o1', null, null)).toBe(true);
+  });
+
+  it('reads each lens from the same fact the strip counts', () => {
+    expect(chainCardMatches(card(), 'o1', reason(true), { kind: 'waiting' })).toBe(true);
+    expect(chainCardMatches(card(), 'o1', reason(false), { kind: 'waiting' })).toBe(false);
+    expect(chainCardMatches(card(), 'o1', null, { kind: 'waiting' })).toBe(false);
+    expect(chainCardMatches(card({ state: 'blocked' }), 'o1', null, { kind: 'blocked' })).toBe(true);
+    expect(chainCardMatches(card({ state: 'waiting' }), 'o1', null, { kind: 'blocked' })).toBe(false);
+    expect(chainCardMatches(card({ state: 'failed' }), 'o1', null, { kind: 'failed' })).toBe(true);
+    expect(chainCardMatches(card({ state: 'failed' }), 'o1', null, { kind: 'blocked' })).toBe(false);
+    expect(chainCardMatches(card({ verdict: verdict('fail') }), 'o1', null, { kind: 'verdict-fail' })).toBe(true);
+    expect(chainCardMatches(card({ verdict: verdict('unchecked') }), 'o1', null, { kind: 'verdict-fail' })).toBe(false);
+    expect(chainCardMatches(card({ verdict: verdict('pass') }), 'o1', null, { kind: 'verdict-fail' })).toBe(false);
+    expect(chainCardMatches(card(), 'o1', null, { kind: 'object', objectKey: 'o1' })).toBe(true);
+    expect(chainCardMatches(card(), 'o1', null, { kind: 'object', objectKey: 'o2' })).toBe(false);
+  });
+
+  it('lets a draft card match only the Object lens', () => {
+    const draft = card({ draft: true, elementId: null, state: 'blocked' });
+    expect(chainCardMatches(draft, 'o1', reason(true), { kind: 'object', objectKey: 'o1' })).toBe(true);
+    expect(chainCardMatches(draft, 'o1', reason(true), { kind: 'waiting' })).toBe(false);
+    expect(chainCardMatches(draft, 'o1', reason(true), { kind: 'blocked' })).toBe(false);
+    expect(chainCardMatches(draft, 'o1', reason(true), { kind: 'verdict-fail' })).toBe(false);
+  });
+
+  it('keeps every strip count equal to the cards its filter admits', () => {
+    const elements: MissionElementRow[] = [
+      { ...el('a'), action: 'approve', assignee: 'human' },
+      el('b'),
+      el('c', 'blocked'),
+      el('d'),
+      el('e'),
+    ];
+    const runs = [
+      run('d', 'failed', '1'),
+      run('e', 'completed', '1', { verdict: verdict('fail') }),
+    ];
+    const fleet = buildFleet({
+      objects: [{ id: 'o1', name: 'Site', domain_id: null }],
+      elements, measures: [], bindings: [],
+      edges: [{ from_element: 'a', to_element: 'b' }],
+      runs,
+    });
+    const reasons = waitingReasonsByElement(fleet, runs);
+    const summary = missionSummary({ elements, measures: [], runs, artifacts: [] });
+    const admitted = (filter: ChainFilter) => fleet.flatMap((o) => o.elements
+      .filter((e) => chainCardMatches(e, o.key, e.elementId ? reasons.get(e.elementId) ?? null : null, filter))).length;
+    const waitingCount = [...reasons.values()].filter((r) => r?.needsPerson).length;
+    expect(waitingCount).toBe(2); // a's verb and c's blocked state both need a person
+    expect(admitted({ kind: 'waiting' })).toBe(waitingCount);
+    expect(admitted({ kind: 'blocked' })).toBe(summary.blocked);
+    expect(admitted({ kind: 'failed' })).toBe(summary.failed);
+    expect(admitted({ kind: 'verdict-fail' })).toBe(summary.verdicts.fail);
+    expect(admitted({ kind: 'object', objectKey: 'o1' })).toBe(5);
+    expect(admitted({ kind: 'object', objectKey: 'elsewhere' })).toBe(0);
+    expect(admitted(null)).toBe(5);
   });
 });

@@ -386,6 +386,9 @@ function WorkspaceContent({
   // until someone asks for it. On Slides it is the open deck's assistant.
   const [copilotOpen, handleCopilotOpenChange] = useState(false);
   const onSlides = activeTab.activeView === 'slides';
+  // The copilot's subject: the open deck on Slides, the open Strategy on
+  // its view — context for its next send, never powers.
+  const openStrategyId = activeTab.activeView === 'strategy' ? activeTab.navigation.strategyId ?? null : null;
   // The pop-up's expand button opens the AI screen; the screen's shrink
   // button goes back to where the person was, with the pop-up open.
   const lastViewRef = useRef('home');
@@ -647,7 +650,8 @@ function WorkspaceContent({
             </div>
           </div>
           {!aiScreen && (
-            <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} subject={onSlides ? 'slides' : null}
+            <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange}
+              subject={onSlides ? { kind: 'slides' } : openStrategyId ? { kind: 'strategy', id: openStrategyId } : null}
               variant="floating" onExpand={onSlides ? undefined : handleExpandAi} />
           )}
         </div>

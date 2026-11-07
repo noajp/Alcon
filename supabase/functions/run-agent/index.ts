@@ -53,7 +53,7 @@ import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunTool
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
 import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
-import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, type ConversationContext } from "./conversation.ts";
+import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, type ConversationContext } from "./conversation.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
@@ -1343,6 +1343,38 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
       const guidance = String(call.input.guidance ?? "").trim().slice(0, 4000);
       await addStep(admin, run.id, "plan_request", "計画を Planner に渡す準備をしました", guidance || null);
       return { content: "会話に「計画を作る」カードを出しました。人が押すと Execution タブで Planner が下書きを作ります。下書きは人が確かめて採用します。ここで計画の中身を作らないでください。" };
+    }
+    // The two proposals follow the hand-over's pattern: the step carries
+    // the proposal (titles snapshotted, so the card reads even if the work
+    // changes), a card is shown, the person presses, the web acts. The
+    // conversation itself starts nothing and answers nothing.
+    if (call.name === START_TOOL.name) {
+      const ids = Array.isArray(call.input.elementIds)
+        ? call.input.elementIds.filter((v): v is string => typeof v === "string")
+        : [];
+      const { data: els } = ids.length
+        ? await userDb.from("elements").select("id, title").in("id", ids)
+        : { data: [] as { id: string; title: string }[] };
+      const titles = new Map(((els ?? []) as { id: string; title: string }[]).map((e) => [e.id, e.title]));
+      const kept = ids.filter((id) => titles.has(id));
+      if (!kept.length) return { content: "開始を提案できる Element が見つかりませんでした。getInitiativeExecution で id を確かめてください。", is_error: true };
+      const detail = JSON.stringify({ elementIds: kept, titles: kept.map((id) => titles.get(id)) });
+      await addStep(admin, run.id, "start_request", "実行の開始を提案しました", detail);
+      return { content: "会話に「実行を開始する」カードを出しました。人が押すと Web が開始します。開始したとは言わないでください。" };
+    }
+    if (call.name === ANSWER_TOOL.name) {
+      const runId = String(call.input.runId ?? "");
+      const elementId = String(call.input.elementId ?? "");
+      const text = String(call.input.text ?? "").trim();
+      if (!runId || !elementId || !text) return { content: "runId / elementId / text が要ります。", is_error: true };
+      const [{ data: target }, { data: el }] = await Promise.all([
+        userDb.from("agent_runs").select("id, summary").eq("id", runId).maybeSingle(),
+        userDb.from("elements").select("id, title").eq("id", elementId).maybeSingle(),
+      ]);
+      if (!target || !el) return { content: "答えを待つ実行が見つかりませんでした。getInitiativeExecution で確かめてください。", is_error: true };
+      const detail = JSON.stringify({ runId, elementId, elementTitle: el.title, text, question: target.summary ?? null });
+      await addStep(admin, run.id, "answer_request", "実行への答えを提案しました", detail);
+      return { content: "会話に「答えを送る」カードを出しました。人が押すと Web がその言葉を実行へ送ります。送ったとは言わないでください。" };
     }
     const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "conversation" });
     const writes = (catalogTool(call.name)?.effect ?? "read") !== "read";

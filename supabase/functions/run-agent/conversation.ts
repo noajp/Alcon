@@ -29,15 +29,49 @@ export const PLANNER_TOOL: ToolDef = {
   },
 };
 
+export const START_TOOL: ToolDef = {
+  name: "propose_run_start",
+  description:
+    "着手できる Element の実行開始を、人に提案するカードを出す。開始そのものはしない — 人がカードを押すと Web が開始する。" +
+    "getInitiativeExecution で状態を読み、着手できる（依存が終わっていて、開いている実行がない）Element の id を渡す。",
+  input_schema: {
+    type: "object",
+    properties: {
+      elementIds: { type: "array", items: { type: "string" }, description: "開始を提案する Element の UUID" },
+    },
+    required: ["elementIds"],
+    additionalProperties: false,
+  },
+};
+
+export const ANSWER_TOOL: ToolDef = {
+  name: "propose_answer",
+  description:
+    "人の答えを待っている実行へ、その人の言葉を届けるカードを出す。送信そのものはしない — 人がカードを押すと Web が送る。" +
+    "text は人が言った言葉そのまま。自分で答えを作らない。",
+  input_schema: {
+    type: "object",
+    properties: {
+      runId: { type: "string", description: "答えを待つ実行の UUID（getInitiativeExecution の latestRun.id）" },
+      elementId: { type: "string", description: "その実行の Element の UUID" },
+      text: { type: "string", description: "人の言葉そのまま" },
+    },
+    required: ["runId", "elementId", "text"],
+    additionalProperties: false,
+  },
+};
+
 /** The catalog's tools under the conversation's policy (it reads anything,
- *  and writes the Strategy's record and files), and the hand-over to the Planner. */
+ *  and writes the Strategy's record and files), the hand-over to the
+ *  Planner, and the two proposals — each only shows a card; the person
+ *  presses, and the web acts. */
 export function conversationTools(): RunToolDef[] {
-  return [PLANNER_TOOL, ...toolsFor("conversation")];
+  return [PLANNER_TOOL, START_TOOL, ANSWER_TOOL, ...toolsFor("conversation")];
 }
 
 /** Pure. How the loop treats a conversation's tool: all run at once, none needs approval. */
 export function conversationKindOf(name: string): ToolKind {
-  return name === PLANNER_TOOL.name ? "internal" : "board";
+  return name === PLANNER_TOOL.name || name === START_TOOL.name || name === ANSWER_TOOL.name ? "internal" : "board";
 }
 
 export interface ConversationContext {
@@ -79,6 +113,13 @@ export function conversationSystemPrompt(agentName: string): string {
 - 定義を書いたら、答えに返る「エンジンの読み取り」（reads と missing）をそのまま人に見せ、読み違いや欠けがないか確かめる。
 - 書き込めないと答えが返ったら（持ち主でない等）、そのことを伝え、内容は提案として示す。
 - 2 回目以降の会話では、前に決めたことを繰り返さず、変わったことだけを扱う。
+
+# 実行の話
+- 実行の状態（進み具合、止まっている所、検証の結果）を聞かれたら、まず getInitiativeExecution で現在の状態を読んでから答える。推測で状態を言わない。
+- 詰まりは barriers と blockers から、どの Element が・何に・なぜ止まっているかを短く説明する。検証で落ちた実行は verdict の gaps を引く。保留中の指標報告（heldReadings）は「レビューで承認されると記録される」と伝える。
+- 着手できる仕事があり、人が進めたいと言ったら、propose_run_start で開始のカードを出す。開始したとは言わない。決めるのは人で、開始はカードが押されてから。
+- 実行が人の答えを待っていて（state が waiting、latestRun が awaiting_input）、人が答えを言ったら、propose_answer でその言葉をそのまま届けるカードを出す。自分で答えを作らない。
+- 状態の説明と提案までが会話の仕事。Element の状態変更や承認そのものはしない。
 
 # 書き方
 - 日本語で、短く。1 回の返事は要点だけ。表や長い前置きは要らない。

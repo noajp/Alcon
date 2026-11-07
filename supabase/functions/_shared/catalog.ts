@@ -30,7 +30,7 @@ export interface CatalogTool extends ToolDef {
 const DELETES = new Set(["deleteElement", "deleteSubelement", "deleteObject", "bulkDeleteElements", "removeIntent", "deleteInitiative"]);
 const READS = new Set([
   "listMyDomains", "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",
-  "listInitiatives", "getInitiative", "listFiles", "readFile", "listHarnesses", "readHarness",
+  "listInitiatives", "getInitiative", "getInitiativeExecution", "listFiles", "readFile", "listHarnesses", "readHarness",
 ]);
 
 function entries(defs: ToolDef[], area: ToolArea): CatalogTool[] {
@@ -109,7 +109,7 @@ export const ENTRY_POLICIES: Record<Entry, EntryPolicy> = {
     effects: ["read"],
     writeAreas: ["strategy", "files"],
     also: ["removeIntent"],
-    core: [...READ_CORE, "updateInitiative", "createInitiative", "addIntent", "updateIntent", "removeIntent", "writeInitiativeDefinition", "readHarness"],
+    core: [...READ_CORE, "getInitiativeExecution", "updateInitiative", "createInitiative", "addIntent", "updateIntent", "removeIntent", "writeInitiativeDefinition", "readHarness"],
   },
   // An Element's run (started by a person or an automation, possibly on
   // input from outside): it reads anything and does the work on the board
