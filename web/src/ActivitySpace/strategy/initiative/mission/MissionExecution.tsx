@@ -152,7 +152,7 @@ function DraftCard({ element, object }: { element: FleetElement; object: FleetOb
       <div className="flex items-start gap-2">
         {/* Where a written card has its Status mark: not created yet. */}
         <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 rounded-full border border-dashed border-muted-foreground/60" />
-        <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground line-clamp-3 break-words">{element.title}</p>
+        <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground line-clamp-2 break-words">{element.title}</p>
         {element.action && <Chip className="mt-px"><ActionTag action={element.action} /></Chip>}
         <DraftTag />
       </div>
@@ -569,8 +569,12 @@ e.elementId && details.get(e.elementId) ? (
   const canApply = (!unplaced || !!placeIn) && (!domainless || !!newObjectsIn);
 
   return (
-    <div>
-      <div className="space-y-3">
+    // A column of its own: the controls, strip and index take their
+    // height, and the chain takes what is left — the Board's arrangement
+    // (a bounded board whose columns scroll inside themselves), reached
+    // through the tab's h-full wrapper instead of a page that grows.
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
         {/* Breaking it down: the Planner drafts Objects and Elements, and
             nothing is created until the draft is approved. Guidance is
             optional, so its field waits behind a link. */}
@@ -716,7 +720,7 @@ e.elementId && details.get(e.elementId) ? (
         ) : (
           // The chain: every action in the column for where it stands, left
           // to right. The draft's actions wait, dashed, in the first.
-          <ExecutionChain className="flex gap-3 overflow-x-auto pb-2"
+          <ExecutionChain className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2"
             onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
             columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
             columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />

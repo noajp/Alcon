@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import { cn } from '@/lib/utils';
-import { daysOverdue, formatElementDate, formatRelative, toDateOnlyString, parseDateOnly } from '@/Function/shared/dateUtils';
+import { daysOverdue, formatElementDate, toDateOnlyString, parseDateOnly } from '@/Function/shared/dateUtils';
 import { CardAgentControl } from '../agent';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
@@ -34,16 +34,18 @@ import { Chip } from './BoardColumn';
 // AI run); the Status mark (it opens the status menu) and the title across
 // the card's width; "↳" the Object it belongs to, when the host names it;
 // then, under a rule, the assignee and AI control at the left and the due
-// date, comments and last change at the right.
+// date and comments at the right — one date only: when the work last moved
+// is the Activity signal's tooltip, not a second date on the card.
 // Title, due date, priority and assignee are edited on the card; the card
 // drags with the Element's id ('text/id'), and the host decides what a drop
 // means (a status on the Board).
 
-// A card title reads at most three lines — beyond that it ellipsises, and the
-// inline rename box grows to the same three lines before it scrolls. Both
-// numbers are the `leading-5` line box, so the box never jumps on click.
-const TITLE_MAX_LINES = 3;
-const TITLE_LINE_HEIGHT = 20;
+// A card title reads at most two lines — beyond that it ellipsises (the
+// whole title lives on the Element's own view), and the inline rename box
+// grows to the same two lines before it scrolls. Both numbers are the
+// `leading-[22px]` line box, so the box never jumps on click.
+const TITLE_MAX_LINES = 2;
+const TITLE_LINE_HEIGHT = 22;
 
 interface ElementCardProps {
   element: ElementWithDetails;
@@ -165,7 +167,7 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
       // laid over the card's own ground as an image so the ground stays).
       className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
     >
-      <div className="px-3.5 py-3">
+      <div className="px-3.5 py-3.5">
         {/* Past its due date and still open: said first, across the top. */}
         {overdueDays > 0 && (
           <p className="mb-1.5 text-[11px] font-medium" style={{ color: 'var(--status-danger)' }}>
@@ -176,10 +178,14 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
             cannot say (waiting on a person, an AI run). */}
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {isElementAction(element.action) && <Chip><ActionTag action={element.action} /></Chip>}
+          {/* Medium is the default — an unset priority reads as medium
+              everywhere else in the app — so a medium chip on every card is
+              noise. Like unset, it stays out of the resting card and
+              appears on hover, where it can still be changed. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" onPointerDown={stop} onClick={stop}
-                className={cn('rounded-md transition-colors', priority ? 'inline-flex' : 'hidden group-hover/card:inline-flex group-focus-within/card:inline-flex data-[state=open]:inline-flex')}>
+                className={cn('rounded-md transition-colors', priority && priority !== 'medium' ? 'inline-flex' : 'hidden group-hover/card:inline-flex group-focus-within/card:inline-flex data-[state=open]:inline-flex')}>
                 <Chip className="hover:bg-muted">
                   {priority ? <><PriorityMark priority={priority} /><span>{t(PRIORITY[priority]?.label ?? priority)}</span></> : <span>{t('Priority')}</span>}
                 </Chip>
@@ -208,7 +214,8 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
 
         {/* The Status mark, then the title across the card's width. */}
         <div className="mt-2 flex items-start gap-2">
-          <div className="flex h-5 shrink-0 items-center">
+          {/* The mark sits on the title's first line: its box is the line box. */}
+          <div className="flex h-[22px] shrink-0 items-center">
             {lead ?? (
               <span onPointerDown={stop} onClick={stop} className="flex">
                 <StatusPicker element={element} onChanged={() => onRefresh?.()} />
@@ -231,11 +238,11 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
                 }}
                 onPointerDown={stop}
                 onClick={stop}
-                className="w-full text-[14px] font-semibold text-foreground leading-5 bg-transparent border-none resize-none overflow-y-auto"
+                className="w-full text-[14px] font-medium text-foreground leading-[22px] bg-transparent border-none resize-none overflow-y-auto"
               />
             ) : (
               <p
-                className="text-[14px] font-semibold text-foreground leading-5 -mx-1 px-1 rounded cursor-text line-clamp-3 break-words"
+                className="text-[14px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text line-clamp-2 break-words"
                 title={t('Click to rename')}
                 onPointerDown={stop}
                 onClick={(e) => { stop(e); setEditingTitle(true); }}
@@ -245,7 +252,7 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
             )}
             {/* Where it belongs. */}
             {object && (
-              <p className="mt-1 flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground" title={object.name}>
+              <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/80" title={object.name}>
                 <span aria-hidden className="shrink-0">↳</span>
                 <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
                 <span className="truncate">{object.name}</span>
@@ -256,7 +263,7 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
         </div>
         {extra}
 
-        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/50 pt-2">
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
           <div className="flex min-w-0 items-center gap-1">
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
@@ -326,8 +333,6 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
             </Popover>
             {/* Same signal the list rows and the Activity column show. */}
             <ActivitySignal activity={element.activity} />
-            {/* When it last changed, as the work's pulse. */}
-            <span className="tabular-nums" title={t('Last updated')}>{formatRelative(element.updated_at)}</span>
           </div>
         </div>
       </div>

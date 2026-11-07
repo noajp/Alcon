@@ -947,7 +947,11 @@ function StrategyDetailView({
             sections that use it must share one — see InitiativeIntent. */}
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
         {tab === 'chain' ? (
-          <div className="px-8 py-6">
+          // The chain tab is a bounded column, not a scrolling page: the
+          // conversation (when open) and the mission's controls take their
+          // height, and the board fills the rest, scrolling inside its
+          // columns as the Board app does.
+          <div className="flex h-full flex-col px-8 py-6">
             {/* The same conversation as the Overview's, opened in place:
                 one mount, one transcript, one composer. */}
             {talking && (
