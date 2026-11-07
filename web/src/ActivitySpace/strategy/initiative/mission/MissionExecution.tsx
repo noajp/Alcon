@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, Clock, Flag, Hand, Pause } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
@@ -14,17 +14,18 @@ import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import { createIntent } from '@/hooks/strategyData';
-import { AI_WEIGHTS, isAiWeight, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
+import { AI_WEIGHTS, isAiWeight, type AgentRunStatus, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
+import { FLOW_COLUMNS, FLOW_COLUMN_LABEL, flowColumnOf, type FlowColumn } from '@/ActivitySpace/execution/domain/flow/flowColumn';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { ActionTag } from '@/Function/shared/elementAction';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
-  answeredQuestions, buildFleet, draftFleet, handOverLabels, measureStateOf, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, measureStateOf, missionSummary, normalizePlan, normalizeQuestions, plannerSources,
   startableTasks, UNPLACED, yourTurn,
-  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
+  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlannerSource, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
@@ -34,21 +35,15 @@ import { listenForPlanRequests } from './plannerRequest';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
 
-// The Execution tab's mission: the Strategy's Objects in one column and the
-// Elements of the chosen Object in the next, joined by lines from the chosen
-// Object, each card saying where it stands, who carries it out, its status
-// and due date, what it delivers and what it waits on. The Planner's draft is
-// laid over the same columns — the Objects and Elements it would add drawn
-// dashed — so the person reads how the Strategy breaks down, moves an
-// Element to another Object by dragging its card onto that Object, approves
-// the draft, and starts the work here.
+// The Strategy's Execution Chain: every action under its Objects in a column
+// for where it stands — To do, Waiting on you, In progress, To review, Done —
+// left to right, as a Domain's Flow board reads them, each card saying which
+// Object it belongs to, who carries it out, what it delivers and what it
+// waits on. The Planner's draft waits, dashed, in the first column until the
+// person creates it; then its actions move along the chain like the rest.
 
 /** The card ground, as the Board's Element cards draw it. */
 const CARD = 'rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)]';
-/** The drag payload: a card's key in the Element column. */
-const DRAG_TYPE = 'application/x-alcon-mission-element';
-/** What a written Element card carries when dragged (ElementCard). */
-const ELEMENT_DRAG_TYPE = 'text/id';
 
 function StateIcon({ state }: { state: ActionState }) {
   switch (state) {
@@ -101,57 +96,6 @@ function DraftTag() {
   return <span className="shrink-0 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[11px] text-muted-foreground">{t('Draft')}</span>;
 }
 
-function ObjectCard({ object, domainName, selected, dropTarget, onSelect, onDragOver, onDragLeave, onDrop }: {
-  object: FleetObject;
-  domainName: string | null;
-  selected: boolean;
-  /** An Element card is being dragged over it and may land here. */
-  dropTarget: boolean;
-  onSelect: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent) => void;
-}) {
-  const { t } = useI18n();
-  const { tally } = object;
-  const unplaced = object.key === UNPLACED;
-  const footer = tally.total === 0 ? t('No Elements')
-    : tally.done === tally.total ? t('All {n} done', { n: tally.total })
-    : tally.stopped > 0 ? t('{n} stopped', { n: tally.stopped })
-    : tally.running > 0 ? t('{n}/{all} running', { n: tally.running, all: tally.total })
-    : t('{done}/{all} done', { done: tally.done, all: tally.total });
-  return (
-    <button type="button" onClick={onSelect} aria-pressed={selected}
-      onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-      className={cn(
-        CARD, 'relative block w-full px-3.5 py-3 text-left transition-[opacity,box-shadow]',
-        object.draft && 'border-dashed border-border',
-        selected ? 'opacity-100' : 'opacity-55 hover:opacity-90',
-        dropTarget && 'opacity-100 ring-2 ring-[var(--accent-default)]',
-      )}>
-      <div className="flex items-start gap-2.5">
-        <ItemIcon icon={object.icon} color={object.color} size={14} className="mt-[3px] text-muted-foreground" fallback={<ObjectIcon size={14} />} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold leading-5 text-foreground">
-            {unplaced ? t('Not placed in an Object') : object.name}
-          </div>
-          <div className="truncate text-[12px] text-muted-foreground">
-            {unplaced ? t('Drag each card onto an Object, or choose one above') : domainName ?? t('No Domain')}
-          </div>
-        </div>
-        {object.draft ? <DraftTag /> : <StateBadge state={object.state} />}
-      </div>
-      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] tabular-nums text-muted-foreground">
-        <Clock size={12} className="shrink-0" />
-        <span style={tally.stopped > 0 ? { color: 'var(--status-danger)' } : undefined}>{footer}</span>
-        <span className="ml-auto text-[11px] text-muted-foreground/80">${object.costUsd.toFixed(2)}</span>
-      </div>
-      {selected && (
-        <span aria-hidden className="absolute -right-[5px] top-1/2 hidden h-2.5 w-2.5 -translate-y-1/2 rounded-full border-[1.5px] border-[var(--accent-default)] bg-card md:block" />
-      )}
-    </button>
-  );
-}
 
 const STRATEGY_DEFINITION = '__strategy';
 
@@ -237,13 +181,10 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickS
 
 /** A task of the Planner's draft, drawn as the Element card it will become —
  *  dashed, and not editable until it is created. */
-function DraftCard({ element, draggable }: { element: FleetElement; draggable: boolean }) {
+function DraftCard({ element }: { element: FleetElement }) {
   const { t } = useI18n();
   return (
-    <div
-      draggable={draggable}
-      onDragStart={(e) => { e.dataTransfer.setData(DRAG_TYPE, element.key); e.dataTransfer.effectAllowed = 'move'; }}
-      className={cn(CARD, 'border-dashed border-border px-3 py-2.5', draggable && 'cursor-grab active:cursor-grabbing')}>
+    <div className={cn(CARD, 'border-dashed border-border px-3 py-2.5')}>
       <div className="flex items-start gap-2">
         <p className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground line-clamp-3 break-words">{element.title}</p>
         {element.action && <ActionTag action={element.action} className="mt-0.5" />}
@@ -260,73 +201,6 @@ function DraftCard({ element, draggable }: { element: FleetElement; draggable: b
   );
 }
 
-/** The lines from the chosen Object to each of its Element cards: out of the
- *  dot on its right edge, down a shared spine, into each card — blue to work
- *  still open, grey to work that is done, dashed to the draft's. Measured
- *  from the cards, so it follows them as they wrap and grow. */
-function Connectors({ root, objectCards, fromKey, elementCards, elements }: {
-  root: React.RefObject<HTMLDivElement | null>;
-  objectCards: React.RefObject<Map<string, HTMLElement>>;
-  fromKey: string | null;
-  elementCards: React.RefObject<Map<string, HTMLElement>>;
-  elements: readonly FleetElement[];
-}) {
-  const [drawing, setDrawing] = useState<{ paths: { d: string; open: boolean; draft: boolean }[]; w: number; h: number }>({ paths: [], w: 0, h: 0 });
-  // Measured after every render (cards load, wrap, and are edited in place)
-  // and whenever the columns resize; stored only when a line moved.
-  const [resized, setResized] = useState(0);
-  useLayoutEffect(() => {
-    const box = root.current;
-    if (!box) return;
-    const observer = new ResizeObserver(() => setResized((n) => n + 1));
-    observer.observe(box);
-    return () => observer.disconnect();
-  }, [root]);
-  useLayoutEffect(() => {
-    const box = root.current;
-    if (!box) return;
-    const store = (next: typeof drawing) => {
-      setDrawing((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-    };
-    const draw = () => {
-      const from = fromKey ? objectCards.current.get(fromKey) : undefined;
-      if (!from || window.matchMedia('(max-width: 767px)').matches) { store({ paths: [], w: 0, h: 0 }); return; }
-      const b = box.getBoundingClientRect();
-      const f = from.getBoundingClientRect();
-      const sx = f.right - b.left;
-      const sy = f.top + f.height / 2 - b.top;
-      const next: { d: string; open: boolean; draft: boolean }[] = [];
-      for (const e of elements) {
-        const el = elementCards.current.get(e.key);
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        const ex = r.left - b.left;
-        const ey = r.top + r.height / 2 - b.top;
-        const spine = sx + (ex - sx) / 2;
-        const dy = ey - sy;
-        const radius = Math.min(10, Math.abs(dy) / 2, (ex - spine) / 2);
-        const d = Math.abs(dy) < 1
-          ? `M ${sx} ${sy} H ${ex}`
-          : `M ${sx} ${sy} H ${spine - radius} Q ${spine} ${sy} ${spine} ${sy + Math.sign(dy) * radius}`
-            + ` V ${ey - Math.sign(dy) * radius} Q ${spine} ${ey} ${spine + radius} ${ey} H ${ex}`;
-        next.push({ d, open: e.state !== 'done' && e.state !== 'cancelled', draft: e.draft });
-      }
-      store({ paths: next, w: b.width, h: b.height });
-    };
-    draw();
-  });
-  void resized;
-  if (drawing.paths.length === 0) return null;
-  return (
-    <svg aria-hidden className="pointer-events-none absolute inset-0 hidden md:block" width={drawing.w} height={drawing.h}>
-      {/* The open ones last, so they draw over the grey along the shared spine. */}
-      {[...drawing.paths].sort((a, b) => Number(a.open) - Number(b.open)).map((p, i) => (
-        <path key={i} d={p.d} fill="none" strokeWidth={1.5} strokeDasharray={p.draft ? '4 4' : undefined}
-          stroke={p.open ? 'var(--accent-default)' : 'var(--border-default)'} opacity={p.open ? 0.75 : 1} />
-      ))}
-    </svg>
-  );
-}
 
 export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot }: {
   ctx: MissionContext;
@@ -346,6 +220,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [guidance, setGuidance] = useState('');
   const [guidanceOpen, setGuidanceOpen] = useState(false);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
+  // How the Planner read the Strategy's files for the current draft.
+  const [sources, setSources] = useState<PlannerSource[] | null>(null);
   // The Planner's questions, asked before it plans, and the answers typed.
   const [questions, setQuestions] = useState<{ reason: string; items: PlanQuestion[] } | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -354,18 +230,12 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [dropKey, setDropKey] = useState<string | null>(null);
-  const columnsRef = useRef<HTMLDivElement>(null);
-  const objectCards = useRef(new Map<string, HTMLElement>());
-  const elementCards = useRef(new Map<string, HTMLElement>());
   const [aiWorkerId, setAiWorkerId] = useState('');
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
   const aiWorker = aiWorkerId || aiWorkers[0]?.id || '';
   const placeIn = fallbackObjectId || objects[0]?.id || '';
   const newObjectsIn = fallbackDomainId || objects.find((o) => o.domain_id)?.domain_id || domains[0]?.id || '';
-  const domainName = useMemo(() => new Map(domains.map((d) => [d.id, d.name])), [domains]);
   const personName = useMemo(() => new Map(people.map((w) => [w.id, w.name])), [people]);
 
   const current = useMemo(() => buildFleet({
@@ -373,10 +243,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     edges: ctx.mission.edges, runs: ctx.mission.runs,
   }), [objects, ctx.elements, ctx.measures, ctx.bindings, ctx.mission.edges, ctx.mission.runs]);
   const fleet = useMemo(() => (draft ? draftFleet(current, ctx.measures, draft, personName) : current), [draft, current, ctx.measures, personName]);
-  // The column the person chose, else the first that needs a look, else the first.
-  const focus = fleet.find((o) => o.key === selected)
-    ?? fleet.find((o) => o.draft || o.tally.stopped > 0 || o.tally.waiting > 0)
-    ?? fleet[0];
 
   const summary = missionSummary({ elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts });
   // Before the dependencies are read every AI Element would look ready.
@@ -391,6 +257,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     setPlanning(true); setError(null); setNotice(null);
     try {
       const reply = await requestInitiativePlan(ctx.initiativeId, opts.guidance ?? guidance, opts);
+      setSources(plannerSources(reply.sources));
       const asked = normalizeQuestions(reply.questions);
       if (asked.length > 0) {
         setQuestions({ reason: reply.reason, items: asked });
@@ -406,7 +273,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         workerIds: new Set(personName.keys()),
       });
       if (next.tasks.length === 0) setError(t('The Planner returned no tasks. Add guidance and try again.'));
-      else { setDraft(next); setSelected(null); }
+      else setDraft(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -464,7 +331,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         ? startableTasks(draft).map((k) => result.elementIds[k]).filter((id): id is string => !!id)
         : [];
       const notStarted = toStart.length ? await start(toStart) : 0;
-      setDraft(null); setSelected(null);
+      setDraft(null);
       const created = result.failed.length
         ? t('Created {n} Elements. Could not finish: {items}', { n: result.created, items: result.failed.join(', ') })
         : t('Created {n} Elements.', { n: result.created });
@@ -501,41 +368,67 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     ctx.refetch();
   };
 
-  // An Element card dropped on another Object card: a draft task changes
-  // the Object it will be created in; a written Element moves there.
-  const mayDrop = (o: FleetObject) => o.key !== focus?.key && (!!o.objectId || !!draft);
-  const dragOver = (o: FleetObject) => (e: React.DragEvent) => {
-    const types = e.dataTransfer.types;
-    if (!(types.includes(DRAG_TYPE) || types.includes(ELEMENT_DRAG_TYPE)) || !mayDrop(o)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dropKey !== o.key) setDropKey(o.key);
-  };
-  const drop = (o: FleetObject) => async (e: React.DragEvent) => {
-    const key = e.dataTransfer.getData(DRAG_TYPE) || e.dataTransfer.getData(ELEMENT_DRAG_TYPE);
-    setDropKey(null);
-    if (!key || !mayDrop(o)) return;
-    e.preventDefault();
-    setError(null);
-    if (key.startsWith('t:')) {
-      if (!draft) return;
-      setDraft(moveDraftTask(draft, key.slice(2), {
-        objectId: o.objectId, name: o.name, draftKey: o.objectId || o.key === UNPLACED ? null : o.key.slice(2),
-      }));
-      return;
+  // Where each action stands: a written Element by its Status, its action and
+  // its latest AI run, as on a Domain's Flow board; a draft task is not
+  // created yet, so it waits in the first column.
+  const chain = useMemo(() => {
+    const latest = new Map<string, AgentRunStatus>();
+    for (const r of [...ctx.mission.runs].sort((a, b) => a.created_at.localeCompare(b.created_at))) latest.set(r.element_id, r.status);
+    const columns = Object.fromEntries(FLOW_COLUMNS.map((c) => [c, [] as { element: FleetElement; object: FleetObject }[]])) as Record<FlowColumn, { element: FleetElement; object: FleetObject }[]>;
+    for (const o of fleet) {
+      for (const e of o.elements) {
+        const written = e.elementId ? details.get(e.elementId) : undefined;
+        const column = written ? flowColumnOf(written, latest.get(written.id) ?? null) : e.draft ? 'todo' : null;
+        if (column) columns[column].push({ element: e, object: o });
+      }
     }
-    if (!o.objectId) return;
-    try {
-      await updateElement(key, { object_id: o.objectId });
-      ctx.refetch();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-  // Each card registers itself, so the lines can be measured from it.
-  const track = (map: Map<string, HTMLElement>, key: string, el: HTMLElement | null) => {
-    if (el) map.set(key, el); else map.delete(key);
-  };
+    // The draft's tasks first in their column: they are what is new.
+    columns.todo.sort((a, b) => Number(b.element.draft) - Number(a.element.draft));
+    return columns;
+  }, [fleet, details, ctx.mission.runs]);
+
+  const cardFor = (e: FleetElement) => (
+e.elementId && details.get(e.elementId) ? (
+                    <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
+                      onOpen={() => ctx.onOpenElement(e.elementId!)}
+                      // The Element's Status, as every list shows it: the mark
+                      // opens the status menu, so work an agent left for
+                      // review is approved (Done) right from its card.
+                      lead={ctx.canEdit ? (
+                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()} className="flex">
+                          <StatusPicker element={details.get(e.elementId)!}
+                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }} />
+                        </span>
+                      ) : (
+                        <ElementProgressMark status={details.get(e.elementId)!.status} progress={getElementProgress(details.get(e.elementId)!)} size={16} />
+                      )}
+                      // Only what the Status cannot say: an AI run that is
+                      // going, waiting on someone, or has failed.
+                      // What it asks someone to do, then only what the Status
+                      // cannot say: an AI run going, waiting or failed.
+                      badge={(e.action || runOnlyState(e.state, details.get(e.elementId)!.status)) ? (
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {e.action && <ActionTag action={e.action} className="mt-0.5" />}
+                          {runOnlyState(e.state, details.get(e.elementId)!.status) && <StateBadge state={e.state} />}
+                        </span>
+                      ) : undefined}
+                      extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
+                        pickSet={!!details.get(e.elementId)?.definition_id || (e.assignee === 'ai' && isAiWeight(details.get(e.elementId)?.ai_weight) && details.get(e.elementId)?.ai_weight !== 'standard')}
+                        definitionPick={ctx.canEdit ? (
+                          <>
+                            <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
+                              onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
+                            {e.assignee === 'ai' && (
+                              <WeightPick value={isAiWeight(details.get(e.elementId)?.ai_weight) ? details.get(e.elementId)!.ai_weight as AiWeight : null}
+                                onChange={(w) => void setElementAiWeight(e.elementId!, w).then(() => ctx.refetch())} />
+                            )}
+                          </>
+                        ) : undefined}
+                        onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
+                  ) : (
+                    <DraftCard element={e} />
+                  )
+  );
 
   const draftTasks = draft?.tasks.length ?? 0;
   const draftNewObjects = draft?.objects.filter((o) => !o.objectId).length ?? 0;
@@ -694,6 +587,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         {draft && (
           <div className="space-y-2 rounded-lg border border-dashed border-border px-3 py-2.5">
             {draft.summary && <MarkdownLite text={draft.summary} className="text-[13px] leading-relaxed text-foreground" />}
+            {sources && <PlannerSources sources={sources} />}
             <p className="text-[12px] text-muted-foreground">
               {t('{tasks} Elements in {objects} Objects, {fresh} of them new. Dashed cards are not created yet.', {
                 tasks: draftTasks, objects: new Set(draft.tasks.map((x) => x.object).filter(Boolean)).size, fresh: draftNewObjects,
@@ -721,7 +615,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                   </span>
                 )}
                 <div className="ml-auto flex items-center gap-1.5">
-                  <Button variant="ghost" size="sm" onClick={() => { setDraft(null); setSelected(null); }} disabled={applying}>{t('Discard')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setDraft(null)} disabled={applying}>{t('Discard')}</Button>
                   <Button variant="secondary" size="sm" onClick={() => void apply(false)} disabled={applying || !canApply}>
                     {applying ? t('Creating…') : t('Create')}
                   </Button>
@@ -742,72 +636,63 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
 
         {fleet.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('No Objects yet. Break the Strategy down with AI, or add Objects below.')}</p>
+          <p className="text-[12px] text-muted-foreground">{t('No Objects yet. Break the Strategy down with AI, or add Objects on the Overview.')}</p>
         ) : (
-          <div ref={columnsRef} className="relative grid gap-3 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:gap-16">
-            <div className="space-y-3">
-              {fleet.map((o) => (
-                <div key={o.key} ref={(el) => track(objectCards.current, o.key, el)}>
-                  <ObjectCard object={o} selected={o.key === focus?.key} dropTarget={dropKey === o.key}
-                    domainName={o.domainId ? domainName.get(o.domainId) ?? null : null}
-                    onSelect={() => setSelected(o.key)}
-                    onDragOver={dragOver(o)} onDragLeave={() => setDropKey(null)} onDrop={(e) => void drop(o)(e)} />
-                </div>
-              ))}
-            </div>
-            <div className="min-w-0 space-y-3">
-              {focus && focus.elements.length > 0 ? focus.elements.map((e) => (
-                <div key={e.key} ref={(el) => track(elementCards.current, e.key, el)}>
-                  {e.elementId && details.get(e.elementId) ? (
-                    <ElementCard element={details.get(e.elementId)!} onRefresh={ctx.refetch}
-                      onOpen={() => ctx.onOpenElement(e.elementId!)}
-                      // The Element's Status, as every list shows it: the mark
-                      // opens the status menu, so work an agent left for
-                      // review is approved (Done) right from its card.
-                      lead={ctx.canEdit ? (
-                        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()} className="flex">
-                          <StatusPicker element={details.get(e.elementId)!}
-                            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(e.elementId!).then(() => ctx.refetch()); else ctx.refetch(); }} />
-                        </span>
-                      ) : (
-                        <ElementProgressMark status={details.get(e.elementId)!.status} progress={getElementProgress(details.get(e.elementId)!)} size={16} />
-                      )}
-                      // Only what the Status cannot say: an AI run that is
-                      // going, waiting on someone, or has failed.
-                      // What it asks someone to do, then only what the Status
-                      // cannot say: an AI run going, waiting or failed.
-                      badge={(e.action || runOnlyState(e.state, details.get(e.elementId)!.status)) ? (
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          {e.action && <ActionTag action={e.action} className="mt-0.5" />}
-                          {runOnlyState(e.state, details.get(e.elementId)!.status) && <StateBadge state={e.state} />}
-                        </span>
-                      ) : undefined}
-                      extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
-                        pickSet={!!details.get(e.elementId)?.definition_id || (e.assignee === 'ai' && isAiWeight(details.get(e.elementId)?.ai_weight) && details.get(e.elementId)?.ai_weight !== 'standard')}
-                        definitionPick={ctx.canEdit ? (
-                          <>
-                            <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
-                              onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
-                            {e.assignee === 'ai' && (
-                              <WeightPick value={isAiWeight(details.get(e.elementId)?.ai_weight) ? details.get(e.elementId)!.ai_weight as AiWeight : null}
-                                onChange={(w) => void setElementAiWeight(e.elementId!, w).then(() => ctx.refetch())} />
-                            )}
-                          </>
-                        ) : undefined}
-                        onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
-                  ) : (
-                    <DraftCard element={e} draggable={ctx.canEdit} />
-                  )}
-                </div>
-              )) : (
-                <p className="px-1 py-2 text-[12px] text-muted-foreground">{t('No Elements in this Object yet.')}</p>
-              )}
-            </div>
-            <Connectors root={columnsRef} objectCards={objectCards} fromKey={focus?.key ?? null}
-              elementCards={elementCards} elements={focus?.elements ?? []} />
+          // The chain: every action in the column for where it stands, left
+          // to right. The draft's actions wait, dashed, in the first.
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {FLOW_COLUMNS.map((column) => {
+              const waiting = column === 'waiting';
+              const items = chain[column];
+              return (
+                <section key={column} aria-label={t(FLOW_COLUMN_LABEL[column])}
+                  className={cn('flex w-[272px] shrink-0 flex-col rounded-lg border', waiting ? '' : 'border-transparent bg-muted/40')}
+                  style={waiting ? { borderColor: 'color-mix(in srgb, var(--status-warning) 45%, transparent)', background: 'color-mix(in srgb, var(--status-warning) 8%, transparent)' } : undefined}>
+                  <header className="flex items-center gap-2 px-3 pb-2 pt-2.5 text-[12px] font-medium">
+                    <span className={waiting ? '' : 'text-foreground'} style={waiting ? { color: 'var(--status-warning)' } : undefined}>{t(FLOW_COLUMN_LABEL[column])}</span>
+                    <span className="tabular-nums text-muted-foreground">{items.length}</span>
+                  </header>
+                  <div className="flex flex-col gap-2 px-2 pb-2">
+                    {items.length === 0 ? (
+                      <p className="px-1 py-2 text-[12px] text-muted-foreground">{t('No Elements')}</p>
+                    ) : items.map(({ element: e, object: o }) => (
+                      <div key={e.key} className="min-w-0">
+                        <p className="mb-1 flex items-center gap-1 truncate px-0.5 text-[11px] text-muted-foreground">
+                          <ItemIcon icon={o.icon ?? null} color={o.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
+                          <span className="truncate">{o.name}</span>
+                          {o.draft && <span className="shrink-0">· {t('new')}</span>}
+                        </p>
+                        {cardFor(e)}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
       </div>
     </PageSection>
+  );
+}
+
+/** Which of the Strategy's files the draft was made from, and how each was read. */
+function PlannerSources({ sources }: { sources: PlannerSource[] }) {
+  const { t } = useI18n();
+  if (sources.length === 0) return <p className="text-[12px] text-muted-foreground">{t('No files are attached to this Strategy; the draft is made from what is recorded.')}</p>;
+  const read = sources.filter((x) => x.mode !== 'unread');
+  const unread = sources.filter((x) => x.mode === 'unread');
+  const readLine = (x: PlannerSource) => x.chars === 0
+    ? t(x.mode === 'digest' ? '{name} (all of it in parts)' : '{name} (whole)', { name: x.name })
+    : t(x.mode === 'digest' ? '{name} ({n} characters, all of it in parts)' : '{name} ({n} characters, whole)', { name: x.name, n: x.chars.toLocaleString() });
+  return (
+    <div className="space-y-0.5 text-[12px]">
+      {read.length > 0 && <p className="text-muted-foreground">{t('Files read: {list}', { list: read.map(readLine).join(' / ') })}</p>}
+      {unread.length > 0 && (
+        <p className="text-[var(--status-warning)]">
+          {t('Not read: {list}', { list: unread.map((x) => t('{name} ({reason})', { name: x.name, reason: x.reason ?? '' })).join(' / ') })}
+        </p>
+      )}
+    </div>
   );
 }

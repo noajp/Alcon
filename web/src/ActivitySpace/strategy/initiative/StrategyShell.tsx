@@ -2,6 +2,7 @@
 
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { IslandHeader } from '@/Function/shared/MainIsland';
+import { ViewTabs } from '@/Function/shared/ViewTabs';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -97,8 +98,16 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { buildInitiativeTree, flattenInitiativeTree, inSpace, planInitiativeDrop, siblingOrder, type InitiativeDropPlace, type InitiativeNode } from './initiativeTree';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
-/** The page's one board: a band for how far it is, and one column below. */
-const BOARD_ZONES: Zone[] = ['band', 'main'];
+/** The Overview's board: a band under the name, the document column, and
+ *  the island beside it. */
+const BOARD_ZONES: Zone[] = ['band', 'main', 'rail'];
+
+/** A Strategy's two views: what it is, and how its work is going. */
+type StrategyTab = 'overview' | 'chain';
+const STRATEGY_TABS: readonly { id: StrategyTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'chain', label: 'Execution Chain' },
+];
 
 /** The Strategy's widget board. The surface key is the persisted
  *  boards.surface, not a display string: it stays 'campaign'. */
@@ -121,8 +130,10 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 // Strategy list — only TOP-LEVEL Strategies (no parent in strategy_children)
 // show there; a Strategy nested inside another only appears in its parent's
 // "Strategies" section. Selecting a row pushes into that Strategy's detail
-// page (title, description, nested Strategies, Object scope — no Properties
-// rail, mirrors ElementDetailView minus the side rail).
+// page, in two tabs: Overview (title, description, files, Objects, Sub
+// Strategies, what the work produced, the discussion, and the Properties
+// island) and Execution Chain (the work in columns by where it stands, and
+// the Planner's draft in the first).
 // =============================================================
 
 export function StrategyShell({
@@ -570,10 +581,24 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  // The conversation opens on request; another Strategy opens without it.
+  // The conversation opens on request; another Strategy opens without it,
+  // on its Overview.
   const [talking, setTalking] = useState(false);
+  const [tab, setTab] = useState<StrategyTab>('overview');
   const [talkingFor, setTalkingFor] = useState(strategy.id);
-  if (talkingFor !== strategy.id) { setTalkingFor(strategy.id); setTalking(false); }
+  if (talkingFor !== strategy.id) { setTalkingFor(strategy.id); setTalking(false); setTab('overview'); }
+  // Opened from the Execution Chain, the conversation is below the
+  // description: bring it into view.
+  // Only the content scrolls; the header and its tabs stay.
+  const talkRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const target = talkRef.current;
+    const box = contentRef.current;
+    if (!talking || tab !== 'overview' || !target || !box) return;
+    const top = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 16;
+    box.scrollTo({ top, behavior: 'smooth' });
+  }, [talking, tab]);
   const host = useMemo<WidgetHost>(
     () => ({
       subject: { kind: 'initiative', id: strategy.id },
@@ -599,12 +624,15 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
-    onTalk: () => setTalking(true),
+    // The conversation is on the Overview.
+    onTalk: () => { setTab('overview'); setTalking(true); },
   };
   const queryClient = useQueryClient();
   // The conversation hands the breakdown to the Planner, in the work below.
   const planFromConversation = (guidance: string) => {
     setTalking(false);
+    // The Planner is on the Execution Chain; the request waits for it there.
+    setTab('chain');
     requestPlan(strategy.id, guidance);
   };
   // An answer may have written the Strategy's purpose, intents or definition.
@@ -911,12 +939,22 @@ function StrategyDetailView({
       </div>
 
 
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto px-8 py-8">
-        {/* The Intent read is mounted here, above the board, because the
-            three sections that use it must share one — see InitiativeIntent. */}
+      <ViewTabs tabs={STRATEGY_TABS} active={tab} onSelect={setTab} label={t('Strategy views')} />
+
+      <div ref={contentRef} className="flex-1 overflow-auto">
+        {/* The Intent read is mounted here, above both tabs, because the
+            sections that use it must share one — see InitiativeIntent. */}
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
-        <div className="space-y-5">
+        {tab === 'chain' ? (
+          <div className="px-8 py-6">
+            <InitiativeMission tab="execution" {...missionProps} />
+          </div>
+        ) : (
+        <div className="max-w-7xl mx-auto px-8 py-8">
+        <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={BOARD_ZONES}>
+        {/* items-start: the island does not stretch the document column. */}
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
           <div>
             <PageIcon>
               <ItemIconButton value={look} onChange={changeLook} canEdit={canEdit} defaultIcon={<NavStrategyIcon size={18} />} />
@@ -945,6 +983,8 @@ function StrategyDetailView({
               className={`w-full bg-transparent border-none resize-none overflow-hidden ${PAGE_TITLE}`}
               style={PAGE_TITLE_WEIGHT}
             />
+            {/* Band — how it is going, right under the name. */}
+            <WidgetZone zone="band" className="mt-3" />
           </div>
           <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
             placeholder={t('Add description…')} onSave={saveDescription} />
@@ -989,6 +1029,7 @@ function StrategyDetailView({
           {/* Talking it through is called up, not a tab: it opens here when
               asked for, and hands its breakdown to the work below. */}
           {talking && (
+            <div ref={talkRef}>
             <PageSection title={t('Talk it through')} action={
               <Button variant="ghost" size="icon-xs" aria-label={t('Close')} className="text-muted-foreground" onClick={() => setTalking(false)}>
                 <X size={13} />
@@ -997,14 +1038,12 @@ function StrategyDetailView({
               <StrategyConversation strategyId={strategy.id}
                 objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
             </PageSection>
+            </div>
           )}
 
-          {/* One page, read top to bottom: how far it is, what waits on you
-              and the work as it runs, how it is won, what it produced, then
-              the discussion. Widgets are what someone chose to add. */}
-          <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={BOARD_ZONES}>
-              <WidgetZone zone="band" />
-              <InitiativeMission tab="execution" {...missionProps} />
+          {/* The document, read top to bottom: the Objects that carry it, its
+              Sub Strategies, what the work produced, then the discussion.
+              The work as it runs is on the Execution Chain. */}
             {selectedIds.size > 0 || pickerMode !== 'closed' ? (
               <PageSection title={t('Objects')} action={canEdit ? (
                 <ButtonAppearanceProvider appearance="navigation">
@@ -1191,7 +1230,7 @@ function StrategyDetailView({
               {/* What the work produced and what was approved, then the
                   discussion — last, because it grows. */}
               <InitiativeMission tab="audit" {...missionProps} />
-              <PageSection title={t('Activity')}>
+              <PageSection title={t('Updates')}>
                 <StrategyCommentsPanel
                   strategyId={strategy.id}
                   strategyName={strategy.name}
@@ -1199,10 +1238,16 @@ function StrategyDetailView({
                   workers={workers}
                 />
               </PageSection>
-          </InitiativeBoard>
         </div>
+        {/* The island: the Strategy's properties, and whatever else was placed beside it. */}
+        <aside className="min-w-0">
+          <WidgetZone zone="rail" />
+        </aside>
+        </div>
+        </InitiativeBoard>
+        </div>
+        )}
         </InitiativeIntentProvider>
-        </div>
       </div>
     </div>
     </WidgetActionSlotProvider>

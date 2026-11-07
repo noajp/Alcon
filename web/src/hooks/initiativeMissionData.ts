@@ -87,12 +87,12 @@ export function useInitiativeMission(initiativeId: string, elementIds: string[])
 
 // ── The Planner ─────────────────────────────────────────────────────────────
 
-/** What the Planner answered: a draft, or questions to answer first. */
-export interface PlannerReply { plan: unknown; questions: unknown; reason: string }
+/** What the Planner answered: a draft, or questions to answer first, and how it read the Strategy's files. */
+export interface PlannerReply { plan: unknown; questions: unknown; reason: string; sources: unknown }
 
 /** Asks the Planner for a draft. It may ask questions first, unless answers
  *  are given or `noQuestions` is set. The raw reply is checked by
- *  normalizePlan / normalizeQuestions. */
+ *  normalizePlan / normalizeQuestions / plannerSources. */
 export async function requestInitiativePlan(
   initiativeId: string,
   guidance: string,
@@ -109,8 +109,8 @@ export async function requestInitiativePlan(
     }
     throw new Error(message);
   }
-  const d = (data ?? {}) as { plan?: unknown; questions?: unknown; reason?: unknown };
-  return { plan: d.plan ?? null, questions: d.questions ?? null, reason: typeof d.reason === 'string' ? d.reason : '' };
+  const d = (data ?? {}) as { plan?: unknown; questions?: unknown; reason?: unknown; sources?: unknown };
+  return { plan: d.plan ?? null, questions: d.questions ?? null, reason: typeof d.reason === 'string' ? d.reason : '', sources: d.sources ?? null };
 }
 
 export interface ApplyPlanInput {

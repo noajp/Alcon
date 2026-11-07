@@ -608,3 +608,20 @@ export function moveDraftTask(draft: PlanDraft, taskKey: string, to: { objectId:
   const used = new Set(tasks.map((t) => t.object));
   return { ...draft, objects: objects.filter((o) => o.objectId || used.has(o.key)), tasks };
 }
+
+/** A file attached to the Strategy, as the Planner read it: whole, in parts
+ *  (every part, planned from the readings), or not at all (with why). */
+export interface PlannerSource { name: string; chars: number; mode: 'full' | 'digest' | 'unread'; reason?: string }
+
+/** Pure. The Planner's account of the files, kept to the shape the page
+ *  shows; null when the reply carries none (a Planner that does not report). */
+export function plannerSources(raw: unknown): PlannerSource[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.flatMap((x): PlannerSource[] => {
+    if (!x || typeof x !== 'object') return [];
+    const r = x as Record<string, unknown>;
+    const mode = r.mode === 'full' || r.mode === 'digest' || r.mode === 'unread' ? r.mode : null;
+    if (typeof r.name !== 'string' || !mode) return [];
+    return [{ name: r.name, chars: typeof r.chars === 'number' ? r.chars : 0, mode, ...(typeof r.reason === 'string' ? { reason: r.reason } : {}) }];
+  });
+}

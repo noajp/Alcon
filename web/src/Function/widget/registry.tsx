@@ -113,6 +113,20 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
       return ObjectPropertiesWidget;
     },
   },
+  'strategy-properties': {
+    type: 'strategy-properties',
+    label: 'Properties',
+    description: 'Owner, progress, success conditions, how the AI works',
+    group: 'content',
+    accepts: ['initiative'],
+    zones: ['rail', 'main'],
+    singleton: true,
+    padded: false,
+    load: async () => {
+      const { StrategyPropertiesWidget } = await import('./widgets/StrategyPropertiesWidget');
+      return StrategyPropertiesWidget;
+    },
+  },
   'campaign-intent': {
     type: 'campaign-intent',
     label: 'Strategy intent',
