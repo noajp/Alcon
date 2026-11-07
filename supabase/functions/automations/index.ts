@@ -21,6 +21,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { nextCronRun } from "../_shared/cron.ts";
 import { sessionFor } from "../_shared/actAs.ts";
 import { checkHarness, parseDefinition } from "../_shared/definition.ts";
+import { usableDefinition } from "../_shared/definitionResolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -86,8 +87,11 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
   };
   try {
     const owner = await sessionFor(env.admin, env.url, env.anonKey, a.owner_id);
-    const { data: def } = await owner.db.from("definitions").select("id, name, body").eq("id", a.definition_id).maybeSingle();
+    const { data: def } = await owner.db.from("definitions").select("id, name, body, enabled").eq("id", a.definition_id).maybeSingle();
     if (!def) return await fail("ハーネスが見つからないか、作った人が見られません。");
+    // The automation's harness is its whole contract: a disabled one does
+    // not fire, and says why — it never falls back to another harness.
+    if (!usableDefinition(def as { enabled: boolean })) return await fail(`ハーネス「${def.name}」が無効化されているため起動しませんでした`);
     // The same check the editor shows: an error means the engine cannot run
     // the harness as written (no goal, or a loop with nothing that stops it),
     // so it is not fired at all rather than left to the generic backstops.

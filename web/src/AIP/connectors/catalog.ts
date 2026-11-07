@@ -203,6 +203,38 @@ export function isSafeEndpoint(raw: string): boolean {
   return true;
 }
 
+// ── Critical commands ──────────────────────────────────────────────────────
+//
+// The same derivation as criticalClassOf in supabase/functions/_shared/
+// connectorManifest.ts, which the engine enforces: a critical command
+// (send / money / delete / contract) asks every time, whatever its
+// permission here says. Web code cannot import Edge Function modules, so
+// it is copied here and the test checks both agree on the same commands.
+
+export type CriticalClass = 'send' | 'money' | 'delete' | 'contract';
+
+const CRITICAL_TOKENS: [CriticalClass, string[]][] = [
+  ['delete', ['delete', 'destroy', 'erase', 'purge', 'remove', 'drop', 'trash', 'revoke']],
+  ['money', ['pay', 'payment', 'payments', 'charge', 'charges', 'refund', 'refunds', 'transfer', 'transfers', 'payout', 'payouts', 'purchase', 'purchases', 'withdraw', 'withdrawal', 'deposit', 'billing', 'invoice', 'invoices']],
+  ['contract', ['contract', 'contracts', 'sign', 'signature', 'agreement', 'agreements', 'quote', 'quotes', 'order', 'orders', 'checkout', 'subscribe', 'subscription', 'subscriptions']],
+  ['send', ['send', 'mail', 'email', 'message', 'messages', 'notify', 'notification', 'notifications', 'publish', 'post', 'comment', 'comments', 'reply', 'replies', 'announce', 'invite', 'invites', 'share', 'dm']],
+];
+
+/** A stored manifest command's critical class, from its loose JSON. */
+export function criticalClassOfManifestCommand(command: { name?: unknown; action?: unknown; effect?: unknown; http?: unknown; mcp?: unknown }): CriticalClass | null {
+  if (command.effect !== 'write') return null;
+  const http = command.http && typeof command.http === 'object' && !Array.isArray(command.http) ? command.http as Record<string, unknown> : null;
+  if (typeof http?.method === 'string' && http.method.toUpperCase() === 'DELETE') return 'delete';
+  const text = [command.action, command.name, command.mcp, typeof http?.path === 'string' ? http.path : '']
+    .filter((v): v is string => typeof v === 'string').join(' ');
+  const tokens = new Set(text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  for (const [cls, words] of CRITICAL_TOKENS) if (words.some((w) => tokens.has(w))) return cls;
+  return null;
+}
+
+/** The class words the Settings copy uses, as t() source strings. */
+export const CRITICAL_CLASS_LABELS: Record<CriticalClass, string> = { send: 'Send', money: 'Money', delete: 'Delete', contract: 'Contract' };
+
 // ── Building a row ─────────────────────────────────────────────────────────
 
 export interface IntegrationDraft {
@@ -313,6 +345,30 @@ export function readLastTest(raw: unknown): IntegrationTestResult | null {
     status: typeof r.status === 'number' ? r.status : null,
   };
 }
+
+export type IntegrationStatus = 'off' | 'not-tested' | 'connected' | 'reachable' | 'action-needed';
+
+/** The one status word a connector row shows, derived from the last test
+ *  (the dialog keeps the detail, via testOutcomeLabel). Precedence: off →
+ *  never tested → a sign-in problem needs the person → verified connected →
+ *  reachable without a credential check → anything else that failed. */
+export function integrationStatus(i: { enabled: boolean; last_test: unknown }): IntegrationStatus {
+  if (!i.enabled) return 'off';
+  const last = readLastTest(i.last_test);
+  if (!last) return 'not-tested';
+  if (!last.ok && (last.code === 'auth_failed' || last.code === 'oauth_expired' || last.code === 'oauth_required')) return 'action-needed';
+  if (last.code === 'connected') return 'connected';
+  if (last.ok) return 'reachable';
+  return 'action-needed';
+}
+
+export const INTEGRATION_STATUS_LABELS: Record<IntegrationStatus, string> = {
+  off: 'Off',
+  'not-tested': 'Not tested',
+  connected: 'Connected',
+  reachable: 'Reachable',
+  'action-needed': 'Action needed',
+};
 
 /** Pure. The words for a connection test's outcome (a t() key). */
 export function testOutcomeLabel(code: string): string {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseInline, parseMarkdown } from '@/Function/shared/markdownParse';
-import { approvalRows, readableFields, sharedColumns } from '@/ActivitySpace/execution/element/agent/approvalView';
+import { approvalRows, readableFields, rememberChoices, sharedColumns } from '@/ActivitySpace/execution/element/agent/approvalView';
 import { agentMention, foldAgentRuns, plainFirstLine } from '@/ActivitySpace/execution/element/agent/commentAgent';
 
 describe('markdown for agent reports', () => {
@@ -61,6 +61,61 @@ describe('approval card rows', () => {
     const rows = approvalRows({ input: { calls: [{ id: 'x', name: 'linear_1234__create_issue', input: { title: 'Bug' } }] } } as never);
     expect(rows[0]).toMatchObject({ integration: 'linear_1234', operation: 'create_issue' });
     expect(sharedColumns(rows)).toBeNull();
+  });
+
+  it('carries destination, detail, effect, criticality and rememberability from the stored display', () => {
+    const rich = {
+      input: {
+        calls: [{ id: 'a', name: 'slack_1__chat_postMessage', input: { channel: 'C1', text: 'hi' } }],
+        display: [{
+          id: 'a', integration: 'Slack', operation: 'chat.postMessage', destination: 'https://slack.com/api',
+          detail: null, effect: 'write', critical: 'send', rememberable: false,
+        }],
+      },
+    };
+    expect(approvalRows(rich as never)[0]).toMatchObject({
+      destination: 'https://slack.com/api', detail: null, effect: 'write', critical: 'send', rememberable: false,
+    });
+    const http = {
+      input: {
+        calls: [{ id: 'a', name: 'gh__comment', input: { repo: 'a/b', number: 7, body: 'x' } }],
+        display: [{
+          id: 'a', integration: 'GitHub', operation: 'issues.comment', destination: 'https://api.github.com',
+          detail: 'POST /repos/a%2Fb/issues/7/comments', effect: 'write', critical: 'send', rememberable: false,
+        }],
+      },
+    };
+    expect(approvalRows(http as never)[0].detail).toBe('POST /repos/a%2Fb/issues/7/comments');
+  });
+
+  it('defaults a legacy display to the safe side: destination is the name, not critical, not rememberable', () => {
+    const rows = approvalRows(action as never);
+    expect(rows[0].destination).toBe('Echo Test');
+    expect(rows[0].detail).toBeNull();
+    expect(rows[0].critical).toBeNull();
+    expect(rows[0].rememberable).toBe(false);
+    // The fixture's calls share method/path values, but a legacy action may not be remembered.
+    expect(rememberChoices(action as never)).toEqual([]);
+  });
+
+  it('offers shared fields only when every call in the batch is rememberable', () => {
+    const batch = (flags: [boolean, boolean], critical: string | null = null) => ({
+      input: {
+        calls: [
+          { id: 'a', name: 'gh__create_issue', input: { repo: 'Alcon', title: 'one' } },
+          { id: 'b', name: 'gh__create_issue', input: { repo: 'Alcon', title: 'two' } },
+        ],
+        display: [
+          { id: 'a', integration: 'GitHub', operation: 'issues.create', rememberable: flags[0], critical },
+          { id: 'b', integration: 'GitHub', operation: 'issues.create', rememberable: flags[1], critical },
+        ],
+      },
+    });
+    expect(rememberChoices(batch([true, true]) as never)).toEqual([{ field: 'repo', value: 'Alcon' }]);
+    // A critical batch, a manifest-less (raw HTTP) batch, and a mixed batch offer nothing.
+    expect(rememberChoices(batch([false, false], 'send') as never)).toEqual([]);
+    expect(rememberChoices(batch([false, false]) as never)).toEqual([]);
+    expect(rememberChoices(batch([true, false]) as never)).toEqual([]);
   });
 });
 

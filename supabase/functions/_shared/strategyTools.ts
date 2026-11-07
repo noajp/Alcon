@@ -407,7 +407,13 @@ export async function runStrategyWriteTool(db: SupabaseClient, name: string, inp
         const defName = typeof input.name === "string" && input.name.trim() ? input.name.trim().slice(0, 200) : initiative.name;
         // The Initiative's own definition is rewritten in place; one shared
         // with other Initiatives or Elements is left as it is and a new one made.
+        // A disabled one is not edited or resurrected either: a new, enabled
+        // definition is made and linked instead.
         let definitionId = initiative.definition_id;
+        if (definitionId) {
+          const { data: linked } = await db.from("definitions").select("enabled").eq("id", definitionId).maybeSingle();
+          if (linked && !(linked as { enabled: boolean }).enabled) definitionId = null;
+        }
         if (definitionId) {
           const [others, elements] = await Promise.all([
             db.from("strategies").select("id", { count: "exact", head: true }).eq("definition_id", definitionId).neq("id", initiative.id),

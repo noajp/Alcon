@@ -36,6 +36,7 @@ async function fetchIntegrations(spaceId: string): Promise<Integration[]> {
 const EMPTY: Integration[] = [];
 
 export function useIntegrations(spaceId: string | null) {
+  const qc = useQueryClient();
   const query = useQuery({
     queryKey: integrationsKey(spaceId),
     queryFn: () => fetchIntegrations(spaceId!),
@@ -46,6 +47,8 @@ export function useIntegrations(spaceId: string | null) {
     data: query.data ?? EMPTY,
     loading: !!spaceId && query.isPending,
     error: (query.error as Error | null) ?? null,
+    /** Re-reads the Space's connections (the install walk awaits this after each dialog closes). */
+    refetch: () => qc.invalidateQueries({ queryKey: integrationsKey(spaceId) }),
   };
 }
 

@@ -11,6 +11,7 @@ import { useObjects } from '@/Function/sync/explorerData';
 import { CopyField } from '@/AIP/connectors/CopyField';
 import { describeCron, parseCron, nextCronRun } from '@/AIP/automation/cron';
 import { useDefinitions } from '@/hooks/definitionData';
+import { enabledDefinitions } from '@/AIP/harness/installState';
 import {
   createAutomation, deleteAutomation, issueWebhookToken, runAutomationNow, setAutomationEnabled,
   useAutomationEvents, useAutomations, webhookUrl, type Automation, type AutomationKind,
@@ -70,7 +71,7 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
       {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
 
       {creating && spaceId && (
-        <NewAutomation spaceId={spaceId} harnesses={harnesses.data} objects={objects}
+        <NewAutomation spaceId={spaceId} harnesses={enabledDefinitions(harnesses.data)} objects={objects}
           onCancel={() => setCreating(false)}
           onCreated={async (a) => {
             setCreating(false); setOpen(a.id); automations.refetch();

@@ -12,6 +12,7 @@ import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import type { AgentOutput, AgentRunStatus, AgentRunStep, AgentRunStepType } from '@/types/database';
 import type { useAgentRun } from '@/hooks/useSupabase';
 import { approvalRows, rememberChoices, sharedColumns } from './approvalView';
+import { CRITICAL_CLASS_LABELS } from '@/AIP/connectors/catalog';
 import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useNow } from '@/Function/shared/useNow';
@@ -128,6 +129,8 @@ function ApprovalCard({ agent }: { agent: Agent }) {
   if (!agent.pending) return null;
   const shared = sharedColumns(rows);
   const omitted = rows.reduce((n, r) => n + r.more, 0);
+  const destinations = [...new Set(rows.map((r) => r.destination))];
+  const anyCritical = rows.some((r) => r.critical);
   return (
     <div className="mt-2">
       <div className="flex items-start gap-2 px-1 pt-1">
@@ -135,6 +138,14 @@ function ApprovalCard({ agent }: { agent: Agent }) {
         <div className="min-w-0">
           <div className="text-[13px] font-medium text-foreground">{agent.pending.summary}</div>
           <div className="text-[12px] text-muted-foreground">{t('Approving runs all {n} operations', { n: rows.length })}</div>
+          <div className="text-[12px] text-muted-foreground">
+            {destinations.length === 1
+              ? t('Destination: {where}', { where: `${rows[0].integration} · ${destinations[0]}` })
+              : t('{n} destinations', { n: destinations.length })}
+          </div>
+          {anyCritical && (
+            <div className="text-[12px] text-[var(--status-warning)]">{t('This includes a critical operation. It asks every time: full delegation and saved conditions do not apply, and it cannot be remembered.')}</div>
+          )}
         </div>
       </div>
 
@@ -150,10 +161,20 @@ function ApprovalCard({ agent }: { agent: Agent }) {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <FragmentRow key={r.id} open={openRow === r.id} colSpan={(shared?.length ?? 1) + 2} raw={r.raw} rawLabel={t('Raw input')}>
+              <FragmentRow key={r.id} open={openRow === r.id} colSpan={(shared?.length ?? 1) + 2} raw={r.raw} rawLabel={t('Exact input')}>
                 <td className="border-b border-border/60 py-1.5 pr-3 align-top">
                   <div className="text-foreground/90">{r.integration}</div>
+                  {destinations.length > 1 && <div className="max-w-56 truncate font-mono text-[11px] text-muted-foreground">{r.destination}</div>}
                   <Chip>{r.operation}</Chip>
+                  {r.detail && <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">{r.detail}</div>}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-muted-foreground">{r.effect === 'read' ? t('read') : t('write')}</span>
+                    {r.critical && (
+                      <span className="rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)]">
+                        {t('Critical · {class} — always asks', { class: t(CRITICAL_CLASS_LABELS[r.critical]) })}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 {shared
                   ? r.fields.map(([k, v]) => <td key={k} className="border-b border-border/60 py-1.5 pr-3 align-top text-foreground">{v}</td>)
@@ -166,7 +187,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
                     </td>
                   )}
                 <td className="border-b border-border/60 py-1.5 align-top">
-                  <button type="button" aria-label={t('Raw input')} aria-expanded={openRow === r.id} onClick={() => setOpenRow((o) => (o === r.id ? null : r.id))} className="rounded p-0.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+                  <button type="button" aria-label={t('Exact input')} aria-expanded={openRow === r.id} onClick={() => setOpenRow((o) => (o === r.id ? null : r.id))} className="rounded p-0.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
                     <DisclosureTriangle open={openRow === r.id} />
                   </button>
                 </td>
@@ -177,11 +198,12 @@ function ApprovalCard({ agent }: { agent: Agent }) {
         {shared && omitted > 0 && (
           <div className="mt-1 text-[12px] text-muted-foreground">{t('+{n} more fields in the raw input', { n: omitted })}</div>
         )}
+        <div className="mt-1 text-[12px] text-muted-foreground">{t('Allowing runs exactly these calls with exactly this input. If the input changes, this approval no longer matches.')}</div>
       </div>
 
       {agent.isMine && isOwner && choices.length > 0 && (
         <div className="px-1 pt-2">
-          <div className="text-[12px] text-muted-foreground">{t('Don’t ask again for this operation when')}</div>
+          <div className="text-[12px] text-muted-foreground">{t('Don’t ask again for {target} when these fields match exactly:', { target: `${rows[0].integration} · ${rows[0].operation}` })}</div>
           <div className="mt-1 flex flex-wrap gap-1">
             {choices.map((c) => {
               const on = remember.includes(c.field);
@@ -196,7 +218,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
             })}
           </div>
           {remember.length > 0 && (
-            <div className="mt-1 text-[12px] text-muted-foreground">{t('Approving also saves this as a rule on the connector. You can remove it in Settings › AI.')}</div>
+            <div className="mt-1 text-[12px] text-muted-foreground">{t('Approving saves this condition on the connector; any other value, operation, or connector asks again.')}</div>
           )}
         </div>
       )}
@@ -209,7 +231,7 @@ function ApprovalCard({ agent }: { agent: Agent }) {
             placeholder={t('Note to the agent (optional)')}
             rows={2}
             className="text-[13px]"
-            secondaryAction={<Button variant="secondary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(false, note)}>{t('Reject')}</Button>}
+            secondaryAction={<Button variant="secondary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(false, note)}>{t('Deny')}</Button>}
             action={
               <Button variant="primary" size="sm" disabled={agent.deciding} onClick={() => void agent.decide(true, note, remember)}>
                 {agent.deciding ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}

@@ -30,3 +30,22 @@ describe('harness catalog', () => {
     expect(d.sections.breakdown).toContain('Object');
   });
 });
+
+describe('harness install versions migration', () => {
+  const migration = read('20261120090000_harness_install_versions.sql');
+
+  it('adds the version columns to the existing tables, each inside a to_regclass guard', () => {
+    expect(migration).toContain("if to_regclass('public.catalog_items') is not null then");
+    expect(migration).toContain("if to_regclass('public.definitions') is not null then");
+    expect(migration).toContain('add column if not exists version integer not null default 1');
+    expect(migration).toContain('add column if not exists source_version integer');
+    expect(migration).toContain('add column if not exists enabled boolean not null default true');
+    expect(migration).toContain('definitions_space_enabled_idx');
+  });
+
+  it('backfills a recorded version only for copies still identical to their catalog item', () => {
+    expect(migration).toContain('d.source_id = c.id');
+    expect(migration).toContain('d.source_version is null');
+    expect(migration).toContain('d.body = c.body');
+  });
+});
