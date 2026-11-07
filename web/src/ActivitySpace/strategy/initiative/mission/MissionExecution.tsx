@@ -14,6 +14,7 @@ import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMi
 import { createIntent } from '@/hooks/strategyData';
 import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
+import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard, ChainLines, ChainSummary } from '@/ActivitySpace/execution/chain/ChainCard';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import { CARD_FLAT } from '@/shared/designTokens';
@@ -139,6 +140,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [chainFilter, setChainFilter] = useState<ChainFilter>(null);
+  // The board's orientation — the one preference every board shares.
+  const [orientation, setOrientation] = useBoardOrientation();
   const [aiWorkerId, setAiWorkerId] = useState('');
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
@@ -385,21 +388,21 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
                 {t('Add guidance')}
               </Button>
             )}
-            {/* The work ready to go, started from here. */}
-            {!draft && (ready.length > 0 || handable.length > 0) && (
-              <span className="ml-auto flex items-center gap-2">
-                {handable.length > 0 && (
-                  <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
-                    {t('Hand {n} to Claude Code', { n: handable.length })}
-                  </Button>
-                )}
-                {ready.length > 0 && (
-                  <Button variant="primary" size="sm" onClick={() => void runReady()} disabled={busy !== null}>
-                    {t('Run {n} ready with AI', { n: ready.length })}
-                  </Button>
-                )}
-              </span>
-            )}
+            {/* The work ready to go, started from here — and the board's
+                orientation, the same choice every board offers. */}
+            <span className="ml-auto flex items-center gap-2">
+              {!draft && handable.length > 0 && (
+                <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
+                  {t('Hand {n} to Claude Code', { n: handable.length })}
+                </Button>
+              )}
+              {!draft && ready.length > 0 && (
+                <Button variant="primary" size="sm" onClick={() => void runReady()} disabled={busy !== null}>
+                  {t('Run {n} ready with AI', { n: ready.length })}
+                </Button>
+              )}
+              <BoardOrientationToggle orientation={orientation} onChange={setOrientation} />
+            </span>
           </div>
           {guidanceOpen && (
             <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2} autoFocus
@@ -511,7 +514,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         ) : (
           // The chain: every action in the column for where it stands, left
           // to right. The draft's actions wait, dashed, in the first.
-          <ExecutionChain className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2"
+          <ExecutionChain orientation={orientation}
+            className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
             onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
             columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
             columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />

@@ -441,6 +441,12 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Handed to Claude Code. It picks the Element up with this comment.': ['Claude Code に渡しました。このコメントと一緒に Element を取りにいきます。', 'Claude Code에 넘겼습니다. 이 댓글과 함께 Element를 가져갑니다.', 'Confié à Claude Code. Il reprend l’Element avec ce commentaire.', 'Entregado a Claude Code. Retoma el Element con este comentario.'],
   'The AI is waiting for your answer. A comment here goes to it, with or without @AI.': ['AI があなたの回答を待っています。ここに書いたコメントは、@AI がなくても AI に届きます。', 'AI가 답변을 기다리고 있습니다. 여기에 쓴 댓글은 @AI 없이도 AI에 전달됩니다.', 'L’IA attend votre réponse. Un commentaire ici lui est transmis, avec ou sans @AI.', 'La IA espera tu respuesta. Un comentario aquí le llega, con o sin @AI.'],
   'Execution Chain': ['Execution Chain', 'Execution Chain', 'Execution Chain', 'Execution Chain'],
+  // The Cascade down tab: generations of nested Strategies.
+  'Cascade down': ['カスケードダウン', '캐스케이드 다운', 'Descente en cascade', 'Descenso en cascada'],
+  'Child Strategies': ['子Strategy', '자식 Strategy', 'Strategies enfants', 'Strategies hijas'],
+  'Grandchild Strategies': ['孫Strategy', '손주 Strategy', 'Strategies petits-enfants', 'Strategies nietas'],
+  'Descendant Strategies': ['子孫Strategy', '후손 Strategy', 'Strategies descendantes', 'Strategies descendientes'],
+  'No child Strategies yet': ['まだ子Strategyがありません', '아직 자식 Strategy가 없습니다', 'Pas encore de Strategy enfant', 'Aún no hay Strategies hijas'],
   'No Objects yet. Break the Strategy down with AI, or add Objects on the Overview.': ['Object はまだありません。AI で分解するか、Overview で Object を足してください。', '아직 Object가 없습니다. AI로 분해하거나 Overview에서 Object를 추가하세요.', 'Aucun Object pour l’instant. Décomposez la Strategy avec l’IA ou ajoutez des Objects dans l’Overview.', 'Aún no hay Objects. Desglosa la Strategy con IA o añade Objects en el Overview.'],
   'new': ['新規', '신규', 'nouveau', 'nuevo'],
   'Owner': ['持ち主', '소유자', 'Propriétaire', 'Propietario'],
