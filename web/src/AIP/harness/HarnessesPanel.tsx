@@ -225,6 +225,9 @@ function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const diagnostics = useMemo(() => checkHarness(parseDefinition(body), { connected }), [body, connected]);
+  // Errors block saving (CLAUDE.md: a harness is checked as it is saved);
+  // warnings and hints are shown but left to the person's judgment.
+  const hasErrors = diagnostics.some((d) => d.severity === 'error');
   const run = async (f: () => Promise<unknown>) => {
     setBusy(true); setError(null);
     try { await f(); onSaved(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
@@ -250,7 +253,7 @@ function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
         <DialogFooter>
           {definition && <Button variant="ghost" size="sm" className="mr-auto text-[var(--status-danger)]" onClick={remove} disabled={busy}>{t('Delete')}</Button>}
           <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>{t('Cancel')}</Button>
-          <Button size="sm" onClick={() => void save()} disabled={busy || !name.trim() || !body.trim()}>{t('Save')}</Button>
+          <Button size="sm" onClick={() => void save()} disabled={busy || !name.trim() || !body.trim() || hasErrors}>{t('Save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

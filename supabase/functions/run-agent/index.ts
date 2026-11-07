@@ -60,7 +60,7 @@ import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { commandSchema, decide, offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
-import { checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
+import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, appendDecisionResults, canonicalCalls,
@@ -133,6 +133,15 @@ interface IntegrationTool {
 function downIntegration(name: string, reason: string): TaskContext["integrations"][number] {
   return { name, kind: "使えない", delegation: "", tools: 0, down: reason };
 }
+
+/** Preset display names (web/src/AIP/connectors/catalog.ts): a harness may name a connector by any of them. */
+const PRESET_NAMES: Record<string, string> = {
+  linear: "Linear", asana: "Asana", "google-drive": "Google Drive", github: "GitHub", slack: "Slack",
+  deepseek: "DeepSeek", kimi: "Kimi", "custom-mcp": "Custom MCP", "custom-http": "Custom API", "custom-model": "Custom model API",
+};
+
+/** The fold harness connector names are matched by (the same fold as checkHarness). */
+const foldName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
 
 /** The operation an integration call shows on the approval card and in the log. */
 function operationOf(it: IntegrationTool | undefined, input: Record<string, unknown>): string {
@@ -389,6 +398,18 @@ async function execute(a: ExecArgs): Promise<void> {
     await failRun(admin, run, reason);
   };
   if (config.disabledReason) { await refuse(config.disabledReason); return; }
+  // The harness is checked before it runs: an error means the engine cannot
+  // run it as written (no goal; a loop with no stop the engine can judge).
+  // Only the context-free errors gate here — the "connector not connected"
+  // check (H005) is a warning, and which connectors are live is settled
+  // further down, where the connections load.
+  if (parsedAll) {
+    const errors = checkHarness(parsedAll).filter((d) => d.severity === "error");
+    if (errors.length) {
+      await refuse(`定義「${definition?.name ?? ""}」をこのまま実行できません。${errors.map((d) => d.message).join(" ")}`);
+      return;
+    }
+  }
 
   // ── Model provider ──────────────────────────────────────────────────────
   // Anthropic with the server's key, or the Worker's model integration in
@@ -446,7 +467,20 @@ async function execute(a: ExecArgs): Promise<void> {
     const { data: rows } = await userDb.from("integrations")
       .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
+    // The connectors the definition names (「# 使うコネクタ」): when it names
+    // any, only those are offered — a connection is matched the way the
+    // editor matches it, by the name the Space gave it, its preset's id, or
+    // its preset's name. A named one with no enabled connection is reported
+    // after the loop; the rows above are already enabled-only.
+    const wantedConnectors = parsedAll?.connectors ?? [];
+    const matchedConnectors = new Set<string>();
     for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null })[]) {
+      if (wantedConnectors.length) {
+        const names = [row.name, row.preset ?? "", PRESET_NAMES[row.preset ?? ""] ?? ""].filter(Boolean);
+        const hits = wantedConnectors.filter((c) => names.some((n) => foldName(n) === foldName(c)));
+        if (!hits.length) continue;
+        for (const h of hits) matchedConnectors.add(h);
+      }
       if (!isSafeEndpoint(row.endpoint)) continue;
       // A manifest declares what the integration may be asked to do. One that
       // declares nothing usable closes the integration rather than opening it.
@@ -456,6 +490,14 @@ async function execute(a: ExecArgs): Promise<void> {
         if (parsed.errors.length) await addStep(admin, run.id, "error", `連携「${row.name}」の manifest に読めない所があります`, parsed.errors.join("\n"));
         if (offeredCommands(parsed.manifest).length === 0) continue;
         manifest = parsed.manifest;
+      }
+      // An MCP connection that was never tested has no manifest: nothing
+      // declares what it may be asked to do, so it stays closed — like a
+      // manifest that declares nothing — until a person runs the test.
+      if (row.kind === "mcp" && row.manifest == null && !isGoogleDriveRow(row)) {
+        await addStep(admin, run.id, "error", `連携「${row.name}」は接続テストが済んでいないため使いません`, "Settings › Customize で接続テストを実行すると、使える操作が宣言されます。");
+        integrationSummary.push(downIntegration(row.name, "接続テストが済んでいない（Settings › Customize で接続テストが必要）"));
+        continue;
       }
       // Never Alcon itself: the board tools already act as the starter, and a
       // stored token would act outside this run.
@@ -541,6 +583,13 @@ async function execute(a: ExecArgs): Promise<void> {
           ? (row.auth_type === "oauth" ? "認証が切れている（Settings › Customize でサインインし直す必要がある）" : "認証に失敗した（Settings › Customize で認証情報を直す必要がある）")
           : `接続できない: ${message.slice(0, 200)}`));
       }
+    }
+    // A connector the definition names but this Space has not enabled: the
+    // run goes on without it, and both the person and the agent are told.
+    for (const name of wantedConnectors) {
+      if (matchedConnectors.has(name)) continue;
+      await addStep(admin, run.id, "error", `定義が使うコネクタ「${name}」につながっていません`, "「# 使うコネクタ」に書かれたコネクタが、この Space で有効になっていません。Settings › Customize で有効にするか、定義から外してください。");
+      integrationSummary.push(downIntegration(name, "定義に書かれているが、この Space で有効な接続がない"));
     }
   }
 
@@ -767,6 +816,11 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // ── State ───────────────────────────────────────────────────────────────
   const deadline = Date.now() + SLICE_MS;
+  // A model call gets what is left of the slice: one that hangs would eat
+  // the platform's whole wall clock and be cut off mid-turn, leaving the
+  // run 'running' with nothing left to resume it. Aborted at the deadline
+  // instead, it surfaces as an error and the run pauses, resumable.
+  const sliceSignal = () => AbortSignal.timeout(Math.max(deadline - Date.now(), 1));
   let state: LoopState;
   let turnBudget: number;
   let pending: SavedPending | undefined = run.transcript?.pending;
@@ -814,6 +868,11 @@ async function execute(a: ExecArgs): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
       body: JSON.stringify({ runId: run.id, continue: true, token }),
+    }).then(async (res) => {
+      // A refused hand-off (a 409, a gateway error) would leave the run
+      // 'running' with an armed token nobody will ever use: pause it, the
+      // way a failed request does, so its starter can resume it.
+      if (!res.ok) { await res.body?.cancel(); throw new Error(`続きの呼び出しが HTTP ${res.status} を返しました`); }
     }).catch(async (e) => {
       await admin.from("agent_runs").update({ status: "paused", error: `続きを開始できませんでした: ${errorMessage(e)}`, continuation_token: null }).eq("id", run.id).eq("status", "running");
     });
@@ -959,7 +1018,7 @@ async function execute(a: ExecArgs): Promise<void> {
         messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb, definition: definition?.body ?? null }) }],
         output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
       // deno-lint-ignore no-explicit-any
-      } as any);
+      } as any, { signal: sliceSignal() });
       await recordUsage(res.usage ?? {});
       const text = (res.content ?? []).find((b: { type: string }) => b.type === "text")?.text ?? "";
       const verdict = readVerdict(text);
@@ -983,7 +1042,7 @@ async function execute(a: ExecArgs): Promise<void> {
           tools: toolParams as any,
           // deno-lint-ignore no-explicit-any
           messages: messages as any,
-        });
+        }, { signal: sliceSignal() });
         return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
       }
       // deno-lint-ignore no-explicit-any
@@ -1012,7 +1071,7 @@ async function execute(a: ExecArgs): Promise<void> {
           exclude_tools: ["web_search", "web_fetch", TOOL_SEARCH.name],
         }] },
       // deno-lint-ignore no-explicit-any
-      } as any);
+      } as any, { signal: sliceSignal() });
       for (const line of webSteps(res.content ?? [])) await addStep(admin, run.id, "action", line);
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
     },
@@ -1204,6 +1263,9 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
   const toolParams = toolParamsFor(tools, cache, false);
   const serverTools = [...webTools(model), ...(needsToolSearch(tools) ? [TOOL_SEARCH] : [])];
   const deadline = Date.now() + SLICE_MS;
+  // The same slice bound as execute(): a hung call aborts at the deadline
+  // and the run pauses, resumable, instead of dying with the invocation.
+  const sliceSignal = () => AbortSignal.timeout(Math.max(deadline - Date.now(), 1));
 
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
@@ -1219,7 +1281,7 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
         // A conversation is answered while the person waits.
         output_config: { effort: "low" },
       // deno-lint-ignore no-explicit-any
-      } as any);
+      } as any, { signal: sliceSignal() });
       // Words said on the way, before the tools they lead into, are part of the conversation.
       const blocks = (res.content ?? []) as { type: string; text?: string }[];
       const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");

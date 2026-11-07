@@ -3,8 +3,10 @@
 //
 //   POST (header x-automation-tick)   the every-minute tick from pg_cron:
 //                                      fires the schedules that are due and
-//                                      picks up automation runs that stopped
-//                                      for a session or were never handed over
+//                                      picks up runs that stopped: automation
+//                                      runs paused for a session or never
+//                                      handed over, and any run left running
+//                                      with no step written for a long while
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -18,6 +20,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { nextCronRun } from "../_shared/cron.ts";
 import { sessionFor } from "../_shared/actAs.ts";
+import { checkHarness, parseDefinition } from "../_shared/definition.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,6 +34,9 @@ const MAX_BODY = 100_000;
 const WEBHOOK_PER_MINUTE = 30;
 const SCHEDULES_PER_TICK = 20;
 const QUEUED_STUCK_MS = 2 * 60_000;
+// run-agent's STALE_MS, mirrored: a run that has written no step for this
+// long is stuck, and its starter may resume it.
+const RUNNING_STALE_MS = 10 * 60_000;
 // run-agent's words for a run paused because its session ran out.
 const SESSION_PAUSED = "セッションの期限が切れた";
 
@@ -80,8 +86,15 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
   };
   try {
     const owner = await sessionFor(env.admin, env.url, env.anonKey, a.owner_id);
-    const { data: def } = await owner.db.from("definitions").select("id, name").eq("id", a.definition_id).maybeSingle();
+    const { data: def } = await owner.db.from("definitions").select("id, name, body").eq("id", a.definition_id).maybeSingle();
     if (!def) return await fail("ハーネスが見つからないか、作った人が見られません。");
+    // The same check the editor shows: an error means the engine cannot run
+    // the harness as written (no goal, or a loop with nothing that stops it),
+    // so it is not fired at all rather than left to the generic backstops.
+    const harnessErrors = checkHarness(parseDefinition(def.body ?? "")).filter((d) => d.severity === "error");
+    if (harnessErrors.length > 0) {
+      return await fail(`ハーネス「${def.name}」の検査でエラーがあるため起動しませんでした: ${harnessErrors.map((d) => `${d.code} ${d.message}`).join(" ")}`);
+    }
     const { data: obj } = await owner.db.from("objects").select("id, domain_id").eq("id", a.object_id).maybeSingle();
     if (!obj) return await fail("置き場所の Object が見つからないか、作った人が見られません。");
     const workerId = await aiWorkerOf(env.admin, a.activity_space_id);
@@ -157,6 +170,31 @@ async function tick(env: Env): Promise<Record<string, number>> {
       resumed += 1;
     } catch (e) {
       console.error("automations: could not resume", r.id, e instanceof Error ? e.message : e);
+    }
+  }
+
+  // Runs of any origin whose invocation was cut off mid-turn: the platform
+  // kills it before the engine can pause, so the row stays 'running' with
+  // nobody driving it, and the one-open-run rule holds its Element for good.
+  // A run is picked up only once it has written no step for RUNNING_STALE_MS
+  // (its started_at, while it has no step yet) — the same silence run-agent
+  // waits for before a starter's resume, whose claim and step_count guard
+  // refuse a run that is in fact still working. So this never drives a run
+  // twice; the armed token, when there is one, continues the slice instead.
+  const staleBefore = new Date(now.getTime() - RUNNING_STALE_MS).toISOString();
+  const { data: stuck } = await env.admin.from("agent_runs").select("id, triggered_by, started_at, continuation_token")
+    .eq("status", "running").lt("started_at", staleBefore).limit(10);
+  for (const r of stuck ?? []) {
+    if (!r.triggered_by) continue;
+    try {
+      const { data: last } = await env.admin.from("agent_run_steps").select("created_at")
+        .eq("run_id", r.id).order("idx", { ascending: false }).limit(1).maybeSingle();
+      if (now.getTime() - new Date(last?.created_at ?? r.started_at).getTime() < RUNNING_STALE_MS) continue;
+      const owner = await sessionFor(env.admin, env.url, env.anonKey, r.triggered_by);
+      await startRun(env, owner.jwt, r.id, r.continuation_token ? { continue: true, token: r.continuation_token } : { resume: true });
+      resumed += 1;
+    } catch (e) {
+      console.error("automations: could not revive", r.id, e instanceof Error ? e.message : e);
     }
   }
   return { fired, scheduled, resumed };

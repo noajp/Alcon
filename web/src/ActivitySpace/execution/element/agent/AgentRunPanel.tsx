@@ -14,6 +14,7 @@ import type { useAgentRun } from '@/hooks/useSupabase';
 import { approvalRows, rememberChoices, sharedColumns } from './approvalView';
 import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useNow } from '@/Function/shared/useNow';
 
 // The agent on an Element (ADR 0027): one status line for the run, its
 // Workpad as compact tool rows, the approval card when it waits on a
@@ -271,14 +272,23 @@ function OutputItem({ output }: { output: AgentOutput }) {
   );
 }
 
+/** A running run whose Workpad has been silent this long is stuck (its
+ *  invocation died mid-turn): run-agent accepts a resume for it (its
+ *  STALE_MS), so the panel offers one next to Stop. */
+const STALE_RUNNING_MS = 10 * 60 * 1000;
+
 export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain: () => void }) {
   const { t } = useI18n();
+  const now = useNow();
   const run = agent.run;
   if (!run && !agent.outputs.length && !agent.error) return null;
   const status = run ? STATUS[run.status] ?? STATUS.completed : null;
   const finished = run && ['awaiting_review', 'completed', 'failed', 'cancelled'].includes(run.status);
   const cost = run ? Number(run.cost_usd || 0) : 0;
   const lastStep = agent.steps.at(-1);
+  const lastActivity = lastStep?.created_at ?? run?.started_at ?? run?.created_at;
+  const stuckRunning = run?.status === 'running' && !!lastActivity
+    && now - new Date(lastActivity).getTime() > STALE_RUNNING_MS;
   const line = (run?.status === 'awaiting_approval' && agent.pending?.summary)
     || run?.summary
     || (run && ['queued', 'running'].includes(run.status) ? lastStep?.title : null)
@@ -295,7 +305,12 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
             {cost > 0 && <span className="shrink-0 font-mono text-[11px] text-muted-foreground">${cost.toFixed(2)}</span>}
             <span className={cn('shrink-0 text-[12px]', status.tone)}>{t(status.label)}</span>
             {agent.isActive || run.status === 'awaiting_approval' ? (
-              <Button variant="ghost" size="xs" onClick={() => void agent.cancel()}>{t('Stop')}</Button>
+              <>
+                {stuckRunning && agent.isMine && (
+                  <Button variant="secondary" size="xs" onClick={() => void agent.resume()}>{t('Resume')}</Button>
+                )}
+                <Button variant="ghost" size="xs" onClick={() => void agent.cancel()}>{t('Stop')}</Button>
+              </>
             ) : run.status === 'paused' ? (
               agent.isMine ? <Button variant="secondary" size="xs" onClick={() => void agent.resume()}>{t('Resume')}</Button> : null
             ) : finished ? (
