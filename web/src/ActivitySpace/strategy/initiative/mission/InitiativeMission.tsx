@@ -7,6 +7,7 @@ import { useNowMinute } from '@/Function/shared/useNow';
 import { useInitiativeIntentContext } from '../InitiativeIntent';
 import { MissionEvaluatePanel, type MissionContext } from './MissionPanels';
 import { MissionExecutionPanel } from './MissionExecution';
+import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import type { ElementWithDetails, StrategyDelegation } from '@/types/database';
 import { missionElementRow, type MissionElementRow, type MissionMeasureRow } from './missionModel';
 
@@ -14,7 +15,7 @@ import { missionElementRow, type MissionElementRow, type MissionMeasureRow } fro
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
-export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, onTalk }: {
+export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, orientation }: {
   tab: 'execution' | 'audit';
   initiativeId: string;
   initiativeName: string;
@@ -28,8 +29,8 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   /** Elements or measures were written: the page re-reads its Objects. */
   onChanged: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
-  /** Opens the Strategy's conversation. */
-  onTalk?: () => void;
+  /** The board's orientation, from the page's tabs-row toggle. */
+  orientation: BoardOrientation;
 }) {
   const intent = useInitiativeIntentContext();
   const { data: workers } = useWorkers();
@@ -63,7 +64,6 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     definitionId,
     setDefinition: onDefinitionChange,
     refetch: () => { void mission.refetch(); intent?.refetch(); onChanged(); },
-    onTalk,
     onOpenElement: (elementId) => {
       const object = objects.find((o) => (o.elements ?? []).some((e) => e.id === elementId));
       if (object) onOpenObject?.(object.id, object.domain_id);
@@ -72,7 +72,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
 
   if (tab === 'execution') {
     return (
-      <MissionExecutionPanel ctx={ctx} details={details}
+      <MissionExecutionPanel ctx={ctx} details={details} orientation={orientation}
         objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id, icon: o.icon ?? null, color: o.color ?? null }))}
         domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}

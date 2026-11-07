@@ -6,7 +6,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { BoardColumn, BoardLane } from '@/ActivitySpace/execution/element/board/BoardColumn';
-import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
+import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import { formatMeasureValue } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import { CARD_FLAT } from '@/shared/designTokens';
@@ -21,8 +21,8 @@ import { cascadeLevels } from './cascadeModel';
 // success conditions. Read-only: nesting is written on the Overview and
 // in the Strategy list; this tab is where the shape of it is read.
 // A card opens its Strategy, so the descent can be walked. Like every
-// board, it stands vertical or lies horizontal — the one shared
-// orientation preference decides.
+// board, it stands vertical or lies horizontal — the page's tabs-row
+// toggle decides, on the one shared orientation preference.
 
 /** The column a generation stands in: the root by its own name, then
  *  children, grandchildren, and every deeper generation as descendants. */
@@ -69,16 +69,17 @@ function CascadeCard({ strategy, measures, onOpen }: {
   );
 }
 
-export function StrategyCascade({ strategy, allStrategies, onOpenStrategy }: {
+export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orientation }: {
   /** The Strategy this page is about — the cascade's root. */
   strategy: StrategyWithObjects;
   /** Every Strategy, so the descent can be read off the nesting links. */
   allStrategies: StrategyWithObjects[];
   /** Open a Strategy of the cascade (drill into it, in this shell). */
   onOpenStrategy: (id: string) => void;
+  /** The board's orientation, from the page's tabs-row toggle. */
+  orientation: BoardOrientation;
 }) {
   const { t } = useI18n();
-  const [orientation, setOrientation] = useBoardOrientation();
   const levels = useMemo(() => cascadeLevels(strategy.id, allStrategies), [strategy.id, allStrategies]);
   const byId = useMemo(() => new Map(allStrategies.map((s) => [s.id, s] as const)), [allStrategies]);
   const visibleIds = useMemo(() => levels.flat(), [levels]);
@@ -120,9 +121,6 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy }: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center pb-3">
-        <BoardOrientationToggle orientation={orientation} onChange={setOrientation} className="ml-auto" />
-      </div>
       {orientation === 'horizontal' ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2">
           {shown.map((ids, depth) => (
