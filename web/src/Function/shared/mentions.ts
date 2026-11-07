@@ -123,3 +123,40 @@ export function mentionedUserIds(
   }
   return Array.from(ids);
 }
+
+/**
+ * Pure. A comment split into plain text and the mentions in it, for drawing
+ * the mentions in the key colour. At each @ (or ＠) the longest of `names`
+ * that follows wins — names may hold spaces ("Claude Code") or be Japanese —
+ * and "@AI" is always one. With no known name there, one run of Latin
+ * letters, digits and . _ - counts (Japanese has no spaces, so an unknown
+ * Japanese name cannot be told from the sentence after it). An @ inside an
+ * address (a@b.com, a URL) is text.
+ */
+export function splitMentions(text: string, names: readonly string[] = []): { text: string; mention: boolean }[] {
+  const known = [...new Set(['AI', ...names.map((n) => n.trim()).filter(Boolean)])]
+    .sort((a, b) => b.length - a.length);
+  const out: { text: string; mention: boolean }[] = [];
+  let plain = '';
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    const prev = i > 0 ? text[i - 1] : '';
+    if ((ch === '@' || ch === '＠') && !(prev && NOT_BEFORE_MENTION.test(prev))) {
+      const rest = text.slice(i + 1);
+      const name = known.find((n) => fold(rest.slice(0, n.length)) === fold(n));
+      const token = name ? rest.slice(0, name.length) : (/^[A-Za-z0-9_.\-]+/.exec(rest)?.[0] ?? '');
+      if (token) {
+        if (plain) out.push({ text: plain, mention: false });
+        plain = '';
+        out.push({ text: ch + token, mention: true });
+        i += 1 + token.length;
+        continue;
+      }
+    }
+    plain += ch;
+    i++;
+  }
+  if (plain) out.push({ text: plain, mention: false });
+  return out;
+}

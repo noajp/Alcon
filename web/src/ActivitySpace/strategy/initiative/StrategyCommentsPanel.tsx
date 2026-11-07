@@ -71,6 +71,8 @@ export function StrategyCommentsPanel({
     for (const w of workers) m.set(w.id, w);
     return m;
   }, [workers]);
+  // Every name a mention may carry, so the thread colours it whole.
+  const mentionNames = useMemo(() => workers.map((w) => w.name).filter(Boolean) as string[], [workers]);
 
   const mentionCandidates = useMemo(() => {
     return rankMentionCandidates(
@@ -158,6 +160,7 @@ export function StrategyCommentsPanel({
               <li key={c.id}>
                 <CommentEntry
                   comment={c}
+                  mentionNames={mentionNames}
                   avatar={
                     <CommentAvatar
                       name={c.author_name ?? authorWorker?.name ?? null}

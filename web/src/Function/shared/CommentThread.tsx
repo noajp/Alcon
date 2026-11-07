@@ -12,6 +12,7 @@ import type { CommentAuthorKind } from '@/types/database';
 import { MarkdownLite } from './MarkdownLite';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatAge } from '@/Function/shared/dateUtils';
+import { splitMentions } from './mentions';
 
 // =============================================================
 // The parts every comment thread is made of.
@@ -37,12 +38,12 @@ export interface CommentEntryData {
 
 /** Tint @name runs so a mention is findable when skimming. Purely visual —
  *  the authoritative mention list is the row's `mentions` column. */
-function renderWithMentions(text: string): React.ReactNode {
-  const parts = text.split(/(@[\w.\-]+(?:\s\w+)?)/g);
-  return parts.map((p, i) =>
-    p.startsWith('@')
-      ? <span key={i} className="text-primary font-medium">{p}</span>
-      : <span key={i}>{p}</span>,
+/** A person's comment with its mentions in the key colour. */
+function renderWithMentions(text: string, names?: readonly string[]): React.ReactNode {
+  return splitMentions(text, names).map((p, i) =>
+    p.mention
+      ? <span key={i} className="font-medium" style={{ color: 'var(--accent-default)' }}>{p.text}</span>
+      : <span key={i}>{p.text}</span>,
   );
 }
 
@@ -88,8 +89,12 @@ export function CommentEntry({
   meta,
   footer,
   menu,
+  mentionNames,
 }: {
   comment: CommentEntryData;
+  /** The names a mention may carry (people and AI Workers), so one with a
+   *  space or in Japanese is coloured whole. */
+  mentionNames?: readonly string[];
   avatar: React.ReactNode;
   /** Extra marks on the byline (pin, badges). */
   meta?: React.ReactNode;
@@ -119,7 +124,7 @@ export function CommentEntry({
         <div className="pl-7 break-words"><MarkdownLite text={comment.content} className="text-foreground/90" /></div>
       ) : (
         <div className="pl-7 text-[13px] leading-[1.6] text-foreground/90 whitespace-pre-wrap break-words">
-          {renderWithMentions(comment.content)}
+          {renderWithMentions(comment.content, mentionNames)}
         </div>
       )}
       {footer && <div className="pl-7">{footer}</div>}
