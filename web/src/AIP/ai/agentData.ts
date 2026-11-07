@@ -248,6 +248,13 @@ async function resumeAgentRun(runId: string): Promise<void> {
   await invokeEngine({ runId, resume: true });
 }
 
+/** Send a person's answer to a run that waits for one — the same channel
+ *  a comment reply resumes through: the words travel as their message to
+ *  that run. */
+export async function answerAgentRun(runId: string, text: string): Promise<void> {
+  await invokeEngine({ runId, message: text });
+}
+
 /** Approve or reject a pending action — bound to the input that was shown. */
 async function decideAgentAction(opts: {
   runId: string;

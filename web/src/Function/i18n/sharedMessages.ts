@@ -53,6 +53,7 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'To-do': ['未着手', '할 일', 'À faire', 'Por hacer'],
   'In progress': ['進行中', '진행 중', 'En cours', 'En curso'],
   'Complete': ['完了', '완료', 'Terminé', 'Completado'],
+  'Stopped for review': ['レビュー待ち', '검토 대기 중', 'Arrêté pour examen', 'Detenido para revisión'],
   'DEFAULT': ['既定', '기본', 'PAR DÉFAUT', 'PREDETERMINADO'],
   'Unknown': ['不明', '알 수 없음', 'Inconnu', 'Desconocido'],
   'Empty': ['空', '비어 있음', 'Vide', 'Vacío'],

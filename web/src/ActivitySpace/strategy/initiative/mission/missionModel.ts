@@ -12,6 +12,7 @@ import { isAiWeight, type AgentRunStatus, type AiWeight, type Worker } from '@/t
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
 import { isElementAction, type ElementAction } from '@/Function/shared/elementActionKinds';
 import type { ProposedReading, RunVerdict } from '@/Function/audit/auditModel';
+import type { WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 
 export interface MissionElementRow {
   id: string;
@@ -114,9 +115,13 @@ export function latestRuns(runs: readonly MissionRunRow[]): Map<string, MissionR
   return out;
 }
 
-/** Pure. The Element's own status decides done / cancelled / blocked; an open
- *  run says it is moving or waiting on a person; a failed last run with the
- *  work still open says so. */
+/** Pure. Where an action stands. The column a card sits in is the Element's
+ *  own status — the record a person sets; this reads that record *with* the
+ *  latest run: the Element's own status decides done / cancelled / blocked,
+ *  an open run says it is moving or waiting on a person (asking for approval,
+ *  waiting for an answer, or paused), and a failed last run with the work
+ *  still open says so. The card badge shows this only when the run adds
+ *  something the status cannot say (runOnlyState in MissionExecution). */
 export function actionState(element: MissionElementRow, run: MissionRunRow | undefined): ActionState {
   if (element.status === 'done') return 'done';
   if (element.status === 'cancelled') return 'cancelled';
@@ -128,7 +133,7 @@ export function actionState(element: MissionElementRow, run: MissionRunRow | und
   }
   if (run) {
     if (run.status === 'queued' || run.status === 'running') return 'running';
-    if (run.status === 'awaiting_approval' || run.status === 'paused') return 'waiting';
+    if (run.status === 'awaiting_approval' || run.status === 'awaiting_input' || run.status === 'paused') return 'waiting';
     if (run.status === 'failed') return 'failed';
   }
   if (element.status === 'review') return 'waiting';
@@ -161,6 +166,9 @@ export interface FleetElement {
   serves: string[];
   /** Predecessors not done yet, by title. */
   waitsOn: string[];
+  /** Predecessors not done yet, with where each stands. A draft task's
+   *  blockers are not written yet, so their elementId is null (not clickable). */
+  blockers: { elementId: string | null; title: string; state: ActionState }[];
   /** An AI may start it now: not a person's, not Claude Code's, open, and
    *  nothing it waits on is unfinished. */
   ready: boolean;
@@ -256,14 +264,16 @@ export function buildFleet(input: {
   }
   const card = (e: MissionElementRow): FleetElement => {
     const s = state.get(e.id)!;
-    const waitsOn = (upstream.get(e.id) ?? []).filter((u) => state.get(u) !== 'done' && state.get(u) !== 'cancelled').map((u) => title.get(u)!);
+    const unmet = (upstream.get(e.id) ?? []).filter((u) => state.get(u) !== 'done' && state.get(u) !== 'cancelled');
+    const waitsOn = unmet.map((u) => title.get(u)!);
+    const blockers = unmet.map((u) => ({ elementId: u as string | null, title: title.get(u)!, state: state.get(u)! }));
     const open = s === 'todo' || s === 'failed';
     const run = latest.get(e.id);
     return {
       key: e.id, elementId: e.id, title: title.get(e.id)!, state: s, draft: false,
       assignee: e.assignee ?? null, action: e.action ?? null, assigneeName: e.assigneeName ?? null, assigneeWorker: e.assigneeWorker ?? null,
       status: e.status ?? 'todo', dueDate: e.due_date ?? null,
-      serves: serves.get(e.id) ?? [], waitsOn,
+      serves: serves.get(e.id) ?? [], waitsOn, blockers,
       ready: open && !e.claudeCode && e.assignee !== 'human' && waitsOn.length === 0,
       handable: !!e.claudeCode && s === 'todo' && !isHandedOver(e),
       verdict: run?.verdict ?? null,
@@ -300,12 +310,14 @@ export function draftFleet(
   for (const t of draft.tasks) {
     const column = (t.object && columnOf.get(t.object)) || UNPLACED;
     const objective = t.objective ? objectiveTitle.get(t.objective) : undefined;
+    const depTitles = t.dependsOn.map((d) => taskTitle.get(d)).filter((x): x is string => !!x);
     added.set(column, [...(added.get(column) ?? []), {
       key: `t:${t.key}`, elementId: null, title: t.title, state: 'todo', draft: true,
       assignee: t.assignee, action: t.action ?? null,
       assigneeName: (t.assigneeWorkerId && people.get(t.assigneeWorkerId)) || null, assigneeWorker: null, status: 'todo', verdict: null, dueDate: null,
       serves: objective ? [objective] : [],
-      waitsOn: t.dependsOn.map((d) => taskTitle.get(d)!).filter(Boolean),
+      waitsOn: depTitles,
+      blockers: depTitles.map((title) => ({ elementId: null, title, state: 'todo' as ActionState })),
       ready: false, handable: false, model: null, costUsd: 0,
     }]);
   }
@@ -319,6 +331,40 @@ export function draftFleet(
     out.push(withTally({ key: UNPLACED, objectId: null, name: '', domainId: null, draft: true, elements: added.get(UNPLACED)! }));
   }
   return out;
+}
+
+// ── The chain filter ─────────────────────────────────────────────────────
+
+/** The Execution Chain read through one lens at a time: what waits on a
+ *  person, what is stuck, what failed its check, or one Object's work. */
+export type ChainFilter =
+  | { kind: 'waiting' }
+  | { kind: 'blocked' }
+  | { kind: 'failed' }
+  | { kind: 'verdict-fail' }
+  | { kind: 'object'; objectKey: string }
+  | null;
+
+/** Pure. Whether a card shows under a filter. The predicates read the same
+ *  facts the strip counts (the card's state, its verdict, its waiting
+ *  reason), so a count and the cards it filters to cannot disagree. A draft
+ *  card matches only the Object lens — it belongs to its Object; every
+ *  other lens is a written-work lens. */
+export function chainCardMatches(
+  element: FleetElement,
+  objectKey: string,
+  reason: WaitingReason | null,
+  filter: ChainFilter,
+): boolean {
+  if (!filter) return true;
+  if (filter.kind === 'object') return objectKey === filter.objectKey;
+  if (element.draft) return false;
+  switch (filter.kind) {
+    case 'waiting': return reason?.needsPerson === true;
+    case 'blocked': return element.state === 'blocked';
+    case 'failed': return element.state === 'failed';
+    case 'verdict-fail': return element.verdict?.result === 'fail';
+  }
 }
 
 // ── Verdicts and measure outcomes ────────────────────────────────────────

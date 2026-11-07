@@ -624,8 +624,9 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
-    // The conversation is on the Overview.
-    onTalk: () => { setTab('overview'); setTalking(true); },
+    // The conversation opens in place on the Chain tab, and on the
+    // Overview from anywhere else — one mount either way.
+    onTalk: () => { if (tab !== 'chain') setTab('overview'); setTalking(true); },
   };
   const queryClient = useQueryClient();
   // The conversation hands the breakdown to the Planner, in the work below.
@@ -947,6 +948,20 @@ function StrategyDetailView({
         <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name} createdBy={strategy.created_by}>
         {tab === 'chain' ? (
           <div className="px-8 py-6">
+            {/* The same conversation as the Overview's, opened in place:
+                one mount, one transcript, one composer. */}
+            {talking && (
+              <div className="mb-6">
+                <PageSection title={t('Talk it through')} action={
+                  <Button variant="ghost" size="icon-xs" aria-label={t('Close')} className="text-muted-foreground" onClick={() => setTalking(false)}>
+                    <X size={13} />
+                  </Button>
+                }>
+                  <StrategyConversation strategyId={strategy.id}
+                    objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
+                </PageSection>
+              </div>
+            )}
             <InitiativeMission tab="execution" {...missionProps} />
           </div>
         ) : (

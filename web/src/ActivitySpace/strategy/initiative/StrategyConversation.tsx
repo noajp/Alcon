@@ -2,18 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, ChevronRight, Globe, ListChecks, Loader2, PenLine, Search,
+  ChevronRight, ListChecks, Loader2, MessageSquare, Play,
 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { SendIcon } from '@/Function/shared/SendIcon';
+import { TraceStepList } from '@/Function/shared/WorkTrace';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useStrategyConversation } from '@/hooks/strategyConversationData';
-import type { ElementWithDetails } from '@/types/database';
-import { conversationItems, workTally, type AgentSegment, type WorkItem } from './conversationModel';
+import { useLatestRunStatuses } from '@/hooks/elementRunData';
+import { answerAgentRun, startElementRun } from '@/AIP/ai/agentData';
+import type { AgentRunStatus, ElementWithDetails } from '@/types/database';
+import { conversationItems, traceStepFromWorkItem, workTally, type AgentSegment, type WorkItem } from './conversationModel';
 
 // =============================================================
 // The Strategy's conversation tab: the person and the agent engine settle
@@ -24,20 +27,6 @@ import { conversationItems, workTally, type AgentSegment, type WorkItem } from '
 // Strategy's Elements as they are made and done. A Strategy that is already
 // clear goes straight to the Planner from that card or the Execution tab.
 // =============================================================
-
-const WORK_LABEL: Record<string, string> = {
-  updateInitiative: 'Updated the purpose',
-  createInitiative: 'Added a Sub Strategy',
-  addIntent: 'Recorded',
-  updateIntent: 'Revised',
-  removeIntent: 'Removed',
-  writeInitiativeDefinition: 'Wrote the harness',
-  getInitiative: 'Read the Strategy',
-  listInitiatives: 'Listed Strategies',
-  hand_to_planner: 'Handed to the Planner',
-  web_search: 'Searched the web',
-  web_fetch: 'Read a page',
-};
 
 export function StrategyConversation({ strategyId, objects, onPlan, onAnswered }: {
   strategyId: string;
@@ -53,6 +42,14 @@ export function StrategyConversation({ strategyId, objects, onPlan, onAnswered }
   const [input, setInput] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const items = useMemo(() => conversationItems(talk.steps), [talk.steps]);
+  // For the proposal cards' revalidation: the Elements as they stand now,
+  // and each one's latest run — a proposal is only as fresh as its press.
+  const elementIds = useMemo(() => objects.flatMap((o) => (o.elements ?? []).map((e) => e.id)), [objects]);
+  const elementStatus = useMemo(
+    () => new Map(objects.flatMap((o) => (o.elements ?? []).map((e) => [e.id, e.status] as const))),
+    [objects],
+  );
+  const { data: runStatuses } = useLatestRunStatuses(elementIds);
 
   useEffect(() => {
     const el = listRef.current;
@@ -92,7 +89,7 @@ export function StrategyConversation({ strategyId, objects, onPlan, onAnswered }
         )}
         {items.map((item, i) => item.kind === 'person'
           ? <PersonTurn key={i} text={item.text} />
-          : <AgentTurn key={i} segments={item.segments} onPlan={onPlan} />)}
+          : <AgentTurn key={i} segments={item.segments} onPlan={onPlan} onAnswered={onAnswered} elementStatus={elementStatus} runStatuses={runStatuses} />)}
         {talk.pendingText && !items.some((it, i) => i === items.length - 1 && it.kind === 'person' && it.text === talk.pendingText) && (
           <PersonTurn text={talk.pendingText} />
         )}
@@ -146,7 +143,13 @@ function PersonTurn({ text }: { text: string }) {
   );
 }
 
-function AgentTurn({ segments, onPlan }: { segments: AgentSegment[]; onPlan: (guidance: string) => void }) {
+function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses }: {
+  segments: AgentSegment[];
+  onPlan: (guidance: string) => void;
+  onAnswered: () => void;
+  elementStatus: Map<string, string | null>;
+  runStatuses: Record<string, AgentRunStatus>;
+}) {
   return (
     <div className="space-y-2">
       {segments.map((s, i) => s.kind === 'text'
@@ -155,13 +158,21 @@ function AgentTurn({ segments, onPlan }: { segments: AgentSegment[]; onPlan: (gu
           <div key={i} className="space-y-2">
             <WorkLine items={s.items} />
             {s.items.filter((w) => w.kind === 'plan').map((w) => <PlanHandOff key={w.id} guidance={w.detail} onPlan={onPlan} />)}
+            {s.items.filter((w) => w.proposal?.kind === 'start').map((w) => (
+              <StartRunsCard key={w.id} item={w} elementStatus={elementStatus} runStatuses={runStatuses} />
+            ))}
+            {s.items.filter((w) => w.proposal?.kind === 'answer').map((w) => (
+              <AnswerCard key={w.id} item={w} onAnswered={onAnswered} />
+            ))}
           </div>
         ))}
     </div>
   );
 }
 
-/** The agent's work between its words, folded to one line that opens to the list. */
+/** The agent's work between its words, folded to one line that opens to
+ *  the list — the tally sentence is the conversation's own; the rows under
+ *  it are the shared trace steps every run shows. */
 function WorkLine({ items }: { items: WorkItem[] }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -170,6 +181,7 @@ function WorkLine({ items }: { items: WorkItem[] }) {
     tally.write ? t('Wrote {n} to the Strategy', { n: tally.write }) : '',
     tally.read ? t('Read {n}', { n: tally.read }) : '',
     tally.web ? t('Searched the web {n}', { n: tally.web }) : '',
+    tally.start + tally.answer ? t('Proposed {n} actions', { n: tally.start + tally.answer }) : '',
     tally.failed ? t('{n} failed', { n: tally.failed }) : '',
   ].filter(Boolean);
   if (parts.length === 0) return null;
@@ -181,28 +193,12 @@ function WorkLine({ items }: { items: WorkItem[] }) {
         <ChevronRight size={12} className={cn('transition-transform', open && 'rotate-90')} />
       </button>
       {open && (
-        <ul className="mt-1.5 space-y-1 border-l border-border/60 pl-3">
-          {items.map((w) => (
-            <li key={w.id} className="flex min-w-0 items-start gap-1.5">
-              <WorkIcon item={w} />
-              <span className="min-w-0">
-                <span className="text-foreground">{t(WORK_LABEL[w.name] ?? w.name)}</span>
-                {w.detail && <span className="ml-1.5">{w.detail}</span>}
-                {w.error && <span className="block text-[var(--status-danger)]">{w.error}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-1.5 border-l border-border/60 pl-3">
+          <TraceStepList steps={items.map(traceStepFromWorkItem)} />
+        </div>
       )}
     </div>
   );
-}
-
-function WorkIcon({ item }: { item: WorkItem }) {
-  if (item.ok === false) return <AlertCircle size={12} className="mt-0.5 shrink-0 text-[var(--status-danger)]" />;
-  if (item.ok === undefined) return <Loader2 size={12} className="mt-0.5 shrink-0 animate-spin" />;
-  const Icon = item.kind === 'write' ? PenLine : item.kind === 'web' ? Globe : item.kind === 'plan' ? ListChecks : Search;
-  return <Icon size={12} className="mt-0.5 shrink-0" />;
 }
 
 /** The agent handed the breakdown to the Planner: one press drafts it in the Execution tab. */
@@ -216,6 +212,93 @@ function PlanHandOff({ guidance, onPlan }: { guidance: string; onPlan: (guidance
         {guidance && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{guidance}</p>}
       </div>
       <Button size="sm" variant="primary" onClick={() => onPlan(guidance)}>{t('Draft the plan')}</Button>
+    </div>
+  );
+}
+
+/** Runs that mean an Element is already spoken for: it cannot be started. */
+const OPEN_RUN: readonly AgentRunStatus[] = ['queued', 'running', 'awaiting_input', 'awaiting_approval', 'paused', 'awaiting_review'];
+
+/** The agent proposed starting ready work: the person presses, and the web
+ *  starts — revalidating at the press, since a proposal is only as fresh
+ *  as when it was made. An Element starts only while it is still open and
+ *  has no open run; each start is the Execution tab's own function. */
+function StartRunsCard({ item, elementStatus, runStatuses }: {
+  item: WorkItem;
+  elementStatus: Map<string, string | null>;
+  runStatuses: Record<string, AgentRunStatus>;
+}) {
+  const { t } = useI18n();
+  const [outcome, setOutcome] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const proposal = item.proposal;
+  if (!proposal || proposal.kind !== 'start') return null;
+  const press = async () => {
+    setStarting(true);
+    let started = 0;
+    let failed = 0;
+    for (const id of proposal.elementIds) {
+      const status = elementStatus.get(id);
+      const runStatus = runStatuses[id];
+      if (status === undefined || status === 'done' || status === 'cancelled' || (runStatus && OPEN_RUN.includes(runStatus))) {
+        failed += 1;
+        continue;
+      }
+      if (await startElementRun(id) === 'failed') failed += 1;
+      else started += 1;
+    }
+    setOutcome([
+      started ? t('Started {n} AI runs.', { n: started }) : '',
+      failed ? t('{n} could not start', { n: failed }) : '',
+    ].filter(Boolean).join(' '));
+    setStarting(false);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+      <Play size={15} className="shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-foreground">{t('Start {n} ready actions with AI', { n: proposal.elementIds.length })}</p>
+        {proposal.titles.length > 0 && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{proposal.titles.join('、')}</p>}
+        {outcome && <p className="mt-0.5 text-[12px] text-muted-foreground">{outcome}</p>}
+      </div>
+      {!outcome && (
+        <Button size="sm" variant="primary" disabled={starting} onClick={() => void press()}>{t('Start')}</Button>
+      )}
+    </div>
+  );
+}
+
+/** The agent proposed delivering the person's words to a waiting run: the
+ *  card shows the Element, the question it waits on, and the exact words;
+ *  the person presses, and the web sends them as their message to the run. */
+function AnswerCard({ item, onAnswered }: { item: WorkItem; onAnswered: () => void }) {
+  const { t } = useI18n();
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const proposal = item.proposal;
+  if (!proposal || proposal.kind !== 'answer') return null;
+  const press = async () => {
+    setState('sending');
+    try {
+      await answerAgentRun(proposal.runId, proposal.text);
+      setState('sent');
+      onAnswered();
+    } catch {
+      setState('failed');
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+      <MessageSquare size={15} className="shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-foreground">{proposal.elementTitle}</p>
+        {proposal.question && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{proposal.question}</p>}
+        <p className="mt-0.5 whitespace-pre-wrap text-[12px] text-foreground/90">{proposal.text}</p>
+        {state === 'sent' && <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Answer sent')}</p>}
+        {state === 'failed' && <p className="mt-0.5 text-[12px] text-[var(--status-danger)]">{t('Could not send the answer.')}</p>}
+      </div>
+      {state !== 'sent' && (
+        <Button size="sm" variant="primary" disabled={state === 'sending'} onClick={() => void press()}>{t('Send answer')}</Button>
+      )}
     </div>
   );
 }

@@ -64,6 +64,13 @@ describe('the conversation run', () => {
     expect(conversation.conversationKindOf('hand_to_planner')).toBe('internal');
   });
 
+  it('sees execution, and proposes — never starts or answers itself', () => {
+    const names = conversation.conversationTools().map((t: { name: string }) => t.name);
+    expect(names).toEqual(expect.arrayContaining(['getInitiativeExecution', 'propose_run_start', 'propose_answer']));
+    expect(conversation.conversationKindOf('propose_run_start')).toBe('internal');
+    expect(conversation.conversationKindOf('propose_answer')).toBe('internal');
+  });
+
   it('the opening ends with what the person said, after the separator the page strips', () => {
     const opening = conversation.conversationOpening({
       strategy: { id: 's1', name: '新規事業', description: null, intents: [{ id: 'i1', kind: 'measure', title: '売上 1 億', status: 'on_track' }], objects: [], children: [], elements: [] },
@@ -110,11 +117,45 @@ describe('conversationItems', () => {
     ]);
     expect(work[2].error).toBe('持ち主だけです');
     expect(work.find((w) => w.kind === 'plan')?.detail).toBe('広告は使わない');
-    expect(workTally(work)).toEqual({ write: 2, read: 1, web: 1, plan: 1, failed: 1 });
+    expect(workTally(work)).toEqual({ write: 2, read: 1, web: 1, plan: 1, start: 0, answer: 0, failed: 1 });
     expect(agent.segments[3]).toEqual({ kind: 'text', text: '記録しました。\n次は前提です。' });
   });
 
   it('no steps, no conversation', () => {
     expect(conversationItems([])).toEqual([]);
+  });
+
+  it('maps the proposal steps to items that carry the proposal', () => {
+    const proposalSteps = [
+      step('message', '進めて', '進めて'),
+      step('action', 'Alcon: getInitiativeExecution', null),
+      step('start_request', '実行の開始を提案しました', JSON.stringify({ elementIds: ['e1', 'e2'], titles: ['下調べ', '集計'] })),
+      step('answer_request', '実行への答えを提案しました', JSON.stringify({ runId: 'r1', elementId: 'e3', elementTitle: '確認', text: 'A で進めて', question: 'A と B どちらにしますか' })),
+      step('reply', 'カードを出しました。', 'カードを出しました。'),
+    ];
+    const items = conversationItems(proposalSteps);
+    const agent = items[1];
+    if (agent.kind !== 'agent') throw new Error('expected the agent');
+    const work = agent.segments.flatMap((s) => (s.kind === 'work' ? s.items : []));
+    expect(work.map((w) => [w.name, w.kind])).toEqual([
+      ['getInitiativeExecution', 'read'], ['propose_run_start', 'start'], ['propose_answer', 'answer'],
+    ]);
+    expect(work[1].proposal).toEqual({ kind: 'start', elementIds: ['e1', 'e2'], titles: ['下調べ', '集計'] });
+    expect(work[2].proposal).toEqual({ kind: 'answer', runId: 'r1', elementId: 'e3', elementTitle: '確認', text: 'A で進めて', question: 'A と B どちらにしますか' });
+    expect(workTally(work)).toEqual({ write: 0, read: 1, web: 0, plan: 0, start: 1, answer: 1, failed: 0 });
+  });
+
+  it('a proposal step with an unreadable detail degrades to a plain work item', () => {
+    const broken = [
+      step('message', '進めて', '進めて'),
+      step('start_request', '実行の開始を提案しました', '{not json'),
+      step('answer_request', '実行への答えを提案しました', JSON.stringify({ runId: 'r1' })),
+      step('reply', 'ok', 'ok'),
+    ];
+    const items = conversationItems(broken);
+    const agent = items[1];
+    if (agent.kind !== 'agent') throw new Error('expected the agent');
+    const work = agent.segments.flatMap((s) => (s.kind === 'work' ? s.items : []));
+    expect(work.map((w) => [w.kind, w.proposal ?? null])).toEqual([['start', null], ['answer', null]]);
   });
 });
