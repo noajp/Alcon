@@ -8,7 +8,9 @@ import type { WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 
 // One column of Element cards: a mark and a name, the count as a chip,
 // then the cards. Every Execution Chain — a Strategy's and a Domain's —
-// draws its columns with it, so the two read the same.
+// draws its columns with it, so the two read the same. A board lying
+// horizontal draws the same group as a BoardLane instead: the same
+// header, laid at the row's left, and the cards flowing sideways.
 
 /** A small rounded label — a count, an Object, a verb — the way every card
  *  and column shows them. */
@@ -93,6 +95,45 @@ export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, em
         {action}
       </header>
       <div className="min-h-[80px] flex-1 space-y-1.5 overflow-y-auto px-1.5 pb-1.5">
+        {count === 0 && empty ? <p className="px-1.5 py-2 text-[12px] text-muted-foreground">{empty}</p> : children}
+      </div>
+    </section>
+  );
+}
+
+/** One row of a board lying horizontal: the BoardColumn's header — mark,
+ *  name, count, the header's right-hand slot — as a rail at the left,
+ *  and the cards in a strip that scrolls sideways. The caller sizes the
+ *  cards (a chain card keeps its column's width). */
+export function BoardLane({ mark, label, count, action, onDragOver, onDrop, empty, children }: {
+  /** Before the name: the lane's mark. */
+  mark?: React.ReactNode;
+  label: string;
+  count: number;
+  /** At the rail's right — the chain's "+". */
+  action?: React.ReactNode;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
+  /** Shown when the lane has no cards. */
+  empty?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section
+      aria-label={label}
+      className="flex w-full flex-shrink-0 rounded-lg bg-muted/60 dark:bg-muted/30"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      <header className="flex h-10 w-52 flex-shrink-0 items-center justify-between self-start px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {mark}
+          <span className="truncate text-[13px] font-medium">{label}</span>
+          <Chip>{count}</Chip>
+        </div>
+        {action}
+      </header>
+      <div className="flex min-h-[80px] min-w-0 flex-1 items-start gap-1.5 overflow-x-auto px-1.5 py-1.5">
         {count === 0 && empty ? <p className="px-1.5 py-2 text-[12px] text-muted-foreground">{empty}</p> : children}
       </div>
     </section>

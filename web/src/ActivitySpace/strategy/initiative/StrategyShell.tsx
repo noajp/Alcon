@@ -60,6 +60,7 @@ import { StrategyConversation } from './StrategyConversation';
 import { requestPlan } from './mission/plannerRequest';
 import { useQueryClient } from '@tanstack/react-query';
 import { InitiativeCodeChanges } from '@/ActivitySpace/reviews/InitiativeCodeChanges';
+import { StrategyCascade } from './StrategyCascade';
 import { InitiativeMission } from './mission/InitiativeMission';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -102,10 +103,12 @@ import { useActiveObjectCount } from '@/hooks/useObjectArchive';
  *  the island beside it. */
 const BOARD_ZONES: Zone[] = ['band', 'main', 'rail'];
 
-/** A Strategy's two views: what it is, and how its work is going. */
-type StrategyTab = 'overview' | 'chain';
+/** A Strategy's views: what it is, how it cascades down, and how its
+ *  work is going. */
+type StrategyTab = 'overview' | 'cascade' | 'chain';
 const STRATEGY_TABS: readonly { id: StrategyTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'cascade', label: 'Cascade down' },
   { id: 'chain', label: 'Execution Chain' },
 ];
 
@@ -130,10 +133,11 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 // Strategy list — only TOP-LEVEL Strategies (no parent in strategy_children)
 // show there; a Strategy nested inside another only appears in its parent's
 // "Strategies" section. Selecting a row pushes into that Strategy's detail
-// page, in two tabs: Overview (title, description, files, Objects, Sub
+// page, in three tabs: Overview (title, description, files, Objects, Sub
 // Strategies, what the work produced, the discussion, and the Properties
-// island) and Execution Chain (the work in columns by where it stands, and
-// the Planner's draft in the first).
+// island), Cascade down (the Strategies nested under this one, generation
+// by generation), and Execution Chain (the work in columns by where it
+// stands, and the Planner's draft in the first).
 // =============================================================
 
 export function StrategyShell({
@@ -967,6 +971,14 @@ function StrategyDetailView({
               </div>
             )}
             <InitiativeMission tab="execution" {...missionProps} />
+          </div>
+        ) : tab === 'cascade' ? (
+          // A bounded board like the chain's: the columns take the height
+          // and scroll inside themselves. The conversation never mounts
+          // here — it lives on the Overview and the Chain, one mount only;
+          // Talk asked for from here opens it on the Overview (onTalk).
+          <div className="flex h-full flex-col px-8 py-6">
+            <StrategyCascade strategy={strategy} allStrategies={allStrategies} onOpenStrategy={onOpenStrategy} />
           </div>
         ) : (
         <div className="max-w-7xl mx-auto px-8 py-8">

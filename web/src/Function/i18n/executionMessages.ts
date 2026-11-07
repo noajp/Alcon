@@ -468,6 +468,10 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'Waiting: review': ['レビュー待ち', '검토 대기', 'En attente : relecture', 'Esperando: revisión'],
   'Accept to record {n} readings': ['承認して {n} 件の報告を記録', '{n}개 보고 기록 승인', 'Accepter pour enregistrer {n} relevés', 'Aceptar para registrar {n} lecturas'],
   'Waiting on work': ['他の作業待ち', '다른 작업 대기', 'En attente d’un autre travail', 'Esperando otro trabajo'],
+  // A board's orientation: groups as columns (cards stack down), or as
+  // rows (cards flow sideways).
+  'Vertical': ['縦', '세로', 'Vertical', 'Vertical'],
+  'Horizontal': ['横', '가로', 'Horizontal', 'Horizontal'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(EXECUTION_MESSAGES).map(([key, row]) => [key, row[index]]));

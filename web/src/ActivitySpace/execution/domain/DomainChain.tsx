@@ -8,6 +8,7 @@ import { createElement, updateElement, type ElementWithDetails } from '@/hooks/u
 import { useElementChainRows } from '@/hooks/initiativeMissionData';
 import { useRunRounds } from '@/hooks/definitionData';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
+import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard, ChainSummary } from '@/ActivitySpace/execution/chain/ChainCard';
 import { waitingReason, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import {
@@ -43,6 +44,8 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
   const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The board's orientation — the one preference every board shares.
+  const [orientation, setOrientation] = useBoardOrientation();
   // Ticks, so a lease that lapses while the tab is open stops reading as running.
   const now = useNowMinute(true);
 
@@ -148,10 +151,16 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 px-4 pb-4 pt-3">
       {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
-      {elements.length > 0 && (
-        <ChainSummary summary={summary} waitingOnYou={waitingOnYou} outcomes={false} />
-      )}
-      <ExecutionChain className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2"
+      <div className="flex items-start gap-2">
+        {elements.length > 0 && (
+          <div className="min-w-0 flex-1">
+            <ChainSummary summary={summary} waitingOnYou={waitingOnYou} outcomes={false} />
+          </div>
+        )}
+        <BoardOrientationToggle orientation={orientation} onChange={setOrientation} className="ml-auto" />
+      </div>
+      <ExecutionChain orientation={orientation}
+        className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
         onDropStatus={canEdit ? (status, id) => void dropToStatus(status, id) : undefined}
         columnAction={canEdit && objectRows.length > 0 ? (status) => <AddElementMenu status={status} objects={objectRows} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
         columns={columns} />
