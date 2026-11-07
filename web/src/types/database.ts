@@ -749,7 +749,6 @@ export type ObjectTabType =
   | 'workers'
   | 'resource'
   | 'custom_view'
-  | 'board'
   | 'note'
   | 'flow'
 

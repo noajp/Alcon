@@ -78,15 +78,14 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   workers: { domainTitle: 'People', objectTitle: 'People' },
   resource: { domainTitle: 'People', objectTitle: 'People' },
   custom_view: { domainTitle: 'CustomView', objectTitle: 'CustomView' },
-  board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
   flow: { domainTitle: 'Execution Chain', objectTitle: 'Execution Chain' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
 // Flow is a Domain's view; an Object's tabs offer the rest.
 const OBJECT_CREATE_TAB_TYPES: ObjectTabType[] = ALL_TAB_TYPES.filter((t) => t !== 'flow');
 // Object tabs that show its Elements through the Elements tab's Filter / Display.
-const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar'];
+const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'gantt', 'calendar'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -306,7 +305,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const [objectElementsControls, setObjectElementsControls] = useState<ListControlsState>(() => loadState('object-elements'));
   useEffect(() => { saveState('object-elements', objectElementsControls); }, [objectElementsControls]);
 
-  // Inside an Object, Board / Calendar / Gantt narrow by the same Element
+  // Inside an Object, Calendar / Gantt narrow by the same Element
   // controls as the Elements tab, so the buttons follow them there.
   const showsElementControls = selectedObject
     ? OBJECT_FILTERED_TABS.includes(effectiveActiveType)
@@ -506,8 +505,8 @@ interface DomainTabContentProps {
   objListControls?: ListControlsState;
   /** Active Domain id — required for the Workload tab to scope correctly. */
   domainId?: string | null;
-  /** Named on the breadcrumb of an Element opened from Board / Calendar /
-   *  Workload. */
+  /** Named on the breadcrumb of an Element opened from the Execution
+   *  Chain / Calendar / Workload. */
   domainName?: string | null;
   /** The tools' Element detail borrows these to reach an Object or an
    *  Strategy — the one-click round trip the List tab already has. */
@@ -559,10 +558,11 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     );
   }
 
-  // Board and Calendar render Elements but own no detail of their own; the
-  // List tab does. ElementDrilldown lends them one — the tab stays mounted
-  // (filters, scroll) while the Element is edited on top, keyed by Domain so
-  // a switch drops it, and closed by any tab switch since the branch changes.
+  // The Execution Chain and Calendar render Elements but own no detail of
+  // their own; the List tab does. ElementDrilldown lends them one — the tab
+  // stays mounted (filters, scroll) while the Element is edited on top,
+  // keyed by Domain so a switch drops it, and closed by any tab switch
+  // since the branch changes.
   if (activeType === 'calendar') {
     return (
       <div className="flex-1 overflow-hidden">
@@ -577,16 +577,6 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     return (
       <div className="flex-1 overflow-hidden">
         <ElementDrilldown key={domainId} label="Execution Chain" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
-          {openElement => <ElementBoardView elements={allElements} objects={objects} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
-        </ElementDrilldown>
-      </div>
-    );
-  }
-
-  if (activeType === 'board') {
-    return (
-      <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Board" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
           {openElement => <ElementBoardView elements={allElements} objects={objects} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>

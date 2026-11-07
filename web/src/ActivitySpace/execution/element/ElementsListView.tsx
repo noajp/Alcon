@@ -18,7 +18,6 @@ import { EmptyState } from '@/Function/shared/EmptyState';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
-import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { useFilteredElements } from '@/ActivitySpace/execution/element/useFilteredElements';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
@@ -58,11 +57,11 @@ const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custo
 // `ObjectTabType` union as Object detail tabs so this view can share
 // the shell `TabBar` and look identical to the Object-level Elements
 // tab. The 'elements' mode renders the flat "All Elements" list; the
-// rest pivot the same data into Board / Gantt / Calendar / Workers.
-const VIEW_MODES: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar', 'workers', 'custom_view'];
+// rest pivot the same data into Gantt / Calendar / Workers. (The board
+// arrangement lives in the Execution Chain now, not here.)
+const VIEW_MODES: ObjectTabType[] = ['elements', 'gantt', 'calendar', 'workers', 'custom_view'];
 const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
   elements: 'All Elements',
-  board: 'Board',
   gantt: 'Gantt',
   calendar: 'Calendar',
   workers: 'Workers',
@@ -258,7 +257,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   }, [domainElements, objectsWithElements]);
 
   // Flattened view of every Element across Domain-direct + per-Object
-  // sections — drives Board / Gantt / Calendar tabs, and the Filter pipeline
+  // sections — drives Gantt / Calendar tabs, and the Filter pipeline
   // when groupBy != 'none'.
   const allElementsFlat = useMemo<ElementWithDetails[]>(() => {
     const m = new Map<string, ElementWithDetails>();
@@ -272,10 +271,10 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
     return m;
   }, [allElementsFlat]);
 
-  // Board / Gantt / Calendar honour the same Group / Sort / Filter controls
+  // Gantt / Calendar honour the same Group / Sort / Filter controls
   // as the list (default groupBy='object' → per-Object bands), so a filter
   // set on one tab narrows them all.
-  const { sections: groupedSections, elements: filteredElements, filtering } =
+  const { sections: groupedSections, elements: filteredElements } =
     useFilteredElements(allElementsFlat, objectSections, controls);
 
   // Multi-select + bulk operations (shared with the other element lists).
@@ -564,7 +563,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       {/* View-mode tabs — uses the shared shell `TabBar` so the look
           matches Object detail's Elements tab exactly. visible-set +
           active are localStorage-backed; "+" surfaces the same Object /
-          Board / Gantt / Calendar / Workers picker as the Object-level
+          Gantt / Calendar / Workers picker as the Object-level
           tab bar. The right slot holds the shared Filter / Display
           controls. */}
       <TabBar
@@ -620,13 +619,6 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
           />
-        </div>
-      )}
-      {effectiveViewMode === 'board' && (
-        <div className="flex-1 overflow-hidden">
-          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Board')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
-            {openElement => <ElementBoardView elements={filteredElements} canAdd={!filtering} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
-          </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'gantt' && (
