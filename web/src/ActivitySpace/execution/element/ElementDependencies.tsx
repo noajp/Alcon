@@ -1,16 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, Plus, X } from '@/ui/icons';
+import { Plus, X } from '@/ui/icons';
 import { useNowWork } from '@/hooks/useNowWork';
 import { setElementDependency } from '@/hooks/coordinationData';
 import { useCurrentUserId } from '@/providers/authContext';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { Popover, PopoverAnchor, PopoverTrigger } from '@/ui/popover';
+import { Button } from '@/ui/button';
+import { Popover, PopoverAnchor } from '@/ui/popover';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
-import { FONT, STATUS } from '@/shared/designTokens';
-import { ContentRow, ContentRowAction } from '@/Function/shared/ContentRow';
+import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface ElementDependenciesProps {
@@ -76,56 +75,66 @@ function DependencyEditor({ elementId, spaceId, onOpenElement, onChanged, openSi
   // dependencies, the section has a heading and its own "+ Add dependency".
   // Empty, the section is only the picker's anchor: out of the flow, so it
   // does not open a blank line (and its row gap) in the page's wrapping row.
-  return <section className={edges.length ? 'w-full space-y-2' : 'absolute bottom-0 left-2.5'} aria-label={t('Dependencies')}>
-    {edges.length > 0 && <div className="flex h-8 items-center"><h2 className={`${FONT.lg} text-foreground`}>{t('Dependencies')}</h2></div>}
-    {(['incoming', 'outgoing'] as const).map((direction) => {
-      const matching = edges.filter((edge) => direction === 'incoming' ? edge.to_element === elementId : edge.from_element === elementId);
-      if (!matching.length) return null;
-      return <div key={direction}>
-        <p className={`${FONT.label} mb-1 px-2`}>{direction === 'incoming' ? t('Waits for') : t('Unblocks')}</p>
-        {matching.map((edge) => {
-          const targetId = direction === 'incoming' ? edge.from_element : edge.to_element;
-          const target = elements.get(targetId);
-          if (!target) return <div key={edge.id} className={`${FONT.sm} flex h-8 items-center gap-2.5 px-2 text-muted-foreground`}>
-            <ArrowRight className="size-3 shrink-0" />{t('Dependency outside this view')}
-          </div>;
-          const statusName = target.status ? STATUS[target.status]?.label : undefined;
-          return <ContentRow key={edge.id}
-            icon={<ArrowRight className="size-3" />}
-            name={target.title}
-            meta={<span>{statusName ? t(statusName) : t('Unspecified')}</span>}
-            onOpen={onOpenElement ? () => onOpenElement(targetId) : undefined}
-            actions={pending ? undefined : <ContentRowAction label={t('Remove dependency with {name}', { name: target.title })}
-              onClick={() => { void save(edge.from_element, edge.to_element, true); }}><X className="size-3" /></ContentRowAction>} />;
-        })}
-      </div>;
-    })}
-    <Popover open={open} onOpenChange={setOpen}>
-      {edges.length > 0 ? (
-        <ButtonAppearanceProvider appearance="inline">
-          <PopoverTrigger asChild><Button variant="ghost" size="sm" disabled={pending}><Plus size={13} strokeWidth={2.5} />{t('Add dependency')}</Button></PopoverTrigger>
-        </ButtonAppearanceProvider>
-      ) : <PopoverAnchor asChild><span aria-hidden className="block h-0 w-0" /></PopoverAnchor>}
-      <MenuShell align="start">
-        <div className="flex gap-1 p-1">
-          <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>{t('Waits for')}</Button>
-          <Button shape="tab" size="xs" variant={relation === 'outgoing' ? 'secondary' : 'ghost'} aria-pressed={relation === 'outgoing'} onClick={() => setRelation('outgoing')}>{t('Unblocks')}</Button>
+  const picker = (
+  <MenuShell align="start">
+    <div className="flex gap-1 p-1">
+      <Button shape="tab" size="xs" variant={relation === 'incoming' ? 'secondary' : 'ghost'} aria-pressed={relation === 'incoming'} onClick={() => setRelation('incoming')}>{t('Waits for')}</Button>
+      <Button shape="tab" size="xs" variant={relation === 'outgoing' ? 'secondary' : 'ghost'} aria-pressed={relation === 'outgoing'} onClick={() => setRelation('outgoing')}>{t('Unblocks')}</Button>
+    </div>
+    <Command shouldFilter={false}>
+      <CommandInput placeholder={t('Find an Element…')} value={search} onValueChange={setSearch} className="focus:bg-muted/40" />
+      <CommandList>
+        <CommandEmpty>{t('No matching Elements.')}</CommandEmpty>
+        {candidates.slice(0, 100).map((element) => <CommandItem key={element.id} value={element.id} disabled={pending}
+          onSelect={() => { void save(relation === 'incoming' ? element.id : elementId, relation === 'incoming' ? elementId : element.id); }}>
+          <div className="min-w-0"><div className="truncate">{element.title}</div>
+            <div className={`${FONT.xs} truncate text-muted-foreground`}>{element.objects?.map((object) => object.name).join(', ')}</div></div>
+        </CommandItem>)}
+      </CommandList>
+    </Command>
+    {candidates.length > 100 && <p className={`${FONT.xs} p-2 text-muted-foreground`}>{t('Showing 100 matches. Type to narrow the list.')}</p>}
+    {saveError && <p role="alert" className={`${FONT.sm} p-2 text-[var(--status-danger)]`}>{saveError}</p>}
+  </MenuShell>
+  );
+
+  // In the Properties island: one row per direction, as the other
+  // properties are drawn — the name at the left, the Elements at the right
+  // (each opens; × removes it), "Add" when there are none. The picker opens
+  // anchored to the rows, set to the row's direction.
+  return <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <div aria-label={t('Dependencies')}>
+          {(['incoming', 'outgoing'] as const).map((direction) => {
+            const matching = edges.filter((edge) => direction === 'incoming' ? edge.to_element === elementId : edge.from_element === elementId);
+            const choose = () => { setRelation(direction); setSearch(''); setOpen(true); };
+            return <div key={direction} className="flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
+              <span className="w-24 shrink-0 text-[12px] leading-5 text-muted-foreground">{direction === 'incoming' ? t('Waits for') : t('Unblocks')}</span>
+              <div className="min-w-0 flex-1">
+                {matching.map((edge) => {
+                  const targetId = direction === 'incoming' ? edge.from_element : edge.to_element;
+                  const target = elements.get(targetId);
+                  return <div key={edge.id} className="group/dep flex min-w-0 items-center gap-1">
+                    <button type="button" disabled={!target || !onOpenElement} onClick={() => target && onOpenElement?.(targetId)}
+                      className="min-w-0 flex-1 truncate text-left text-[13px] leading-5 text-foreground hover:underline disabled:cursor-default disabled:no-underline">
+                      {target ? target.title : t('Dependency outside this view')}
+                    </button>
+                    {!pending && <button type="button" aria-label={t('Remove dependency with {name}', { name: target?.title ?? '' })}
+                      onClick={() => { void save(edge.from_element, edge.to_element, true); }}
+                      className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/dep:opacity-100">
+                      <X className="size-3" />
+                    </button>}
+                  </div>;
+                })}
+                <button type="button" onClick={choose} disabled={pending}
+                  className={`flex items-center gap-1 leading-5 text-muted-foreground hover:text-foreground ${matching.length ? 'text-[12px]' : 'text-[13px]'}`}>
+                  {matching.length > 0 && <Plus size={11} strokeWidth={2.5} />}{t('Add')}
+                </button>
+              </div>
+            </div>;
+          })}
+          {!open && saveError && <p role="alert" className={`${FONT.sm} px-2 text-[var(--status-danger)]`}>{saveError}</p>}
         </div>
-        <Command shouldFilter={false}>
-          <CommandInput placeholder={t('Find an Element…')} value={search} onValueChange={setSearch} className="focus:bg-muted/40" />
-          <CommandList>
-            <CommandEmpty>{t('No matching Elements.')}</CommandEmpty>
-            {candidates.slice(0, 100).map((element) => <CommandItem key={element.id} value={element.id} disabled={pending}
-              onSelect={() => { void save(relation === 'incoming' ? element.id : elementId, relation === 'incoming' ? elementId : element.id); }}>
-              <div className="min-w-0"><div className="truncate">{element.title}</div>
-                <div className={`${FONT.xs} truncate text-muted-foreground`}>{element.objects?.map((object) => object.name).join(', ')}</div></div>
-            </CommandItem>)}
-          </CommandList>
-        </Command>
-        {candidates.length > 100 && <p className={`${FONT.xs} p-2 text-muted-foreground`}>{t('Showing 100 matches. Type to narrow the list.')}</p>}
-        {saveError && <p role="alert" className={`${FONT.sm} p-2 text-[var(--status-danger)]`}>{saveError}</p>}
-      </MenuShell>
-    </Popover>
-    {!open && saveError && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{saveError}</p>}
-  </section>;
+      </PopoverAnchor>
+      {picker}
+    </Popover>;
 }

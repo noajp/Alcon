@@ -894,8 +894,6 @@ function ElementDetailBody({
           {/* Sub-elements — Elements under this one, each with its own page. */}
           <SubElementsSection element={element} onOpen={(id) => onOpenElement?.(id)} onAdded={(title) => log('subelement', `Added sub-element “${title}”`)} />
 
-          <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
-            onOpenElement={onOpenElement} onChanged={onRefresh} openSignal={dependencySignal} />
           </div>
 
           <CodeChangesSection elementId={element.id} openSignal={linkPrSignal} />
@@ -1235,6 +1233,9 @@ function ElementDetailBody({
                 />
               </label>
 
+              {/* What this Element waits for and what it unblocks. */}
+              <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
+                onOpenElement={onOpenElement} onChanged={onRefresh} openSignal={dependencySignal} />
               {/* Custom Properties (object-scoped). Assignee, Lease and Estimate
                   are built-in fields and sit with the others above; this
                   heading only appears when the Object defines fields of its own. */}
