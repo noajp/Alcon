@@ -21,7 +21,6 @@ import { CalendarView } from '@/ActivitySpace/calendar/CalendarView';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
 import { GanttView } from '@/ActivitySpace/execution/element/gantt';
-import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
 import { ResourceView } from '@/ActivitySpace/people/workload/ResourceView';
 import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { useCustomColumns } from '@/Function/property/useCustomColumns';
@@ -41,6 +40,16 @@ import { useElementSelection } from '@/ActivitySpace/execution/element/useElemen
 import { useFilteredElements } from '@/ActivitySpace/execution/element/useFilteredElements';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/Function/shared/listControls';
 import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/element/quickAdd';
+
+// Every tab type the union knows. A stored tab whose type sits outside
+// this set has no view of its own — a 'board' row the migration has not
+// rewritten yet, or a type from another build — and reads as the Elements
+// list rather than a blank pane (see showElementsTab below). Known types
+// without a branch here ('note', 'flow') keep their current rendering.
+const KNOWN_OBJECT_TAB_TYPES: ReadonlySet<string> = new Set([
+  'summary', 'elements', 'overview', 'gantt', 'calendar', 'workers',
+  'resource', 'custom_view', 'note', 'flow',
+]);
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
@@ -239,6 +248,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         ?? { id: `__override_${tabTypeOverride}`, object_id: object.id, tab_type: tabTypeOverride, title: tabTypeOverride, order_index: 0, created_at: null, updated_at: null })
     : internalActiveTab;
 
+  // The Elements list also stands in for a tab whose stored type is not a
+  // known one — the Board tab is gone (the Execution Chain is the board),
+  // and an un-rewritten 'board' row shows the list it was an arrangement
+  // of instead of nothing.
+  const activeTabType = activeTab?.tab_type as string | undefined;
+  const showElementsTab = activeTabType === 'elements'
+    || (activeTabType !== undefined && !KNOWN_OBJECT_TAB_TYPES.has(activeTabType));
+
   // 1 Object = 1 sheet. Existing rows keep their sheet_id values (we just stop
   // exposing the sheet picker), and new rows are written with sheet_id = null.
 
@@ -431,9 +448,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   // Single-sheet model: every element on the Object shows up in the list.
   const allElements = object.elements || [];
   const elements = allElements;
-  // Board / Calendar / Gantt narrow by the same Filter / Display as the
+  // Calendar / Gantt narrow by the same Filter / Display as the
   // Elements tab, so switching tabs keeps what the user filtered to.
-  const { sections: filteredSections, elements: filteredElements, filtering } = useFilteredElements(allElements, undefined, elementsControls);
+  const { sections: filteredSections, elements: filteredElements } = useFilteredElements(allElements, undefined, elementsControls);
 
 
   // (Inline add helpers removed alongside section grouping. Element / Object
@@ -515,7 +532,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {/* Elements tab — flat 2-level model: Domain > Object > Elements.
             Body lives in the shared ObjectElementsView so the markup +
             filter/grouping match the sidebar Elements view exactly. */}
-        {activeTab?.tab_type === 'elements' && (
+        {showElementsTab && (
           <ObjectElementsView
             elements={object.elements ?? []}
             objectId={object.id}
@@ -578,19 +595,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               phases={domainPhases}
               milestones={objectMilestones}
               onElementOpen={(el) => setDetailElementId(el.id)}
-            />
-          </div>
-        )}
-
-        {/* Board (Kanban) Tab Content */}
-        {activeTab?.tab_type === 'board' && (
-          <div className="flex-1 overflow-hidden bg-card">
-            <ElementBoardView
-              elements={filteredElements}
-              canAdd={!filtering}
-              onRefresh={onRefresh}
-              objectId={object.id}
-              onElementClick={(el) => setDetailElementId(el.id)}
             />
           </div>
         )}

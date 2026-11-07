@@ -5,7 +5,7 @@ import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, close
 import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { constrainTabDrag } from './tabDrag';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag, Columns3 } from '@/ui/icons';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, FileText, Flag, Columns3 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
@@ -32,6 +32,9 @@ interface TabBarProps {
 // (rendered in the strip), the title used when a tab is created, and whether
 // the type appears in the "+" create menu. Replaces the old TAB_ICONS +
 // TAB_OPTIONS + defaultTitles triplication that had to be kept in sync.
+// A stored tab can still carry a retired type (a 'board' row the migration
+// has not rewritten), so the strip's icon lookup falls back to the List
+// icon rather than reading meta for a type that no longer exists.
 type TabMeta = { title: string; Icon: React.ComponentType<{ size?: number }> };
 const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   summary:     { title: 'Dashboard',  Icon: BarChart3 },
@@ -41,7 +44,6 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   calendar:    { title: 'Calendar',   Icon: Calendar },
   workers:     { title: 'People',     Icon: Users },
   resource:    { title: 'People',     Icon: Users },
-  board:       { title: 'Board',      Icon: Kanban },
   custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
   flow:        { title: 'Execution Chain', Icon: Columns3 },
@@ -53,7 +55,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
 // (open NotePicker → persist note_id → render embed) isn't wired here yet —
 // the type stays in the union for the Element detail's Note link.
 const CREATE_TAB_ORDER: ObjectTabType[] = [
-  'overview', 'flow', 'board', 'gantt', 'calendar', 'workers', 'custom_view',
+  'overview', 'flow', 'gantt', 'calendar', 'workers', 'custom_view',
 ];
 
 interface ContextMenu {
@@ -114,7 +116,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       {/* Tabs — a quiet strip, folded into one menu when they do not fit */}
       <CollapsingTabs
         menuLabel={t('Views')}
-        items={tabs.map((tab) => ({ id: tab.id, label: t(tab.title), icon: OBJECT_TAB_META[tab.tab_type].Icon }))}
+        items={tabs.map((tab) => ({ id: tab.id, label: t(tab.title), icon: (OBJECT_TAB_META[tab.tab_type] ?? OBJECT_TAB_META.elements).Icon }))}
         activeId={activeTabId ?? tabs[0]?.id ?? ''}
         onSelect={onTabSelect}
         strip={(
