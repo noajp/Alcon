@@ -66,7 +66,8 @@ export const HOME_BOARD: BoardLayout = {
 export const INITIATIVE_BOARD: BoardLayout = {
   band: [],
   main: [{ id: 'cmp-tables', type: 'data-view' }],
-  rail: [],
+  // The island beside the Overview: the Strategy's facts.
+  rail: [{ id: 'cmp-properties', type: 'strategy-properties' }],
 };
 
 /** Object Summary tab. */
