@@ -3,6 +3,7 @@
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { ViewTabs } from '@/Function/shared/ViewTabs';
+import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -589,10 +590,13 @@ function StrategyDetailView({
   // on its Overview.
   const [talking, setTalking] = useState(false);
   const [tab, setTab] = useState<StrategyTab>('overview');
+  // The boards' orientation — the one preference every board shares,
+  // owned here so the tabs-row toggle turns the mounted board live.
+  const [boardOrientation, setBoardOrientation] = useBoardOrientation();
   const [talkingFor, setTalkingFor] = useState(strategy.id);
   if (talkingFor !== strategy.id) { setTalkingFor(strategy.id); setTalking(false); setTab('overview'); }
-  // Opened from the Execution Chain, the conversation is below the
-  // description: bring it into view.
+  // Opened on the Overview, the conversation is below the description:
+  // bring it into view.
   // Only the content scrolls; the header and its tabs stay.
   const talkRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -628,9 +632,7 @@ function StrategyDetailView({
     onDefinitionChange: async (id: string | null) => { await setStrategyDefinition(strategy.id, id); onSaved(); },
     onChanged: () => { void refetchObjects(); onSaved(); },
     onOpenObject,
-    // The conversation opens in place on the Chain tab, and on the
-    // Overview from anywhere else — one mount either way.
-    onTalk: () => { if (tab !== 'chain') setTab('overview'); setTalking(true); },
+    orientation: boardOrientation,
   };
   const queryClient = useQueryClient();
   // The conversation hands the breakdown to the Planner, in the work below.
@@ -944,7 +946,10 @@ function StrategyDetailView({
       </div>
 
 
-      <ViewTabs tabs={STRATEGY_TABS} active={tab} onSelect={setTab} label={t('Strategy views')} />
+      <ViewTabs tabs={STRATEGY_TABS} active={tab} onSelect={setTab} label={t('Strategy views')}
+        actions={(tab === 'chain' || tab === 'cascade') ? (
+          <BoardOrientationToggle orientation={boardOrientation} onChange={setBoardOrientation} />
+        ) : undefined} />
 
       <div ref={contentRef} className="flex-1 overflow-auto">
         {/* The Intent read is mounted here, above both tabs, because the
@@ -975,10 +980,10 @@ function StrategyDetailView({
         ) : tab === 'cascade' ? (
           // A bounded board like the chain's: the columns take the height
           // and scroll inside themselves. The conversation never mounts
-          // here — it lives on the Overview and the Chain, one mount only;
-          // Talk asked for from here opens it on the Overview (onTalk).
+          // here — it lives on the Overview and the Chain, one mount only.
           <div className="flex h-full flex-col px-8 py-6">
-            <StrategyCascade strategy={strategy} allStrategies={allStrategies} onOpenStrategy={onOpenStrategy} />
+            <StrategyCascade strategy={strategy} allStrategies={allStrategies} onOpenStrategy={onOpenStrategy}
+              orientation={boardOrientation} />
           </div>
         ) : (
         <div className="max-w-7xl mx-auto px-8 py-8">

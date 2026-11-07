@@ -14,7 +14,7 @@ import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMi
 import { createIntent } from '@/hooks/strategyData';
 import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
-import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
+import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard, ChainLines, ChainSummary } from '@/ActivitySpace/execution/chain/ChainCard';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import { CARD_FLAT } from '@/shared/designTokens';
@@ -111,8 +111,10 @@ function ChainObjectIndex({ fleet, filter, onFilter }: {
   );
 }
 
-export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot }: {
+export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot, orientation }: {
   ctx: MissionContext;
+  /** The board's orientation, from the page's tabs-row toggle. */
+  orientation: BoardOrientation;
   /** The written Elements, by id, as the shared Element card reads them. */
   details: ReadonlyMap<string, ElementWithDetails>;
   /** The Strategy's Objects, in order. */
@@ -127,7 +129,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
 }) {
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
-  const [guidanceOpen, setGuidanceOpen] = useState(false);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   // How the Planner read the Strategy's files for the current draft.
   const [sources, setSources] = useState<PlannerSource[] | null>(null);
@@ -140,8 +141,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [chainFilter, setChainFilter] = useState<ChainFilter>(null);
-  // The board's orientation — the one preference every board shares.
-  const [orientation, setOrientation] = useBoardOrientation();
   const [aiWorkerId, setAiWorkerId] = useState('');
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
@@ -369,47 +368,25 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     // through the tab's h-full wrapper instead of a page that grows.
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        {/* Breaking it down: the Planner drafts Objects and Elements, and
-            nothing is created until the draft is approved. Guidance is
-            optional, so its field waits behind a link. */}
-        <div className="space-y-2">
+        {/* The work ready to go, started from here. Breaking the Strategy
+            down is the conversation's work — the Planner's requests land
+            here as the questions and the draft below. */}
+        {!draft && (handable.length > 0 || ready.length > 0) && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant={draft ? 'secondary' : 'primary'} size="sm" onClick={() => void plan()} disabled={planning || applying || !!questions}
-              title={t('The Planner reads this Strategy and breaks it down into Objects and Elements. Nothing is created until you approve the draft.')}>
-              {planning ? t('Planning…') : draft ? t('Plan again') : t('Break down with AI')}
-            </Button>
-            {ctx.onTalk && (
-              <Button variant="ghost" size="sm" onClick={ctx.onTalk} title={t('Settle the purpose, success conditions and premises by talking first')}>
-                {t('Talk it through')}
-              </Button>
-            )}
-            {!guidanceOpen && (
-              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setGuidanceOpen(true)}>
-                {t('Add guidance')}
-              </Button>
-            )}
-            {/* The work ready to go, started from here — and the board's
-                orientation, the same choice every board offers. */}
             <span className="ml-auto flex items-center gap-2">
-              {!draft && handable.length > 0 && (
+              {handable.length > 0 && (
                 <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
                   {t('Hand {n} to Claude Code', { n: handable.length })}
                 </Button>
               )}
-              {!draft && ready.length > 0 && (
+              {ready.length > 0 && (
                 <Button variant="primary" size="sm" onClick={() => void runReady()} disabled={busy !== null}>
                   {t('Run {n} ready with AI', { n: ready.length })}
                 </Button>
               )}
-              <BoardOrientationToggle orientation={orientation} onChange={setOrientation} />
             </span>
           </div>
-          {guidanceOpen && (
-            <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2} autoFocus
-              placeholder={t('Guidance for the Planner (optional): scope, constraints, what to leave out…')}
-              className="min-h-[52px] w-full resize-y rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:bg-muted/30" />
-          )}
-        </div>
+        )}
         {questions && (
           <div className="space-y-3 rounded-lg border border-border bg-muted/20 px-3 py-3">
             <div>
@@ -498,8 +475,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
 
-        {/* Orientation: the summary strip and the Object index, whose
-            counts are the chain's filters. Hidden under a Planner draft —
+        {/* Where things stand: the summary strip and the Object index,
+            whose counts are the chain's filters. Hidden under a Planner draft —
             the fleet is hypothetical then, and the draft panel explains
             itself. The per-Object verdict tallies live in the index rows. */}
         {!draft && current.length > 0 && (
@@ -509,17 +486,14 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           <ChainObjectIndex fleet={current} filter={chainFilter} onFilter={setChainFilter} />
         )}
 
-        {fleet.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('No Objects yet. Break the Strategy down with AI, or add Objects on the Overview.')}</p>
-        ) : (
-          // The chain: every action in the column for where it stands, left
-          // to right. The draft's actions wait, dashed, in the first.
-          <ExecutionChain orientation={orientation}
-            className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
-            onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
-            columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
-            columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
-        )}
+        {/* The chain: every action in the column for where it stands, left
+            to right. The draft's actions wait, dashed, in the first. With
+            no Objects yet, the columns stand empty, as on every board. */}
+        <ExecutionChain orientation={orientation}
+          className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
+          onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
+          columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
+          columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
       </div>
     </div>
   );
