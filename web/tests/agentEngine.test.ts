@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-const loop = await import(new URL('../../supabase/functions/run-agent/loop.ts', import.meta.url).pathname);
+const loop = await import(new URL('../../supabase/functions/_shared/agentLoop.ts', import.meta.url).pathname);
 const tools = await import(new URL('../../supabase/functions/run-agent/agentTools.ts', import.meta.url).pathname);
 const ctx = await import(new URL('../../supabase/functions/run-agent/context.ts', import.meta.url).pathname);
 const pricing = await import(new URL('../../supabase/functions/_shared/aiPricing.ts', import.meta.url).pathname);
@@ -303,10 +303,10 @@ describe('agent tools', () => {
     ])).toEqual(['Web 検索: 古民家 東京', 'Web ページ: https://example.com']);
   });
 
-  it('offers reads and everyday writes on the board, never deletes or bulk writes', () => {
+  it('offers the catalog\'s reads and writes, the Strategy and files included, never a delete', () => {
     const names = tools.baseAgentTools().map((t: { name: string }) => t.name);
-    expect(names).toEqual(expect.arrayContaining(['finish', 'save_artifact', 'getElement', 'createElement', 'getInitiative']));
-    expect(names.some((n: string) => /delete|bulk|move/i.test(n))).toBe(false);
+    expect(names).toEqual(expect.arrayContaining(['finish', 'save_artifact', 'getElement', 'createElement', 'getInitiative', 'createInitiative', 'readFile', 'writeFile', 'readHarness']));
+    expect(names.some((n: string) => /delete|remove(Intent|Element)/i.test(n) && n !== 'removeElementAssignee')).toBe(false);
     expect(tools.baseKindOf('finish')).toBe('finish');
     expect(tools.baseKindOf('updateElement')).toBe('board');
     expect(tools.baseKindOf('linear_ab12__create_issue')).toBeNull();

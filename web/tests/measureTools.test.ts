@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // Deno dependencies belong to the Edge runtime, not the web compiler graph.
-const { validateMeasurePatch, runMeasureTool } = await import(new URL('../../supabase/functions/alcon-copilot/measureTools.ts',import.meta.url).pathname);
+const { validateMeasurePatch, runMeasureTool } = await import(new URL('../../supabase/functions/_shared/measureTools.ts',import.meta.url).pathname);
 const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 describe('Strategy measure Copilot boundaries', () => {
   it('keeps partial updates partial and timestamps readings', () => {

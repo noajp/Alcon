@@ -4,7 +4,7 @@
 // saved. Pure: index.ts loads the rows and makes the call; this file builds
 // the prompt and reads the answer.
 
-import type { FinishPayload, Verdict } from "./loop.ts";
+import type { FinishPayload, Verdict } from "../_shared/agentLoop.ts";
 
 export interface VerifyInput {
   element: { title: string; description: string | null };

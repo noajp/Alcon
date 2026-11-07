@@ -6,22 +6,22 @@ import { definitionReading, parseDefinition } from "./definition.ts";
 // premises, decisions) and the Objects that execute them, so an agent can
 // read why an Element exists before it acts on it.
 //
-// Strategy writes — the intent itself, settled with the person in a
-// conversation run: purpose, success conditions, premises, decisions,
-// nested Initiatives and the definition the work follows. They run with the
-// person's JWT, so RLS keeps them to the Initiative's owner. An Element's run
-// is not offered them: carrying out the work does not rewrite why it exists.
+// Strategy writes — the intent itself: purpose, success conditions,
+// premises, decisions, nested Initiatives and the definition the work
+// follows. They run with the person's JWT, so RLS keeps them to the
+// Initiative's owner. Which entries offer them is the catalog's policy.
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const STRATEGY_TOOLS: ToolDef[] = [
   {
     name: "listInitiatives",
-    description: "閲覧できる Initiative（戦略の単位）の一覧。parentId を渡すと、その Initiative の中に入れ子になったものだけを返す。",
+    description: "閲覧できる Initiative（Strategy）の一覧。各行の parentIds は入れ子の親（最上位は空）。parentId でその中の子だけ、spaceId でその Space のものだけに絞る。",
     input_schema: {
       type: "object",
       properties: {
         parentId: { type: "string", description: "親 Initiative の UUID（省略可）" },
+        spaceId: { type: "string", description: "Space の UUID（省略可）" },
         status: { type: "string", description: "active / archived など（省略可）" },
       },
       additionalProperties: false,
@@ -57,10 +57,21 @@ export async function runStrategyTool(
           if (edges.error) throw edges.error;
           q = q.in("id", (edges.data ?? []).map((e) => e.child_strategy_id));
         }
+        if (input.spaceId) q = q.eq("activity_space_id", String(input.spaceId));
         if (input.status) q = q.eq("status", String(input.status));
         const { data, error } = await q;
         if (error) throw error;
-        return { ok: true, data, meta: { rows: data?.length ?? 0 } };
+        const rows = (data ?? []) as { id: string }[];
+        const parents = new Map<string, string[]>();
+        if (rows.length) {
+          const e = await supabase.from("strategy_children").select("parent_strategy_id, child_strategy_id").in("child_strategy_id", rows.map((r) => r.id));
+          if (e.error) throw e.error;
+          for (const edge of (e.data ?? []) as { parent_strategy_id: string; child_strategy_id: string }[]) {
+            parents.set(edge.child_strategy_id, [...(parents.get(edge.child_strategy_id) ?? []), edge.parent_strategy_id]);
+          }
+        }
+        const list = rows.map((r) => ({ ...r, parentIds: parents.get(r.id) ?? [] }));
+        return { ok: true, data: list, meta: { rows: list.length } };
       }
 
       case "getInitiative": {
@@ -135,15 +146,26 @@ export const STRATEGY_WRITE_TOOLS: ToolDef[] = [
   },
   {
     name: "createInitiative",
-    description: "Initiative の中に、それを勝ち取る筋道として子の Initiative（Sub Strategy）を作る。",
+    description: "Initiative（Strategy）を作る。parentId を渡すと、その中に筋道として子の Initiative（Sub Strategy）を作る。parentId がなければ spaceId の Space の最上位に作る。",
     input_schema: {
       type: "object",
       properties: {
-        parentId: { type: "string", description: "親 Initiative の UUID" },
+        parentId: { type: "string", description: "親 Initiative の UUID（Sub Strategy を作るとき）" },
+        spaceId: { type: "string", description: "Space の UUID（最上位に作るとき）" },
         name: { type: "string" },
         description: { type: "string", description: "目的" },
       },
-      required: ["parentId", "name"],
+      required: ["name"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "deleteInitiative",
+    description: "Initiative を削除する（作った人だけができる）。中に入れ子の Initiative は残り、最上位に移る。Object と Element には触れない。人が名指しして消すと言ったものだけ。",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Initiative UUID" } },
+      required: ["id"],
       additionalProperties: false,
     },
   },
@@ -318,21 +340,34 @@ export async function runStrategyWriteTool(db: SupabaseClient, name: string, inp
         return { ok: true, data: data[0] };
       }
       case "createInitiative": {
-        const parent = await ownInitiative(db, uuidOf(input.parentId, "parentId"));
+        const parent = input.parentId ? await ownInitiative(db, uuidOf(input.parentId, "parentId")) : null;
+        const spaceId = parent ? parent.activity_space_id : input.spaceId ? uuidOf(input.spaceId, "spaceId") : null;
+        if (!parent && !spaceId) return { ok: false, error: "parentId（Sub Strategy）か spaceId（最上位）を渡してください" };
         const { data: auth } = await db.auth.getUser();
         if (!auth.user) throw new Error("サインインが切れています");
         const { data: created, error } = await db.from("strategies").insert({
           name: textOf(input.name, "name", 200),
           description: typeof input.description === "string" ? input.description.trim().slice(0, 4000) || null : null,
-          created_by: auth.user.id, activity_space_id: parent.activity_space_id,
+          created_by: auth.user.id, activity_space_id: spaceId,
         }).select("id, name").single();
         if (error) throw error;
+        if (!parent) return { ok: true, data: { ...created, parentIds: [] } };
         const link = await db.from("strategy_children").insert({ parent_strategy_id: parent.id, child_strategy_id: created.id });
         if (link.error) {
           await db.from("strategies").delete().eq("id", created.id);
           throw link.error;
         }
         return { ok: true, data: created };
+      }
+      case "deleteInitiative": {
+        const id = uuidOf(input.id, "id");
+        const { data, error } = await db.from("strategies").delete().eq("id", id).select("id");
+        if (error) {
+          if (error.code === "23503") return { ok: false, error: "この Initiative を指している Domain の取り組みがあります。先にそれを外してください。" };
+          throw error;
+        }
+        if (!data?.length) return { ok: false, error: "削除できるのは Initiative を作った人だけです（または存在しません）。" };
+        return { ok: true, data: { id, deleted: true } };
       }
       case "addIntent": {
         const kind = String(input.kind) as IntentKind;
