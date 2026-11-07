@@ -1,29 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { collapsedColumns, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
+import { chainStatusOf, emptyChain } from '@/ActivitySpace/execution/chain/ExecutionChain';
+import { STATUS_ORDER } from '@/shared/designTokens';
 
-describe('collapsedColumns', () => {
-  it('collapses every empty column a person has not expanded', () => {
+describe('emptyChain', () => {
+  it('has a column for every Status, each one empty — every column renders, empty or not', () => {
     const columns = emptyChain<string>();
-    columns.todo = ['a'];
-    const collapsed = collapsedColumns(columns, new Set());
-    expect(collapsed.has('todo')).toBe(false);
-    for (const s of ['backlog', 'in_progress', 'review', 'done', 'cancelled', 'blocked'] as ChainStatus[]) {
-      expect(collapsed.has(s), s).toBe(true);
-    }
+    expect(Object.keys(columns)).toEqual([...STATUS_ORDER]);
+    for (const s of STATUS_ORDER) expect(columns[s]).toEqual([]);
+  });
+});
+
+describe('chainStatusOf', () => {
+  it('passes a known Status through to its own column', () => {
+    for (const s of STATUS_ORDER) expect(chainStatusOf(s)).toBe(s);
   });
 
-  it('keeps an expanded empty column full-size', () => {
-    const columns = emptyChain<string>();
-    const collapsed = collapsedColumns(columns, new Set<ChainStatus>(['done', 'blocked']));
-    expect(collapsed.has('done')).toBe(false);
-    expect(collapsed.has('blocked')).toBe(false);
-    expect(collapsed.has('review')).toBe(true);
-  });
-
-  it('never collapses a column with cards, expanded or not', () => {
-    const columns = emptyChain<string>();
-    columns.review = ['a', 'b'];
-    expect(collapsedColumns(columns, new Set()).has('review')).toBe(false);
-    expect(collapsedColumns(columns, new Set<ChainStatus>(['review'])).has('review')).toBe(false);
+  it('reads no Status, and a Status the chain does not have, as To do', () => {
+    expect(chainStatusOf(null)).toBe('todo');
+    expect(chainStatusOf(undefined)).toBe('todo');
+    expect(chainStatusOf('doing')).toBe('todo');
   });
 });

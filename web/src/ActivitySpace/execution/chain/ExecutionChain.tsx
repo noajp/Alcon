@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import type React from 'react';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
-import { BoardColumn, Chip } from '../element/board/BoardColumn';
+import { BoardColumn } from '../element/board/BoardColumn';
 
 // The Execution Chain: work in the Board's Status columns, drawn with the
 // Board's columns and cards. What waits on a person is a chip on its card
@@ -13,10 +12,13 @@ import { BoardColumn, Chip } from '../element/board/BoardColumn';
 // uses it with its own cards (the Planner's draft among them); a Domain's is
 // the Board itself.
 //
+// Every column renders at full width, empty or not — the columns are the
+// map of where work can stand, and an empty one is a place work can be
+// dropped, not a gap to fold away. An empty column's body is blank, as the
+// Board's is.
+//
 // A card drags with its Element's id, and the host decides what a drop
-// means: pass onDropStatus and the columns become drop targets for it. A
-// column with nothing to show is a stub, not a full-width empty column;
-// expanding it by hand restores the full column (and its drop target).
+// means: pass onDropStatus and the columns become drop targets for it.
 
 export type ChainStatus = (typeof STATUS_ORDER)[number];
 
@@ -31,22 +33,11 @@ export function ExecutionChain({ columns, className, onDropStatus, columnAction 
   columnAction?: (status: ChainStatus) => React.ReactNode;
 }) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState<ReadonlySet<ChainStatus>>(new Set());
-  const collapsed = collapsedColumns(columns, expanded);
-  const expand = (status: ChainStatus) => setExpanded((prev) => new Set(prev).add(status));
   return (
     <div className={className ?? 'flex h-full gap-3 overflow-x-auto px-4 pb-4 pt-1'}>
-      {STATUS_ORDER.map((status) => collapsed.has(status) ? (
-        <button key={status} type="button" onClick={() => expand(status)}
-          aria-label={t(STATUS[status].label)} title={t(STATUS[status].label)}
-          className="flex w-10 flex-shrink-0 flex-col items-center gap-2 rounded-lg bg-muted/60 px-1 py-3 dark:bg-muted/30">
-          <ElementProgressMark status={status} size={14} />
-          <span className="text-[12px] font-medium [writing-mode:vertical-rl]">{t(STATUS[status].label)}</span>
-          <Chip>0</Chip>
-        </button>
-      ) : (
+      {STATUS_ORDER.map((status) => (
         <BoardColumn key={status} mark={<ElementProgressMark status={status} size={14} />} label={t(STATUS[status].label)}
-          count={columns[status].length} empty={t('No Elements')}
+          count={columns[status].length}
           action={columnAction?.(status)}
           onDragOver={onDropStatus ? (e) => e.preventDefault() : undefined}
           onDrop={onDropStatus ? (e) => {
@@ -59,15 +50,6 @@ export function ExecutionChain({ columns, className, onDropStatus, columnAction 
       ))}
     </div>
   );
-}
-
-/** Pure. The columns that render as stubs: the empty ones, unless a person
- *  expanded them by hand. A column that gains cards renders full-size on
- *  its own. */
-export function collapsedColumns<T>(columns: Record<ChainStatus, readonly T[]>, expanded: ReadonlySet<ChainStatus>): Set<ChainStatus> {
-  const out = new Set<ChainStatus>();
-  for (const s of STATUS_ORDER) if (columns[s].length === 0 && !expanded.has(s)) out.add(s);
-  return out;
 }
 
 /** Pure. Empty Status columns, to fill. */
