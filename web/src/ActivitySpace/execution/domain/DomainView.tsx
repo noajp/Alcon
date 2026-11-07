@@ -30,7 +30,6 @@ import {
   type ListControlsState,
 } from '@/Function/shared/listControls';
 import { DomainOverview } from './DomainOverview';
-import { FlowBoard } from './flow/FlowBoard';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
 import { ElementBoardView } from '@/ActivitySpace/execution/element/board/ElementBoardView';
@@ -81,7 +80,7 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   custom_view: { domainTitle: 'CustomView', objectTitle: 'CustomView' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
-  flow: { domainTitle: 'Flow', objectTitle: 'Flow' },
+  flow: { domainTitle: 'Execution Chain', objectTitle: 'Execution Chain' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
 // Flow is a Domain's view; an Object's tabs offer the rest.
@@ -451,6 +450,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
           <DomainTabContent
             activeType={effectiveActiveType}
             allElements={allDomainElements}
+            objects={explorerData.objects}
             onSelectObject={(id) => onNavigate({ objectId: id })}
             onRefresh={onRefresh}
             objListControls={objListControls}
@@ -497,6 +497,8 @@ function HierarchyHeader({
 interface DomainTabContentProps {
   activeType: ObjectTabType;
   allElements: ReturnType<typeof collectAllElements>;
+  /** The Domain's Objects, for the cards that name theirs. */
+  objects?: { id: string; name: string; icon?: string | null; color?: string | null }[];
   onSelectObject: (id: string) => void;
   onRefresh?: () => void;
   /** ListControls state owned by DomainView; the Filter / Display buttons
@@ -513,7 +515,7 @@ interface DomainTabContentProps {
   onViewChange?: (view: string) => void;
 }
 
-function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange }: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -574,8 +576,8 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   if (activeType === 'flow') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Flow" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
-          {openElement => <FlowBoard elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+        <ElementDrilldown key={domainId} label="Execution Chain" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+          {openElement => <ElementBoardView elements={allElements} objects={objects} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
     );
@@ -585,7 +587,7 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
     return (
       <div className="flex-1 overflow-hidden">
         <ElementDrilldown key={domainId} label="Board" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
-          {openElement => <ElementBoardView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+          {openElement => <ElementBoardView elements={allElements} objects={objects} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
     );

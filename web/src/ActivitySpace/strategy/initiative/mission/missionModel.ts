@@ -10,7 +10,7 @@
 
 import { isAiWeight, type AgentRunStatus, type AiWeight, type Worker } from '@/types/database';
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
-import { isElementAction, isHumanAction, type ElementAction } from '@/Function/shared/elementActionKinds';
+import { isElementAction, type ElementAction } from '@/Function/shared/elementActionKinds';
 
 export interface MissionElementRow {
   id: string;
@@ -491,65 +491,6 @@ export function normalizePlan(
 }
 
 // ── Your turn ────────────────────────────────────────────────────────────────
-
-/** What a person is asked to do for the mission, most pressing first:
- *  approve an AI's external write, answer an AI that stopped for them, review
- *  an AI's result, or do their own Element. */
-export type YourTurnKind = 'approve' | 'answer' | 'review' | 'do';
-
-export interface YourTurn {
-  elementId: string;
-  title: string;
-  kind: YourTurnKind;
-  /** What the AI said (its summary, or the write it waits on). */
-  detail: string | null;
-  /** What the person is asked to do, as a verb: the Element's own when it
-   *  is a person's verb, otherwise the one this kind of turn means. */
-  action: ElementAction;
-}
-
-const TURN_ORDER: Record<YourTurnKind, number> = { approve: 0, answer: 1, review: 2, do: 3 };
-
-/** Pure. Everything in the mission that waits on a person, in one list. A
- *  person's Element counts only once nothing it waits on is open. */
-/** The verb a turn asks of the person: what each kind of turn means, unless
- *  the Element itself names a person's verb (judge, decide…) — that is the
- *  more exact ask. A person's own Element keeps whatever verb it has. */
-const TURN_ACTION: Record<YourTurnKind, ElementAction> = { approve: 'approve', answer: 'answer', review: 'judge', do: 'execute' };
-function turnAction(kind: YourTurnKind, own: ElementAction | null): ElementAction {
-  if (own && (isHumanAction(own) || kind === 'do')) return own;
-  return TURN_ACTION[kind];
-}
-
-export function yourTurn(input: {
-  fleet: readonly FleetObject[];
-  elements: readonly MissionElementRow[];
-  runs: readonly MissionRunRow[];
-  actions: readonly { element_id: string; summary: string; status: string }[];
-}): YourTurn[] {
-  const latest = latestRuns(input.runs);
-  const status = new Map(input.elements.map((e) => [e.id, e.status]));
-  const out: YourTurn[] = [];
-  for (const o of input.fleet) {
-    for (const e of o.elements) {
-      if (!e.elementId || e.draft) continue;
-      const run = latest.get(e.elementId);
-      const s = status.get(e.elementId);
-      if (s === 'done' || s === 'cancelled') continue;
-      if (run?.status === 'awaiting_approval') {
-        const action = input.actions.find((a) => a.element_id === e.elementId && a.status === 'pending');
-        out.push({ elementId: e.elementId, title: e.title, kind: 'approve', detail: action?.summary ?? run.summary, action: turnAction('approve', e.action) });
-      } else if (e.assignee !== 'human' && s === 'blocked') {
-        out.push({ elementId: e.elementId, title: e.title, kind: 'answer', detail: run?.summary ?? run?.error ?? null, action: turnAction('answer', e.action) });
-      } else if (s === 'review') {
-        out.push({ elementId: e.elementId, title: e.title, kind: 'review', detail: run?.summary ?? null, action: turnAction('review', e.action) });
-      } else if (e.assignee === 'human' && e.waitsOn.length === 0 && (e.state === 'todo' || e.state === 'running')) {
-        out.push({ elementId: e.elementId, title: e.title, kind: 'do', detail: null, action: turnAction('do', e.action) });
-      }
-    }
-  }
-  return out.sort((a, b) => TURN_ORDER[a.kind] - TURN_ORDER[b.kind]);
-}
 
 /** A question the Planner asks before it plans; `options` empty means free text. */
 export interface PlanQuestion { key: string; question: string; options: string[] }

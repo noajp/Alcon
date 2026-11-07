@@ -12,6 +12,9 @@ import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { ElementCard } from './ElementCard';
+import { BoardColumn, WaitingChip } from './BoardColumn';
+import { useLatestRunStatuses } from '@/hooks/elementRunData';
+import { waitsOnPerson } from '../../chain/waiting';
 
 type ElementStatus = (typeof STATUS_ORDER)[number];
 
@@ -32,9 +35,12 @@ interface ElementBoardViewProps {
   /** Show the column "+". Hosts turn it off while a filter is active, since
    *  an Element made there could be filtered out of sight at once. */
   canAdd?: boolean;
+  /** The Objects the Elements belong to, so each card can name its own
+   *  (a Domain's board spans several; an Object's needs none). */
+  objects?: { id: string; name: string; icon?: string | null; color?: string | null }[];
 }
 
-export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick, canAdd = true }: ElementBoardViewProps) {
+export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick, canAdd = true, objects }: ElementBoardViewProps) {
   const { t } = useI18n();
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -43,8 +49,11 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
   // "active" means.
   const elementIds = useMemo(() => elements.map((el) => el.id), [elements]);
   const activity = useElementCommentActivity(elementIds);
+  // Each card's latest AI run, for whether it waits on a person.
+  const { data: runs } = useLatestRunStatuses(elementIds);
 
   useEffect(() => { setItems(elements); }, [elements]);
+  const objectById = useMemo(() => new Map((objects ?? []).map((o) => [o.id, o])), [objects]);
 
   const groups = useMemo(() => {
     const m = new Map<ElementStatus, ElementWithDetails[]>();
@@ -93,20 +102,15 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
       {COLUMNS.map((col) => {
         const colItems = groups.get(col.status) ?? [];
         return (
-          <div
+          <BoardColumn
             key={col.status}
-            className="w-72 flex-shrink-0 flex flex-col rounded-lg bg-muted/60 dark:bg-muted/30"
+            mark={<ElementProgressMark status={col.status} size={14} />}
+            label={t(col.label)}
+            count={colItems.length}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop(col.status)}
-          >
-            {/* Column header */}
-            <div className="flex h-10 items-center justify-between px-3">
-              <div className="flex items-center gap-2">
-                <ElementProgressMark status={col.status} size={14} />
-                <span className="text-[13px] font-medium">{t(col.label)}</span>
-                <span className="text-[12px] tabular-nums text-muted-foreground">{colItems.length}</span>
-              </div>
-              {canAdd && <Button variant="ghost" size="icon-xs"
+            action={canAdd ? (
+              <Button variant="ghost" size="icon-xs"
                 type="button"
                 onClick={async () => {
                   try {
@@ -124,30 +128,22 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                 aria-label={t('Add Element to {column}', { column: t(col.label) })}
               >
                 <Plus className="h-3.5 w-3.5" />
-              </Button>}
-            </div>
-
-            {/* Cards */}
-            <div className="flex-1 overflow-y-auto px-1.5 pb-1.5 space-y-1.5 min-h-[80px]">
-              {colItems.map((el) => (
-                <div
-                  key={el.id}
-                  className={cn(
-                    'transition-opacity',
-                    draggingId === el.id ? 'opacity-40' : '',
-                  )}
-                  onDragStart={() => setDraggingId(el.id)}
-                  onDragEnd={() => setDraggingId(null)}
-                >
-                  <ElementCard
-                    element={el}
-                    onRefresh={onRefresh}
-                    onOpen={onElementClick}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+              </Button>
+            ) : undefined}
+          >
+            {colItems.map((el) => (
+              <div
+                key={el.id}
+                className={cn('transition-opacity', draggingId === el.id ? 'opacity-40' : '')}
+                onDragStart={() => setDraggingId(el.id)}
+                onDragEnd={() => setDraggingId(null)}
+              >
+                <ElementCard element={el} onRefresh={onRefresh} onOpen={onElementClick}
+                  object={el.object_id ? objectById.get(el.object_id) ?? null : null}
+                  badge={waitsOnPerson(el, runs[el.id] ?? null) ? <WaitingChip /> : undefined} />
+              </div>
+            ))}
+          </BoardColumn>
         );
       })}
     </div>
