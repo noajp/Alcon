@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
-  actionState, buildFleet, draftFleet, latestRuns, moveDraftTask, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan,
+  actionState, buildFleet, draftFleet, latestRuns, measureOutcomes, moveDraftTask, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan, verdictTallyOf,
   type MissionElementRow, type MissionMeasureRow, type MissionRunRow, handOverLabels, isHandedOver
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
+import type { RunVerdict } from '@/Function/audit/auditModel';
 
 const el = (id: string, status: string | null = 'todo'): MissionElementRow => ({ id, title: `Task ${id}`, status, display_id: null, object_id: 'o1' });
 const run = (element_id: string, status: MissionRunRow['status'], created_at: string, extra: Partial<MissionRunRow> = {}): MissionRunRow => ({
-  element_id, status, input_tokens: 100, output_tokens: 50, cost_usd: '0.10', summary: null, error: null, created_at, ...extra,
+  id: `run-${element_id}-${created_at}`, element_id, status, input_tokens: 100, output_tokens: 50, cost_usd: '0.10', summary: null, error: null, created_at,
+  verdict: null, proposed_readings: null, ...extra,
 });
 const measure = (id: string, actual: number | null, target: number | null = 10): MissionMeasureRow => ({
-  id, title: `Measure ${id}`, target_value: target, actual_value: actual, unit: null, direction: 'at_least',
+  id, title: `Measure ${id}`, target_value: target, actual_value: actual, unit: null, direction: 'at_least', measured_at: null,
+});
+const verdict = (result: 'pass' | 'fail' | 'unchecked'): RunVerdict => ({
+  v: 1, result, source: result === 'unchecked' ? 'none' : 'verifier', model: 'claude-test', gaps: [], revisions: 0,
+  checkedAt: '2026-11-07T01:00:00Z', outcome: 'completed', reason: null, evidence: { verifyStepIdx: 3, artifactIds: [] },
 });
 
 describe('actionState', () => {
@@ -235,5 +241,137 @@ describe('Planner questions', () => {
     const { answeredQuestions } = await import('@/ActivitySpace/strategy/initiative/mission/missionModel');
     const qs = [{ key: 'a', question: 'A?', options: [] }, { key: 'b', question: 'B?', options: [] }, { key: 'c', question: 'C?', options: [] }];
     expect(answeredQuestions(qs, { c: ' 3 ', a: '1', b: '  ' })).toEqual([{ question: 'A?', answer: '1' }, { question: 'C?', answer: '3' }]);
+  });
+});
+
+describe('verdictTallyOf', () => {
+  it('counts the latest run per Element only — a passed re-run supersedes an older failure', () => {
+    const tally = verdictTallyOf([
+      run('a', 'completed', '2026-11-01', { verdict: verdict('fail') }),
+      run('a', 'completed', '2026-11-02', { verdict: verdict('pass') }),
+      run('b', 'completed', '2026-11-01', { verdict: verdict('fail') }),
+      run('c', 'completed', '2026-11-01', { verdict: verdict('unchecked') }),
+      run('d', 'completed', '2026-11-01'),
+    ]);
+    expect(tally).toEqual({ pass: 1, fail: 1, unchecked: 1, none: 1 });
+  });
+});
+
+describe('buildFleet verdicts', () => {
+  it('surfaces each Element’s latest verdict and the Object’s tally over them', () => {
+    const fleet = buildFleet({
+      objects: [{ id: 'o1', name: 'Site', domain_id: 'd1' }],
+      elements: [el('a', 'done'), el('b'), el('c')],
+      measures: [], bindings: [], edges: [],
+      runs: [
+        run('a', 'completed', '2026-11-01', { verdict: verdict('fail') }),
+        run('a', 'completed', '2026-11-02', { verdict: verdict('pass') }),
+        run('b', 'completed', '2026-11-01', { verdict: verdict('fail') }),
+      ],
+    });
+    const [site] = fleet;
+    expect(site.elements.find((e) => e.key === 'a')?.verdict?.result).toBe('pass');
+    expect(site.elements.find((e) => e.key === 'b')?.verdict?.result).toBe('fail');
+    expect(site.elements.find((e) => e.key === 'c')?.verdict).toBeNull();
+    expect(site.verdicts).toEqual({ pass: 1, fail: 1, unchecked: 0, none: 1 });
+  });
+});
+
+describe('measureOutcomes', () => {
+  const NOW = new Date('2026-11-07T00:00:00Z');
+  const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
+  const base = { bindings: [], elements: [], runs: [], readings: [], now: NOW };
+
+  it('buckets freshness at the 7 and 30 day boundaries, and never-measured as never', () => {
+    const outcomes = measureOutcomes({
+      ...base,
+      measures: [
+        { ...measure('fresh', 1), measured_at: daysAgo(7) },
+        { ...measure('aging', 1), measured_at: daysAgo(7.5) },
+        { ...measure('agingEdge', 1), measured_at: daysAgo(30) },
+        { ...measure('stale', 1), measured_at: daysAgo(31) },
+        { ...measure('never', null), measured_at: null },
+      ],
+    });
+    expect(outcomes.map((o) => [o.measure.id, o.freshness])).toEqual([
+      ['fresh', 'fresh'], ['aging', 'aging'], ['agingEdge', 'aging'], ['stale', 'stale'], ['never', 'never'],
+    ]);
+  });
+
+  it('picks the latest history row as the last reading', () => {
+    const [outcome] = measureOutcomes({
+      ...base,
+      measures: [measure('m1', 5)],
+      readings: [
+        { intent_id: 'm1', value: 3, measured_at: daysAgo(3), source: 'manual', recorded_by_name: 'Aya', recorded_at: daysAgo(3) },
+        { intent_id: 'm1', value: 5, measured_at: daysAgo(1), source: 'agent', recorded_by_name: 'Takanori', recorded_at: daysAgo(1) },
+        { intent_id: 'other', value: 9, measured_at: daysAgo(0), source: 'manual', recorded_by_name: null, recorded_at: daysAgo(0) },
+      ],
+    });
+    expect(outcome.lastReading).toEqual({ value: 5, source: 'agent', recordedByName: 'Takanori', recordedAt: daysAgo(1) });
+  });
+
+  it('attributes only applied agent readings, newest first', () => {
+    const applied = (value: number, appliedAt: string) => ({
+      measureId: 'm1', value, applied: true, appliedAt, appliedBy: 'u1', heldReason: null as null,
+    });
+    const [outcome] = measureOutcomes({
+      ...base,
+      measures: [measure('m1', 5)],
+      runs: [
+        run('a', 'completed', '2026-11-05', { id: 'r1', proposed_readings: [applied(4, '2026-11-05T02:00:00Z')] }),
+        run('b', 'completed', '2026-11-06', {
+          id: 'r2',
+          proposed_readings: [
+            applied(5, '2026-11-06T02:00:00Z'),
+            { measureId: 'm1', value: 99, applied: false, appliedAt: null, appliedBy: null, heldReason: 'awaiting-acceptance' as const },
+            { measureId: 'm2', value: 7, applied: true, appliedAt: '2026-11-06T03:00:00Z', appliedBy: 'u1', heldReason: null },
+          ],
+        }),
+      ],
+    });
+    expect(outcome.agentReadings).toEqual([
+      { runId: 'r2', elementId: 'b', value: 5, appliedAt: '2026-11-06T02:00:00Z' },
+      { runId: 'r1', elementId: 'a', value: 4, appliedAt: '2026-11-05T02:00:00Z' },
+    ]);
+  });
+
+  it('joins the Elements that deliver the measure, with their latest verdicts and states', () => {
+    const [outcome] = measureOutcomes({
+      ...base,
+      measures: [measure('m1', 5)],
+      elements: [el('a', 'done'), el('b')],
+      bindings: [
+        { intent_id: 'm1', target_type: 'element', target_id: 'a', relationship_type: 'delivers' },
+        { intent_id: 'm1', target_type: 'element', target_id: 'b', relationship_type: 'delivers' },
+        { intent_id: 'm1', target_type: 'object', target_id: 'o1', relationship_type: 'delivers' },
+      ],
+      runs: [run('a', 'completed', '2026-11-01', { verdict: verdict('pass') })],
+    });
+    expect(outcome.serves).toEqual([
+      { elementId: 'a', title: 'Task a', verdict: verdict('pass'), state: 'done' },
+      { elementId: 'b', title: 'Task b', verdict: null, state: 'todo' },
+    ]);
+  });
+});
+
+describe('missionSummary verdicts and staleness', () => {
+  const NOW = new Date('2026-11-07T00:00:00Z');
+  it('adds verdicts (run-less Elements count as none) and stale-or-never unmet measures, leaving the rest unchanged', () => {
+    const s = missionSummary({
+      elements: [el('a', 'done'), el('b'), el('c')],
+      measures: [
+        { ...measure('met', 12), measured_at: '2026-09-01T00:00:00Z' },
+        { ...measure('stale', 3), measured_at: '2026-09-01T00:00:00Z' },
+        { ...measure('never', null), measured_at: null },
+        { ...measure('fresh', 3), measured_at: '2026-11-06T00:00:00Z' },
+      ],
+      runs: [run('a', 'completed', '2026-11-01', { verdict: verdict('pass') }), run('b', 'completed', '2026-11-01', { verdict: verdict('fail') })],
+      artifacts: [],
+      now: NOW,
+    });
+    expect(s.verdicts).toEqual({ pass: 1, fail: 1, unchecked: 0, none: 1 });
+    expect(s.measuresStale).toBe(2);
+    expect(s).toMatchObject({ actions: 3, measures: 4, measuresMet: 1 });
   });
 });

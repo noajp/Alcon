@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { inToolScope, SPACE_SCOPE, useToolScope, type ToolScope } from '@/Function/shared/tool/toolScope';
-import { NEEDS_PERSON, runOutcome, summarizeDeployment, type DeploymentSummary, type WorkflowDeploymentRecord } from '@/Function/audit/auditModel';
+import { mergeAuditTimeline, NEEDS_PERSON, runOutcome, summarizeDeployment, type DeploymentSummary, type WorkflowDeploymentRecord } from '@/Function/audit/auditModel';
 import type { AuditSource } from './auditSource';
 
 /** What the Audit App shows in its scope (the Domain a deployment serves),
@@ -21,6 +21,12 @@ export function useAuditScope(audit: AuditSource) {
   const inScope = useMemo(() => new Set(deployments.map(d => d.id)), [deployments]);
   const runs = useMemo(() => audit.runs.filter(run => inScope.has(run.deployment_id)), [audit.runs, inScope]);
   const attention = useMemo(() => runs.filter(run => NEEDS_PERSON.has(runOutcome(audit.stepsByRun.get(run.id) ?? []))), [runs, audit.stepsByRun]);
+  // Agent runs join the same scope by the Domain they carry; the Log and
+  // the Overview's attention read the merged entries, while deployment
+  // summaries and runs-by-deployment stay ledger-only.
+  const agentRuns = useMemo(() => audit.agentRuns.filter(run => inToolScope(scope, run.domain_id)), [audit.agentRuns, scope]);
+  const timeline = useMemo(() => mergeAuditTimeline(runs, agentRuns), [runs, agentRuns]);
+  const attentionEntries = useMemo(() => timeline.filter(entry => entry.needsPerson), [timeline]);
   const deploymentOf = useMemo(() => new Map<string, WorkflowDeploymentRecord>(audit.deployments.map(d => [d.id, d])), [audit.deployments]);
-  return { scope, setScope, scopeName: name(scope), options, deployments, summaries, runs, attention, deploymentOf };
+  return { scope, setScope, scopeName: name(scope), options, deployments, summaries, runs, attention, agentRuns, timeline, attentionEntries, deploymentOf };
 }

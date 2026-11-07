@@ -4,13 +4,14 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useAudit, useAuditChain, useAuditRunSteps, type Audit } from '@/hooks/useAudit';
-import { sealChain, type ChainStep, type GrantVersionRecord, type LedgerRun, type StepEvent, type WorkflowStepRecord } from '@/Function/audit/auditModel';
+import { auditShowsSample, mergeAuditTimeline, sealChain, type ChainStep, type GrantVersionRecord, type LedgerRun, type StepEvent, type WorkflowStepRecord } from '@/Function/audit/auditModel';
 import { buildAuditSample } from '@/Function/audit/auditSample';
 
-// What the Audit app reads: the Space's ledger, or — while the Space has no
-// AI workflow yet — the on-screen sample in the same shape, so every page
-// shows what it is for before the first gateway reports. The sample is never
-// written anywhere and gives way to the first real deployment.
+// What the Audit app reads: the Space's ledger and its agent runs, or —
+// while the Space has no AI work at all — the on-screen sample in the
+// ledger's shape, so every page shows what it is for before the first
+// gateway reports or the first agent runs. The sample is never written
+// anywhere and gives way to the first real work of either kind.
 
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -31,7 +32,7 @@ const EMPTY: never[] = [];
 export function useAuditSource(): AuditSource {
   const audit = useAudit();
   const { t, locale } = useI18n();
-  const empty = Boolean(audit.spaceId) && !audit.loading && !audit.error && audit.deployments.length === 0;
+  const empty = Boolean(audit.spaceId) && !audit.loading && !audit.error && auditShowsSample(audit.deployments.length, audit.agentRuns.length);
   const sample = useQuery({
     queryKey: ['audit-sample', locale],
     queryFn: async () => {
@@ -59,6 +60,10 @@ export function useAuditSource(): AuditSource {
     deployments: data.deployments,
     runs: data.runs,
     truncated: false,
+    // The sample is ledger-shaped and gains no fake agent runs.
+    agentRuns: EMPTY,
+    agentTruncated: false,
+    timeline: mergeAuditTimeline(data.runs, []),
     stepsByRun,
     runsByDeployment,
     // The sample's Domains and agents carry only what the pages read: an id and a name.

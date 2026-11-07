@@ -15,7 +15,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { AUDIT_WINDOW_DAYS } from '@/hooks/useAudit';
 import type { useAuditScope } from './auditScope';
 import type { AuditSource } from './auditSource';
-import { Empty, RunRows, SampleBadge, SampleNotice, Stat, STATE_LABEL, pct } from './auditParts';
+import { Empty, EntryRows, SampleBadge, SampleNotice, Stat, STATE_LABEL, pct } from './auditParts';
 
 // Audit's first page: what needs a person now, how much of the work the AI
 // finishes on its own, and each workflow — read the way a Domain or an
@@ -90,18 +90,25 @@ export function AuditOverview({ source, scoped, status, onOpenWorkflow, onOpenRu
             {status}
             {!status && <>
               <dl className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-                <Stat label={t('Needs a person')} value={String(scoped.attention.length)} danger={scoped.attention.length > 0} hint={t('Waiting, handed over, blocked or stopped')} />
+                <Stat label={t('Needs a person')} value={String(scoped.attentionEntries.length)} danger={scoped.attentionEntries.length > 0} hint={t('Waiting, handed over, blocked or stopped')} />
                 <Stat label={t('Completed by AI')} value={pct(totals.autoRate)} hint={t('Of the runs that finished')} />
                 <Stat label={t('Returned by a person')} value={pct(totals.returnRate)} hint={t('Of the runs a person reviewed')} />
                 <Stat label={t('Runs in {n} days', { n: AUDIT_WINDOW_DAYS })} value={String(totals.runs)}
                   hint={totals.hours === null ? undefined : t('About {h} hours saved (estimate)', { h: totals.hours.toLocaleString(locale, { maximumFractionDigits: 1 }) })} />
               </dl>
 
-              <PageSection title={t('Needs a person')} action={scoped.attention.length > 0 && <ButtonAppearanceProvider appearance="inline"><Button size="xs" variant="ghost" onClick={() => onOpenLog(true)}><ScrollText size={14} />{t('Open in the log')}</Button></ButtonAppearanceProvider>}>
-                {scoped.attention.length
-                  ? <RunRows runs={scoped.attention.slice(0, 5)} deploymentOf={scoped.deploymentOf} selectedId={null} onOpen={onOpenRun} limitStep={5} />
+              <PageSection title={t('Needs a person')} action={scoped.attentionEntries.length > 0 && <ButtonAppearanceProvider appearance="inline"><Button size="xs" variant="ghost" onClick={() => onOpenLog(true)}><ScrollText size={14} />{t('Open in the log')}</Button></ButtonAppearanceProvider>}>
+                {scoped.attentionEntries.length
+                  ? <EntryRows entries={scoped.attentionEntries.slice(0, 5)} deploymentOf={scoped.deploymentOf} selectedId={null} onOpen={onOpenRun} limitStep={5} />
                   : <Empty>{t('Nothing needs a person right now.')}</Empty>}
               </PageSection>
+
+              {!scoped.deployments.length && source.agentRuns.length > 0 && (
+                <p className={`${FONT.base} text-muted-foreground`}>
+                  {t('{n} agent runs need a person', { n: scoped.attentionEntries.filter(e => e.source === 'agent').length })}{' '}
+                  <ButtonAppearanceProvider appearance="inline"><Button size="xs" variant="ghost" onClick={() => onOpenLog(scoped.attentionEntries.some(e => e.source === 'agent'))}><ScrollText size={14} />{t('Open in the log')}</Button></ButtonAppearanceProvider>
+                </p>
+              )}
 
               <PageSection title={t('Workflows')}>
                 {!scoped.deployments.length ? <Empty>{t('No AI workflows are registered in this Space yet. A workflow appears here when its gateway is connected and starts reporting.')}</Empty> : (

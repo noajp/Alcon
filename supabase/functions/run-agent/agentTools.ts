@@ -57,13 +57,24 @@ export const INTERNAL_TOOLS: ToolDef[] = [
   },
   {
     name: "finish",
-    description: "任務を終える。必ず最後に一度呼ぶ。outcome: completed（達成）/ partial（一部だけ）/ blocked（人の判断や資格情報が要る）。message は Element にコメントとして残る完了報告で、何をしたか・件数・失敗・残り・人に確認してほしいことを具体的に書く。",
+    description: "任務を終える。必ず最後に一度呼ぶ。outcome: completed（達成）/ partial（一部だけ）/ blocked（人の判断や資格情報が要る）。message は Element にコメントとして残る完了報告で、何をしたか・件数・失敗・残り・人に確認してほしいことを具体的に書く。成功条件の値を実際に測ったときは readings で報告する（下の「報告できる成功条件」にある measure だけ、推測や目標値ではなく実測値）。",
     input_schema: {
       type: "object",
       properties: {
         outcome: { type: "string", enum: ["completed", "partial", "blocked"] },
         summary: { type: "string", description: "1 行の要約" },
         message: { type: "string", description: "完了報告（Markdown）" },
+        readings: {
+          type: "array", maxItems: 10,
+          items: {
+            type: "object",
+            properties: {
+              measureId: { type: "string", description: "この実行が仕える Strategy の成功条件（measure）の id。下の「報告できる成功条件」にあるものだけ" },
+              value: { type: "number", description: "実際に数えた・測った値。推測や目標値を書かない" },
+            },
+            required: ["measureId", "value"], additionalProperties: false,
+          },
+        },
       },
       required: ["outcome", "summary", "message"],
       additionalProperties: false,

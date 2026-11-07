@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PageSection } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import type { MissionData } from '@/hooks/initiativeMissionData';
 import type { StrategyDelegation } from '@/types/database';
 import {
+  measureOutcomes,
   type ActionState, type MissionBindingRow, type MissionElementRow, type MissionMeasureRow,
 } from './missionModel';
 
@@ -73,9 +74,64 @@ export function MissionEvaluatePanel({ ctx }: { ctx: MissionContext }) {
   const titleOf = new Map(ctx.elements.map((e) => [e.id, e.display_id ? `${e.display_id} ${e.title}` : e.title]));
   const decided = ctx.mission.actions;
   const finishedRuns = ctx.mission.runs.filter((r) => r.finished_at);
+  // Each measure with its attribution: how fresh its number is, where the
+  // last reading came from, and underneath it the work that delivers it.
+  const outcomes = useMemo(() => measureOutcomes({
+    measures: ctx.measures, bindings: ctx.bindings, elements: ctx.elements,
+    runs: ctx.mission.runs, readings: ctx.mission.readings, now: new Date(),
+  }), [ctx.measures, ctx.bindings, ctx.elements, ctx.mission.runs, ctx.mission.readings]);
 
   return (
     <div className="space-y-6">
+      {outcomes.length > 0 && <PageSection title={t('Success conditions')}>
+        {(
+          <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+            {outcomes.map((o) => {
+              const key = `m:${o.measure.id}`;
+              const expanded = open === key;
+              return (
+                <li key={o.measure.id} className="px-3 py-2">
+                  <button type="button" onClick={() => setOpen(expanded ? null : key)} className="flex w-full items-center gap-2 text-left">
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{o.measure.title}</span>
+                    <span className="shrink-0 text-[12px] tabular-nums text-foreground">
+                      {o.measure.actual_value ?? '—'}{o.measure.target_value !== null ? ` / ${o.measure.target_value}` : ''}{o.measure.unit ? ` ${o.measure.unit}` : ''}
+                    </span>
+                    <span className="shrink-0 truncate text-[11px] text-muted-foreground">
+                      {o.lastReading
+                        ? `${o.lastReading.source === 'agent' ? t('Agent run') : o.lastReading.recordedByName ?? t('A person')} · ${formatRelative(o.lastReading.recordedAt)}`
+                        : '—'}
+                    </span>
+                    {(o.freshness === 'stale' || o.freshness === 'never') && o.state !== 'met' && (
+                      <span className="shrink-0 text-[11px] text-[var(--status-warning)]">{o.freshness === 'never' ? t('Not measured yet') : t('Stale')}</span>
+                    )}
+                  </button>
+                  {expanded && (
+                    <div className="mt-2 space-y-1 text-[12px]">
+                      {o.serves.map((s) => (
+                        <div key={s.elementId} className="flex items-baseline gap-2">
+                          <span className="min-w-0 flex-1 truncate text-foreground">{s.title}</span>
+                          {s.verdict?.result === 'pass' && <span className="shrink-0 text-[var(--status-success)]">{t('Verifier: passed')}</span>}
+                          {s.verdict?.result === 'fail' && <span className="shrink-0 text-[var(--status-danger)]">{t('Verifier: not passed')}</span>}
+                          {s.verdict?.result === 'unchecked' && <span className="shrink-0 text-muted-foreground">{t('Not verified')}</span>}
+                          <span className="shrink-0" style={{ color: stateColor(s.state) }}>{t(STATE_LABEL[s.state])}</span>
+                        </div>
+                      ))}
+                      {o.agentReadings.map((r) => (
+                        <div key={`${r.runId}:${r.appliedAt}`} className="flex items-baseline gap-2 text-muted-foreground">
+                          <span className="min-w-0 flex-1 truncate">{t('Agent run')} · {titleOf.get(r.elementId) ?? ''}</span>
+                          <span className="shrink-0 tabular-nums text-foreground">{r.value}</span>
+                          <span className="shrink-0">{formatRelative(r.appliedAt)}</span>
+                        </div>
+                      ))}
+                      {!o.serves.length && !o.agentReadings.length && <p className="text-muted-foreground">{t('No work delivers this measure yet.')}</p>}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </PageSection>}
       {ctx.mission.artifacts.length > 0 && <PageSection title={t('Deliverables')}>
         {(
           <ul className="divide-y divide-border/50 rounded-lg border border-border/60">

@@ -269,6 +269,7 @@ export type Database = {
           model: string | null
           output_tokens: number
           prompt: string | null
+          proposed_readings: Json | null
           reply_to: string | null
           result: string | null
           started_at: string | null
@@ -278,6 +279,7 @@ export type Database = {
           transcript: Json | null
           triggered_by: string | null
           triggered_from: string | null
+          verdict: Json | null
           worker_id: string | null
         }
         Insert: {
@@ -297,6 +299,7 @@ export type Database = {
           model?: string | null
           output_tokens?: number
           prompt?: string | null
+          proposed_readings?: Json | null
           reply_to?: string | null
           result?: string | null
           started_at?: string | null
@@ -306,6 +309,7 @@ export type Database = {
           transcript?: Json | null
           triggered_by?: string | null
           triggered_from?: string | null
+          verdict?: Json | null
           worker_id?: string | null
         }
         Update: {
@@ -325,6 +329,7 @@ export type Database = {
           model?: string | null
           output_tokens?: number
           prompt?: string | null
+          proposed_readings?: Json | null
           reply_to?: string | null
           result?: string | null
           started_at?: string | null
@@ -334,6 +339,7 @@ export type Database = {
           transcript?: Json | null
           triggered_by?: string | null
           triggered_from?: string | null
+          verdict?: Json | null
           worker_id?: string | null
         }
         Relationships: [

@@ -58,12 +58,13 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   const elementIds = useMemo(() => elements.map((e) => e.id), [elements]);
   // The Elements as the shared card reads them, for the Execution tab.
   const details = useMemo(() => new Map(objects.flatMap((o) => (o.elements ?? []).map((e) => [e.id, e] as const))), [objects]);
-  const mission = useInitiativeMission(initiativeId, elementIds);
 
   const measures = useMemo<MissionMeasureRow[]>(() => (intent?.data?.subs ?? [])
     .filter((i) => i.kind === 'measure')
-    .map((m) => ({ id: m.id, title: m.title, target_value: m.target_value, actual_value: m.actual_value, unit: m.unit, direction: m.direction })),
+    .map((m) => ({ id: m.id, title: m.title, target_value: m.target_value, actual_value: m.actual_value, unit: m.unit, direction: m.direction, measured_at: m.measured_at ?? null })),
   [intent?.data?.subs]);
+  const measureIds = useMemo(() => measures.map((m) => m.id), [measures]);
+  const mission = useInitiativeMission(initiativeId, elementIds, measureIds);
 
   const ctx: MissionContext = {
     initiativeId, initiativeName, spaceId,

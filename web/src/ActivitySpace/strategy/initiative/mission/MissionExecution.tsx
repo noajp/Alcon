@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, Clock, Flag, Hand, Pause } from '@/ui/icons';
+import { AlertTriangle, Check, Clock, Flag, Hand, Pause, ShieldCheck } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
@@ -93,9 +93,15 @@ function MissionLines({ element, busy, onHandOver, rounds }: {
       best: rounds.values.length ? Math.max(...rounds.values) : '—',
     })
     : null;
-  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop) return null;
+  // Only a failed check is card-worthy: unchecked is the common case and
+  // would be noise here (it lives in the run panel and the Audit log).
+  const verdictFail = element.verdict?.result === 'fail';
+  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop && !verdictFail) return null;
   return (
     <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
+      {verdictFail && (
+        <div className="flex min-w-0 items-center gap-1.5 text-[var(--status-danger)]"><ShieldCheck size={12} className="shrink-0" /><span className="truncate">{t('Verifier: not passed')}</span></div>
+      )}
       {element.serves.length > 0 && (
         <div className="flex min-w-0 items-center gap-1.5"><Flag size={12} className="shrink-0" /><span className="truncate">{element.serves.join(', ')}</span></div>
       )}
@@ -502,6 +508,20 @@ e.elementId && details.get(e.elementId) ? (
 
         {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
+
+        {/* Each Object's checked outcomes, tallied quietly over its
+            Elements' latest runs — only where a check passed or failed. */}
+        {!draft && fleet.some((o) => o.verdicts.pass + o.verdicts.fail > 0) && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+            {fleet.filter((o) => o.verdicts.pass + o.verdicts.fail > 0).map((o) => (
+              <span key={o.key} className="flex items-baseline gap-1.5">
+                <span className="text-foreground/80">{o.name}</span>
+                {o.verdicts.pass > 0 && <span className="text-[var(--status-success)]">✓ {t('passed {n}', { n: o.verdicts.pass })}</span>}
+                {o.verdicts.fail > 0 && <span className="text-[var(--status-danger)]">{t('not passed {n}', { n: o.verdicts.fail })}</span>}
+              </span>
+            ))}
+          </div>
+        )}
 
         {fleet.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">{t('No Objects yet. Break the Strategy down with AI, or add Objects on the Overview.')}</p>

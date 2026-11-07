@@ -62,6 +62,8 @@ import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { commandSchema, criticalClassForTokens, criticalClassOf, decide, offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type CriticalClass, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
 import { needsApprovalFor, type ApprovalFacts } from "../_shared/approvalPolicy.ts";
+import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
+import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
@@ -201,6 +203,13 @@ Deno.serve(async (req: Request) => {
     if (!user) return json({ error: "session expired or invalid" }, 401);
     const { data: el } = await userDb.from("elements").select("id, status").eq("id", body.advance).maybeSingle();
     if (!el) return json({ error: "element not found" }, 404);
+    // Closing done accepts the work — and with it, the readings its latest
+    // run held for this acceptance. That happens whatever the delegation;
+    // a cancelled Element's numbers never land. It must not fail the close.
+    if (el.status === "done") {
+      await applyHeldReadings({ admin, userDb, user: { id: user.id } }, el.id)
+        .catch((e) => console.error("run-agent: held readings failed", errorMessage(e)));
+    }
     // Cancelled settles a prerequisite as much as done does.
     if (!["done", "cancelled"].includes(el.status ?? "") || (await elementDelegation(userDb, el.id)) !== "auto") return json({ started: [] });
     const started = await advanceFrom({ admin, userDb, user: { id: user.id, email: user.email ?? null }, jwt, supabaseUrl }, el.id);
@@ -335,10 +344,11 @@ async function nextStepIdx(admin: SupabaseClient, runId: string): Promise<number
   return idx;
 }
 
-async function addStep(admin: SupabaseClient, runId: string, type: string, title: string, detail?: string | null) {
+async function addStep(admin: SupabaseClient, runId: string, type: string, title: string, detail?: string | null): Promise<number> {
   const idx = await nextStepIdx(admin, runId);
   await admin.from("agent_run_steps").insert({ run_id: runId, idx, type, title: title.slice(0, 300), detail: detail ? String(detail).slice(0, 8000) : null });
   await admin.from("agent_runs").update({ step_count: idx + 1 }).eq("id", runId);
+  return idx;
 }
 
 interface ExecArgs {
@@ -829,7 +839,12 @@ async function execute(a: ExecArgs): Promise<void> {
       }
       case "finish": {
         const outcome = ["completed", "partial", "blocked"].includes(String(input.outcome)) ? String(input.outcome) as FinishPayload["outcome"] : "completed";
-        const finish: FinishPayload = { outcome, summary: String(input.summary ?? "").trim().slice(0, 300) || "完了", message: String(input.message ?? "").trim() };
+        const finish: FinishPayload = {
+          outcome, summary: String(input.summary ?? "").trim().slice(0, 300) || "完了", message: String(input.message ?? "").trim(),
+          // Copied through unvalidated: the gate validates the proposals at
+          // finish time, when the bound measures and the verdict are known.
+          ...(Array.isArray(input.readings) ? { readings: input.readings as { measureId: string; value: number }[] } : {}),
+        };
         return { content: "完了報告を受け取りました。", finish };
       }
     }
@@ -865,6 +880,12 @@ async function execute(a: ExecArgs): Promise<void> {
     return { content: "Unknown tool.", is_error: true };
   };
 
+  // The measures this run may report readings for: those of the Strategies
+  // its Element serves — the same set the verifier judges the finish
+  // against. Loaded once: the task context lists them for the agent, and
+  // finishRun gates the finish's proposals by them.
+  const boundMeasures = await loadBoundMeasures(userDb, run.element_id);
+
   // ── State ───────────────────────────────────────────────────────────────
   const deadline = Date.now() + SLICE_MS;
   // A model call gets what is left of the slice: one that hangs would eat
@@ -881,7 +902,7 @@ async function execute(a: ExecArgs): Promise<void> {
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
   } else {
-    const task = taskMessage(await loadContext(userDb, run, integrationSummary, recordScope ? await strategyTableLines(userDb, recordScope.strategyId) : null));
+    const task = taskMessage(await loadContext(userDb, run, integrationSummary, recordScope ? await strategyTableLines(userDb, recordScope.strategyId) : null, boundMeasures));
     const defText = definition && parsedAll
       ? definition.scope === "element"
         ? definitionPrompt(definition.name, definition.body, parsedAll)
@@ -1044,14 +1065,25 @@ async function execute(a: ExecArgs): Promise<void> {
     await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
   };
 
+  // The verdict record's raw material (runVerdict.ts): the last check the
+  // verifier made, kept so the terminal finishRun can seal it onto the run.
+  // Each attempt resets it — the record describes the finish that stood, so
+  // a check of a finish that was sent back must not leak into it. When
+  // revisions run out no new attempt happens, and the holder keeps the last
+  // check (a fail), which is what the record then says.
+  let lastCheck: VerdictInputs["lastCheck"] = null;
+  let checkAttempted = false;
+
   // The verifier reads the task, the Strategy's success conditions and this
   // run's outputs fresh, in its own context, on the run's model at low effort.
   // Any failure to answer lets the finish stand rather than trap the run.
   const verifyFinish = async (finish: FinishPayload) => {
+    lastCheck = null;
+    checkAttempted = true;
     try {
       const [{ data: el }, { data: arts }] = await Promise.all([
         userDb.from("elements").select("title, description, object_id").eq("id", run.element_id).maybeSingle(),
-        admin.from("agent_artifacts").select("title, content").eq("run_id", run.id),
+        admin.from("agent_artifacts").select("id, title, content").eq("run_id", run.id),
       ]);
       if (!el) return null;
       const intents: string[] = [];
@@ -1078,7 +1110,13 @@ async function execute(a: ExecArgs): Promise<void> {
       await recordUsage(res.usage ?? {});
       const text = (res.content ?? []).find((b: { type: string }) => b.type === "text")?.text ?? "";
       const verdict = readVerdict(text);
-      if (verdict) await addStep(admin, run.id, "thought", verdict.pass ? "検証: 合格" : `検証: 不足 ${verdict.gaps.length} 点`, verdict.gaps.join("\n") || null);
+      if (verdict) {
+        const stepIdx = await addStep(admin, run.id, "thought", verdict.pass ? "検証: 合格" : `検証: 不足 ${verdict.gaps.length} 点`, verdict.gaps.join("\n") || null);
+        lastCheck = {
+          pass: verdict.pass, gaps: verdict.gaps, model, checkedAt: new Date().toISOString(), verifyStepIdx: stepIdx,
+          artifactIds: ((arts ?? []) as { id: string }[]).map((art) => art.id),
+        };
+      }
       return verdict;
     } catch (e) {
       console.error("run-agent: verify failed", errorMessage(e));
@@ -1170,10 +1208,17 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // ── Outcome ─────────────────────────────────────────────────────────────
   switch (outcome.kind) {
-    case "finished":
+    case "finished": {
       await saveTranscript();
-      await finishRun(a, run, agentName, outcome.finish);
+      // A reply run's finish is a reply, not checked work: its verdict stays
+      // null. Any other run's record is built from the verifier's holder —
+      // a checked pass/fail, or an honest "unchecked" with its reason.
+      const verdict = run.mode === "reply" ? null : buildRunVerdict({
+        lastCheck, checkAttempted, revisions: state.revisions ?? 0, finish: outcome.finish, external,
+      });
+      await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
       return;
+    }
 
     case "approval": {
       await saveTranscript(outcome.pending);
@@ -1458,7 +1503,7 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
   };
 }
 
-async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: FinishPayload, status?: "paused") {
+async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: FinishPayload, status?: "paused", verdict?: RunVerdict | null, bound?: readonly BoundMeasure[]) {
   const { admin, userDb, user } = a;
   // A run stopped meanwhile stays stopped, and says nothing.
   const { data: live } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
@@ -1484,10 +1529,31 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     }
   }
 
+  // ── The finish's proposed readings ──────────────────────────────────────
+  // Gated by the run's verdict and the Strategies' delegation
+  // (readingsGate.ts): only a checked pass ever lands — now, under 'auto';
+  // held for the work's acceptance, under manual review. Everything else
+  // stays on the run with the reason it did not land.
+  let proposals: ProposedReading[] | null = null;
+  if (verdict && bound && finish.readings?.length) {
+    proposals = validateProposals(finish.readings, bound);
+    const decision = readingsDecision({ verdict, delegation: await elementDelegation(userDb, run.element_id), elementClosed: false });
+    if (decision === "apply") {
+      proposals = await applyReadings(admin, run.id, proposals, userDb, user.id);
+    } else {
+      const heldReason: ProposedReading["heldReason"] = decision === "hold" ? "awaiting-acceptance" : "verdict-not-pass";
+      proposals = proposals.map((p) => (p.heldReason === "not-bound" ? p : { ...p, heldReason }));
+    }
+  }
+
   const runStatus = status ?? (finish.outcome === "completed" && run.mode !== "reply" && !auto ? "awaiting_review" : "completed");
   const { data: closed } = await admin.from("agent_runs").update({
     status: runStatus, summary: finish.summary, result: finish.message, finished_at: status ? null : new Date().toISOString(),
     error: status === "paused" ? finish.summary : null, continuation_token: null,
+    // The verdict is sealed with the finish that stood — written here, at a
+    // terminal finish only, and never updated afterwards.
+    ...(verdict ? { verdict } : {}),
+    ...(proposals ? { proposed_readings: proposals } : {}),
   }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
   if (!closed) return;
 
@@ -1505,7 +1571,8 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
     content, ...(parentId ? { parent_id: parentId } : {}),
   });
-  await addStep(admin, run.id, "result", finish.summary, finish.message);
+  const readingsLine = proposals?.length ? readingsSummaryLine(proposals) : "";
+  await addStep(admin, run.id, "result", finish.summary, readingsLine ? `${finish.message}\n\n${readingsLine}` : finish.message);
 
   if (run.triggered_by) {
     await admin.from("notifications").insert({
@@ -1522,6 +1589,64 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
       console.error("run-agent: advance failed", errorMessage(e));
     }
   }
+}
+
+/**
+ * Lands a run's pending proposals on their measures, through the given
+ * person's client — RLS decides, and the readings trigger records each
+ * with source 'agent' and that person as its recorder. Only proposals
+ * still waiting to land are attempted (at finish, the ones the gate just
+ * validated; at acceptance, the ones held for it). A failure marks the
+ * proposal write-failed and steps the run; it never fails the run, never
+ * blocks a close, and never falls back to the service role — bypassing
+ * RLS to land a Strategy's success number is precisely what the gate
+ * exists to prevent.
+ */
+async function applyReadings(admin: SupabaseClient, runId: string, proposals: ProposedReading[], db: SupabaseClient, by: string): Promise<ProposedReading[]> {
+  const now = new Date().toISOString();
+  const out: ProposedReading[] = [];
+  for (const p of proposals) {
+    if (p.applied || (p.heldReason !== null && p.heldReason !== "awaiting-acceptance")) { out.push(p); continue; }
+    const { data, error } = await db.from("intents")
+      .update({ actual_value: p.value, measured_at: now })
+      .eq("id", p.measureId).eq("kind", "measure")
+      .setHeader("x-alcon-reading-source", "agent")
+      .select("id");
+    if (error || !data?.length) {
+      const { data: m } = await admin.from("intents").select("title").eq("id", p.measureId).maybeSingle();
+      await addStep(admin, runId, "status", `成功条件「${(m as { title?: string } | null)?.title ?? p.measureId}」の報告を記録できませんでした`, error?.message ?? null);
+      out.push({ ...p, heldReason: "write-failed" });
+      continue;
+    }
+    out.push({ ...p, applied: true, appliedAt: now, appliedBy: by, heldReason: null });
+  }
+  return out;
+}
+
+/**
+ * A person accepted an Element's work by closing it done: the readings its
+ * latest finished run held for that acceptance land now, through the
+ * closer's client — the same act that accepts the work accepts its
+ * numbers. Only the latest finished run's proposals can land: a re-run
+ * supersedes an older run's, which stay held forever. The verdict is
+ * re-read from the run's row — it cannot have changed since it was sealed.
+ */
+async function applyHeldReadings(a: { admin: SupabaseClient; userDb: SupabaseClient; user: { id: string } }, elementId: string): Promise<void> {
+  const { admin, userDb, user } = a;
+  const { data: runs } = await admin.from("agent_runs")
+    .select("id, verdict, proposed_readings")
+    .eq("element_id", elementId).not("finished_at", "is", null)
+    .order("finished_at", { ascending: false }).limit(1);
+  const latest = (runs ?? [])[0] as { id: string; verdict: unknown; proposed_readings: unknown } | undefined;
+  if (!latest) return;
+  const proposals = parseProposedReadings(latest.proposed_readings);
+  if (!proposals?.some((p) => !p.applied && p.heldReason === "awaiting-acceptance")) return;
+  const decision = readingsDecision({
+    verdict: parseRunVerdict(latest.verdict), delegation: await elementDelegation(userDb, elementId), elementClosed: true,
+  });
+  if (decision !== "apply") return;
+  const next = await applyReadings(admin, latest.id, proposals, userDb, user.id);
+  await admin.from("agent_runs").update({ proposed_readings: next }).eq("id", latest.id);
 }
 
 /** The definition an Element follows: its own, else the first enabled of its
@@ -1554,6 +1679,37 @@ async function loadDefinition(userDb: SupabaseClient, elementId: string): Promis
   const { data: d } = await userDb.from("definitions").select("name, body").eq("id", id).maybeSingle();
   if (!d) return { definition: null, skippedDisabled };
   return { definition: { ...(d as { name: string; body: string }), scope: id === ownId ? "element" : "strategy" }, skippedDisabled };
+}
+
+/** One measure of a Strategy an Element serves, as the readings gate and
+ *  the task context need it. */
+interface BoundMeasureInfo extends BoundMeasure {
+  strategyName: string;
+  unit: string | null;
+  direction: string | null;
+  targetValue: number | null;
+  actualValue: number | null;
+}
+
+/** The measures a run on this Element may report readings for: those of
+ *  the Strategies linked to its Object — the same set the verifier judges
+ *  the finish against. */
+async function loadBoundMeasures(userDb: SupabaseClient, elementId: string): Promise<BoundMeasureInfo[]> {
+  const { data: el } = await userDb.from("elements").select("object_id").eq("id", elementId).maybeSingle();
+  if (!el?.object_id) return [];
+  const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id);
+  const ids = [...new Set(((links ?? []) as { strategy_id: string }[]).map((l) => l.strategy_id))];
+  if (!ids.length) return [];
+  const [{ data: measures }, { data: strategies }] = await Promise.all([
+    userDb.from("intents").select("id, title, unit, direction, target_value, actual_value, strategy_id").in("strategy_id", ids).eq("kind", "measure").is("superseded_by_intent_id", null),
+    userDb.from("strategies").select("id, name").in("id", ids),
+  ]);
+  const nameOf = new Map(((strategies ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
+  return ((measures ?? []) as { id: string; title: string; unit: string | null; direction: string | null; target_value: number | null; actual_value: number | null; strategy_id: string }[])
+    .map((m) => ({
+      id: m.id, title: m.title, strategyId: m.strategy_id, strategyName: nameOf.get(m.strategy_id) ?? "",
+      unit: m.unit, direction: m.direction, targetValue: m.target_value, actualValue: m.actual_value,
+    }));
 }
 
 /** The delegation of the Strategies an Element's Object serves. */
@@ -1651,7 +1807,7 @@ async function loadUpstream(userDb: SupabaseClient, ids: string[]): Promise<Task
   });
 }
 
-async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskContext["integrations"], tables: string[] | null): Promise<TaskContext> {
+async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskContext["integrations"], tables: string[] | null, boundMeasures: readonly BoundMeasureInfo[] = []): Promise<TaskContext> {
   const { data: el } = await userDb.from("elements")
     .select("id, display_id, title, description, status, priority, due_date, labels, object_id").eq("id", run.element_id).single();
   if (!el) throw new Error("対象の Element が見つかりません。");
@@ -1683,6 +1839,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
     objectName: (obj.data as { name?: string } | null)?.name ?? null,
     subElements: (subs.data ?? []).map((s: { id: string; title: string; status: string | null }) => ({ id: s.id, title: s.title, done: s.status === "done" })),
     initiatives,
+    measures: boundMeasures.map((m) => ({ id: m.id, title: m.title, strategyName: m.strategyName, unit: m.unit, target: m.targetValue, current: m.actualValue })),
     comments: ((comments.data ?? []) as { author_name: string | null; author_kind: string; content: string; created_at: string }[]).reverse()
       .map((c) => ({ author: c.author_name ?? "不明", kind: c.author_kind, content: c.content ?? "", at: c.created_at.slice(0, 16).replace("T", " ") })),
     previousRuns: ((runs.data ?? []) as { created_at: string; status: string; summary: string | null }[])

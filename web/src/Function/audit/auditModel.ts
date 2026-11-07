@@ -12,6 +12,8 @@
 // stays append-only and the reading can change without rewriting history.
 // =============================================================
 
+import type { AgentRunMode, AgentRunStatus } from '@/types/database';
+
 export type DeploymentState = 'trial' | 'live' | 'paused';
 export type StepKind = 'start' | 'step' | 'approval' | 'exception' | 'end';
 export type StepOperation = 'read' | 'draft' | 'send' | 'money' | 'none';
@@ -388,4 +390,288 @@ export async function verifyChain(steps: readonly ChainStep[], sha256Hex: (text:
     if (await sha256Hex(stepChainText(step)) !== step.hash) breaks.push({ seq: step.seq, kind: 'hash' });
   }
   return breaks;
+}
+
+// ── Agent runs: verdicts and readings (Phase 2) ────────────────────────
+// The app's own agent work, kept apart from the ledger above: an agent run
+// is a mutable application row written by the service role, never part of
+// the hash chain, and nothing here borrows the chain's language for it.
+// What the run itself claims is its finish (summary/result); the verdict
+// below is the separate verifier's judgement of that finish, and a run's
+// proposed readings are the numbers its finish offered the Strategy's
+// measures. The server definitions live in
+// supabase/functions/_shared/runVerdict.ts and readingsGate.ts; these are
+// the web mirrors, pinned to them by agreement tests.
+
+export type RunVerdictResult = 'pass' | 'fail' | 'unchecked';
+
+export type RunVerdictReason =
+  | 'revisions-exhausted'    // last check failed; the finish stood anyway
+  | 'verify-unavailable'     // the check errored or answered unreadably
+  | 'outcome-not-completed'  // partial / blocked finishes are not checked
+  | 'external-model';        // runs on an external model have no verifier
+
+export interface RunVerdict {
+  v: 1;
+  result: RunVerdictResult;
+  /** Who judged. 'verifier' = the separate check; 'none' = nobody did. */
+  source: 'verifier' | 'none';
+  /** The model that ran the check (the verifier runs on the run's model). */
+  model: string | null;
+  /** What the verifier found missing (≤5, its own words). Empty on pass. */
+  gaps: string[];
+  /** Times the loop sent a finish back before the one that stood. */
+  revisions: number;
+  /** When the last check ran; null when no check ran. */
+  checkedAt: string | null;
+  /** The finish outcome this record judges. */
+  outcome: 'completed' | 'partial' | 'blocked';
+  /** Why the record is not a checked pass; null on pass. */
+  reason: RunVerdictReason | null;
+  /** What the check read, so a person can re-walk it. */
+  evidence: {
+    /** idx of the run's 検証 step (agent_run_steps.idx), null when none. */
+    verifyStepIdx: number | null;
+    /** The artifacts the verifier was shown. */
+    artifactIds: string[];
+  };
+}
+
+const VERDICT_RESULTS: readonly string[] = ['pass', 'fail', 'unchecked'];
+const VERDICT_SOURCES: readonly string[] = ['verifier', 'none'];
+const VERDICT_OUTCOMES: readonly string[] = ['completed', 'partial', 'blocked'];
+const VERDICT_REASONS: readonly string[] = ['revisions-exhausted', 'verify-unavailable', 'outcome-not-completed', 'external-model'];
+
+/** Strict narrowing of the jsonb: a record that is not exactly this shape
+ *  is not a verdict (null), never a partially-read one. Mirrors the
+ *  server's parseRunVerdict field for field. */
+export function parseRunVerdict(raw: unknown): RunVerdict | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  if (r.v !== 1) return null;
+  if (typeof r.result !== 'string' || !VERDICT_RESULTS.includes(r.result)) return null;
+  if (typeof r.source !== 'string' || !VERDICT_SOURCES.includes(r.source)) return null;
+  if (!(r.model === null || typeof r.model === 'string')) return null;
+  if (!Array.isArray(r.gaps) || !r.gaps.every((g) => typeof g === 'string')) return null;
+  if (typeof r.revisions !== 'number' || !Number.isInteger(r.revisions) || r.revisions < 0) return null;
+  if (!(r.checkedAt === null || typeof r.checkedAt === 'string')) return null;
+  if (typeof r.outcome !== 'string' || !VERDICT_OUTCOMES.includes(r.outcome)) return null;
+  if (!(r.reason === null || (typeof r.reason === 'string' && VERDICT_REASONS.includes(r.reason)))) return null;
+  const evidence = r.evidence;
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return null;
+  const e = evidence as Record<string, unknown>;
+  if (!(e.verifyStepIdx === null || (typeof e.verifyStepIdx === 'number' && Number.isInteger(e.verifyStepIdx)))) return null;
+  if (!Array.isArray(e.artifactIds) || !e.artifactIds.every((id) => typeof id === 'string')) return null;
+  return {
+    v: 1,
+    result: r.result as RunVerdictResult,
+    source: r.source as RunVerdict['source'],
+    model: r.model as string | null,
+    gaps: [...(r.gaps as string[])],
+    revisions: r.revisions as number,
+    checkedAt: r.checkedAt as string | null,
+    outcome: r.outcome as RunVerdict['outcome'],
+    reason: r.reason as RunVerdictReason | null,
+    evidence: { verifyStepIdx: e.verifyStepIdx as number | null, artifactIds: [...(e.artifactIds as string[])] },
+  };
+}
+
+export type ProposedReadingHeldReason =
+  | 'awaiting-acceptance'   // checked pass, manual Strategy: lands when the work is accepted
+  | 'verdict-not-pass'      // fail or unchecked verdict: never lands from this run
+  | 'not-bound'             // measure is not one this run serves (dropped at validation; kept for the record)
+  | 'write-failed';         // the intents update failed; see the run's step
+
+/** One reading a finish proposed for a Strategy measure, and whether it landed. */
+export interface ProposedReading {
+  measureId: string;
+  value: number;
+  applied: boolean;
+  appliedAt: string | null;
+  /** The person whose client wrote the intents update. */
+  appliedBy: string | null;
+  /** Why it did not land, when it never will or has not yet. Null once applied. */
+  heldReason: ProposedReadingHeldReason | null;
+}
+
+const HELD_REASONS: readonly string[] = ['awaiting-acceptance', 'verdict-not-pass', 'not-bound', 'write-failed'];
+
+// ── Agent runs in the audit timeline ───────────────────────────────────
+// The Audit app reads two sources: the gateway's hash-chained ledger
+// above, and the app's own agent runs. They are shown together but never
+// blended into a fake common run: each entry keeps its own record and its
+// own guarantees, and an agent run is always badged as not hash-chained.
+// Agent statuses are stored, not derived — so they get their own outcome
+// vocabulary rather than the ledger's, whose labels would lie about them.
+
+/** An agent run as the audit timeline carries it: the run row (browser-safe
+ *  columns, verdict parsed) plus the names a row needs to be readable. */
+export interface AgentRunRecord {
+  id: string;
+  element_id: string;
+  domain_id: string | null;
+  worker_id: string | null;
+  status: AgentRunStatus;             // the stored vocabulary, unmapped
+  mode: AgentRunMode;
+  summary: string | null;
+  error: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  cost_usd: number;
+  verdict: RunVerdict | null;
+  proposed_readings: ProposedReading[] | null;
+  elementTitle: string;
+  elementStatus: string | null;
+  objectName: string | null;
+  /** Pending agent_actions on this run (its approvals still waiting). */
+  pendingActions: number;
+}
+
+export type AgentOutcome =
+  | 'running'        // queued | running
+  | 'waiting'        // awaiting_approval | awaiting_input | paused
+  | 'review'         // awaiting_review — the work is done; a person judges it on the Element
+  | 'passed'         // completed, verdict pass
+  | 'completed'      // completed, verdict unchecked or null
+  | 'unpassed'       // completed, verdict fail (ended after the revision limit)
+  | 'failed'         // failed
+  | 'cancelled';     // cancelled
+
+/** One row of the merged timeline. `key` is `ledger:{id}` / `agent:{id}` —
+ *  route state carries the key, so the two id spaces can never collide. */
+export type AuditRunEntry =
+  | { source: 'ledger'; key: string; startedAt: string; needsPerson: boolean; run: LedgerRun }
+  | { source: 'agent'; key: string; startedAt: string; needsPerson: boolean; run: AgentRunRecord };
+
+/** Where a finished or standing agent run sits, in audit language. */
+export function agentRunOutcome(run: Pick<AgentRunRecord, 'status' | 'verdict' | 'pendingActions'>): AgentOutcome {
+  switch (run.status) {
+    case 'queued':
+    case 'running': return 'running';
+    case 'awaiting_input':
+    case 'awaiting_approval':
+    case 'paused': return 'waiting';
+    case 'awaiting_review': return 'review';
+    case 'completed':
+      if (run.verdict?.result === 'pass') return 'passed';
+      if (run.verdict?.result === 'fail') return 'unpassed';
+      return 'completed';
+    case 'failed': return 'failed';
+    case 'cancelled': return 'cancelled';
+  }
+}
+
+/**
+ * The states where the record asks something of a person now (the role
+ * NEEDS_PERSON plays for the ledger). Paused is not attention: a
+ * session-paused run resumes on its own when its person opens the Element,
+ * and an error-paused run is already counted through its Element's state.
+ */
+export function agentRunNeedsPerson(run: Pick<AgentRunRecord, 'status' | 'pendingActions'>): boolean {
+  return run.status === 'awaiting_approval' || run.status === 'awaiting_review' || run.status === 'failed';
+}
+
+/**
+ * Both sources as one timeline: newest first by when the run started
+ * (an agent run that never started falls back to when it was queued),
+ * stable, with ledger entries winning ties — they carry the stronger record.
+ */
+export function mergeAuditTimeline(ledger: readonly LedgerRun[], agent: readonly AgentRunRecord[]): AuditRunEntry[] {
+  const entries: AuditRunEntry[] = [
+    ...ledger.map((run): AuditRunEntry => ({
+      source: 'ledger', key: `ledger:${run.id}`, startedAt: run.started_at,
+      needsPerson: NEEDS_PERSON.has(runOutcome(run.steps)), run,
+    })),
+    ...agent.map((run): AuditRunEntry => ({
+      source: 'agent', key: `agent:${run.id}`, startedAt: run.started_at ?? run.created_at,
+      needsPerson: agentRunNeedsPerson(run), run,
+    })),
+  ];
+  return entries.sort((a, b) =>
+    a.startedAt !== b.startedAt ? (a.startedAt < b.startedAt ? 1 : -1)
+      : a.source !== b.source ? (a.source === 'ledger' ? -1 : 1)
+        : 0);
+}
+
+/** One agent_run_steps row, as the detail panel reads it. */
+export interface AgentRunStepRow {
+  idx: number;
+  type: string;
+  title: string;
+  detail: string | null;
+  created_at: string;
+}
+
+/** One agent_actions row, as the detail panel reads it. */
+export interface AgentActionRow {
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
+  summary: string;
+  created_at: string;
+}
+
+const ACTION_RESULT: Record<AgentActionRow['status'], StepResult> = {
+  pending: 'waiting', approved: 'approved', executed: 'approved', rejected: 'returned', failed: 'failed',
+};
+
+/**
+ * A run's steps and its approvals as one event list, in the ledger panel's
+ * StepEvent shape — the shape only: an agent run has no hash, no previous
+ * hash, no grants version and no digest, and none is synthesised here.
+ * Steps keep chain order (idx); each approval is inserted by its time
+ * against the steps' times, ties keeping the step first. An approval's
+ * `seq` is the step it follows (0 before the first step).
+ */
+export function agentRunEvents(steps: readonly AgentRunStepRow[], actions: readonly AgentActionRow[]): StepEvent[] {
+  const ordered = [...steps].sort((a, b) => a.idx - b.idx);
+  const byTime = [...actions].sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+  const events: StepEvent[] = [];
+  let next = 0;
+  let lastIdx = 0;
+  const pushAction = (action: AgentActionRow) => {
+    events.push({
+      seq: lastIdx, step_key: 'approval', kind: 'approval', connector: null, operation: 'none',
+      result: ACTION_RESULT[action.status], reason: action.summary, outside_grant: false,
+    });
+  };
+  for (const step of ordered) {
+    while (next < byTime.length && byTime[next].created_at < step.created_at) pushAction(byTime[next++]);
+    events.push({
+      seq: step.idx, step_key: step.type, kind: step.type === 'error' ? 'exception' : 'step', connector: null,
+      operation: 'none', result: step.type === 'error' ? 'failed' : 'ok', reason: step.detail, outside_grant: false,
+    });
+    lastIdx = step.idx;
+  }
+  while (next < byTime.length) pushAction(byTime[next++]);
+  return events;
+}
+
+/** The sample stands in only while the Space has no AI work at all: no
+ *  deployments and no agent runs a person can see. */
+export function auditShowsSample(deployments: number, agentRuns: number): boolean {
+  return deployments === 0 && agentRuns === 0;
+}
+
+/** Strict narrowing of the proposed_readings jsonb; one malformed entry
+ *  makes the whole record unreadable rather than silently partial. */
+export function parseProposedReadings(raw: unknown): ProposedReading[] | null {
+  if (raw === null || raw === undefined) return null;
+  if (!Array.isArray(raw)) return null;
+  const out: ProposedReading[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.measureId !== 'string' || !e.measureId) return null;
+    if (typeof e.value !== 'number' || !Number.isFinite(e.value)) return null;
+    if (typeof e.applied !== 'boolean') return null;
+    if (!(e.appliedAt === null || typeof e.appliedAt === 'string')) return null;
+    if (!(e.appliedBy === null || typeof e.appliedBy === 'string')) return null;
+    if (!(e.heldReason === null || (typeof e.heldReason === 'string' && HELD_REASONS.includes(e.heldReason)))) return null;
+    out.push({
+      measureId: e.measureId, value: e.value, applied: e.applied,
+      appliedAt: e.appliedAt as string | null, appliedBy: e.appliedBy as string | null,
+      heldReason: e.heldReason as ProposedReadingHeldReason | null,
+    });
+  }
+  return out;
 }
