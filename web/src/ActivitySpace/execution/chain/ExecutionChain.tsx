@@ -6,16 +6,15 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { BoardColumn } from '../element/board/BoardColumn';
 
-// The Execution Chain: work in the Board's Status columns, drawn with the
-// Board's columns and cards. What waits on a person is a chip on its card
-// (WaitingChip), not a column of its own. A Strategy's Execution Chain tab
-// uses it with its own cards (the Planner's draft among them); a Domain's is
-// the Board itself.
+// The Execution Chain: work in Status columns, drawn with the shared
+// columns and cards. What waits on a person is a chip on its card
+// (WaitingChip), not a column of its own. Both hosts draw this one
+// component — a Strategy's Execution tab (the Planner's draft among its
+// cards) and a Domain's Flow tab alike.
 //
 // Every column renders at full width, empty or not — the columns are the
 // map of where work can stand, and an empty one is a place work can be
-// dropped, not a gap to fold away. An empty column's body is blank, as the
-// Board's is.
+// dropped, not a gap to fold away. An empty column's body is blank.
 //
 // A card drags with its Element's id, and the host decides what a drop
 // means: pass onDropStatus and the columns become drop targets for it.

@@ -59,18 +59,31 @@ async function inChunks<T>(ids: string[], read: (chunk: string[]) => PromiseLike
 
 type MissionRunRaw = Omit<MissionRun, 'verdict' | 'proposed_readings'> & { verdict: unknown; proposed_readings: unknown };
 
-async function fetchMission(elementIds: string[], measureIds: string[]): Promise<MissionData> {
-  if (elementIds.length === 0 && measureIds.length === 0) return EMPTY;
-  const [rawRuns, artifacts, actions, edges, readings] = await Promise.all([
-    elementIds.length === 0 ? [] : inChunks<MissionRunRaw>(elementIds, (c) => supabase.from('agent_runs')
+/** The runs and depends_on edges of a set of Elements — the rows both
+ *  chains read, a Strategy's mission and a Domain's alike. */
+async function fetchRunsAndEdges(elementIds: string[]): Promise<{ runs: MissionRun[]; edges: MissionEdge[] }> {
+  if (elementIds.length === 0) return { runs: [], edges: [] };
+  const [rawRuns, edges] = await Promise.all([
+    inChunks<MissionRunRaw>(elementIds, (c) => supabase.from('agent_runs')
       .select('id, element_id, status, model, input_tokens, output_tokens, cost_usd, summary, error, created_at, finished_at, verdict, proposed_readings')
       .in('element_id', c).order('created_at', { ascending: false })),
+    inChunks<MissionEdge>(elementIds, (c) => supabase.from('element_edges')
+      .select('from_element, to_element').eq('edge_type', 'depends_on').in('to_element', c)),
+  ]);
+  const runs: MissionRun[] = rawRuns.map((r) => ({
+    ...r, verdict: parseRunVerdict(r.verdict), proposed_readings: parseProposedReadings(r.proposed_readings),
+  }));
+  return { runs, edges };
+}
+
+async function fetchMission(elementIds: string[], measureIds: string[]): Promise<MissionData> {
+  if (elementIds.length === 0 && measureIds.length === 0) return EMPTY;
+  const [{ runs, edges }, artifacts, actions, readings] = await Promise.all([
+    fetchRunsAndEdges(elementIds),
     elementIds.length === 0 ? [] : inChunks<MissionArtifact>(elementIds, (c) => supabase.from('agent_artifacts')
       .select('id, element_id, title, format, content, author_name, updated_at').in('element_id', c).order('updated_at', { ascending: false })),
     elementIds.length === 0 ? [] : inChunks<MissionAction>(elementIds, (c) => supabase.from('agent_actions')
       .select('id, element_id, summary, status, decision_note, decided_at, created_at').in('element_id', c).order('created_at', { ascending: false })),
-    elementIds.length === 0 ? [] : inChunks<MissionEdge>(elementIds, (c) => supabase.from('element_edges')
-      .select('from_element, to_element').eq('edge_type', 'depends_on').in('to_element', c)),
     // The latest reading per measure of this Strategy: the history table is
     // indexed (intent_id, recorded_at desc) for exactly this read; the
     // reduction to latest-per-measure happens in measureOutcomes.
@@ -78,9 +91,6 @@ async function fetchMission(elementIds: string[], measureIds: string[]): Promise
       .select('intent_id, value, measured_at, source, recorded_by_name, recorded_at')
       .in('intent_id', c).order('recorded_at', { ascending: false })),
   ]);
-  const runs: MissionRun[] = rawRuns.map((r) => ({
-    ...r, verdict: parseRunVerdict(r.verdict), proposed_readings: parseProposedReadings(r.proposed_readings),
-  }));
   return { runs, artifacts, actions, edges, readings };
 }
 
@@ -101,6 +111,27 @@ export function useInitiativeMission(initiativeId: string, elementIds: string[],
     loading: query.isPending,
     error: (query.error as Error | null) ?? null,
     refetch: () => qc.invalidateQueries({ queryKey: ['initiative-mission', initiativeId] }),
+  };
+}
+
+const EMPTY_CHAIN_ROWS: { runs: MissionRun[]; edges: MissionEdge[] } = { runs: [], edges: [] };
+
+/** The runs and dependency edges of any set of Elements, with no Strategy
+ *  around them — what a Domain's Execution Chain reads. Re-read every 5s
+ *  while any run is working. */
+export function useElementChainRows(elementIds: string[]) {
+  const key = ['element-chain-rows', [...elementIds].sort().join(',')];
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchRunsAndEdges(elementIds),
+    staleTime: 5_000,
+    refetchInterval: (q) => ((q.state.data as { runs: MissionRun[] } | undefined)?.runs.some((r) => OPEN.includes(r.status)) ? 5_000 : false),
+  });
+  const qc = useQueryClient();
+  return {
+    data: query.data ?? EMPTY_CHAIN_ROWS,
+    loading: query.isPending,
+    refetch: () => qc.invalidateQueries({ queryKey: ['element-chain-rows'] }),
   };
 }
 

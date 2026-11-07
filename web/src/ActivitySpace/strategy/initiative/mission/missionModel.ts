@@ -8,9 +8,11 @@
 // Pure — hooks/initiativeMissionData.ts reads the rows, the Strategy's
 // tabs draw them; tests/missionModel.test.ts checks this file.
 
-import { isAiWeight, type AgentRunStatus, type AiWeight, type Worker } from '@/types/database';
+import { isAiWeight, type AgentRunStatus, type AiWeight, type ElementWithDetails, type Worker } from '@/types/database';
 import { measureState, type MeasureState } from '../initiativeMeasureModel';
 import { isElementAction, type ElementAction } from '@/Function/shared/elementActionKinds';
+import { runsInClaudeCode } from '@/Function/team/agentModel';
+import { liveLease } from '@/Function/shared/element/lease';
 import type { ProposedReading, RunVerdict } from '@/Function/audit/auditModel';
 import type { WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 
@@ -37,6 +39,28 @@ export interface MissionElementRow {
 
 /** What a card needs of a Worker to draw its avatar. */
 export interface MissionWorker { name?: string | null; type?: Worker['type'] | null; avatar_url?: string | null; ai_model?: string | null }
+
+/** Pure. An Element as the mission row the chains read: who carries it
+ *  out (the first assignee who is not a reviewer), the verb it asks for,
+ *  whether a Claude Code Worker holds it and whether a session's lease on
+ *  it is live at `now`. `objectId` is the Object the caller reads the
+ *  Element under — its home Object, or the Object a Strategy groups it
+ *  in. Shared by the Strategy's mission and a Domain's chain, so both
+ *  read an Element the same way. */
+export function missionElementRow(e: ElementWithDetails, objectId: string | null, now: number): MissionElementRow {
+  const doer = (e.assignees ?? []).find((a) => a.role !== 'reviewer' && a.worker)?.worker;
+  return {
+    id: e.id, title: e.title, status: e.status, display_id: e.display_id ?? null, object_id: objectId,
+    labels: e.labels ?? null,
+    assignee: doer ? (doer.type === 'ai_agent' ? 'ai' as const : 'human' as const) : null,
+    action: isElementAction(e.action) ? e.action : null,
+    assigneeName: doer?.name ?? null,
+    assigneeWorker: doer ?? null,
+    due_date: e.due_date ?? null,
+    claudeCode: (e.assignees ?? []).some((a) => a.role !== 'reviewer' && runsInClaudeCode(a.worker?.ai_config)),
+    leased: !!liveLease({ claimed_by: e.claimed_by ?? null, claim_expires_at: e.claim_expires_at ?? null, branch: e.branch ?? null }, now),
+  };
+}
 
 /** The label that hands an Element to the dev loop's dispatcher. */
 const DISPATCH_LABEL = 'dispatch';
@@ -235,17 +259,29 @@ function withTally(o: Omit<FleetObject, 'tally' | 'verdicts' | 'state' | 'costUs
   };
 }
 
-/** Pure. The Strategy's Objects in their order, each with its Elements —
- *  what needs a look first — and where each stands, who carries it out, what it delivers, what it waits on, and
- *  whether an AI may start it now. */
-export function buildFleet(input: {
-  objects: readonly FleetObjectRow[];
+/** The readings over a set of Elements that turn rows into cards: each
+ *  Element's latest run and its state, its display title, the measures it
+ *  serves, the predecessors it waits on, its runs' cost. buildFleet reads
+ *  them grouped by Object (a Strategy's chain); a Domain's chain reads
+ *  the same cards flat — one core, so the two chains cannot disagree
+ *  about where a card stands. */
+export interface FleetCardContext {
+  latest: Map<string, MissionRunRow>;
+  costs: Map<string, number>;
+  state: Map<string, ActionState>;
+  title: Map<string, string>;
+  serves: Map<string, string[]>;
+  upstream: Map<string, string[]>;
+}
+
+/** Pure. The card context over a set of Elements and their runs. */
+export function fleetCardContext(input: {
   elements: readonly MissionElementRow[];
   measures: readonly MissionMeasureRow[];
   bindings: readonly MissionBindingRow[];
   edges: readonly MissionEdgeRow[];
   runs: readonly MissionRunRow[];
-}): FleetObject[] {
+}): FleetCardContext {
   const latest = latestRuns(input.runs);
   const costs = new Map<string, number>();
   for (const r of input.runs) costs.set(r.element_id, (costs.get(r.element_id) ?? 0) + Number(r.cost_usd || 0));
@@ -262,30 +298,55 @@ export function buildFleet(input: {
   for (const d of input.edges) {
     if (state.has(d.from_element)) upstream.set(d.to_element, [...(upstream.get(d.to_element) ?? []), d.from_element]);
   }
-  const card = (e: MissionElementRow): FleetElement => {
-    const s = state.get(e.id)!;
-    const unmet = (upstream.get(e.id) ?? []).filter((u) => state.get(u) !== 'done' && state.get(u) !== 'cancelled');
-    const waitsOn = unmet.map((u) => title.get(u)!);
-    const blockers = unmet.map((u) => ({ elementId: u as string | null, title: title.get(u)!, state: state.get(u)! }));
-    const open = s === 'todo' || s === 'failed';
-    const run = latest.get(e.id);
-    return {
-      key: e.id, elementId: e.id, title: title.get(e.id)!, state: s, draft: false,
-      assignee: e.assignee ?? null, action: e.action ?? null, assigneeName: e.assigneeName ?? null, assigneeWorker: e.assigneeWorker ?? null,
-      status: e.status ?? 'todo', dueDate: e.due_date ?? null,
-      serves: serves.get(e.id) ?? [], waitsOn, blockers,
-      ready: open && !e.claudeCode && e.assignee !== 'human' && waitsOn.length === 0,
-      handable: !!e.claudeCode && s === 'todo' && !isHandedOver(e),
-      verdict: run?.verdict ?? null,
-      model: run?.model ?? null, costUsd: roundCost(costs.get(e.id) ?? 0),
-    };
+  return { latest, costs, state, title, serves, upstream };
+}
+
+/** Pure. One Element's card, read from the context over its set: where it
+ *  stands, who carries it out, what it delivers, what it waits on, and
+ *  whether an AI may start it now. */
+export function fleetCard(ctx: FleetCardContext, e: MissionElementRow): FleetElement {
+  const s = ctx.state.get(e.id)!;
+  const unmet = (ctx.upstream.get(e.id) ?? []).filter((u) => ctx.state.get(u) !== 'done' && ctx.state.get(u) !== 'cancelled');
+  const waitsOn = unmet.map((u) => ctx.title.get(u)!);
+  const blockers = unmet.map((u) => ({ elementId: u as string | null, title: ctx.title.get(u)!, state: ctx.state.get(u)! }));
+  const open = s === 'todo' || s === 'failed';
+  const run = ctx.latest.get(e.id);
+  return {
+    key: e.id, elementId: e.id, title: ctx.title.get(e.id)!, state: s, draft: false,
+    assignee: e.assignee ?? null, action: e.action ?? null, assigneeName: e.assigneeName ?? null, assigneeWorker: e.assigneeWorker ?? null,
+    status: e.status ?? 'todo', dueDate: e.due_date ?? null,
+    serves: ctx.serves.get(e.id) ?? [], waitsOn, blockers,
+    ready: open && !e.claudeCode && e.assignee !== 'human' && waitsOn.length === 0,
+    handable: !!e.claudeCode && s === 'todo' && !isHandedOver(e),
+    verdict: run?.verdict ?? null,
+    model: run?.model ?? null, costUsd: roundCost(ctx.costs.get(e.id) ?? 0),
   };
+}
+
+/** Pure. What needs a look first — stopped, waiting on a person, running,
+ *  not started, then finished — keeping the given order within a state. */
+export function orderFleetCards(cards: readonly FleetElement[]): FleetElement[] {
+  return cards
+    .map((c, i) => ({ c, i }))
+    .sort((x, y) => CARD_ORDER[x.c.state] - CARD_ORDER[y.c.state] || x.i - y.i)
+    .map(({ c }) => c);
+}
+
+/** Pure. The Strategy's Objects in their order, each with its Elements —
+ *  what needs a look first — and where each stands, who carries it out, what it delivers, what it waits on, and
+ *  whether an AI may start it now. */
+export function buildFleet(input: {
+  objects: readonly FleetObjectRow[];
+  elements: readonly MissionElementRow[];
+  measures: readonly MissionMeasureRow[];
+  bindings: readonly MissionBindingRow[];
+  edges: readonly MissionEdgeRow[];
+  runs: readonly MissionRunRow[];
+}): FleetObject[] {
+  const ctx = fleetCardContext(input);
   return input.objects.map((o) => withTally({
     key: o.id, objectId: o.id, name: o.name, domainId: o.domain_id, icon: o.icon ?? null, color: o.color ?? null, draft: false,
-    elements: input.elements.filter((e) => e.object_id === o.id).map(card)
-      .map((c, i) => ({ c, i }))
-      .sort((x, y) => CARD_ORDER[x.c.state] - CARD_ORDER[y.c.state] || x.i - y.i)
-      .map(({ c }) => c),
+    elements: orderFleetCards(input.elements.filter((e) => e.object_id === o.id).map((e) => fleetCard(ctx, e))),
   }));
 }
 

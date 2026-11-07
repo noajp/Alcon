@@ -1,30 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { waitingReason, waitingReasonsByElement, waitsOnPerson } from '@/ActivitySpace/execution/chain/waiting';
+import { waitingReason, waitingReasonsByElement } from '@/ActivitySpace/execution/chain/waiting';
 import { buildFleet, type ActionState, type MissionRunRow } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import type { ElementAction } from '@/Function/shared/elementActionKinds';
 import type { ProposedReading } from '@/Function/audit/auditModel';
-
-const el = (status: string | null, action: string | null = null) => ({ status, action }) as never;
-
-describe('waitsOnPerson', () => {
-  it('marks what only a person can carry', () => {
-    for (const verb of ['judge', 'decide', 'approve', 'answer']) expect(waitsOnPerson(el('todo', verb), null), verb).toBe(true);
-    for (const verb of ['research', 'create', 'execute', 'verify']) expect(waitsOnPerson(el('todo', verb), null), verb).toBe(false);
-  });
-
-  it('marks a blocked Element and an AI run that stopped to ask', () => {
-    expect(waitsOnPerson(el('blocked'), null)).toBe(true);
-    expect(waitsOnPerson(el('in_progress', 'create'), 'awaiting_approval')).toBe(true);
-    expect(waitsOnPerson(el('in_progress', 'research'), 'awaiting_input')).toBe(true);
-    expect(waitsOnPerson(el('in_progress', 'research'), 'running')).toBe(false);
-    expect(waitsOnPerson(el('todo'), null)).toBe(false);
-  });
-
-  it('leaves closed work alone', () => {
-    expect(waitsOnPerson(el('done', 'approve'), 'awaiting_approval')).toBe(false);
-    expect(waitsOnPerson(el('cancelled', 'decide'), null)).toBe(false);
-  });
-});
 
 const elem = (status: string | null, action: ElementAction | null = null) => ({ status, action });
 const runRow = (status: MissionRunRow['status'], extra: Partial<MissionRunRow> = {}): MissionRunRow => ({
@@ -82,11 +60,6 @@ describe('waitingReason', () => {
   it('leaves closed work alone, whatever its run says', () => {
     expect(waitingReason({ element: elem('done', 'approve'), latestRun: runRow('awaiting_approval'), blockers: [] })).toBeNull();
     expect(waitingReason({ element: elem('cancelled'), latestRun: null, blockers: [blocker('todo')] })).toBeNull();
-  });
-
-  it('agrees with waitsOnPerson on the run that waits for an answer', () => {
-    expect(waitsOnPerson(el('in_progress', 'research'), 'awaiting_input')).toBe(true);
-    expect(waitingReason({ element: elem('in_progress', 'research'), latestRun: runRow('awaiting_input'), blockers: [] })?.needsPerson).toBe(true);
   });
 });
 

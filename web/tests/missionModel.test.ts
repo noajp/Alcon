@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  actionState, buildFleet, chainCardMatches, draftFleet, latestRuns, measureOutcomes, moveDraftTask, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan, verdictTallyOf,
+  actionState, buildFleet, chainCardMatches, draftFleet, fleetCard, fleetCardContext, latestRuns, measureOutcomes, missionElementRow, moveDraftTask, orderFleetCards, startableTasks, UNPLACED, missionBarriers, missionSummary, normalizePlan, verdictTallyOf,
   type ChainFilter, type FleetElement, type MissionElementRow, type MissionMeasureRow, type MissionRunRow, handOverLabels, isHandedOver
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
@@ -492,5 +492,68 @@ describe('chainCardMatches', () => {
     expect(admitted({ kind: 'object', objectKey: 'o1' })).toBe(5);
     expect(admitted({ kind: 'object', objectKey: 'elsewhere' })).toBe(0);
     expect(admitted(null)).toBe(5);
+  });
+});
+
+describe('fleetCardContext + fleetCard — the flat reading (a Domain’s chain)', () => {
+  it('builds the same cards buildFleet groups, and keeps Elements that sit in no Object', () => {
+    const input = {
+      elements: [
+        { ...el('a', 'done'), assignee: 'ai' as const },
+        { ...el('b'), assignee: 'ai' as const },
+        { id: 'root', title: 'Loose', status: 'todo', display_id: null, object_id: null },
+      ],
+      measures: [measure('m1', 12)],
+      bindings: [{ intent_id: 'm1', target_type: 'element', target_id: 'b', relationship_type: 'delivers' }],
+      edges: [{ from_element: 'a', to_element: 'b' }],
+      runs: [run('b', 'failed', '1', { cost_usd: 0.25 })],
+    };
+    const ctx = fleetCardContext(input);
+    const flat = input.elements.map((e) => fleetCard(ctx, e));
+    const byKey = new Map(flat.map((c) => [c.key, c]));
+    // Grouped or flat, a written Element's card is the same card.
+    const grouped = buildFleet({ objects: [{ id: 'o1', name: 'Site', domain_id: 'd1' }], ...input });
+    expect(grouped[0].elements.map((c) => c.key).sort()).toEqual(['a', 'b']);
+    for (const c of grouped[0].elements) expect(c).toEqual(byKey.get(c.key));
+    // The flat reading keeps the Element no Object holds — a Domain's own
+    // root Element — with nothing invented for it: no measures served.
+    expect(byKey.get('root')).toMatchObject({ elementId: 'root', state: 'todo', serves: [], blockers: [] });
+    expect(byKey.get('b')).toMatchObject({ state: 'failed', serves: ['Measure m1'], waitsOn: [], costUsd: 0.25 });
+  });
+
+  it('orders what needs a look first, stably within a state', () => {
+    const rows = [el('x', 'done'), el('y'), el('z', 'blocked'), el('w')];
+    const ctx = fleetCardContext({ elements: rows, measures: [], bindings: [], edges: [], runs: [] });
+    expect(orderFleetCards(rows.map((r) => fleetCard(ctx, r))).map((c) => c.key)).toEqual(['z', 'y', 'w', 'x']);
+  });
+});
+
+describe('missionElementRow', () => {
+  const detail = (extra: Record<string, unknown> = {}) => ({
+    id: 'e1', title: 'Write it', status: 'todo', display_id: 'EL-1', labels: [], action: 'create',
+    due_date: null, claimed_by: null, claim_expires_at: null, branch: null, assignees: [],
+    ...extra,
+  }) as never;
+  const NOW = Date.parse('2026-11-07T00:00:00Z');
+
+  it('reads the doer as the first assignee who is not a reviewer', () => {
+    const row = missionElementRow(detail({
+      assignees: [
+        { role: 'reviewer', worker: { id: 'w-h', name: 'Hana', type: 'human', ai_config: null } },
+        { role: 'assignee', worker: { id: 'w-ai', name: 'Bot', type: 'ai_agent', ai_config: { runner: 'claude-code' } } },
+      ],
+    }), 'o9', NOW);
+    expect(row).toMatchObject({ object_id: 'o9', assignee: 'ai', assigneeName: 'Bot', action: 'create', claudeCode: true, leased: false });
+  });
+
+  it('reads a live lease, and only a live one', () => {
+    expect(missionElementRow(detail({ claimed_by: 'sess-1', claim_expires_at: '2026-11-07T01:00:00Z' }), null, NOW).leased).toBe(true);
+    expect(missionElementRow(detail({ claimed_by: 'sess-1', claim_expires_at: '2026-11-06T23:00:00Z' }), null, NOW).leased).toBe(false);
+    expect(missionElementRow(detail(), null, NOW)).toMatchObject({ assignee: null, claudeCode: false, object_id: null });
+  });
+
+  it('keeps only a real verb for the action', () => {
+    expect(missionElementRow(detail({ action: 'judge' }), null, NOW).action).toBe('judge');
+    expect(missionElementRow(detail({ action: 'not-a-verb' }), null, NOW).action).toBeNull();
   });
 });
