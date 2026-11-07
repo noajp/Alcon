@@ -22,9 +22,9 @@ import { ActionTag } from '@/Function/shared/elementAction';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import {
-  answeredQuestions, buildFleet, draftFleet, handOverLabels, measureStateOf, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, measureStateOf, missionSummary, moveDraftTask, normalizePlan, normalizeQuestions, plannerSources,
   startableTasks, UNPLACED, yourTurn,
-  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlanQuestion,
+  type ActionState, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlannerSource, type PlanQuestion,
 } from './missionModel';
 import { STATE_LABEL, compact, stateColor, type MissionContext } from './MissionPanels';
 import { YourTurnTray } from './YourTurnTray';
@@ -346,6 +346,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [guidance, setGuidance] = useState('');
   const [guidanceOpen, setGuidanceOpen] = useState(false);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
+  // How the Planner read the Strategy's files for the current draft.
+  const [sources, setSources] = useState<PlannerSource[] | null>(null);
   // The Planner's questions, asked before it plans, and the answers typed.
   const [questions, setQuestions] = useState<{ reason: string; items: PlanQuestion[] } | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -391,6 +393,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     setPlanning(true); setError(null); setNotice(null);
     try {
       const reply = await requestInitiativePlan(ctx.initiativeId, opts.guidance ?? guidance, opts);
+      setSources(plannerSources(reply.sources));
       const asked = normalizeQuestions(reply.questions);
       if (asked.length > 0) {
         setQuestions({ reason: reply.reason, items: asked });
@@ -694,6 +697,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         {draft && (
           <div className="space-y-2 rounded-lg border border-dashed border-border px-3 py-2.5">
             {draft.summary && <MarkdownLite text={draft.summary} className="text-[13px] leading-relaxed text-foreground" />}
+            {sources && <PlannerSources sources={sources} />}
             <p className="text-[12px] text-muted-foreground">
               {t('{tasks} Elements in {objects} Objects, {fresh} of them new. Dashed cards are not created yet.', {
                 tasks: draftTasks, objects: new Set(draft.tasks.map((x) => x.object).filter(Boolean)).size, fresh: draftNewObjects,
@@ -809,5 +813,26 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         )}
       </div>
     </PageSection>
+  );
+}
+
+/** Which of the Strategy's files the draft was made from, and how each was read. */
+function PlannerSources({ sources }: { sources: PlannerSource[] }) {
+  const { t } = useI18n();
+  if (sources.length === 0) return <p className="text-[12px] text-muted-foreground">{t('No files are attached to this Strategy; the draft is made from what is recorded.')}</p>;
+  const read = sources.filter((x) => x.mode !== 'unread');
+  const unread = sources.filter((x) => x.mode === 'unread');
+  const readLine = (x: PlannerSource) => x.chars === 0
+    ? t(x.mode === 'digest' ? '{name} (all of it in parts)' : '{name} (whole)', { name: x.name })
+    : t(x.mode === 'digest' ? '{name} ({n} characters, all of it in parts)' : '{name} ({n} characters, whole)', { name: x.name, n: x.chars.toLocaleString() });
+  return (
+    <div className="space-y-0.5 text-[12px]">
+      {read.length > 0 && <p className="text-muted-foreground">{t('Files read: {list}', { list: read.map(readLine).join(' / ') })}</p>}
+      {unread.length > 0 && (
+        <p className="text-[var(--status-warning)]">
+          {t('Not read: {list}', { list: unread.map((x) => t('{name} ({reason})', { name: x.name, reason: x.reason ?? '' })).join(' / ') })}
+        </p>
+      )}
+    </div>
   );
 }
