@@ -14,7 +14,7 @@ import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import { createIntent } from '@/hooks/strategyData';
-import { AI_WEIGHTS, isAiWeight, type AgentRunStatus, type AiWeight, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
+import { type AgentRunStatus, type ElementWithDetails, type StrategyDelegation, type Worker } from '@/types/database';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { FLOW_COLUMNS, FLOW_COLUMN_LABEL, flowColumnOf, type FlowColumn } from '@/ActivitySpace/execution/domain/flow/flowColumn';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
@@ -33,7 +33,7 @@ import { measureStateLabel } from '../initiativeMeasureModel';
 import { DefinitionPanel } from './DefinitionPanel';
 import { listenForPlanRequests } from './plannerRequest';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
-import { setElementAiWeight, setElementDefinition, useDefinitions, useRunRounds, type Definition, type RoundSummary } from '@/hooks/definitionData';
+import { useDefinitions, useRunRounds, type RoundSummary } from '@/hooks/definitionData';
 
 // The Strategy's Execution Chain: every action under its Objects in a column
 // for where it stands — To do, Waiting on you, In progress, To review, Done —
@@ -97,45 +97,11 @@ function DraftTag() {
 }
 
 
-const STRATEGY_DEFINITION = '__strategy';
-
-/** The Element's own definition, chosen on its card: its output shape and its
- *  loop are enforced for it (a Strategy's definition only directs). */
-function DefinitionPick({ value, definitions, onChange }: { value: string | null; definitions: Definition[]; onChange: (id: string | null) => void }) {
-  const { t } = useI18n();
-  if (definitions.length === 0 && !value) return null;
-  return (
-    <span className="flex min-w-0 items-center gap-0.5">
-      <span className="shrink-0">{t('Harness')}</span>
-      <OptionMenu label={t('Harness')} value={value ?? STRATEGY_DEFINITION}
-        options={[{ value: STRATEGY_DEFINITION, label: t('The Strategy\'s') }, ...definitions.map((d) => ({ value: d.id, label: d.name }))]}
-        onChange={(v) => onChange(v === STRATEGY_DEFINITION ? null : v)} />
-    </span>
-  );
-}
-
-const WEIGHT_LABEL: Record<AiWeight, string> = { light: 'Light (small model)', standard: 'Standard', heavy: 'Heavy (large model)' };
-
-/** How heavy the work is for an AI: the model a run picks when no setting names one. */
-function WeightPick({ value, onChange }: { value: AiWeight | null; onChange: (w: AiWeight | null) => void }) {
-  const { t } = useI18n();
-  return (
-    <span className="flex min-w-0 items-center gap-0.5">
-      <span className="shrink-0">{t('Weight')}</span>
-      <OptionMenu label={t('Weight')} value={value ?? 'standard'}
-        options={AI_WEIGHTS.map((w) => ({ value: w, label: t(WEIGHT_LABEL[w]) }))}
-        onChange={(w) => onChange(w === 'standard' ? null : w)} />
-    </span>
-  );
-}
-
 /** What the Execution tab adds under a card's title: what it delivers,
  *  what it waits on, the model that ran it and what that cost, and a hand-off
  *  to Claude Code. */
-function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickSet = false }: {
-  element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary; definitionPick?: React.ReactNode;
-  /** A definition or weight other than the default is chosen: its row stays in view. */
-  pickSet?: boolean;
+function MissionLines({ element, busy, onHandOver, rounds }: {
+  element: FleetElement; busy: boolean; onHandOver?: () => void; rounds?: RoundSummary;
 }) {
   const { t } = useI18n();
   const meta = [element.model, element.costUsd > 0 ? `$${element.costUsd.toFixed(2)}` : null].filter(Boolean).join(' · ');
@@ -146,7 +112,7 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickS
       best: rounds.values.length ? Math.max(...rounds.values) : '—',
     })
     : null;
-  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop && !definitionPick) return null;
+  if (!element.serves.length && !element.waitsOn.length && !meta && !onHandOver && !loop) return null;
   return (
     <div className="mt-1.5 space-y-0.5 text-[12px] leading-5 text-muted-foreground">
       {element.serves.length > 0 && (
@@ -156,14 +122,6 @@ function MissionLines({ element, busy, onHandOver, rounds, definitionPick, pickS
         <div className="flex min-w-0 items-center gap-1.5"><Clock size={12} className="shrink-0" /><span className="truncate">{t('After {items}', { items: element.waitsOn.join(', ') })}</span></div>
       )}
       {loop && <div className="tabular-nums">{loop}</div>}
-      {/* How the AI runs it is a setting, not the work: shown only while the
-          card is hovered or focused, unless something other than the
-          default is chosen. */}
-      {definitionPick && (
-        <div className={cn('min-w-0 flex-wrap items-center gap-x-3', pickSet ? 'flex' : 'hidden group-hover/card:flex group-focus-within/card:flex has-[[data-state=open]]:flex')}>
-          {definitionPick}
-        </div>
-      )}
       {(meta || onHandOver) && (
         <div className="flex items-center gap-2 tabular-nums">
           {meta && <span className="truncate text-[11px] text-muted-foreground/70">{meta}</span>}
@@ -413,17 +371,6 @@ e.elementId && details.get(e.elementId) ? (
                         </span>
                       ) : undefined}
                       extra={<MissionLines element={e} rounds={rounds.get(e.elementId)} busy={busy !== null && (busy === 'all' || busy === e.elementId)}
-                        pickSet={!!details.get(e.elementId)?.definition_id || (e.assignee === 'ai' && isAiWeight(details.get(e.elementId)?.ai_weight) && details.get(e.elementId)?.ai_weight !== 'standard')}
-                        definitionPick={ctx.canEdit ? (
-                          <>
-                            <DefinitionPick value={details.get(e.elementId)?.definition_id ?? null} definitions={definitions.data}
-                              onChange={(id) => void setElementDefinition(e.elementId!, id).then(() => ctx.refetch())} />
-                            {e.assignee === 'ai' && (
-                              <WeightPick value={isAiWeight(details.get(e.elementId)?.ai_weight) ? details.get(e.elementId)!.ai_weight as AiWeight : null}
-                                onChange={(w) => void setElementAiWeight(e.elementId!, w).then(() => ctx.refetch())} />
-                            )}
-                          </>
-                        ) : undefined}
                         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />} />
                   ) : (
                     <DraftCard element={e} />
