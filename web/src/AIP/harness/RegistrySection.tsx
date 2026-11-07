@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Search } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { CARD, FONT } from '@/shared/designTokens';
+import { CARD_FLAT, FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useConnectorDirectory, type DirectoryEntry } from '@/hooks/customizeData';
 import { IntegrationIcon } from '@/AIP/connectors/IntegrationDetailDialog';
@@ -14,21 +14,23 @@ import { IntegrationIcon } from '@/AIP/connectors/IntegrationDetailDialog';
 // Adding opens the usual connection dialog; once connected, the connection
 // test lists its tools and turns them into the commands agents may use.
 
-export function RegistrySection({ connectedEndpoints, canAdd, onAdd }: {
+export function RegistrySection({ connectedEndpoints, canAdd, onAdd, initialQuery }: {
   connectedEndpoints: Set<string>;
   canAdd: boolean;
   onAdd: (entry: DirectoryEntry) => void;
+  /** A search to open with (the install walk, looking for one named connector). */
+  initialQuery?: string;
 }) {
   const { t } = useI18n();
-  const [input, setInput] = useState('');
-  const [q, setQ] = useState('');
+  const [input, setInput] = useState(initialQuery ?? '');
+  const [q, setQ] = useState(initialQuery ?? '');
   useEffect(() => { const id = setTimeout(() => setQ(input.trim()), 350); return () => clearTimeout(id); }, [input]);
   const directory = useConnectorDirectory(q, true);
 
   return (
     <section className="space-y-3">
       <div>
-        <h3 className={`${FONT.lg} text-foreground`}>{t('From the MCP Registry')}</h3>
+        <h3 className={FONT.label}>{t('From the MCP Registry')}</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">{t('Servers listed in the public MCP Registry that run remotely. Anyone can list a server there, so add only ones you trust.')}</p>
       </div>
       <div className="relative">
@@ -47,7 +49,7 @@ export function RegistrySection({ connectedEndpoints, canAdd, onAdd }: {
           {directory.data.map((e) => {
             const added = connectedEndpoints.has(e.endpoint);
             return (
-              <div key={e.id} className={`${CARD} flex gap-3 p-3`}>
+              <div key={e.id} className={`${CARD_FLAT} flex gap-3 p-3`}>
                 <IntegrationIcon name={e.title} icon={null} size={28} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] font-medium text-foreground">{e.title}</div>

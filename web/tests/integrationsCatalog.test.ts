@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, customPresetFor, darkIconFor, filterPresets, installedPresetIds,
-  isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
+  integrationStatus, isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
 } from '@/AIP/connectors/catalog';
 
 import { existsSync } from 'node:fs';
@@ -188,5 +188,35 @@ describe('preset logos', () => {
   it('a one-color logo has a dark counterpart; a colored one does not', () => {
     expect(darkIconFor('/integrations/github.svg')).toBe('/integrations/github-dark.svg');
     expect(darkIconFor('/integrations/slack.svg')).toBeNull();
+  });
+});
+
+describe('integrationStatus', () => {
+  const tested = (code: string, ok: boolean) => ({ code, ok });
+
+  it('off wins over any test result', () => {
+    expect(integrationStatus({ enabled: false, last_test: tested('connected', true) })).toBe('off');
+    expect(integrationStatus({ enabled: false, last_test: null })).toBe('off');
+  });
+
+  it('an enabled connection with no stored test is not-tested', () => {
+    expect(integrationStatus({ enabled: true, last_test: null })).toBe('not-tested');
+    expect(integrationStatus({ enabled: true, last_test: { malformed: true } })).toBe('not-tested');
+  });
+
+  it('a refused credential asks for action, ahead of the generic failure bucket', () => {
+    for (const code of ['auth_failed', 'oauth_expired', 'oauth_required']) {
+      expect(integrationStatus({ enabled: true, last_test: tested(code, false) })).toBe('action-needed');
+    }
+  });
+
+  it('a checked credential is connected; a mere answer is reachable', () => {
+    expect(integrationStatus({ enabled: true, last_test: tested('connected', true) })).toBe('connected');
+    expect(integrationStatus({ enabled: true, last_test: tested('reachable', true) })).toBe('reachable');
+  });
+
+  it('any other failure is action-needed', () => {
+    expect(integrationStatus({ enabled: true, last_test: tested('http_error', false) })).toBe('action-needed');
+    expect(integrationStatus({ enabled: true, last_test: tested('unreachable', false) })).toBe('action-needed');
   });
 });

@@ -1,20 +1,26 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { Textarea } from '@/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
-import { CARD, FONT } from '@/shared/designTokens';
+import { CARD_FLAT, FONT } from '@/shared/designTokens';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useIntegrations, useIsSpaceOwner } from '@/AIP/connectors/data';
-import { presetById } from '@/AIP/connectors/catalog';
-import { createDefinition, deleteDefinition, updateDefinition, useDefinitions, useSpaceDefaultHarness, type Definition } from '@/hooks/definitionData';
-import { useCatalog, type CatalogDefinition } from '@/hooks/customizeData';
+import { signsInWithOAuth } from '@/AIP/connectors/catalog';
+import { ConnectDialogHost, openedForPreset, openedForRegistryEntry, type OpenedConnection } from '@/AIP/connectors/ConnectDialogHost';
+import { saveOAuthReturnSettingsTab, useOAuthOutcome } from '@/AIP/connectors/oauthReturn';
+import { applyDefinitionCatalogUpdate, createDefinition, deleteDefinition, markDefinitionCatalogVersion, setDefinitionEnabled, updateDefinition, useDefinitions, useSpaceDefaultHarness, type Definition } from '@/hooks/definitionData';
+import { useCatalog, useConnectorDirectory, type CatalogDefinition } from '@/hooks/customizeData';
 import { checkHarness, parseDefinition, type Diagnostic } from './harnessDefinition';
+import { catalogRelation, lineDiffCounts } from './installState';
+import { enabledConnectedNames, installReadiness, missingConnectors } from './installFlow';
+import { clearInstallSession, saveInstallSession, takeInstallSession } from './installReturn';
+import { RegistrySection } from './RegistrySection';
 import { YoursDiscover, type CustomizeMode } from './YoursDiscover';
 import { TryDefinition } from './TryDefinition';
 
@@ -24,13 +30,28 @@ import { TryDefinition } from './TryDefinition';
 // Space's library, shared by its members; one of them may be the Space's
 // default, which Strategies are worked by when they name none (otherwise
 // Alcon's built-in way). Discover is the catalog Alcon offers to start from,
-// added by copying into the library. Every harness is checked as it is
-// written (checkHarness), against the Space's connections.
+// added by copying into the library. Adding one starts an install walk: the
+// connectors it still needs are connected one at a time through the usual
+// connection dialog, then the harness is checked again. A walk left
+// unfinished is not a failure — the definition stays installed and its row
+// shows what it still needs. Every harness is checked as it is written
+// (checkHarness), against the Space's enabled connections.
 
-/** Names a harness may call a connected service by: what the Space named it, and its preset's id and name. */
-function useConnectedNames(spaceId: string | null): string[] {
-  const { data } = useIntegrations(spaceId);
-  return useMemo(() => data.flatMap((i) => [i.name, i.preset ?? '', presetById(i.preset)?.name ?? ''].filter(Boolean)), [data]);
+/** The fold connector names are matched by (the same fold as checkHarness and the runtime). */
+const fold = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '');
+
+/** One install walk, in progress or settled. Missing connectors are
+ *  derivable at any time, so this is only the walk's own bookkeeping. */
+interface InstallSession {
+  definitionId: string;
+  catalogId: string;
+  phase: 'connecting' | 'needs-choice' | 'checking' | 'complete' | 'incomplete';
+  /** Missing count when the walk started (the progress denominator). */
+  totalMissing: number;
+  /** Folded names already opened once this session (the loop guard). */
+  attempted: string[];
+  /** Why the walk stopped, when it ended incomplete. */
+  note: string | null;
 }
 
 export function HarnessesPanel() {
@@ -40,15 +61,154 @@ export function HarnessesPanel() {
   const catalog = useCatalog();
   const fallback = useSpaceDefaultHarness(spaceId);
   const isOwner = useIsSpaceOwner(spaceId) === true;
-  const connected = useConnectedNames(spaceId);
+  const integrations = useIntegrations(spaceId);
+  // "Connected" is the runtime's test: enabled connections only.
+  const connected = useMemo(() => enabledConnectedNames(integrations.data), [integrations.data]);
+  const connectedEndpoints = useMemo(() => new Set(integrations.data.map((i) => i.endpoint)), [integrations.data]);
   const [mode, setMode] = useState<CustomizeMode>('yours');
   const [editing, setEditing] = useState<Definition | 'new' | null>(null);
   const [preview, setPreview] = useState<CatalogDefinition | null>(null);
   const [trying, setTrying] = useState<Definition | null>(null);
+  const [reviewing, setReviewing] = useState<{ definition: Definition; item: CatalogDefinition } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const added = new Set(library.data.map((d) => d.source_id).filter(Boolean));
   const defaultHarness = library.data.find((d) => d.id === fallback.data) ?? null;
+  const catalogById = useMemo(() => new Map(catalog.definitions.map((i) => [i.id, i])), [catalog.definitions]);
+
+  // ── The install walk ────────────────────────────────────────────────────
+  const [session, setSession] = useState<InstallSession | null>(null);
+  const [opened, setOpened] = useState<OpenedConnection | null>(null);
+  const [activeNeed, setActiveNeed] = useState<string | null>(null);
+  const [choiceFor, setChoiceFor] = useState<string | null>(null);
+  const directory = useConnectorDirectory(choiceFor ?? '', !!choiceFor);
+  const oauthOutcome = useOAuthOutcome();
+  const sessionDef = session ? library.data.find((d) => d.id === session.definitionId) ?? null : null;
+  const sessionName = sessionDef?.name ?? (session ? catalog.definitions.find((i) => i.id === session.catalogId)?.name ?? '' : '');
+
+  const startWalk = (definition: Definition, catalogId: string) => {
+    const missing = missingConnectors(parseDefinition(definition.body).connectors, integrations.data);
+    if (!isOwner && missing.length) {
+      setSession({
+        definitionId: definition.id, catalogId, phase: 'incomplete', totalMissing: missing.length, attempted: [],
+        note: t('Only a Space owner can connect these: {names}.', { names: missing.map((m) => m.name).join(', ') }),
+      });
+      return;
+    }
+    setSession({ definitionId: definition.id, catalogId, phase: 'connecting', totalMissing: missing.length, attempted: [], note: null });
+  };
+
+  // Drive the walk: open the dialog for the first missing connector not yet
+  // attempted this session; a name with no preset goes to the registry step.
+  /* eslint-disable react-hooks/set-state-in-effect -- the walk is a state machine over the Space's connections, an outside store; their changes advance it */
+  useEffect(() => {
+    if (!session || session.phase !== 'connecting' || opened || !sessionDef || !spaceId) return;
+    const missing = installReadiness(sessionDef, integrations.data).missing;
+    if (!missing.length) { setSession((s) => (s ? { ...s, phase: 'checking' } : s)); return; }
+    if (!isOwner) {
+      setSession((s) => (s ? {
+        ...s, phase: 'incomplete',
+        note: t('Only a Space owner can connect these: {names}.', { names: missing.map((m) => m.name).join(', ') }),
+      } : s));
+      return;
+    }
+    const next = missing.find((n) => !session.attempted.includes(fold(n.name)));
+    if (!next) {
+      setSession((s) => (s ? { ...s, phase: 'incomplete', note: t('{name} is not connected yet', { name: missing[0].name }) } : s));
+      return;
+    }
+    if (next.preset) {
+      // A sign-in with OAuth leaves the app: keep the walk's place for the return.
+      if (signsInWithOAuth(next.preset)) {
+        saveInstallSession({ spaceId, definitionId: session.definitionId, catalogId: session.catalogId });
+        saveOAuthReturnSettingsTab('definitions');
+      }
+      setActiveNeed(next.name);
+      setOpened(openedForPreset(next.preset, integrations.data));
+    } else {
+      setChoiceFor(next.name);
+      setSession((s) => (s ? { ...s, phase: 'needs-choice' } : s));
+    }
+  }, [session, opened, sessionDef, spaceId, integrations.data, isOwner, t]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // The registry step: an exact title match opens at once; anything else is
+  // the person's pick in the step's own dialog.
+  /* eslint-disable react-hooks/set-state-in-effect -- the registry's answer arrives from outside the component; an exact match opens its dialog */
+  useEffect(() => {
+    if (!session || session.phase !== 'needs-choice' || !choiceFor || opened || directory.loading) return;
+    const exact = directory.data.find((e) => fold(e.title) === fold(choiceFor));
+    if (!exact) return;
+    setActiveNeed(choiceFor);
+    setOpened(openedForRegistryEntry(exact));
+    setSession((s) => (s ? { ...s, phase: 'connecting' } : s));
+  }, [session, choiceFor, opened, directory.loading, directory.data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // The walk's last step is the check itself: passing means no connector is
+  // missing and no error-severity diagnostic remains.
+  /* eslint-disable react-hooks/set-state-in-effect -- the check's verdict over the outside connections is what settles the walk */
+  useEffect(() => {
+    if (!session || session.phase !== 'checking' || !sessionDef) return;
+    const r = installReadiness(sessionDef, integrations.data);
+    if (r.passing) {
+      clearInstallSession();
+      setSession((s) => (s ? { ...s, phase: 'complete' } : s));
+    } else if (r.missing.length) {
+      setSession((s) => (s ? { ...s, phase: 'connecting', attempted: [] } : s));
+    } else {
+      const firstError = r.diagnostics.find((d) => d.severity === 'error');
+      setSession((s) => (s ? { ...s, phase: 'incomplete', note: firstError ? firstError.message : null } : s));
+    }
+  }, [session, sessionDef, integrations.data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // A walk kept across an OAuth sign-in resumes at the recompute step, once
+  // the sign-in's outcome is known.
+  const restoreTried = useRef(false);
+  /* eslint-disable react-hooks/set-state-in-effect -- the stored session and the sign-in's outcome are outside stores; their arrival resumes the walk */
+  useEffect(() => {
+    if (restoreTried.current || !spaceId || library.loading || !oauthOutcome || oauthOutcome.status === 'pending') return;
+    restoreTried.current = true;
+    const stored = takeInstallSession();
+    if (!stored || stored.spaceId !== spaceId) return;
+    const def = library.data.find((d) => d.id === stored.definitionId);
+    if (!def) return;
+    if (oauthOutcome.status === 'error') {
+      setSession({
+        definitionId: def.id, catalogId: stored.catalogId, phase: 'incomplete', totalMissing: 1, attempted: [],
+        note: t('Sign-in did not finish, so nothing was connected. Try again.'),
+      });
+      return;
+    }
+    void integrations.refetch();
+    const missing = missingConnectors(parseDefinition(def.body).connectors, integrations.data);
+    setSession({ definitionId: def.id, catalogId: stored.catalogId, phase: 'connecting', totalMissing: Math.max(missing.length, 1), attempted: [], note: null });
+  }, [oauthOutcome, spaceId, library, integrations, t]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const closeDialog = async () => {
+    setOpened(null);
+    const need = activeNeed;
+    setActiveNeed(null);
+    setChoiceFor(null);
+    if (need) setSession((s) => (s ? { ...s, attempted: [...s.attempted, fold(need)] } : s));
+    await integrations.refetch();
+  };
+  const skipNeed = () => {
+    if (choiceFor) setSession((s) => (s ? { ...s, attempted: [...s.attempted, fold(choiceFor)], phase: 'connecting' } : s));
+    setChoiceFor(null);
+  };
+  const cancelWalk = () => {
+    setSession(null); setOpened(null); setActiveNeed(null); setChoiceFor(null);
+    clearInstallSession();
+  };
+  const endWalkIncomplete = () => {
+    setOpened(null); setActiveNeed(null); setChoiceFor(null);
+    setSession((s) => (s ? { ...s, phase: 'incomplete', note: t('Connect the rest later, from the harness’s row in the library.') } : s));
+  };
+  const retryWalk = () => setSession((s) => (s ? { ...s, phase: 'connecting', attempted: [], note: null } : s));
+  const dismissWalk = () => { setSession(null); clearInstallSession(); };
 
   const act = async (id: string, f: () => Promise<unknown>) => {
     setBusy(id); setError(null);
@@ -57,16 +217,21 @@ export function HarnessesPanel() {
   };
   const add = (item: CatalogDefinition) => act(item.id, async () => {
     if (!spaceId) return;
-    await createDefinition({ spaceId, name: item.name, body: item.body, sourceId: item.id });
+    const created = await createDefinition({ spaceId, name: item.name, body: item.body, sourceId: item.id, sourceVersion: item.version });
     await library.refetch();
+    startWalk(created, item.id);
   });
+
+  const sessionReadiness = sessionDef ? installReadiness(sessionDef, integrations.data) : null;
+  const sessionDone = session ? session.totalMissing - (sessionReadiness ? sessionReadiness.missing.length : session.totalMissing) : 0;
+  const sessionWarnings = sessionReadiness?.diagnostics.some((d) => d.severity === 'warning') ?? false;
+  const canRetry = isOwner && !!sessionReadiness && sessionReadiness.missing.length > 0;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className={`${FONT.lg} text-foreground`}>{t('Harnesses')}</h2>
-          <p className="mt-1 text-[12px] text-muted-foreground">{t('How AI carries out a kind of work: the goal, the steps, where it stops and asks, the shape of the result and the connectors it uses.')}</p>
         </div>
         <div className="flex items-center gap-2">
           <YoursDiscover mode={mode} onChange={setMode} />
@@ -76,10 +241,39 @@ export function HarnessesPanel() {
 
       <div className="rounded-md bg-[var(--surface-strong)] px-3 py-2 text-[12px] text-foreground">
         {defaultHarness
-          ? t('Strategies are worked by “{name}” unless they name another harness.', { name: defaultHarness.name })
-          : t('Strategies are worked by Alcon’s built-in way. To change how they are broken down, add “Strategy の進め方” from Discover, edit it and make it the default.')}
+          ? defaultHarness.enabled
+            ? t('Default harness: {name}', { name: defaultHarness.name })
+            : t('Default harness: {name} · Off — Strategies use Alcon’s built-in way', { name: defaultHarness.name })
+          : t('No default harness — Strategies use Alcon’s built-in way')}
       </div>
       {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+
+      {session && (
+        <div className="rounded-md bg-[var(--surface-strong)] px-3 py-2 text-[12px] text-foreground" role="status">
+          {session.phase === 'complete' ? (
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1">
+                {sessionWarnings
+                  ? t('{name} is installed — with check warnings', { name: sessionName })
+                  : t('{name} is installed and passing', { name: sessionName })}
+              </span>
+              <Button size="xs" variant="ghost" onClick={dismissWalk}>{t('Dismiss')}</Button>
+            </div>
+          ) : session.phase === 'incomplete' ? (
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1">{session.note ?? t('{name} is not fully set up yet', { name: sessionName })}</span>
+              {canRetry && <Button size="xs" variant="secondary" onClick={retryWalk}>{t('Retry')}</Button>}
+              <Button size="xs" variant="ghost" onClick={dismissWalk}>{t('Dismiss')}</Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1">{t('Connectors for {harness} — {done} of {total} connected', { harness: sessionName, done: sessionDone, total: session.totalMissing })}</span>
+              <Button size="xs" variant="ghost" onClick={endWalkIncomplete}>{t('Skip')}</Button>
+              <Button size="xs" variant="ghost" onClick={cancelWalk}>{t('Cancel')}</Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {mode === 'yours' ? (
         library.loading ? <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
@@ -89,6 +283,9 @@ export function HarnessesPanel() {
             <div>
               {library.data.map((d) => {
                 const isDefault = d.id === fallback.data;
+                const item = d.source_id ? catalogById.get(d.source_id) ?? null : null;
+                const relation = catalogRelation(d, item);
+                const needs = installReadiness(d, integrations.data).missing;
                 return (
                   <div key={d.id} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-2 rounded-md px-2 transition-colors hover:bg-[var(--surface-strong)]">
                     <button type="button" onClick={() => setEditing(d)}
@@ -97,19 +294,49 @@ export function HarnessesPanel() {
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-[13px] font-medium text-foreground">{d.name}</span>
                           {isDefault && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]">{t('Default')}</span>}
+                          {!d.enabled && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-muted-foreground">{t('Off')}</span>}
+                          {(relation.kind === 'current' || relation.kind === 'legacy-unknown') && relation.differs && (
+                            <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-muted-foreground">{t('Edited locally')}</span>
+                          )}
+                          {needs.length > 0 && (
+                            <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)]">
+                              {t('Needs: {names}', { names: needs.map((n) => n.name).join(', ') })}
+                            </span>
+                          )}
                         </div>
                         <div className="truncate text-[12px] text-muted-foreground">{firstLine(d.body)}</div>
                       </div>
                       <CheckSummary diagnostics={checkHarness(parseDefinition(d.body), { connected })} />
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{d.updated_at.slice(0, 10)}</span>
                     </button>
-                    {isOwner && (
+                    {needs.length > 0 && (
                       <Button size="xs" variant="ghost" disabled={busy !== null}
+                        onClick={() => startWalk(d, d.source_id ?? '')}>
+                        {t('Set up connectors')}
+                      </Button>
+                    )}
+                    {relation.kind === 'update-available' && item && (
+                      <Button size="xs" variant="ghost" disabled={busy !== null}
+                        onClick={() => setReviewing({ definition: d, item })}>
+                        {t('Update v{from} → v{to}', { from: relation.installedVersion, to: relation.catalogVersion })}
+                      </Button>
+                    )}
+                    {relation.kind === 'legacy-unknown' && item && (
+                      <Button size="xs" variant="ghost" disabled={busy !== null}
+                        onClick={() => setReviewing({ definition: d, item })}>
+                        {t('Review catalog version')}
+                      </Button>
+                    )}
+                    <Button size="xs" variant="ghost" disabled={busy !== null}
+                      onClick={() => void act(d.id, async () => { await setDefinitionEnabled(d.id, !d.enabled); await library.refetch(); })}>
+                      {d.enabled ? t('Turn off') : t('Turn on')}
+                    </Button>
+                    {isOwner && (
+                      <Button size="xs" variant="ghost" disabled={busy !== null || !d.enabled}
                         onClick={() => void act(d.id, () => fallback.set(isDefault ? null : d.id))}>
                         {isDefault ? t('Stop using as default') : t('Make default')}
                       </Button>
                     )}
-                    <Button size="xs" variant="ghost" onClick={() => setTrying(d)}>{t('Try')}</Button>
+                    <Button size="xs" variant="ghost" disabled={!d.enabled} onClick={() => setTrying(d)}>{t('Try')}</Button>
                   </div>
                 );
               })}
@@ -118,14 +345,14 @@ export function HarnessesPanel() {
       ) : catalog.loading ? <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p> : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {catalog.definitions.map((item) => (
-            <div key={item.id} className={`${CARD} flex flex-col gap-2 p-4`}>
+            <div key={item.id} className={`${CARD_FLAT} flex flex-col gap-2 p-4`}>
               <div className="text-[13px] font-semibold text-foreground">{item.name}</div>
               <p className="line-clamp-2 text-[12px] text-muted-foreground">{item.description}</p>
               <ConnectorChips names={parseDefinition(item.body).connectors} connected={connected} />
               <div className="mt-auto flex items-center gap-2 pt-1">
                 <Button size="xs" variant="ghost" onClick={() => setPreview(item)}>{t('Preview')}</Button>
                 {added.has(item.id)
-                  ? <span className="ml-auto text-[11px] text-[var(--status-success)]">{t('Added')}</span>
+                  ? <span className="ml-auto text-[11px] text-[var(--status-success)]">{t('Installed')}</span>
                   : <Button size="xs" variant="secondary" className="ml-auto" onClick={() => void add(item)} disabled={busy !== null || !spaceId}>{busy === item.id ? t('Adding…') : t('Add')}</Button>}
               </div>
             </div>
@@ -140,8 +367,38 @@ export function HarnessesPanel() {
             <div className="max-h-[60vh] overflow-y-auto text-[13px]"><MarkdownLite text={preview.body} /></div>
             <DialogFooter>
               {added.has(preview.id)
-                ? <span className="text-[12px] text-[var(--status-success)]">{t('Added')}</span>
+                ? <span className="text-[12px] text-[var(--status-success)]">{t('Installed')}</span>
                 : <Button size="sm" onClick={() => void add(preview).then(() => setPreview(null))} disabled={busy !== null}>{t('Add')}</Button>}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {reviewing && (
+        <CatalogReviewDialog definition={reviewing.definition} item={reviewing.item}
+          onClose={() => setReviewing(null)}
+          onDone={() => { void library.refetch(); setReviewing(null); }} />
+      )}
+
+      {opened && spaceId && (
+        <ConnectDialogHost spaceId={spaceId} opened={opened} integrations={integrations.data} canEdit={isOwner}
+          onClose={() => void closeDialog()}
+          onCreated={(created) => setOpened((o) => (o ? { preset: o.preset, integration: created } : o))} />
+      )}
+
+      {session?.phase === 'needs-choice' && choiceFor && (
+        <Dialog open onOpenChange={(o) => { if (!o) skipNeed(); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader><DialogTitle>{t('Connect {name}', { name: choiceFor })}</DialogTitle></DialogHeader>
+            <RegistrySection connectedEndpoints={connectedEndpoints} canAdd={isOwner} initialQuery={choiceFor}
+              onAdd={(e) => {
+                setActiveNeed(choiceFor);
+                setOpened(openedForRegistryEntry(e));
+                setSession((s) => (s ? { ...s, phase: 'connecting' } : s));
+              }} />
+            <DialogFooter>
+              <Button variant="ghost" size="sm" onClick={skipNeed}>{t('Skip')}</Button>
+              <Button variant="ghost" size="sm" onClick={cancelWalk}>{t('Cancel')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -154,6 +411,62 @@ export function HarnessesPanel() {
           onClose={() => setEditing(null)} onSaved={() => { void library.refetch(); setEditing(null); }} />
       )}
     </div>
+  );
+}
+
+/** An installed copy held against the catalog version it came from: how far
+ *  the texts have drifted, and the choice to take the catalog version —
+ *  or, for an untouched copy from before versioning, to record which
+ *  catalog version it already is. Updating replaces; nothing is merged. */
+function CatalogReviewDialog({ definition, item, onClose, onDone }: {
+  definition: Definition; item: CatalogDefinition; onClose: () => void; onDone: () => void;
+}) {
+  const { t } = useI18n();
+  const relation = catalogRelation(definition, item);
+  const differs = 'differs' in relation ? relation.differs : false;
+  const counts = lineDiffCounts(definition.body, item.body);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (f: () => Promise<unknown>) => {
+    setBusy(true); setError(null);
+    try { await f(); onDone(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
+  };
+  const canUpdate = relation.kind === 'update-available' || (relation.kind === 'legacy-unknown' && differs);
+  const canRecord = relation.kind === 'legacy-unknown' && !differs;
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>{definition.name}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-[12px] tabular-nums text-muted-foreground">{t('−{removed} / +{added} lines', { removed: counts.removed, added: counts.added })}</p>
+          {differs && (
+            <p className="text-[12px] text-foreground">{t('This copy differs from the catalog version. Updating replaces its name and text; local edits are not merged.')}</p>
+          )}
+          <div>
+            <div className="mb-1 text-[11px] text-muted-foreground">{t('Installed copy')}</div>
+            <div className="max-h-[24vh] overflow-y-auto rounded-md border border-[var(--border-default)] p-3 text-[13px]"><MarkdownLite text={definition.body} /></div>
+          </div>
+          <div>
+            <div className="mb-1 text-[11px] text-muted-foreground">{t('Catalog version')}</div>
+            <div className="max-h-[24vh] overflow-y-auto rounded-md border border-[var(--border-default)] p-3 text-[13px]"><MarkdownLite text={item.body} /></div>
+          </div>
+          {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>{t('Close')}</Button>
+          {canRecord && (
+            <Button size="sm" disabled={busy} onClick={() => void run(() => markDefinitionCatalogVersion(definition.id, item.version))}>
+              {t('Record as catalog v{n}', { n: item.version })}
+            </Button>
+          )}
+          {canUpdate && (
+            <Button size="sm" disabled={busy} onClick={() => void run(() => applyDefinitionCatalogUpdate(definition.id, item))}>
+              {t('Update to v{n}', { n: item.version })}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -179,15 +492,15 @@ function ConnectorChips({ names, connected }: { names: string[]; connected: stri
   );
 }
 
-/** A row's count of problems: errors, then warnings. Nothing when clean. */
+/** The row's check slot, always in place: Passed, or the count of problems
+ *  (errors, then warnings). Hints never dirty it. */
 function CheckSummary({ diagnostics }: { diagnostics: Diagnostic[] }) {
   const { t } = useI18n();
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
   const warnings = diagnostics.filter((d) => d.severity === 'warning').length;
-  if (!errors && !warnings) return null;
   return (
-    <span className={cn('shrink-0 text-[11px]', errors ? 'text-[var(--status-danger)]' : 'text-[var(--status-warning)]')}>
-      {errors ? t('Problems: {count}', { count: errors }) : t('Warnings: {count}', { count: warnings })}
+    <span className={cn('shrink-0 text-[11px]', errors ? 'text-[var(--status-danger)]' : warnings ? 'text-[var(--status-warning)]' : 'text-muted-foreground')}>
+      {t('Check')}: {errors ? t('Problems: {count}', { count: errors }) : warnings ? t('Warnings: {count}', { count: warnings }) : t('Passed')}
     </span>
   );
 }
@@ -244,6 +557,7 @@ function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>{definition ? t('Edit harness') : t('New harness')}</DialogTitle></DialogHeader>
         <div className="space-y-3">
+          {definition && <p className="text-[11px] tabular-nums text-muted-foreground">{t('Updated')} {definition.updated_at.slice(0, 10)}</p>}
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Name')} className="h-8 text-[13px] md:text-[13px]" />
           <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={14} spellCheck={false} className="font-mono text-[12px]"
             placeholder={'# 目的\n…\n# 進め方\n1. …\n# 止める条件\n- …\n# 使うコネクタ\n- GitHub\n# 成果物の型\n```md\n# …\n```'} />

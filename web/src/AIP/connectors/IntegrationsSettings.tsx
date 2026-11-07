@@ -6,18 +6,19 @@ import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from '@/ui
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { CARD, CARD_HOVER, FONT } from '@/shared/designTokens';
+import { CARD_FLAT, CARD_HOVER, FONT } from '@/shared/designTokens';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { Integration } from '@/types/database';
 import {
-  CATEGORY_LABELS, EMPTY_FILTER, INTEGRATION_PRESETS, KIND_LABELS, SOURCE_LABELS, customPresetFor,
-  filterPresets, installedPresetIds, presetById, readLastTest, testOutcomeLabel,
+  CATEGORY_LABELS, EMPTY_FILTER, INTEGRATION_PRESETS, INTEGRATION_STATUS_LABELS, KIND_LABELS, SOURCE_LABELS,
+  filterPresets, installedPresetIds, integrationStatus, presetById, readLastTest, testOutcomeLabel,
   type CatalogFilter, type IntegrationPreset,
 } from './catalog';
 import { useIntegrations, useIsSpaceOwner } from './data';
-import { IntegrationDetailDialog, IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
+import { IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
+import { ConnectDialogHost, openedForIntegration, openedForPreset, openedForRegistryEntry, type OpenedConnection } from './ConnectDialogHost';
 import { AlconConnectPanel } from './AlconConnectPanel';
 import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
@@ -50,8 +51,6 @@ export function IntegrationsSettings({ tab }: { tab: string | null }) {
     : <HarnessesPanel />;
 }
 
-type Opened = { preset: IntegrationPreset; integration: Integration | null; initial?: { name: string; endpoint: string; auth: 'none' | 'bearer' | 'header'; authHeader: string | null } } | null;
-
 function ExternalServicesPanel() {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
@@ -60,7 +59,7 @@ function ExternalServicesPanel() {
   const isOwner = ownerRole === true;
   const [filter, setFilter] = useState<CatalogFilter>(EMPTY_FILTER);
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [opened, setOpened] = useState<Opened>(null);
+  const [opened, setOpened] = useState<OpenedConnection | null>(null);
   // Yours first: what the Space has, where a sign-in coming back lands too.
   const [mode, setMode] = useState<CustomizeMode>('yours');
   const oauthOutcome = useOAuthOutcome();
@@ -74,37 +73,17 @@ function ExternalServicesPanel() {
 
   const installed = useMemo(() => installedPresetIds(integrations), [integrations]);
   const visible = useMemo(() => filterPresets(INTEGRATION_PRESETS, filter), [filter]);
-  const featured = INTEGRATION_PRESETS.filter((p) => p.featured);
-  const filtering = filter !== EMPTY_FILTER && (filter.query.trim() !== '' || !!filter.category || !!filter.kind || !!filter.source);
 
-  // A fixed preset opens its existing connection; a custom one always starts a new one.
-  const openPreset = (preset: IntegrationPreset) => {
-    const existing = preset.custom ? null : integrations.find((i) => i.preset === preset.id) ?? null;
-    setOpened({ preset, integration: existing });
-  };
-  const openIntegration = (integration: Integration) => {
-    const preset = presetById(integration.preset) ?? customPresetFor(integration.kind);
-    setOpened({ preset, integration });
-  };
-  // Keep the open dialog on the live row (test results, optimistic edits);
-  // while a disconnect is in flight the row is gone from the list, so the
-  // dialog holds the row it opened with.
-  const openedIntegration = opened?.integration ? integrations.find((i) => i.id === opened.integration!.id) ?? null : null;
-
+  const openPreset = (preset: IntegrationPreset) => setOpened(openedForPreset(preset, integrations));
+  const openIntegration = (integration: Integration) => setOpened(openedForIntegration(integration));
   const connectedEndpoints = useMemo(() => new Set(integrations.map((i) => i.endpoint)), [integrations]);
-  const addFromRegistry = (e: DirectoryEntry) => setOpened({
-    preset: customPresetFor('mcp'), integration: null,
-    initial: { name: e.title, endpoint: e.endpoint, auth: e.auth, authHeader: e.authHeader },
-  });
+  const addFromRegistry = (e: DirectoryEntry) => setOpened(openedForRegistryEntry(e));
 
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className={`${FONT.lg} text-foreground`}>{t('Connectors')}</h2>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            {t('Connect external services and AI agents can use them while working on Elements. Writes to an external service wait for your approval every time by default.')}
-          </p>
         </div>
         <YoursDiscover mode={mode} onChange={setMode} />
         <Button asChild variant="ghost" size="sm">
@@ -135,18 +114,6 @@ function ExternalServicesPanel() {
 
       {ownerRole === false && (
         <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>
-      )}
-
-      {mode === 'discover' && !filtering && (
-        <section className="space-y-3">
-          <h3 className={`${FONT.lg} text-foreground`}>{t('Featured')}</h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-            {featured.map((p, i) => (
-              <PresetCard key={p.id} preset={p} installed={installed.has(p.id)} featured
-                className={i === 0 ? 'sm:col-span-2' : undefined} onOpen={() => openPreset(p)} />
-            ))}
-          </div>
-        </section>
       )}
 
       {mode === 'discover' && <section className="space-y-3">
@@ -183,7 +150,7 @@ function ExternalServicesPanel() {
       {mode === 'discover' && <RegistrySection connectedEndpoints={connectedEndpoints} canAdd={isOwner} onAdd={addFromRegistry} />}
 
       {mode === 'yours' && <section className="space-y-3">
-        <h3 className={`${FONT.lg} text-foreground`}>{t('Connected')}</h3>
+        <h3 className={FONT.label}>{t('Installed connections')}</h3>
         {error ? (
           <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
         ) : loading ? (
@@ -198,13 +165,11 @@ function ExternalServicesPanel() {
       </section>}
 
       {opened && spaceId && (
-        <IntegrationDetailDialog
-          key={opened.integration?.id ?? opened.preset.id}
+        <ConnectDialogHost
           spaceId={spaceId}
-          preset={opened.preset}
-          integration={opened.integration ? openedIntegration ?? opened.integration : null}
+          opened={opened}
+          integrations={integrations}
           canEdit={isOwner}
-          initial={opened.initial}
           onClose={() => setOpened(null)}
           onCreated={(created) => { setMode('yours'); setOpened({ preset: opened.preset, integration: created }); }}
         />
@@ -251,19 +216,19 @@ function InstalledBadge() {
   );
 }
 
-function PresetCard({ preset, installed, featured = false, className, onOpen }: {
-  preset: IntegrationPreset; installed: boolean; featured?: boolean; className?: string; onOpen: () => void;
+function PresetCard({ preset, installed, onOpen }: {
+  preset: IntegrationPreset; installed: boolean; onOpen: () => void;
 }) {
   const { t } = useI18n();
   return (
     <button type="button" onClick={onOpen}
-      className={cn(CARD, CARD_HOVER, 'flex flex-col gap-3 p-4 text-left outline-none focus-visible:bg-[var(--surface-strong)]', featured ? 'min-h-[176px]' : 'min-h-[156px]', className)}>
+      className={cn(CARD_FLAT, CARD_HOVER, 'flex min-h-[156px] flex-col gap-3 p-4 text-left outline-none focus-visible:bg-[var(--surface-strong)]')}>
       <div className="flex items-start justify-between gap-2">
-        <IntegrationIcon name={preset.name} icon={preset.icon} size={featured ? 40 : 32} />
+        <IntegrationIcon name={preset.name} icon={preset.icon} size={32} />
         {installed && !preset.custom && <InstalledBadge />}
       </div>
       <div className="min-w-0">
-        <div className={cn('font-semibold text-foreground', featured ? 'text-[15px]' : 'text-[13px]')}>{t(preset.name)}</div>
+        <div className="text-[13px] font-semibold text-foreground">{t(preset.name)}</div>
         <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{t(preset.description)}</p>
       </div>
       <div className="mt-auto flex items-center justify-between gap-2">
@@ -300,7 +265,6 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-[13px] font-medium text-foreground">{integration.name}</span>
-          {!integration.enabled && <span className="text-[11px] text-muted-foreground">{t('Off')}</span>}
         </div>
         <div className="truncate text-[12px] text-muted-foreground">
           {[
@@ -309,29 +273,24 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
           ].filter(Boolean).join(' · ')}
         </div>
       </div>
-      <TestStatus integration={integration} />
+      <StatusChip integration={integration} />
     </button>
   );
 }
 
-function TestStatus({ integration }: { integration: Integration }) {
+/** The row's one status word (off / not tested / connected / reachable /
+ *  action needed); the dialog carries the test's detail. */
+function StatusChip({ integration }: { integration: Integration }) {
   const { t } = useI18n();
+  const status = integrationStatus(integration);
   const last = readLastTest(integration.last_test);
-  if (!last) return <span className="shrink-0 text-[11px] text-muted-foreground">{t('Not tested')}</span>;
-  // Only a checked credential is "Connected"; a custom API that merely
-  // answered is "Reachable", in a neutral tone.
-  const tone = last.code === 'connected' ? 'success' : last.ok ? 'neutral' : 'danger';
-  // A refused credential (a test, or an agent's run that met it) asks for one thing.
-  const refused = !last.ok && (last.code === 'auth_failed' || last.code === 'oauth_expired' || last.code === 'oauth_required');
   return (
     <span
-      title={t(testOutcomeLabel(last.code))}
-      className={cn('inline-flex shrink-0 items-center gap-1.5 text-[11px]',
-        tone === 'success' ? 'text-[var(--status-success)]' : tone === 'danger' ? 'text-[var(--status-danger)]' : 'text-muted-foreground')}
+      title={last ? t(testOutcomeLabel(last.code)) : undefined}
+      className={cn('inline-flex shrink-0 items-center text-[11px]',
+        status === 'connected' ? 'text-[var(--status-success)]' : status === 'action-needed' ? 'text-[var(--status-danger)]' : 'text-muted-foreground')}
     >
-      <span aria-hidden="true" className={cn('size-1.5 rounded-full',
-        tone === 'success' ? 'bg-[var(--status-success)]' : tone === 'danger' ? 'bg-[var(--status-danger)]' : 'bg-muted-foreground')} />
-      {tone === 'success' ? t('Connected') : tone === 'neutral' ? t('Reachable') : refused ? t(integration.auth_type === 'oauth' ? 'Sign in again' : 'Authentication failed') : t('Error')}
+      {t(INTEGRATION_STATUS_LABELS[status])}
     </span>
   );
 }

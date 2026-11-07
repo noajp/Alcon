@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { criticalClassOfManifestCommand } from '@/AIP/connectors/catalog';
 
 const cm = await import(new URL('../../supabase/functions/_shared/connectorManifest.ts', import.meta.url).pathname);
 
@@ -157,5 +158,54 @@ describe('argument rules', () => {
     const next = cm.manifestFromTools([{ name: 'create_pull_request', readOnly: false }], RULED);
     const c = (next.commands as { mcp: string; rules?: unknown[] }[]).find((x) => x.mcp === 'create_pull_request');
     expect(c?.rules).toHaveLength(5);
+  });
+});
+
+describe('critical commands', () => {
+  const cmd = (over: Record<string, unknown>) => ({
+    name: 'x', action: 'x', effect: 'write', permission: 'ask', description: '', input: {}, required: [], http: null, mcp: null, rules: [], ...over,
+  });
+
+  it('classifies the operations a person must be able to stop every time', () => {
+    expect(cm.criticalClassOf(cmd({ name: 'send', action: 'gmail.send' }))).toBe('send');
+    expect(cm.criticalClassOf(cmd({ name: 'post_message', action: 'chat.postMessage', mcp: 'chat.postMessage' }))).toBe('send');
+    expect(cm.criticalClassOf(cmd({ name: 'comment', action: 'issues.comment' }))).toBe('send');
+    expect(cm.criticalClassOf(cmd({ name: 'create_charge', action: 'charges.create' }))).toBe('money');
+    expect(cm.criticalClassOf(cmd({ name: 'create_refund', action: 'refunds.create' }))).toBe('money');
+    expect(cm.criticalClassOf(cmd({ name: 'accept_quote', action: 'quotes.accept' }))).toBe('contract');
+    expect(cm.criticalClassOf(cmd({ name: 'create_order', action: 'orders.create' }))).toBe('contract');
+    expect(cm.criticalClassOf(cmd({ name: 'sign_contract', action: 'contracts.sign' }))).toBe('contract');
+    expect(cm.criticalClassOf(cmd({ name: 'delete_file', action: 'files.delete' }))).toBe('delete');
+    // A typed tool's name is judged by the same tokens (Google Drive's trash).
+    expect(cm.criticalClassForTokens('trash', 'write')).toBe('delete');
+    // An HTTP DELETE is a delete whatever its names say.
+    expect(cm.criticalClassOf(cmd({ name: 'fetch_it', action: 'things.fetch', http: { method: 'DELETE', path: '/things/1', query: [], body: [] } }))).toBe('delete');
+  });
+
+  it('does not classify ordinary writes, near-miss tokens, or any read', () => {
+    expect(cm.criticalClassOf(cmd({ name: 'create_issue', action: 'issues.create' }))).toBeNull();
+    expect(cm.criticalClassOf(cmd({ name: 'merge_pull_request', action: 'pulls.merge' }))).toBeNull();
+    expect(cm.criticalClassOf(cmd({ name: 'update_postpone_flag', action: 'flags.update' }))).toBeNull();
+    expect(cm.criticalClassForTokens('sender postpone', 'write')).toBeNull();
+    expect(cm.criticalClassOf(cmd({ name: 'list_deleted_items', action: 'items.listDeleted', effect: 'read' }))).toBeNull();
+    expect(cm.criticalClassForTokens('send', 'read')).toBeNull();
+  });
+
+  it('orders the classes delete → money → contract → send', () => {
+    expect(cm.criticalClassOf(cmd({ name: 'send_invoice', action: 'invoices.send' }))).toBe('money');
+    expect(cm.criticalClassOf(cmd({ name: 'delete_order', action: 'orders.delete' }))).toBe('delete');
+  });
+
+  it('agrees with the Settings mirror over loose manifest JSON', () => {
+    const fixtures = [
+      { name: 'send', action: 'gmail.send', effect: 'write', mcp: null, http: null },
+      { name: 'post_message', action: 'chat.postMessage', effect: 'write', mcp: 'chat.postMessage', http: null },
+      { name: 'create_charge', action: 'charges.create', effect: 'write', mcp: null, http: null },
+      { name: 'sign_contract', action: 'contracts.sign', effect: 'write', mcp: null, http: null },
+      { name: 'fetch_it', action: 'things.fetch', effect: 'write', mcp: null, http: { method: 'DELETE', path: '/things/1' } },
+      { name: 'create_issue', action: 'issues.create', effect: 'write', mcp: null, http: null },
+      { name: 'list_deleted_items', action: 'items.listDeleted', effect: 'read', mcp: null, http: null },
+    ];
+    for (const f of fixtures) expect(criticalClassOfManifestCommand(f), f.name).toBe(cm.criticalClassOf(f));
   });
 });

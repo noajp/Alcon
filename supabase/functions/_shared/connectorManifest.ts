@@ -271,6 +271,51 @@ export function requestFor(c: ManifestCommand, input: Record<string, unknown>): 
   return { method: c.http.method, path, query, body };
 }
 
+export type CriticalClass = "send" | "money" | "delete" | "contract";
+
+// Critical operations: the ones a person must be able to stop every time —
+// sending something out, moving money, deleting, or binding the
+// organisation (an order, a signature, a subscription). The manifest has
+// no criticality field, so the class is derived from the only fields it
+// does have: the command's names and its HTTP mapping. Whole tokens only,
+// so "postpone" is not "post" and "sender" is not "send".
+//
+// This is a floor, not a guarantee: a write whose names avoid every token
+// below is an ordinary write and keeps the delegation behaviour. An
+// explicit per-command flag belongs to manifest authoring, not to this
+// derivation.
+const CRITICAL_TOKENS: [CriticalClass, string[]][] = [
+  ["delete", ["delete", "destroy", "erase", "purge", "remove", "drop", "trash", "revoke"]],
+  ["money", ["pay", "payment", "payments", "charge", "charges", "refund", "refunds", "transfer", "transfers", "payout", "payouts", "purchase", "purchases", "withdraw", "withdrawal", "deposit", "billing", "invoice", "invoices"]],
+  ["contract", ["contract", "contracts", "sign", "signature", "agreement", "agreements", "quote", "quotes", "order", "orders", "checkout", "subscribe", "subscription", "subscriptions"]],
+  ["send", ["send", "mail", "email", "message", "messages", "notify", "notification", "notifications", "publish", "post", "comment", "comments", "reply", "replies", "announce", "invite", "invites", "share", "dm"]],
+];
+
+/** Pure. A name broken into whole tokens: camelCase humps, snake_case, kebab, dots and slashes all separate. */
+function nameTokens(text: string): string[] {
+  return text.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/**
+ * Pure. The critical class a write's name carries, or null. First class in
+ * the order delete → money → contract → send wins. A read is never
+ * critical. Shared core: a manifest command's fields and a typed tool's
+ * name (Google Drive's tools) are judged the same way.
+ */
+export function criticalClassForTokens(text: string, effect: Effect): CriticalClass | null {
+  if (effect !== "write") return null;
+  const tokens = new Set(nameTokens(text));
+  for (const [cls, words] of CRITICAL_TOKENS) if (words.some((w) => tokens.has(w))) return cls;
+  return null;
+}
+
+/** Pure. A command's critical class from its own fields; an HTTP DELETE is a delete whatever its names say. */
+export function criticalClassOf(command: Pick<ManifestCommand, "name" | "action" | "effect" | "http" | "mcp">): CriticalClass | null {
+  if (command.effect !== "write") return null;
+  if (command.http?.method === "DELETE") return "delete";
+  return criticalClassForTokens([command.action, command.name, command.mcp ?? "", command.http?.path ?? ""].join(" "), command.effect);
+}
+
 /** Pure. A command name from a tool's: lower case, letters, digits and _. */
 export function commandNameOf(tool: string): string {
   const base = tool.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");

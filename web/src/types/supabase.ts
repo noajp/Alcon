@@ -1178,6 +1178,7 @@ export type Database = {
           payload: Json
           sort: number
           updated_at: string
+          version: number
         }
         Insert: {
           body?: string | null
@@ -1188,6 +1189,7 @@ export type Database = {
           payload?: Json
           sort?: number
           updated_at?: string
+          version?: number
         }
         Update: {
           body?: string | null
@@ -1198,6 +1200,7 @@ export type Database = {
           payload?: Json
           sort?: number
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -1658,9 +1661,11 @@ export type Database = {
           body: string
           created_at: string
           created_by: string | null
+          enabled: boolean
           id: string
           name: string
           source_id: string | null
+          source_version: number | null
           updated_at: string
         }
         Insert: {
@@ -1668,9 +1673,11 @@ export type Database = {
           body: string
           created_at?: string
           created_by?: string | null
+          enabled?: boolean
           id?: string
           name: string
           source_id?: string | null
+          source_version?: number | null
           updated_at?: string
         }
         Update: {
@@ -1678,9 +1685,11 @@ export type Database = {
           body?: string
           created_at?: string
           created_by?: string | null
+          enabled?: boolean
           id?: string
           name?: string
           source_id?: string | null
+          source_version?: number | null
           updated_at?: string
         }
         Relationships: [

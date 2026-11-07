@@ -21,9 +21,13 @@ export interface Definition {
   updated_at: string;
   /** The catalog item it was added from (Settings › AI), if any. */
   source_id: string | null;
+  /** The catalog version it was added or last updated from (null: local, or a copy from before versioning). */
+  source_version: number | null;
+  /** Off means installed but inert: nothing runs, plans from or offers it. */
+  enabled: boolean;
 }
 
-const COLUMNS = 'id, activity_space_id, name, body, created_by, created_at, updated_at, source_id';
+const COLUMNS = 'id, activity_space_id, name, body, created_by, created_at, updated_at, source_id, source_version, enabled';
 const key = (spaceId: string | null) => ['definitions', spaceId ?? 'none'] as const;
 
 export function useDefinitions(spaceId: string | null) {
@@ -44,12 +48,31 @@ export function useDefinitions(spaceId: string | null) {
   };
 }
 
-export async function createDefinition(input: { spaceId: string; name: string; body: string; sourceId?: string | null }): Promise<Definition> {
+export async function createDefinition(input: { spaceId: string; name: string; body: string; sourceId?: string | null; sourceVersion?: number | null }): Promise<Definition> {
   const { data, error } = await supabase.from('definitions')
-    .insert({ activity_space_id: input.spaceId, name: input.name.trim(), body: input.body, source_id: input.sourceId ?? null })
+    .insert({ activity_space_id: input.spaceId, name: input.name.trim(), body: input.body, source_id: input.sourceId ?? null, source_version: input.sourceVersion ?? null })
     .select(COLUMNS).single();
   if (error) throw error;
   return data as Definition;
+}
+
+/** Turns a harness off or back on. Off is the reversible form of removal: bindings stay, and the engine falls through as if the slot were empty. */
+export async function setDefinitionEnabled(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase.from('definitions').update({ enabled, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+/** Replaces an installed copy with the catalog version it came from. The id, the on/off state and every binding are kept; local edits are not merged. */
+export async function applyDefinitionCatalogUpdate(id: string, item: { name: string; body: string; version: number }): Promise<void> {
+  const { error } = await supabase.from('definitions')
+    .update({ name: item.name, body: item.body, source_version: item.version, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+/** Records that an unmodified pre-versioning copy is the catalog version shown, without touching its text. */
+export async function markDefinitionCatalogVersion(id: string, version: number): Promise<void> {
+  const { error } = await supabase.from('definitions').update({ source_version: version, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
 }
 
 export async function updateDefinition(id: string, updates: { name?: string; body?: string }): Promise<void> {

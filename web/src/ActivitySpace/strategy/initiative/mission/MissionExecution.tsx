@@ -214,7 +214,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
       const next = normalizePlan(reply.plan, new Set(ctx.measures.map((m) => m.id)), {
         objects: new Map(objects.map((o) => [o.id, o.name])),
         domainIds: new Set(domains.map((d) => d.id)),
-        definitionIds: new Set(definitions.data.map((d) => d.id)),
+        definitionIds: new Set(definitions.data.filter((d) => d.enabled).map((d) => d.id)),
         workerIds: new Set(personName.keys()),
       });
       if (next.tasks.length === 0) setError(t('The Planner returned no tasks. Add guidance and try again.'));

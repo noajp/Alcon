@@ -41,7 +41,7 @@ export async function runHarnessTool(db: SupabaseClient, name: string, input: Re
   try {
     switch (name) {
       case "listHarnesses": {
-        let q = db.from("definitions").select("id, name, body, activity_space_id").order("name").limit(200);
+        let q = db.from("definitions").select("id, name, body, activity_space_id").eq("enabled", true).order("name").limit(200);
         if (input.spaceId) {
           const spaceId = String(input.spaceId);
           if (!UUID.test(spaceId)) return { ok: false, error: "spaceId は UUID で渡してください" };
@@ -63,9 +63,10 @@ export async function runHarnessTool(db: SupabaseClient, name: string, input: Re
       case "readHarness": {
         const id = String(input.id ?? "").trim();
         if (!UUID.test(id)) return { ok: false, error: "id は UUID で渡してください（listHarnesses の id）" };
-        const { data, error } = await db.from("definitions").select("id, name, body").eq("id", id).maybeSingle();
+        const { data, error } = await db.from("definitions").select("id, name, body, enabled").eq("id", id).maybeSingle();
         if (error) throw error;
         if (!data) return { ok: false, error: "ハーネスが見つかりません" };
+        if (!(data as { enabled: boolean }).enabled) return { ok: false, error: `ハーネス「${(data as { name: string }).name}」は無効化されています` };
         const body = String((data as { body: string }).body ?? "");
         return { ok: true, data: { id, name: (data as { name: string }).name, body, reading: definitionReading(parseDefinition(body)) } };
       }

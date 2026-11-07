@@ -57,9 +57,11 @@ import { conversationKindOf, conversationOpening, conversationSystemPrompt, conv
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
+import { resolveDefinition, type DefinitionCandidate } from "../_shared/definitionResolution.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
-import { commandSchema, decide, offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
+import { commandSchema, criticalClassForTokens, criticalClassOf, decide, offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type CriticalClass, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
+import { needsApprovalFor, type ApprovalFacts } from "../_shared/approvalPolicy.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
@@ -127,6 +129,19 @@ interface IntegrationTool {
   integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean;
   /** The declared command this tool is, when the integration has a manifest. */
   command?: ManifestCommand; manifest?: Manifest;
+}
+
+/** One call as the approval card shows it, stored with the pending action. */
+interface ApprovalDisplay {
+  id: string; integration: string; operation: string;
+  /** Where the call goes: the connection's base URL, or "Alcon" for its own tools. */
+  destination: string;
+  /** A manifest HTTP command's resolved request line (`POST /repos/…`), when it has one. */
+  detail: string | null;
+  effect: "read" | "write";
+  critical: CriticalClass | null;
+  /** Only a manifest command that is not critical can become a standing rule. */
+  rememberable: boolean;
 }
 
 /** An integration this run cannot use, told to the agent with the reason. */
@@ -381,7 +396,12 @@ async function execute(a: ExecArgs): Promise<void> {
   const config = resolveAgentConfig(worker, domain, weight, run.transcript?.messages?.length ? run.model : null);
   const { agentName, model, instructions, domainInstructions } = config;
   // The definition the work follows: the Element's own, else its Strategy's.
-  const definition = await loadDefinition(userDb, run.element_id);
+  // A disabled harness in the way is skipped, and the run says so.
+  const loadedDefinition = await loadDefinition(userDb, run.element_id);
+  const definition = loadedDefinition.definition;
+  if (loadedDefinition.skippedDisabled.length) {
+    await addStep(admin, run.id, "status", `無効化されているハーネス「${loadedDefinition.skippedDisabled.join("」「")}」は使わずに進めます`);
+  }
   // A Strategy's definition is direction for all its Elements; the output
   // shape and the loop are enforced only for an Element's own definition.
   const parsedAll: ParsedDefinition | null = definition ? parseDefinition(definition.body) : null;
@@ -630,6 +650,37 @@ async function execute(a: ExecArgs): Promise<void> {
     if (!it) return false;
     if (it.command) return it.command.effect === "read";
     return it.remote ? it.remote.readOnly : httpIsRead(call.input);
+  };
+  /** The critical class of a call, from its command's fields or (Drive) its tool's name. */
+  const criticalOf = (it: IntegrationTool | undefined): CriticalClass | null => {
+    if (!it) return null;
+    if (it.command) return criticalClassOf(it.command);
+    if (it.drive && it.remote) return criticalClassForTokens(it.remote.name, "write");
+    return null;
+  };
+  /** What the approval card is told about one call: where it goes, what it
+   *  is, whether it is critical, and whether approving may be remembered. */
+  const approvalDisplayFor = (c: ToolCall): ApprovalDisplay => {
+    const it = integrationTools.get(c.name);
+    if (!it) {
+      if (isCatalogTool(c.name)) {
+        return { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input), destination: "Alcon", detail: null, effect: "write", critical: null, rememberable: false };
+      }
+      const parts = c.name.split(INTEGRATION_SEPARATOR);
+      return { id: c.id, integration: parts[0], operation: parts.slice(1).join(INTEGRATION_SEPARATOR) || c.name, destination: parts[0], detail: null, effect: "write", critical: null, rememberable: false };
+    }
+    const critical = criticalOf(it);
+    let detail: string | null = null;
+    if (it.command?.http) {
+      const req = requestFor(it.command, c.input);
+      if (!("error" in req)) detail = `${req.method} ${req.path}`;
+    }
+    return {
+      id: c.id, integration: it.integration.name, operation: operationOf(it, c.input),
+      destination: it.integration.endpoint, detail,
+      effect: it.command ? it.command.effect : isRead(c) ? "read" : "write",
+      critical, rememberable: !!it.command && !critical,
+    };
   };
 
   // ── Executors ───────────────────────────────────────────────────────────
@@ -884,9 +935,7 @@ async function execute(a: ExecArgs): Promise<void> {
   if (pending && !pending.approved && !a.body.decision) {
     const { data: open } = await admin.from("agent_actions").select("id").eq("run_id", run.id).eq("status", "pending").maybeSingle();
     if (!open) {
-      const display = pending.calls.map((c) => isCatalogTool(c.name)
-        ? { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input) }
-        : { id: c.id, integration: c.name.split(INTEGRATION_SEPARATOR)[0], operation: c.name.split(INTEGRATION_SEPARATOR).slice(1).join(INTEGRATION_SEPARATOR) || c.name });
+      const display = pending.calls.map((c) => approvalDisplayFor(c));
       await admin.from("agent_actions").insert({
         run_id: run.id, element_id: run.element_id, tool_use_id: pending.calls[0].id, tool: pending.calls.length === 1 ? pending.calls[0].name : "batch",
         input: { calls: pending.calls, display }, input_hash: await sha256(canonicalCalls(pending.calls)), summary: approvalSummary(display),
@@ -905,8 +954,15 @@ async function execute(a: ExecArgs): Promise<void> {
     const its = calls.map((c) => integrationTools.get(c.name));
     const first = its[0];
     const command = first?.command;
+    // A critical operation asks every time; it never becomes a standing rule.
+    if (its.some((it) => criticalOf(it))) {
+      await addStep(admin, run.id, "approval", "重要な操作は、今後の自動実行の条件にできません");
+      return;
+    }
     if (!first || !command || its.some((it) => it?.integration.id !== first.integration.id || it?.command?.name !== command.name)) {
-      await addStep(admin, run.id, "approval", "以後の承認は保存できませんでした: 同じコマンドの呼び出しだけを条件にできます");
+      await addStep(admin, run.id, "approval", first && !command
+        ? "以後の承認は保存できませんでした: 条件を結び付けるコマンドがこの連携にありません"
+        : "以後の承認は保存できませんでした: 同じコマンドの呼び出しだけを条件にできます");
       return;
     }
     const rule = ruleFromCalls(calls.map((c) => c.input), fields);
@@ -1077,23 +1133,29 @@ async function execute(a: ExecArgs): Promise<void> {
     },
     kindOf,
     needsApproval: (call) => {
+      // The decision itself is _shared/approvalPolicy.ts; this adapter only
+      // gathers the facts this call has.
       // Alcon's own operations: the Element entry's policy decides each call.
       if (isCatalogTool(call.name)) {
         const tool = catalogTool(call.name);
-        return !!tool && decideCall("element", tool, call.input) === "approve";
+        return needsApprovalFor({ catalogDecision: tool ? decideCall("element", tool, call.input) : "allow", isWrite: true, isRead: false });
       }
-      if (kindOf(call.name) !== "write") return false;
       const it = integrationTools.get(call.name);
-      // A rule on the arguments decides under any delegation; otherwise the
-      // command's own permission does, and a full delegation lifts "ask" only.
-      // A denied call is not asked about: the executor refuses it.
+      const facts: ApprovalFacts = {
+        isWrite: kindOf(call.name) === "write",
+        isRead: isRead(call),
+        delegation: it?.integration.delegation ?? null,
+      };
       if (it?.command && it.manifest) {
         const d = decide(it.manifest, it.command, call.input);
-        if (d.permission !== "ask") return false;
-        return d.rule !== null || it.integration.delegation !== "full_delegation";
+        facts.manifest = { permission: d.permission, rule: d.rule, critical: criticalClassOf(it.command) };
+      } else if (it?.drive && it.remote) {
+        facts.critical = criticalClassForTokens(it.remote.name, "write");
+      } else if (it && !it.remote) {
+        // No command and no typed tool: the raw http_request tool.
+        facts.rawHttp = true;
       }
-      if (isRead(call)) return false;
-      return !it || it.integration.delegation !== "full_delegation";
+      return needsApprovalFor(facts);
     },
     execute: (call) => executeCall(call),
     onUsage: recordUsage,
@@ -1116,11 +1178,7 @@ async function execute(a: ExecArgs): Promise<void> {
     case "approval": {
       await saveTranscript(outcome.pending);
       const calls = outcome.pending.calls;
-      const display = calls.map((c) => {
-        const it = integrationTools.get(c.name);
-        if (!it && isCatalogTool(c.name)) return { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input) };
-        return { id: c.id, integration: it?.integration.name ?? c.name, operation: operationOf(it, c.input) };
-      });
+      const display = calls.map((c) => approvalDisplayFor(c));
       const summary = approvalSummary(display);
       const inputHash = await sha256(canonicalCalls(calls));
       const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
@@ -1370,11 +1428,21 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
       ? userDb.from("integrations").select("name, kind, delegation").eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"])
       : Promise.resolve({ data: [] }),
   ]);
-  // The harness the Strategy is worked by: its own, else the Space's default.
-  let definitionId = (row as { definition_id?: string | null } | null)?.definition_id ?? null;
-  if (!definitionId && run.activity_space_id) {
+  // The harness the Strategy is worked by: its own, else the Space's
+  // default. A disabled one is inert — the chain falls through to the next
+  // slot, and to no harness (Alcon's built-in conversation) at the end.
+  const strategyDefId = (row as { definition_id?: string | null } | null)?.definition_id ?? null;
+  let defaultDefId: string | null = null;
+  if (run.activity_space_id) {
     const { data: space } = await userDb.from("activity_spaces").select("default_definition_id").eq("id", run.activity_space_id).maybeSingle();
-    definitionId = (space as { default_definition_id?: string | null } | null)?.default_definition_id ?? null;
+    defaultDefId = (space as { default_definition_id?: string | null } | null)?.default_definition_id ?? null;
+  }
+  const chainIds = [...new Set([strategyDefId, defaultDefId].filter((x): x is string => !!x))];
+  let definitionId: string | null = null;
+  if (chainIds.length) {
+    const { data: rows } = await userDb.from("definitions").select("id, name, enabled").in("id", chainIds);
+    const byId = new Map(((rows ?? []) as DefinitionCandidate[]).map((r) => [r.id, r]));
+    definitionId = resolveDefinition(chainIds.map((cid) => byId.get(cid) ?? null)).id;
   }
   const { data: def } = definitionId ? await userDb.from("definitions").select("name, body").eq("id", definitionId).maybeSingle() : { data: null };
   return {
@@ -1456,22 +1524,36 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
   }
 }
 
-/** The definition an Element follows: its own, else the first of its Strategies'. */
-async function loadDefinition(userDb: SupabaseClient, elementId: string): Promise<{ name: string; body: string; scope: "element" | "strategy" } | null> {
+/** The definition an Element follows: its own, else the first enabled of its
+ *  Strategies'. A disabled definition is skipped as if its slot were empty;
+ *  the skipped names come back so the run can say it went on without them. */
+async function loadDefinition(userDb: SupabaseClient, elementId: string): Promise<{ definition: { name: string; body: string; scope: "element" | "strategy" } | null; skippedDisabled: string[] }> {
   const { data: el } = await userDb.from("elements").select("definition_id, object_id").eq("id", elementId).maybeSingle();
-  let id = (el as { definition_id?: string | null } | null)?.definition_id ?? null;
-  const scope: "element" | "strategy" = id ? "element" : "strategy";
-  if (!id && el?.object_id) {
+  const ownId = (el as { definition_id?: string | null } | null)?.definition_id ?? null;
+  const candidates: (DefinitionCandidate | null)[] = [];
+  if (ownId) {
+    const { data: own } = await userDb.from("definitions").select("id, name, enabled").eq("id", ownId).maybeSingle();
+    candidates.push((own as DefinitionCandidate | null) ?? null);
+  }
+  const own = candidates[0] ?? null;
+  if ((!own || !own.enabled) && el?.object_id) {
     const { data: links } = await userDb.from("strategy_objects").select("strategy_id").eq("object_id", el.object_id);
     const ids = ((links ?? []) as { strategy_id: string }[]).map((l) => l.strategy_id);
     if (ids.length) {
-      const { data: s } = await userDb.from("strategies").select("definition_id").in("id", ids).not("definition_id", "is", null).limit(1);
-      id = ((s ?? []) as { definition_id: string }[])[0]?.definition_id ?? null;
+      const { data: s } = await userDb.from("strategies").select("definition_id").in("id", ids).not("definition_id", "is", null);
+      const defIds = [...new Set(((s ?? []) as { definition_id: string }[]).map((r) => r.definition_id).filter((d) => d !== ownId))];
+      if (defIds.length) {
+        const { data: rows } = await userDb.from("definitions").select("id, name, enabled").in("id", defIds);
+        const byId = new Map(((rows ?? []) as DefinitionCandidate[]).map((r) => [r.id, r]));
+        for (const defId of defIds) candidates.push(byId.get(defId) ?? null);
+      }
     }
   }
-  if (!id) return null;
+  const { id, skippedDisabled } = resolveDefinition(candidates);
+  if (!id) return { definition: null, skippedDisabled };
   const { data: d } = await userDb.from("definitions").select("name, body").eq("id", id).maybeSingle();
-  return d ? { ...(d as { name: string; body: string }), scope } : null;
+  if (!d) return { definition: null, skippedDisabled };
+  return { definition: { ...(d as { name: string; body: string }), scope: id === ownId ? "element" : "strategy" }, skippedDisabled };
 }
 
 /** The delegation of the Strategies an Element's Object serves. */

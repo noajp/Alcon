@@ -39,6 +39,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseDefinition } from "../_shared/definition.ts";
+import { resolveDefinition, type DefinitionCandidate } from "../_shared/definitionResolution.ts";
 import { chunkText, DIGEST_SYSTEM, inBatches, readStrategySources, sourceReport, type Source } from "./sources.ts";
 
 const corsHeaders = {
@@ -274,18 +275,27 @@ Deno.serve(async (req: Request) => {
       ? db.from("domains").select("id, name, description").eq("activity_space_id", initiative.activity_space_id).order("order_index").limit(50)
       : Promise.resolve({ data: [] }),
     initiative.activity_space_id
-      ? db.from("definitions").select("id, name, body").eq("activity_space_id", initiative.activity_space_id).order("name").limit(50)
+      ? db.from("definitions").select("id, name, body").eq("activity_space_id", initiative.activity_space_id).eq("enabled", true).order("name").limit(50)
       : Promise.resolve({ data: [] }),
     // The Space's people a task may go to, as the assignee pickers list them.
     initiative.activity_space_id
       ? db.rpc("list_assignable_workers", { p_space_id: initiative.activity_space_id, p_domain_id: null, p_element_id: null })
       : Promise.resolve({ data: [] }),
   ]);
-  // The harness the Strategy is worked by: its own, else the Space's default.
-  let harnessId = (initiative.definition_id as string | null) ?? null;
-  if (!harnessId && initiative.activity_space_id) {
+  // The harness the Strategy is worked by: its own, else the Space's
+  // default. A disabled one falls through, as in a conversation.
+  const strategyDefId = (initiative.definition_id as string | null) ?? null;
+  let defaultDefId: string | null = null;
+  if (initiative.activity_space_id) {
     const { data: space } = await db.from("activity_spaces").select("default_definition_id").eq("id", initiative.activity_space_id).maybeSingle();
-    harnessId = (space as { default_definition_id?: string | null } | null)?.default_definition_id ?? null;
+    defaultDefId = (space as { default_definition_id?: string | null } | null)?.default_definition_id ?? null;
+  }
+  const chainIds = [...new Set([strategyDefId, defaultDefId].filter((x): x is string => !!x))];
+  let harnessId: string | null = null;
+  if (chainIds.length) {
+    const { data: rows } = await db.from("definitions").select("id, name, enabled").in("id", chainIds);
+    const byId = new Map(((rows ?? []) as DefinitionCandidate[]).map((r) => [r.id, r]));
+    harnessId = resolveDefinition(chainIds.map((cid) => byId.get(cid) ?? null)).id;
   }
   const { data: harnessRow } = harnessId ? await db.from("definitions").select("name, body").eq("id", harnessId).maybeSingle() : { data: null };
   const harnessSections = harnessRow ? parseDefinition(String((harnessRow as Row).body ?? "")).sections : null;

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { Integration, Json } from '@/types/database';
+import { criticalClassOfManifestCommand, CRITICAL_CLASS_LABELS } from './catalog';
 import { useIntegrationActions } from './data';
 
 // What agents may do with an MCP connection, command by command. The
@@ -18,7 +19,10 @@ import { useIntegrationActions } from './data';
 
 type Permission = 'allow' | 'ask' | 'deny';
 interface Rule { when: Record<string, string>; permission: Permission }
-interface Command { name: string; effect: 'read' | 'write'; permission: Permission | null; description: string; rules: Rule[] }
+interface Command {
+  name: string; action: string; effect: 'read' | 'write'; permission: Permission | null; description: string; rules: Rule[];
+  mcp: string | null; http: { method: string; path: string } | null;
+}
 
 const LABEL: Record<Permission, string> = { allow: 'Allowed', ask: 'Asks first', deny: 'Not allowed' };
 
@@ -37,7 +41,14 @@ function readCommands(manifest: Json | null): { commands: Command[]; defaults: R
       if (!when || !p || !Object.values(when).every((v) => typeof v === 'string') || !Object.keys(when).length) return [];
       return [{ when: when as Record<string, string>, permission: p }];
     });
-    return [{ name: x.name, effect: x.effect === 'read' ? 'read' : 'write', permission: perm(x.permission), description: typeof x.description === 'string' ? x.description : '', rules }];
+    const h = x.http && typeof x.http === 'object' && !Array.isArray(x.http) ? x.http as Record<string, unknown> : null;
+    return [{
+      name: x.name, action: typeof x.action === 'string' && x.action ? x.action : x.name,
+      effect: x.effect === 'read' ? 'read' : 'write', permission: perm(x.permission),
+      description: typeof x.description === 'string' ? x.description : '', rules,
+      mcp: typeof x.mcp === 'string' && x.mcp ? x.mcp : null,
+      http: h && typeof h.method === 'string' && typeof h.path === 'string' ? { method: h.method, path: h.path } : null,
+    }];
   });
   return { commands, defaults };
 }
@@ -69,23 +80,33 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
   const sorted = [...commands].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
   const shown = showAll ? sorted : sorted.slice(0, 12);
   const writes = commands.filter((c) => c.effect === 'write').length;
+  const anyCritical = commands.some((c) => criticalClassOfManifestCommand(c) !== null);
   return (
     <div className="w-full min-w-0 space-y-2 overflow-hidden">
       <p className="text-[12px] text-muted-foreground">
         {t('{reads} read and {writes} write commands. Reads are allowed and writes ask first unless you change them.', { reads: commands.length - writes, writes })}
       </p>
+      {anyCritical && (
+        <p className="text-[12px] text-muted-foreground">{t('Critical operations (send / money / delete / contract) always ask. Full delegation, “Allowed”, and conditions do not lift them, and they cannot be remembered.')}</p>
+      )}
       {integration.delegation === 'full_delegation' && (
         <p className="text-[12px] text-[var(--status-warning)]">{t('Full delegation is on, so commands set to “Asks first” run without asking. Conditions and “Not allowed” still hold.')}</p>
       )}
       <ul className="min-w-0 divide-y divide-[var(--border-default)]">
         {shown.map((c) => {
           const effective = c.permission ?? defaults[c.effect];
+          const critical = criticalClassOfManifestCommand(c);
           return (
             <li key={c.name} className="min-w-0 py-1.5 text-[12px]">
             <div className="flex min-w-0 items-center gap-2">
               <span className="min-w-0 flex-1 overflow-hidden">
                 <span className="font-mono text-foreground">{c.name}</span>
                 <span className="ml-2 text-muted-foreground">{c.effect === 'read' ? t('read') : t('write')}</span>
+                {critical && (
+                  <span className="ml-2 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)]">
+                    {t('Always asks · {class}', { class: t(CRITICAL_CLASS_LABELS[critical]) })}
+                  </span>
+                )}
                 {c.description && <span className="line-clamp-1 text-[11px] text-muted-foreground">{c.description}</span>}
               </span>
               <select value={effective} disabled={readOnly || actions.update.isPending} onChange={(e) => set(c.name, e.target.value as Permission)}

@@ -1,4 +1,5 @@
 import type { AgentAction } from '@/types/database';
+import type { CriticalClass } from '@/AIP/connectors/catalog';
 
 // What a person reads before approving: one row per external write, with
 // the operation and the few fields that say what it will do. The raw input
@@ -8,6 +9,15 @@ export interface ApprovalRow {
   id: string;
   integration: string;
   operation: string;
+  /** Where the call goes: the connection's base URL (or "Alcon"). */
+  destination: string;
+  /** A manifest HTTP command's resolved request line, when it has one. */
+  detail: string | null;
+  effect: 'read' | 'write';
+  /** The critical class the engine derived for this call, if any. */
+  critical: CriticalClass | null;
+  /** Whether approving may offer "don't ask again" for this call. */
+  rememberable: boolean;
   /** The fields worth reading, flattened to text: [label, value]. */
   fields: [string, string][];
   /** How many fields the table leaves out; the raw input has them. */
@@ -49,18 +59,36 @@ export function readableFields(input: Record<string, unknown>): { fields: [strin
   return { fields: all.slice(0, MAX_FIELDS), more: Math.max(0, all.length - MAX_FIELDS) };
 }
 
+interface DisplayEntry {
+  id: string; integration: string; operation: string;
+  destination?: string; detail?: string | null; effect?: string; critical?: CriticalClass | null; rememberable?: boolean;
+}
+
+function displayOf(action: Pick<AgentAction, 'input'>): Map<string, DisplayEntry> {
+  return new Map((((action.input as { display?: DisplayEntry[] })?.display) ?? []).map((d) => [d.id, d]));
+}
+
 /** Pure. The approval card's rows for a pending action. */
 export function approvalRows(action: Pick<AgentAction, 'input'>): ApprovalRow[] {
   const calls = action.input?.calls ?? [];
-  const display = new Map((((action.input as { display?: { id: string; integration: string; operation: string }[] })?.display) ?? []).map((d) => [d.id, d]));
+  const display = displayOf(action);
   return calls.map((c) => {
     const d = display.get(c.id);
     const input = c.input ?? {};
     const httpOp = typeof input.method === 'string' ? `${input.method} ${typeof input.path === 'string' ? input.path : ''}`.trim() : '';
+    const integration = d?.integration ?? c.name.split('__')[0];
     return {
       id: c.id,
-      integration: d?.integration ?? c.name.split('__')[0],
+      integration,
       operation: d?.operation || httpOp || c.name.split('__').slice(1).join('__') || c.name,
+      // Actions saved before the display carried these default to the safe
+      // side: no destination beyond the connection's name, not critical,
+      // and not rememberable.
+      destination: d?.destination ?? integration,
+      detail: d?.detail ?? null,
+      effect: d?.effect === 'read' ? 'read' as const : 'write' as const,
+      critical: d?.critical ?? null,
+      rememberable: d?.rememberable === true,
       ...readableFields(input),
       raw: input,
     };
@@ -75,6 +103,10 @@ export function approvalRows(action: Pick<AgentAction, 'input'>): ApprovalRow[] 
 export function rememberChoices(action: Pick<AgentAction, 'input'>): { field: string; value: string }[] {
   const calls = action.input?.calls ?? [];
   if (!calls.length || calls.some((c) => c.name !== calls[0].name)) return [];
+  // Only a batch the engine marked rememberable on every call — a manifest
+  // command that is not critical — may become a standing rule.
+  const display = displayOf(action);
+  if (calls.some((c) => display.get(c.id)?.rememberable !== true)) return [];
   const plain = (v: unknown) => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null);
   return Object.keys(calls[0].input ?? {}).flatMap((field) => {
     if (!/^[A-Za-z0-9_.-]{1,64}$/.test(field)) return [];

@@ -86,7 +86,13 @@ export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
       <RailRow name={t('Harness')} label={
         <OptionMenu label={t('Harness')} value={harness?.id ?? SPACE_DEFAULT} disabled={!canEdit}
           onChange={(v) => void setHarness(v === SPACE_DEFAULT ? null : v)}
-          options={[{ value: SPACE_DEFAULT, label: t("The Space's default") }, ...library.data.map((d) => ({ value: d.id, label: d.name }))]} />
+          options={[
+            { value: SPACE_DEFAULT, label: t("The Space's default") },
+            // A binding to an off harness stays stored and is shown as such;
+            // new selections offer enabled harnesses only.
+            ...(harness && !harness.enabled ? [{ value: harness.id, label: `${harness.name} · ${t('Off')}` }] : []),
+            ...library.data.filter((d) => d.enabled).map((d) => ({ value: d.id, label: d.name })),
+          ]} />
       } />
       <RailRow name={t('Created')} label={formatRelative(strategy.created_at)} />
       <RailRow name={t('Updated')} label={formatRelative(strategy.updated_at)} />
