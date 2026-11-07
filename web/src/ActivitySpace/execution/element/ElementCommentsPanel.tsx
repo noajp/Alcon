@@ -33,7 +33,13 @@ interface ElementCommentsPanelProps {
   focusCommentId?: string | null;
   /** A comment addressed to an agent ("@AI", "@<AI Worker>") becomes its
    *  next instruction; the agent answers under that comment. */
-  onAskAgent?: (ask: { prompt: string; commentId: string; workerId: string | null }) => Promise<AgentStartOutcome>;
+  /** Sends a comment to an AI. 'handed': the AI works in Claude Code, and
+   *  the Element was handed over to it there. */
+  onAskAgent?: (ask: { prompt: string; commentId: string; workerId: string | null }) => Promise<AgentStartOutcome | 'handed'>;
+  /** The Element is held up waiting for an answer (blocked). When the newest
+   *  comment is the AI's, a person's reply goes back to the AI as its answer,
+   *  with or without "@AI". */
+  waitingOnAnswer?: boolean;
   /** Changes when the agent's run moves on; the thread re-reads its comments. */
   refreshKey?: string | null;
   /** Other ways to send, from the ▾ beside Send (e.g. Share an update). */
@@ -53,11 +59,11 @@ interface MentionCandidate {
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, refreshKey, sendOptions }: ElementCommentsPanelProps) {
+export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, waitingOnAnswer = false, refreshKey, sendOptions }: ElementCommentsPanelProps) {
   const { t } = useI18n();
   const aiWorkers = useMemo(() => workers.filter((w) => w.type === 'ai_agent').map((w) => ({ id: w.id, name: w.name })), [workers]);
   const humanNames = useMemo(() => workers.filter((w) => w.type === 'human').map((w) => w.name), [workers]);
-  const [askOutcome, setAskOutcome] = useState<AgentStartOutcome | null>(null);
+  const [askOutcome, setAskOutcome] = useState<AgentStartOutcome | 'handed' | null>(null);
   const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
   const { user, profile } = useAuthContext();
   const { comments, loading, reload, setComments } = useElementComments(elementId);
@@ -116,6 +122,11 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
   // The @ list: the agent first (@AI, then this Element's AI Workers by
   // name), then people. Picking an agent turns the comment into its next
   // instruction (agentMention); picking a person notifies them.
+  // The AI asked and the Element waits: the newest comment is the AI's.
+  const newest = comments.reduce<ElementComment | null>((a, c) => (!a || c.created_at > a.created_at ? c : a), null);
+  const aiAsked = waitingOnAnswer && newest?.author_kind === 'ai_agent';
+  // Every name a mention may carry, so the thread colours it whole.
+  const mentionNames = useMemo(() => workers.map((w) => w.name).filter(Boolean) as string[], [workers]);
   const mentionCandidates = useMemo(() => {
     const agents: MentionCandidate[] = onAskAgent
       ? rankMentionCandidates([
@@ -192,7 +203,8 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       setMentionOpen(false);
       setMentionQuery('');
 
-      const ask = onAskAgent ? agentMention(content, aiWorkers, humanNames) : null;
+      // Named, or — when the AI asked and waits — a reply to it.
+      const ask = onAskAgent ? (agentMention(content, aiWorkers, humanNames) ?? (aiAsked ? { workerId: null } : null)) : null;
       setAskOutcome(null);
       if (ask && onAskAgent) void onAskAgent({ prompt: content, commentId: created.id, workerId: ask.workerId }).then(setAskOutcome);
 
@@ -303,6 +315,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
               >
                 <CommentEntry
                   comment={c}
+                  mentionNames={mentionNames}
                   avatar={
                     <CommentAvatar
                       name={c.author_name ?? authorWorker?.name ?? null}
@@ -413,6 +426,10 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
         <p className="text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
       )}
       {askOutcome === 'failed' && <p className="text-[12px] text-[var(--status-danger)]">{t('The agent could not start. See the agent panel above.')}</p>}
+      {askOutcome === 'handed' && <p className="text-[12px] text-muted-foreground">{t('Handed to Claude Code. It picks the Element up with this comment.')}</p>}
+      {aiAsked && onAskAgent && (
+        <p className="text-[12px]" style={{ color: 'var(--accent-default)' }}>{t('The AI is waiting for your answer. A comment here goes to it, with or without @AI.')}</p>
+      )}
       <CommentComposer
         value={draft}
         onChange={handleDraftChange}

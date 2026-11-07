@@ -1,5 +1,7 @@
 'use client';
 
+import { runsInClaudeCode } from '@/Function/team/agentModel';
+import { handOverLabels } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import { markElementCommentsRead } from '@/hooks/notificationData';
 import { FollowButton } from '@/Function/shared/FollowButton';
 import { AiWorkingMark } from '@/Function/shared/element/AiWorkingMark';
@@ -954,8 +956,24 @@ function ElementDetailBody({
               elementId={element.id}
               workers={allWorkers}
               focusCommentId={focusCommentId}
-              onAskAgent={({ prompt, commentId, workerId }) =>
-                agent.start({ mode: 'reply', prompt, replyTo: commentId, workerId: workerId ?? assignedAiWorkerId, triggeredFrom: 'comment', domainId })}
+              waitingOnAnswer={element.status === 'blocked'}
+              onAskAgent={async ({ prompt, commentId, workerId }) => {
+                // Named, else the AI that last worked it, else the assigned one.
+                const id = workerId ?? rerunWorkerId(agent.run?.worker_id);
+                // An AI that works in Claude Code is not run here: the Element
+                // is handed to it, and it reads the comment when it picks it up.
+                const worker = aiWorkers.find((w) => w.id === id);
+                if (worker && runsInClaudeCode(worker.ai_config)) {
+                  try {
+                    await updateElement(element.id, { labels: handOverLabels(element.labels), status: element.status === 'in_progress' ? 'in_progress' : 'todo' });
+                    onRefresh?.();
+                    return 'handed';
+                  } catch {
+                    return 'failed';
+                  }
+                }
+                return agent.start({ mode: 'reply', prompt, replyTo: commentId, workerId: id, triggeredFrom: 'comment', domainId });
+              }}
             />
           </div>
 
