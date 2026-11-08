@@ -1554,6 +1554,109 @@ export interface DefinitionRevisionCandidate {
   updated_at: string
 }
 
+export type ConstraintScope = 'definition' | 'strategy'
+export type ConstraintDerivedFrom = 'verifier_gap' | 'rejection_cluster' | 'correction_pattern'
+export type ConstraintDraftStatus = 'draft' | 'awaiting_review' | 'activated' | 'rejected' | 'expired'
+
+/** The cluster a constraint draft was derived from, as the derivation
+ *  stamped it: the signature's count over the target's window
+ *  outcomes, and the baseline rate the constraint claims it will
+ *  move. The review surface's decision minimum. */
+export interface ConstraintClusterRecord {
+  outcomes?: number
+  withSignature?: number
+  windowOutcomes?: number
+  baselineRate?: number
+  signalled?: number
+  samples?: string[]
+}
+
+/** One entry in a constraint draft's own event log (drafted /
+ *  activated / rejected), appended by the deciding RPC. */
+export interface ConstraintDraftEvent {
+  at: string
+  kind: string
+  by: string | null
+}
+
+/** A constraint the system drafted from outcome evidence (B6): one
+ *  sentence of learned rule, its cluster and its evidence, hash-bound
+ *  at drafting. It steers nothing until a Space owner activates it
+ *  through activate_constraint_draft — the RPC re-checks ownership
+ *  and the target's snapshot itself. Written only by the automations
+ *  tick's derivation (service role). */
+export interface ConstraintDraft {
+  id: string
+  activity_space_id: string
+  scope: ConstraintScope
+  target_definition_id: string | null
+  target_strategy_id: string | null
+  constraint_text: string | null
+  derived_from: ConstraintDerivedFrom
+  signature: string
+  evidence_outcome_ids: string[]
+  cluster: ConstraintClusterRecord
+  calibration_candidate_id: string | null
+  structure_hash: string | null
+  binding_hash: string | null
+  target_version: string | null
+  status: ConstraintDraftStatus
+  offered_at: string | null
+  decided_by: string | null
+  decided_at: string | null
+  activated_constraint_id: string | null
+  expires_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type PlanningConstraintStatus = 'active' | 'retired'
+export type ConstraintEffectStatus = 'measuring' | 'improving' | 'established' | 'ineffective'
+
+/** The effect measurement's latest reading, written by the tick
+ *  evaluator: how many outcomes ran under the constraint, how many
+ *  still carried its signature, and the rate that makes. */
+export interface ConstraintEffectRecord {
+  under?: number
+  withSignature?: number
+  rate?: number
+  baselineRate?: number
+  firstImprovingAt?: string | null
+  evaluatedAt?: string
+}
+
+/** An activated constraint (B6) — the learning edge's truth. It
+ *  lands in the planner's brief and the Strategy conversation
+ *  (strategy scope) and in the definition's effective body at
+ *  resolution (definition scope), as a projection computed at read
+ *  time; the stored definition body is never rewritten by it.
+ *  Effect is measured against baseline_rate; an ineffective status
+ *  flags it for a person — nothing retires it automatically. */
+export interface PlanningConstraint {
+  id: string
+  activity_space_id: string
+  scope: ConstraintScope
+  target_definition_id: string | null
+  target_strategy_id: string | null
+  constraint_text: string
+  draft_id: string
+  signature: string
+  derived_from: ConstraintDerivedFrom
+  baseline_rate: number
+  baseline_outcomes: number
+  baseline_with: number
+  effect_status: ConstraintEffectStatus
+  effect: ConstraintEffectRecord
+  status: PlanningConstraintStatus
+  activated_by: string
+  activated_at: string
+  retired_by: string | null
+  retired_at: string | null
+  retire_reason: 'owner' | 'folded' | null
+  created_at: string
+  updated_at: string
+}
+
 export type IntegrationDraftStatus =
   | 'drafting' | 'awaiting_input' | 'testing' | 'awaiting_review'
   | 'active' | 'rejected' | 'failed' | 'expired' | 'superseded' | 'rerouted'

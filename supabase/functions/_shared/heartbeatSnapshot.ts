@@ -21,7 +21,8 @@ export type HeartbeatSignalKind =
   | "capability_landed"
   | "credential_refused" | "credential_auth_failed"
   | "credential_unused" | "credential_unknown_use"
-  | "calibration_candidate";
+  | "calibration_candidate"
+  | "constraint_review";
 
 /** One thing waiting for a person, as the driver's reads found it. */
 export interface HeartbeatSignal {
@@ -95,6 +96,7 @@ export const HEARTBEAT_KIND_LABEL: Record<HeartbeatSignalKind, string> = {
   credential_unused: "使われていない資格情報",
   credential_unknown_use: "実行が特定できない資格情報の使用",
   calibration_candidate: "定義の見直し候補",
+  constraint_review: "制約ドラフトの審査待ち",
 };
 
 const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
@@ -118,6 +120,7 @@ const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
   credential_unused: "credential_unused",
   credential_unknown_use: "credential_unknown_use",
   calibration_candidate: "calibration",
+  constraint_review: "constraint",
 };
 
 /** Pure. A wait's identity across wakes: its kind, its thing, and its
