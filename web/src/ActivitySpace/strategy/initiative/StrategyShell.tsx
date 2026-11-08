@@ -1077,19 +1077,63 @@ function StrategyDetailView({
             </div>
           )}
 
-          {/* The document, read top to bottom: the Objects that carry it, its
-              Sub Strategies, what the work produced, then the discussion.
+          {/* The document, read top to bottom: its Sub Strategies, the Objects
+              that carry it, what the work produced, then the discussion.
               The work as it runs is on the Execution Chain. */}
-            {selectedIds.size > 0 || pickerMode !== 'closed' ? (
-              <PageSection title={t('Objects')} action={canEdit ? (
-                <ButtonAppearanceProvider appearance="navigation">
-                  {objectsMenu(
-                    <Button variant="ghost" size="icon-xs" aria-label={t('Add Objects')} className="text-muted-foreground">
-                      <Plus size={13} />
-                    </Button>,
-                  )}
-                </ButtonAppearanceProvider>
-              ) : undefined}>
+
+              {/* What the work under these Objects has shipped as code, read
+                  against this Strategy's intent. */}
+              <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
+              <div className="w-full">
+              <FoldSection title={t('Sub Strategies')} count={childStrategies.length ? String(childStrategies.length) : undefined}>
+                {childStrategies.map((child) => {
+                  const n = countObjects(child.objectIds);
+                  return (
+                    <ContentRow key={child.id} icon={<ItemIcon icon={child.icon} color={child.color} size={16} fallback={<NavStrategyIcon size={16} />} />} name={child.name}
+                      onOpen={() => onOpenStrategy(child.id)}
+                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
+                      actions={canEdit ? (
+                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
+                          <X size={12} />
+                        </ContentRowAction>
+                      ) : undefined} />
+                  );
+                })}
+                {childPickerOpen && (
+                  <div className="mt-1 px-2">
+                    <div className="mb-1 flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
+                      <Search size={12} className="text-muted-foreground" />
+                      <input value={childQuery} onChange={(e) => setChildQuery(e.target.value)}
+                        placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
+                      <button type="button" onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                        aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-auto">
+                      {childCandidates.length === 0 && (
+                        <div className="px-3 py-3 text-[12px] text-muted-foreground">{t('No Strategies match.')}</div>
+                      )}
+                      {childCandidates.map((c) => (
+                        <button type="button" key={c.id} disabled={linkingChildId === c.id} onClick={() => linkChild(c.id)}
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[12px] hover:bg-muted/40 disabled:opacity-50">
+                          <NavStrategyIcon size={11} />
+                          <span className="flex-1 truncate text-foreground">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {canEdit && (
+                  <FoldSectionAddRow icon={<NavStrategyIcon size={16} />} placeholder={t('Add Sub Strategy')} onAdd={createChild} />
+                )}
+              </FoldSection>
+              </div>
+              {/* The Objects that carry it: each row opens its Object; the last
+                  row adds one, as Sub Strategies does. */}
+              {(selectedIds.size > 0 || canEdit) && (
+              <div className="w-full">
+              <FoldSection title={t('Objects')} count={selectedIds.size ? String(selectedIds.size) : undefined}>
               {selectedIds.size > 0 && (
                 <div className="mb-2">
                   {Array.from(selectedIds).map((id) => {
@@ -1109,7 +1153,7 @@ function StrategyDetailView({
                         // fraction of a px taller and visibly nudged the row).
                         className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
                       >
-                        <ItemIcon icon={obj.icon} color={obj.color} size={13} className="text-muted-foreground" fallback={<ObjectIcon size={13} />} />
+                        <ItemIcon icon={obj.icon} color={obj.color} size={16} className="text-muted-foreground" fallback={<ObjectIcon size={16} />} />
                         <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
                         {/* The cells already draw read-only when handed no handler;
                             membership decides whether they get one. */}
@@ -1203,65 +1247,15 @@ function StrategyDetailView({
                   </div>
                 </div>
               )}
-              </PageSection>
-            ) : canEdit ? (
-              <ButtonAppearanceProvider appearance="inline">
-                {objectsMenu(
-                  <Button variant="ghost" size="sm" align="start" className="-ml-2 self-start">
-                    <Plus size={13} strokeWidth={2.5} />{t('Add Objects')}
-                  </Button>,
-                )}
-              </ButtonAppearanceProvider>
-            ) : null}
-
-              {/* What the work under these Objects has shipped as code, read
-                  against this Strategy's intent. */}
-              <InitiativeCodeChanges objects={allObjects.filter((o) => selectedIds.has(o.id))} />
-              <div className="w-full">
-              <FoldSection title={t('Sub Strategies')} count={childStrategies.length ? String(childStrategies.length) : undefined}>
-                {childStrategies.map((child) => {
-                  const n = countObjects(child.objectIds);
-                  return (
-                    <ContentRow key={child.id} icon={<ItemIcon icon={child.icon} color={child.color} size={14} fallback={<NavStrategyIcon size={14} />} />} name={child.name}
-                      onOpen={() => onOpenStrategy(child.id)}
-                      meta={<span>{n === 1 ? t('1 Object') : t('{n} Objects', { n })}</span>}
-                      actions={canEdit ? (
-                        <ContentRowAction label={t('Remove {name} from this Strategy', { name: child.name })} onClick={() => void unlinkChild(child.id)}>
-                          <X size={12} />
-                        </ContentRowAction>
-                      ) : undefined} />
-                  );
-                })}
-                {childPickerOpen && (
-                  <div className="mt-1 px-2">
-                    <div className="mb-1 flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
-                      <Search size={12} className="text-muted-foreground" />
-                      <input value={childQuery} onChange={(e) => setChildQuery(e.target.value)}
-                        placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
-                      <button type="button" onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
-                        aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="max-h-72 overflow-auto">
-                      {childCandidates.length === 0 && (
-                        <div className="px-3 py-3 text-[12px] text-muted-foreground">{t('No Strategies match.')}</div>
-                      )}
-                      {childCandidates.map((c) => (
-                        <button type="button" key={c.id} disabled={linkingChildId === c.id} onClick={() => linkChild(c.id)}
-                          className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[12px] hover:bg-muted/40 disabled:opacity-50">
-                          <NavStrategyIcon size={11} />
-                          <span className="flex-1 truncate text-foreground">{c.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {canEdit && (
-                  <FoldSectionAddRow icon={<NavStrategyIcon size={14} />} placeholder={t('Add Sub Strategy')} onAdd={createChild} />
-                )}
+              {canEdit && pickerMode === 'closed' && objectsMenu(
+                <button type="button" className="flex min-h-[2.125rem] w-full items-center gap-2 px-2 text-left">
+                  <span className="flex text-muted-foreground opacity-50"><ObjectIcon size={16} /></span>
+                  <span className="text-[14px] text-muted-foreground/60">{t('Add Objects')}</span>
+                </button>,
+              )}
               </FoldSection>
               </div>
+              )}
               <WidgetZone zone="main" columns={1} />
               {/* What the work produced and what was approved, then the
                   discussion — last, because it grows. */}
