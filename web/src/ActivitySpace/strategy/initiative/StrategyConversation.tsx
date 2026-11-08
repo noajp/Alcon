@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { SendIcon } from '@/Function/shared/SendIcon';
-import { TraceStepList } from '@/Function/shared/WorkTrace';
+import { TraceStepList } from '@/Function/shared/workTraceView';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useStrategyConversation } from '@/hooks/strategyConversationData';

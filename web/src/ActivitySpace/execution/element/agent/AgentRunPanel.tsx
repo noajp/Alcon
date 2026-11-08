@@ -10,7 +10,7 @@ import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { traceFromRunSteps } from '@/Function/shared/workTrace';
-import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared/WorkTrace';
+import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared/workTraceView';
 import type { AgentOutput } from '@/types/database';
 import type { ProposedReading } from '@/Function/audit/auditModel';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
