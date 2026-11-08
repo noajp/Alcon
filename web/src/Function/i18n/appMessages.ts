@@ -513,6 +513,11 @@ const APP_MESSAGES: Record<string, Row> = {
   'Set up connectors': ['コネクタを設定', '커넥터 설정', 'Configurer les connecteurs', 'Configurar conectores'],
   'Needs: {names}': ['必要なもの：{names}', '필요: {names}', 'Manque : {names}', 'Falta: {names}'],
   'Connect {name}': ['{name} を接続', '{name} 연결', 'Connecter {name}', 'Conectar {name}'],
+  'Not connected: {names}': ['未接続：{names}', '연결되지 않음: {names}', 'Non connecté : {names}', 'No conectado: {names}'],
+  '{names} is connected': ['{names} は接続されています', '{names}이(가) 연결되어 있습니다', '{names} est connecté', '{names} está conectado'],
+  '{work} is waiting on this connection': ['この接続を待っている仕事：{work}', '이 연결을 기다리는 작업: {work}', 'Travail en attente de cette connexion : {work}', 'Trabajo en espera de esta conexión: {work}'],
+  'Only a Space owner can connect it.': ['接続できるのは Space のオーナーだけです。', '연결할 수 있는 사람은 Space 소유자뿐입니다.', 'Seul un propriétaire du Space peut le connecter.', 'Solo un propietario del Space puede conectarlo.'],
+  'Find and connect it from the MCP Registry in Settings › Customize': ['Settings › Customize の MCP Registry から探して接続できます', 'Settings › Customize의 MCP Registry에서 찾아 연결할 수 있습니다', 'Recherchez-le et connectez-le depuis le MCP Registry dans Settings › Customize', 'Búscalo y conéctalo desde el MCP Registry en Settings › Customize'],
   // One vocabulary for having / getting (Settings › AI).
   'Catalog': ['カタログ', '카탈로그', 'Catalogue', 'Catálogo'],
   'Installed connections': ['インストール済みの接続', '설치된 연결', 'Connexions installées', 'Conexiones instaladas'],

@@ -71,13 +71,29 @@ describe('the conversation run', () => {
     expect(conversation.conversationKindOf('propose_answer')).toBe('internal');
   });
 
+  it('proposes a connection — never connects anything itself', () => {
+    const names = conversation.conversationTools().map((t: { name: string }) => t.name);
+    expect(names).toContain('propose_connection');
+    expect(conversation.conversationKindOf('propose_connection')).toBe('internal');
+  });
+
   it('the opening ends with what the person said, after the separator the page strips', () => {
     const opening = conversation.conversationOpening({
       strategy: { id: 's1', name: '新規事業', description: null, intents: [{ id: 'i1', kind: 'measure', title: '売上 1 億', status: 'on_track' }], objects: [], children: [], elements: [] },
-      canEdit: true, definition: null, integrations: [], today: '2026-11-05',
+      canEdit: true, definition: null, integrations: [], missingConnectors: [], today: '2026-11-05',
     }, '目的から決めたい');
     expect(opening).toContain('成功条件: 売上 1 億');
     expect(opening.endsWith(`${OPENING_SEPARATOR}目的から決めたい`)).toBe(true);
+  });
+
+  it('the opening names the connectors the definition needs but the Space has not connected', () => {
+    const opening = conversation.conversationOpening({
+      strategy: { id: 's1', name: '新規事業', description: null, intents: [], objects: [], children: [], elements: [] },
+      canEdit: true, definition: null, integrations: [], missingConnectors: ['GitHub'], today: '2026-11-05',
+    }, '進めて');
+    expect(opening).toContain('## 未接続のコネクタ');
+    expect(opening).toContain('- GitHub');
+    expect(opening).toContain('propose_connection');
   });
 });
 
@@ -117,7 +133,7 @@ describe('conversationItems', () => {
     ]);
     expect(work[2].error).toBe('持ち主だけです');
     expect(work.find((w) => w.kind === 'plan')?.detail).toBe('広告は使わない');
-    expect(workTally(work)).toEqual({ write: 2, read: 1, web: 1, plan: 1, start: 0, answer: 0, failed: 1 });
+    expect(workTally(work)).toEqual({ write: 2, read: 1, web: 1, plan: 1, start: 0, answer: 0, connect: 0, failed: 1 });
     expect(agent.segments[3]).toEqual({ kind: 'text', text: '記録しました。\n次は前提です。' });
   });
 
@@ -142,7 +158,22 @@ describe('conversationItems', () => {
     ]);
     expect(work[1].proposal).toEqual({ kind: 'start', elementIds: ['e1', 'e2'], titles: ['下調べ', '集計'] });
     expect(work[2].proposal).toEqual({ kind: 'answer', runId: 'r1', elementId: 'e3', elementTitle: '確認', text: 'A で進めて', question: 'A と B どちらにしますか' });
-    expect(workTally(work)).toEqual({ write: 0, read: 1, web: 0, plan: 0, start: 1, answer: 1, failed: 0 });
+    expect(workTally(work)).toEqual({ write: 0, read: 1, web: 0, plan: 0, start: 1, answer: 1, connect: 0, failed: 0 });
+  });
+
+  it('maps a connection proposal step to an item that carries the ask', () => {
+    const connectSteps = [
+      step('message', '集計して', '集計して'),
+      step('connection_request', '接続を提案しました', JSON.stringify({ names: ['GitHub'], waitingFor: '問い合わせ集計の Element' })),
+      step('reply', 'カードを出しました。', 'カードを出しました。'),
+    ];
+    const items = conversationItems(connectSteps);
+    const agent = items[1];
+    if (agent.kind !== 'agent') throw new Error('expected the agent');
+    const work = agent.segments.flatMap((s) => (s.kind === 'work' ? s.items : []));
+    expect(work.map((w) => [w.name, w.kind])).toEqual([['propose_connection', 'connect']]);
+    expect(work[0].proposal).toEqual({ kind: 'connect', names: ['GitHub'], waitingFor: '問い合わせ集計の Element' });
+    expect(workTally(work)).toEqual({ write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 1, failed: 0 });
   });
 
   it('a proposal step with an unreadable detail degrades to a plain work item', () => {

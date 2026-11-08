@@ -6,14 +6,15 @@
 
 import type { TraceStep } from '@/Function/shared/workTrace';
 
-export type WorkKind = 'write' | 'read' | 'web' | 'plan' | 'start' | 'answer';
+export type WorkKind = 'write' | 'read' | 'web' | 'plan' | 'start' | 'answer' | 'connect';
 
 /** A proposal the conversation made and the person decides on: the step's
  *  detail, parsed. Titles are the engine's snapshots, so the card reads
  *  even if the work has changed since. */
 export type WorkProposal =
   | { kind: 'start'; elementIds: string[]; titles: string[] }
-  | { kind: 'answer'; runId: string; elementId: string; elementTitle: string; text: string; question: string | null };
+  | { kind: 'answer'; runId: string; elementId: string; elementTitle: string; text: string; question: string | null }
+  | { kind: 'connect'; names: string[]; waitingFor: string };
 
 /** What a work item is called in the conversation (i18n source strings). */
 const WORK_LABEL: Record<string, string> = {
@@ -31,6 +32,7 @@ const WORK_LABEL: Record<string, string> = {
   getInitiativeExecution: 'Read the work',
   propose_run_start: 'Proposed starting runs',
   propose_answer: 'Proposed an answer',
+  propose_connection: 'Proposed a connection',
 };
 
 export interface WorkItem {
@@ -61,9 +63,13 @@ const ALCON = 'Alcon: ';
 /** Pure. A proposal step's detail, read defensively: anything unreadable
  *  or incomplete reads as no proposal, never as an exception. */
 function proposalOf(step: ConversationStep): WorkProposal | null {
-  if (step.type !== 'start_request' && step.type !== 'answer_request') return null;
+  if (step.type !== 'start_request' && step.type !== 'answer_request' && step.type !== 'connection_request') return null;
   try {
     const raw = JSON.parse(step.detail ?? '') as Record<string, unknown>;
+    if (step.type === 'connection_request') {
+      const names = Array.isArray(raw.names) ? raw.names.filter((v): v is string => typeof v === 'string' && !!v) : [];
+      return names.length ? { kind: 'connect', names, waitingFor: typeof raw.waitingFor === 'string' ? raw.waitingFor : '' } : null;
+    }
     if (step.type === 'start_request') {
       const elementIds = Array.isArray(raw.elementIds) ? raw.elementIds.filter((v): v is string => typeof v === 'string') : [];
       const titles = Array.isArray(raw.titles) ? raw.titles.filter((v): v is string => typeof v === 'string') : [];
@@ -82,10 +88,10 @@ function proposalOf(step: ConversationStep): WorkProposal | null {
 
 function work(step: ConversationStep): WorkItem | null {
   if (step.type === 'plan_request') return { id: step.id, name: 'hand_to_planner', kind: 'plan', detail: step.detail ?? '', ok: true };
-  if (step.type === 'start_request' || step.type === 'answer_request') {
-    const start = step.type === 'start_request';
+  if (step.type === 'start_request' || step.type === 'answer_request' || step.type === 'connection_request') {
+    const kind = step.type === 'start_request' ? 'start' : step.type === 'answer_request' ? 'answer' : 'connect';
     return {
-      id: step.id, name: start ? 'propose_run_start' : 'propose_answer', kind: start ? 'start' : 'answer',
+      id: step.id, name: kind === 'start' ? 'propose_run_start' : kind === 'answer' ? 'propose_answer' : 'propose_connection', kind,
       detail: '', ok: true, proposal: proposalOf(step),
     };
   }
@@ -135,7 +141,7 @@ export function conversationItems(steps: ConversationStep[]): ConversationItem[]
 
 /** Pure. How many of each kind a folded work line stands for. */
 export function workTally(items: WorkItem[]): Record<WorkKind, number> & { failed: number } {
-  const tally = { write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, failed: 0 };
+  const tally = { write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 0, failed: 0 };
   for (const w of items) {
     tally[w.kind] += 1;
     if (!w.ok) tally.failed += 1;
@@ -153,6 +159,6 @@ export function traceStepFromWorkItem(item: WorkItem): TraceStep {
     label: WORK_LABEL[item.name] ?? item.name,
     chip: null,
     detail: item.ok ? (item.detail || null) : (item.error ?? item.detail ?? null),
-    tone: !item.ok ? 'error' : item.kind === 'plan' || item.kind === 'start' || item.kind === 'answer' ? 'note' : 'work',
+    tone: !item.ok ? 'error' : item.kind === 'plan' || item.kind === 'start' || item.kind === 'answer' || item.kind === 'connect' ? 'note' : 'work',
   };
 }

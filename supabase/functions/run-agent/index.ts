@@ -57,7 +57,8 @@ import {
 } from "../_shared/integrationTools.ts";
 import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
-import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, type ConversationContext } from "./conversation.ts";
+import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
+import { missingConnectorNames } from "../_shared/connectorNeeds.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
@@ -580,10 +581,24 @@ async function execute(a: ExecArgs): Promise<void> {
     }
     // A connector the definition names but this Space has not enabled: the
     // run goes on without it, and both the person and the agent are told.
+    const missingNamed: string[] = [];
     for (const name of wantedConnectors) {
       if (matchedConnectors.has(name)) continue;
+      missingNamed.push(name);
       await addStep(admin, run.id, "error", `定義が使うコネクタ「${name}」につながっていません`, "「# 使うコネクタ」に書かれたコネクタが、この Space で有効になっていません。Settings › Customize で有効にするか、定義から外してください。");
       integrationSummary.push(downIntegration(name, "定義に書かれているが、この Space で有効な接続がない"));
+    }
+    // The step above lives inside this run's panel; the ask itself belongs
+    // on the Element, where a person can act on it — once per run (its
+    // first slice), however the run was started, a person pressing Start
+    // or the engine advancing work on its own alike. The run still goes
+    // on without the tools; this says plainly that it is doing so, and
+    // what would give them back.
+    if (missingNamed.length && !run.transcript) {
+      await admin.from("element_comments").insert({
+        element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+        content: `**接続待ち** — 定義が使うコネクタ「${missingNamed.join("」「")}」がこの Space で未接続のため、その道具なしで実行しています。接続すると次回から使えます（Settings › Customize、または Strategy の会話から接続できます）。`,
+      }).then(() => {}, () => {});
     }
   }
 
@@ -1266,6 +1281,26 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
       await addStep(admin, run.id, "start_request", "実行の開始を提案しました", detail);
       return { content: "会話に「実行を開始する」カードを出しました。人が押すと Web が開始します。開始したとは言わないでください。" };
     }
+    // The connection proposal follows the same pattern: the step carries
+    // the ask (which connectors, and what work waits on them), a card is
+    // shown, and connecting itself is the person's act in the dialog the
+    // card opens. Names that are already connected are dropped here — the
+    // card re-reads the live state anyway, so a stale ask cannot survive.
+    if (call.name === CONNECT_TOOL.name) {
+      const asked = Array.isArray(call.input.names)
+        ? call.input.names.filter((v): v is string => typeof v === "string").map((v) => v.trim().slice(0, 80)).filter(Boolean).slice(0, 5)
+        : [];
+      const waitingFor = String(call.input.waitingFor ?? "").trim().slice(0, 300);
+      if (!asked.length || !waitingFor) return { content: "names（未接続のコネクタ名）と waitingFor（待っている仕事）が要ります。", is_error: true };
+      const { data: rows } = run.activity_space_id
+        ? await userDb.from("integrations").select("name, preset, enabled").eq("activity_space_id", run.activity_space_id).in("kind", ["mcp", "http"])
+        : { data: [] };
+      const names = missingConnectorNames(asked, (rows ?? []) as { name: string; preset: string | null; enabled: boolean }[]);
+      if (!names.length) return { content: `${asked.join("、")} はすでに接続されています。接続の提案は要りません。` };
+      const detail = JSON.stringify({ names, waitingFor });
+      await addStep(admin, run.id, "connection_request", "接続を提案しました", detail);
+      return { content: "会話に「接続する」カードを出しました。接続は人がカードからダイアログを開いて行います。接続したとは言わないでください。" };
+    }
     if (call.name === ANSWER_TOOL.name) {
       const runId = String(call.input.runId ?? "");
       const elementId = String(call.input.elementId ?? "");
@@ -1401,12 +1436,18 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
   const r = await runStrategyTool(userDb, "getInitiative", { id: strategyId });
   if (!r.ok) throw new Error(`Strategy を読めませんでした: ${r.error}`);
   const d = r.data as { id: string; name: string; description: string | null; intents: { id: string; kind: string | null; title: string; status: string | null }[]; objects: { id: string; name: string }[]; childInitiativeIds: string[] };
-  const [{ data: row }, { data: children }, { data: elements }, { data: integrations }] = await Promise.all([
+  const [{ data: row }, { data: children }, { data: elements }, { data: integrations }, { data: allIntegrations }] = await Promise.all([
     userDb.from("strategies").select("created_by, definition_id").eq("id", strategyId).maybeSingle(),
     d.childInitiativeIds.length ? userDb.from("strategies").select("name").in("id", d.childInitiativeIds) : Promise.resolve({ data: [] }),
     d.objects.length ? userDb.from("elements").select("title, status").in("object_id", d.objects.map((o) => o.id)).is("parent_id", null).limit(300) : Promise.resolve({ data: [] }),
     run.activity_space_id
       ? userDb.from("integrations").select("name, kind, delegation").eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"])
+      : Promise.resolve({ data: [] }),
+    // Every row, enabled or not: what the definition names but the Space
+    // has not connected is computed against these (a switched-off row is
+    // not a connection).
+    run.activity_space_id
+      ? userDb.from("integrations").select("name, preset, enabled").eq("activity_space_id", run.activity_space_id).in("kind", ["mcp", "http"])
       : Promise.resolve({ data: [] }),
   ]);
   // The harness the Strategy is worked by: its own, else the Space's
@@ -1426,6 +1467,7 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
     definitionId = resolveDefinition(chainIds.map((cid) => byId.get(cid) ?? null)).id;
   }
   const { data: def } = definitionId ? await userDb.from("definitions").select("name, body").eq("id", definitionId).maybeSingle() : { data: null };
+  const defRow = (def as { name: string; body: string } | null) ?? null;
   return {
     strategy: {
       id: d.id, name: d.name, description: d.description, intents: d.intents, objects: d.objects,
@@ -1433,8 +1475,11 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
       elements: (elements ?? []) as { title: string; status: string | null }[],
     },
     canEdit: (row as { created_by?: string } | null)?.created_by === userId,
-    definition: (def as { name: string; body: string } | null) ?? null,
+    definition: defRow,
     integrations: (integrations ?? []) as { name: string; kind: string; delegation: string }[],
+    missingConnectors: defRow
+      ? missingConnectorNames(parseDefinition(defRow.body).connectors, (allIntegrations ?? []) as { name: string; preset: string | null; enabled: boolean }[])
+      : [],
     today: new Date().toISOString().slice(0, 10),
   };
 }

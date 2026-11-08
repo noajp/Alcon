@@ -53,6 +53,40 @@ export function missingConnectors(
   return out;
 }
 
+/** The definition a piece of work follows, resolved the way the engine
+ *  resolves it for a run (run-agent's loadDefinition): the first candidate
+ *  slot that names an enabled definition wins — for an Element run, its
+ *  own definition, then its Strategy's. A disabled definition is skipped
+ *  as if its slot were empty. Null when no slot names a usable one. */
+export function workDefinition(
+  candidateIds: readonly (string | null | undefined)[],
+  definitions: readonly Pick<Definition, 'id' | 'enabled'>[],
+): string | null {
+  const byId = new Map(definitions.map((d) => [d.id, d]));
+  for (const id of candidateIds) {
+    if (!id) continue;
+    const def = byId.get(id);
+    if (def?.enabled) return def.id;
+  }
+  return null;
+}
+
+/** The connectors the work's own definition names that the Space has not
+ *  connected — what a start of this work would go without. Candidate ids
+ *  in the engine's resolution order (the Element's own, then its
+ *  Strategy's). No usable definition, no named connectors: nothing is
+ *  missing, because nothing was promised. */
+export function missingForWork(
+  candidateIds: readonly (string | null | undefined)[],
+  definitions: readonly Pick<Definition, 'id' | 'body' | 'enabled'>[],
+  integrations: readonly Pick<Integration, 'name' | 'preset' | 'enabled'>[],
+): ConnectorNeed[] {
+  const id = workDefinition(candidateIds, definitions);
+  const def = id ? definitions.find((d) => d.id === id) : null;
+  if (!def) return [];
+  return missingConnectors(parseDefinition(def.body).connectors, integrations);
+}
+
 /** A definition's install state against the Space's connections: what is missing, what the check says, and whether it is installed and passing. */
 export function installReadiness(
   definition: Pick<Definition, 'body'>,
