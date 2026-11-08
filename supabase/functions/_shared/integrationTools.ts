@@ -14,6 +14,14 @@
 // HTTP API's raw http_request is a run's tool (a run can pause for its
 // approval and resume), not a manifest command. Google Drive's typed tools
 // are likewise a run's surface today; a Drive row is reported as down.
+//
+// Assembly is definition only: the planned tools come from the plan cache
+// (_shared/integrationPlans.ts) whenever it can vouch for them, and the
+// binding — the Vault secret, the MCP session — is resolved lazily by
+// bindingOf on the first call that actually runs, memoized for the rest
+// of the request. A connection the turn never calls costs one row in one
+// select and nothing else. Approval never needs the binding: the facts
+// are gathered from the manifest and the command alone.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { ToolCall } from "./agentLoop.ts";
@@ -29,6 +37,7 @@ import {
 } from "./integrationClient.ts";
 import { isGoogleDriveRow } from "./googleOAuth.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
+import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
 import { driveOperationLabel, runDriveTool } from "./googleDrive.ts";
 import { catalogOperation, isCatalogTool, summaryOf } from "./catalog.ts";
 
@@ -55,16 +64,69 @@ export function uniqueToolName(raw: string, taken: Map<string, unknown>): string
 
 // ── One tool, one call ──────────────────────────────────────────────────────
 
+/** What running one call needs from its connection: the credential to
+ *  send, and — for MCP — the initialized session to call through. */
+export interface IntegrationBinding {
+  secret: string | null;
+  session: McpSession | null;
+}
+
 /**
  * One integration tool the agent sees. `remote` describes an MCP tool or a
  * typed Drive tool (its readOnly decides read vs write); null is the generic
  * http_request. `drive` marks the Google Drive tools, which run through
- * runDriveTool with `secret` as the access token.
+ * runDriveTool with the binding's secret as the access token.
+ *
+ * The binding is separate from the definition: a tool assembled from a
+ * manifest or a cached plan carries `bind` and pays for its secret and
+ * session only when a call runs (bindingOf memoizes it for the request).
+ * A caller that already holds them (a run's Drive tools) sets `secret` /
+ * `session` eagerly instead.
  */
 export interface IntegrationTool {
-  integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean;
+  integration: IntegrationRow; remote: RemoteTool | null; drive?: boolean;
   /** The declared command this tool is, when the integration has a manifest. */
   command?: ManifestCommand; manifest?: Manifest;
+  /** An eagerly held credential / session, when the caller bound them. */
+  secret?: string | null; session?: McpSession | null;
+  /** Resolves the binding on first use; see lazyBinding. */
+  bind?: () => Promise<IntegrationBinding>;
+  /** The binding's memo, once resolution has started. */
+  binding?: Promise<IntegrationBinding>;
+}
+
+/**
+ * The tool's binding, resolved once per request: through `bind` when the
+ * tool was assembled lazily, otherwise the eagerly held secret / session.
+ * A resolution failure rejects every later call the same way — the first
+ * call's error is the honest one to report.
+ */
+export function bindingOf(it: IntegrationTool): Promise<IntegrationBinding> {
+  if (!it.binding) {
+    it.binding = it.bind
+      ? it.bind()
+      : Promise.resolve({ secret: it.secret ?? null, session: it.session ?? null });
+  }
+  return it.binding;
+}
+
+/**
+ * Binds a connection at execution time: the secret out of Vault (service
+ * role, as everywhere), resolved to a current credential, and — for MCP —
+ * a session initialized against the server. Nothing here runs at assembly
+ * time, so an integration no call touches is never bound at all.
+ */
+export function lazyBinding(admin: SupabaseClient, row: IntegrationRow): () => Promise<IntegrationBinding> {
+  return async () => {
+    const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
+    const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
+    if (row.kind === "mcp") {
+      const session = new McpSession(row, secret);
+      await session.initialize();
+      return { secret, session };
+    }
+    return { secret, session: null };
+  };
 }
 
 /** One call as the approval card shows it, stored with the pending action. */
@@ -182,11 +244,15 @@ export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall
     if ("error" in req) return { text: req.error, isError: true };
     httpInput = req;
   }
+  // The binding is resolved here, at the moment the call runs — never at
+  // assembly, and never for the approval decision, which reads only the
+  // manifest facts gathered from this same tool.
+  const binding = await bindingOf(it);
   const r = it.drive && it.remote
-    ? await runDriveTool(it.remote.name, call.input, it.secret ?? "")
-    : it.remote && it.session
-      ? await it.session.callTool(it.remote.name, call.input)
-      : await callHttp(it.integration, it.secret, httpInput);
+    ? await runDriveTool(it.remote.name, call.input, binding.secret ?? "")
+    : it.remote && binding.session
+      ? await binding.session.callTool(it.remote.name, call.input)
+      : await callHttp(it.integration, binding.secret, httpInput);
   return { text: r.text, isError: r.isError };
 }
 
@@ -242,6 +308,24 @@ export function planManifestTools(
   return out;
 }
 
+/**
+ * Pure. Takes a stored plan's tools into one assembly: the names the plan
+ * was made with are kept, except a name this assembly already holds, which
+ * is renamed the way planManifestTools would name it. The plan's own
+ * objects are not mutated (a rename copies).
+ */
+export function adoptPlannedTools(planned: PlannedIntegrationTool[], taken: Map<string, unknown>): PlannedIntegrationTool[] {
+  return planned.map((p) => {
+    if (!taken.has(p.name)) {
+      taken.set(p.name, true);
+      return p;
+    }
+    const name = uniqueToolName(p.name, taken);
+    taken.set(name, true);
+    return { ...p, name };
+  });
+}
+
 // ── A Space's toolset ───────────────────────────────────────────────────────
 
 export interface IntegrationUsable { name: string; kind: "MCP" | "API"; delegation: string; tools: number }
@@ -262,10 +346,20 @@ const MAX_INTEGRATION_TOOLS = 120;
  * decides), enabled, MCP or HTTP, with the same closings a run applies —
  * an unsafe endpoint is skipped, a manifest that declares nothing usable
  * closes its integration, an untested MCP connection stays closed, a
- * connection pointing at Alcon itself is never used, and a secret is read
- * from Vault with the service role only to be resolved and sent to the
- * service itself. What cannot be used is reported in `down` with the
- * reason, so the agent can tell the person instead of guessing.
+ * connection pointing at Alcon itself is never used. What cannot be used
+ * is reported in `down` with the reason, so the agent can tell the person
+ * instead of guessing.
+ *
+ * The definitions come from the plan cache whenever it can vouch for
+ * them (one select for the whole Space); an MCP connection whose plan is
+ * missing or too old is listed once and its plan stored. The binding is
+ * never resolved here — a connection's secret leaves Vault only when a
+ * call runs, through lazyBinding — so this assembly costs no secret read
+ * and no session for a connection the turn never calls. A refetch that
+ * fails with a plan on file still offers the plan's tools: the binding
+ * resolves fresh when a call runs, and the call itself reports if the
+ * tool is really gone. Only a first-ever assembly can be downed by a
+ * connection failure.
  */
 export async function buildSpaceIntegrationTools(args: {
   userDb: SupabaseClient;
@@ -279,9 +373,11 @@ export async function buildSpaceIntegrationTools(args: {
   const usable: IntegrationUsable[] = [];
   const down: IntegrationDown[] = [];
   const { data: rows } = await userDb.from("integrations")
-    .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide")
+    .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide, updated_at")
     .eq("activity_space_id", spaceId).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
-  for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null })[]) {
+  const list = (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null; updated_at?: string | null })[];
+  const cachedPlans = await loadToolPlans(admin, list.map((r) => r.id));
+  for (const row of list) {
     if (!isSafeEndpoint(row.endpoint)) continue;
     // Drive's tools are typed, not manifest commands; they are a run's
     // surface today (see the header), so the row is reported, not opened.
@@ -314,8 +410,46 @@ export async function buildSpaceIntegrationTools(args: {
     }
     // OAuth here is GitHub's sign-in; any other OAuth row has no way to authenticate.
     if (row.auth_type === "oauth" && !isGithubOAuthRow(row)) continue;
-    const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
+    // An API with no manifest has no declared commands to offer here.
+    if (row.kind === "http" && !manifest) {
+      down.push({ name: row.name, reason: "コマンドの宣言（manifest）がないため、チャットではまだ使えません" });
+      continue;
+    }
+
+    const fingerprint = await planFingerprint(row);
+    const cached = cachedPlans.get(row.id);
+    const bind = lazyBinding(admin, row);
+    const offer = (planned: PlannedIntegrationTool[], toolBind: IntegrationTool["bind"]) => {
+      for (const p of planned) {
+        if (defs.length >= MAX_INTEGRATION_TOOLS) break;
+        tools.set(p.name, { integration: row, remote: p.remote, command: p.command, ...(manifest ? { manifest } : {}), bind: toolBind });
+        defs.push({ name: p.name, description: p.description, input_schema: p.input_schema, defer: true });
+      }
+    };
+
+    if (row.kind === "http") {
+      // An API's plan is pure — the cache only saves the planning itself.
+      if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
+        offer(adoptPlannedTools(cached.plan, tools), bind);
+        usable.push({ name: row.name, kind: "API", delegation: row.delegation, tools: cached.plan.length });
+      } else {
+        const planned = planManifestTools(row, manifest, null, tools);
+        await saveToolPlan(admin, row.id, fingerprint, planned);
+        offer(planned, bind);
+        usable.push({ name: row.name, kind: "API", delegation: row.delegation, tools: planned.length });
+      }
+      continue;
+    }
+
+    // MCP: the plan carries the server's tool list, so it is the one that
+    // can go stale in a way the row cannot show.
+    if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
+      offer(adoptPlannedTools(cached.plan, tools), bind);
+      usable.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: cached.plan.length });
+      continue;
+    }
     try {
+      const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
       // An OAuth token set becomes a current access token here (refreshed
       // when due); other credentials pass through as stored.
       const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
@@ -323,30 +457,22 @@ export async function buildSpaceIntegrationTools(args: {
         down.push({ name: row.name, reason: "GitHub にサインインしていない（Settings › Customize でサインインが必要）" });
         continue;
       }
-      if (row.kind === "mcp") {
-        const session = new McpSession(row, secret);
-        await session.initialize();
-        const remoteTools = await session.listTools();
-        const planned = planManifestTools(row, manifest, remoteTools, tools);
-        for (const p of planned) {
-          if (defs.length >= MAX_INTEGRATION_TOOLS) break;
-          tools.set(p.name, { integration: row, remote: p.remote, secret, session, command: p.command, ...(manifest ? { manifest } : {}) });
-          defs.push({ name: p.name, description: p.description, input_schema: p.input_schema, defer: true });
-        }
-        usable.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: planned.length });
-      } else if (manifest) {
-        // An API with a manifest: its declared commands, never a raw request.
-        const planned = planManifestTools(row, manifest, null, tools);
-        for (const p of planned) {
-          if (defs.length >= MAX_INTEGRATION_TOOLS) break;
-          tools.set(p.name, { integration: row, remote: null, secret, session: null, command: p.command, manifest });
-          defs.push({ name: p.name, description: p.description, input_schema: p.input_schema, defer: true });
-        }
-        usable.push({ name: row.name, kind: "API", delegation: row.delegation, tools: planned.length });
-      } else {
-        down.push({ name: row.name, reason: "コマンドの宣言（manifest）がないため、チャットではまだ使えません" });
-      }
+      const session = new McpSession(row, secret);
+      await session.initialize();
+      const remoteTools = await session.listTools();
+      const planned = planManifestTools(row, manifest, remoteTools, tools);
+      await saveToolPlan(admin, row.id, fingerprint, planned);
+      // The listing already paid for this binding: the tools keep it
+      // instead of initializing a second session when a call runs.
+      const bound = Promise.resolve<IntegrationBinding>({ secret, session });
+      offer(planned, () => bound);
+      usable.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: planned.length });
     } catch (e) {
+      if (cached) {
+        offer(adoptPlannedTools(cached.plan, tools), bind);
+        usable.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: cached.plan.length });
+        continue;
+      }
       const message = e instanceof Error ? e.message : String(e);
       down.push({
         name: row.name,
