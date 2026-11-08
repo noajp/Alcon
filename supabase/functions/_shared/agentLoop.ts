@@ -45,9 +45,12 @@ export interface FinishPayload {
  * internal / board / read: run right away.
  * write: an external write — needs approval unless its integration is fully
  *   delegated (deps.needsApproval decides).
+ * question: files a question ticket for a person (B12) — the call runs
+ *   right away to file it, and a filed question rests the run until the
+ *   person's answer arrives as the call's tool result.
  * finish: ends the run after the turn's other tools have run.
  */
-export type ToolKind = "internal" | "board" | "read" | "write" | "finish";
+export type ToolKind = "internal" | "board" | "read" | "write" | "finish" | "question";
 
 export interface ModelTurn {
   content: Block[];
@@ -55,7 +58,17 @@ export interface ModelTurn {
   usage: ModelUsage;
 }
 
-export interface ExecResult { content: string; is_error?: boolean; finish?: FinishPayload }
+export interface ExecResult {
+  content: string; is_error?: boolean; finish?: FinishPayload;
+  /**
+   * A question call that filed its ticket (B12): the loop rests the
+   * run on it. The result's `content` is NOT what the model receives —
+   * a filed question's tool result is the person's answer, appended
+   * when the answer resumes the run (appendDecisionResults, the same
+   * single-message discipline as a decision's).
+   */
+  question?: { ticketId: string };
+}
 
 export interface LoopDeps {
   callModel(messages: Msg[]): Promise<ModelTurn>;
@@ -153,6 +166,16 @@ export type LoopOutcome =
        *  same way — approve continues the batch, reject stops it. */
       breaker?: { call: ToolCall; reason: string };
     }
+  | {
+      kind: "question"; pending: PendingApproval;
+      /** The ticket each pending question call filed, in call order:
+       *  the pending's calls are the unanswered ask_question calls,
+       *  and a ticket's answer is what resumes the run as that call's
+       *  tool result. Two calls that asked the same question share
+       *  one ticket (the ticket layer dedups) and both are answered
+       *  by its one answer. */
+      tickets: { callId: string; ticketId: string }[];
+    }
   | { kind: "yield" }
   | { kind: "limit" }
   | { kind: "budget" }
@@ -242,7 +265,8 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       }
     }
     const finishCall = calls.find((c) => deps.kindOf(c.name) === "finish");
-    const immediate = calls.filter((c) => !writes.includes(c) && c !== finishCall);
+    const questionCalls = calls.filter((c) => deps.kindOf(c.name) === "question");
+    const immediate = calls.filter((c) => !writes.includes(c) && c !== finishCall && !questionCalls.includes(c));
 
     // The turn's other tools run at the same time; the model asked for them
     // together, so none waits on another's result.
@@ -256,12 +280,46 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
     }));
 
     if (writes.length > 0) {
+      // A run rests in exactly one wait at a time: while writes wait
+      // for a decision, a question is not filed — it is answered as
+      // not yet askable, and the model asks again once the decision
+      // lands and the work it might change is known.
+      for (const c of questionCalls) {
+        results.push({ type: "tool_result", tool_use_id: c.id, content: "承認待ちの操作があるため、質問はまだ出せません。承認の結果を受け取ってから、あらためて ask_question で質問してください。", is_error: true });
+      }
       // A finish in the same turn as writes waiting for approval is
       // premature: answer it as not yet done, and stop for the person.
       if (finishCall) {
         results.push({ type: "tool_result", tool_use_id: finishCall.id, content: "承認待ちの操作があるため、まだ完了できません。承認の結果を受け取ってから finish してください。", is_error: true });
       }
       return { kind: "approval", pending: { calls: writes, partial: results }, ...(breaker ? { breaker } : {}) };
+    }
+
+    // Question calls run now — filing the ticket IS their execution —
+    // but a filed question's tool result is not known yet: it is the
+    // person's answer, appended when the answer resumes the run. A
+    // question that could not be filed (its shape refused) is an
+    // ordinary error result the model can correct, and rests nothing.
+    const filed: { call: ToolCall; ticketId: string }[] = [];
+    for (const c of questionCalls) {
+      let r: ExecResult;
+      try { r = await deps.execute(c); } catch (e) {
+        r = { content: `Error: ${e instanceof Error ? e.message : String(e)}`, is_error: true };
+      }
+      if (r.question && !r.is_error) filed.push({ call: c, ticketId: r.question.ticketId });
+      else results.push({ type: "tool_result", tool_use_id: c.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
+    }
+    if (filed.length > 0) {
+      // A finish in the same turn as a filed question is premature in
+      // the same way: the answer may change what "done" means here.
+      if (finishCall) {
+        results.push({ type: "tool_result", tool_use_id: finishCall.id, content: "質問への回答を待っているため、まだ完了できません。回答を受け取ってから finish してください。", is_error: true });
+      }
+      return {
+        kind: "question",
+        pending: { calls: filed.map((f) => f.call), partial: results },
+        tickets: filed.map((f) => ({ callId: f.call.id, ticketId: f.ticketId })),
+      };
     }
 
     if (finishCall) {
@@ -309,7 +367,10 @@ export function revisionRequest(verdict: Verdict): string {
 /**
  * After a person decided on a pending approval: append the single user
  * message that answers the paused turn — the results of the tools that ran
- * then, and the results of the writes now executed (or rejected).
+ * then, and the results of the writes now executed (or rejected). The
+ * question rest (B12) resumes through this same append: the pending's
+ * partial results plus one tool result per question call, carrying the
+ * person's answer verbatim.
  */
 export function appendDecisionResults(state: LoopState, pending: PendingApproval, writeResults: ToolResult[]): void {
   const last = state.messages[state.messages.length - 1];

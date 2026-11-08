@@ -61,6 +61,7 @@ import { collectOutcomes } from "../_shared/outcomeCollector.ts";
 import { evaluateCalibration } from "../_shared/verifierCalibration.ts";
 import { evaluateAutonomy } from "../_shared/autonomy.ts";
 import { deriveConstraintDrafts, evaluateConstraintEffects, type ConstraintCluster } from "../_shared/constraintDrafts.ts";
+import { claimExpiredQuestionTickets, settleRunBlockedByQuestions, type QuestionTicketRow } from "../_shared/questionTickets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -320,6 +321,52 @@ async function expireCopilotApproval(env: Env, actionId: string, runId: string):
   return true;
 }
 
+/**
+ * Question tickets whose window ran out unanswered (B12): each is
+ * claimed first (open → expired, the guarded transition), and a run
+ * still resting on the claimed tickets ends as blocked — its
+ * Element blocked, the unanswered questions preserved on its
+ * record, its starter told. A run that moved on meanwhile (its
+ * other questions answered and the work resumed, or it was
+ * cancelled) keeps its own course: the ticket's expiry stands on
+ * its row alone, and nothing is settled under it. Never a guessed
+ * answer, never a silent proceed.
+ */
+async function expireQuestionTickets(env: Env, now: Date): Promise<{ tickets: number; runs: number }> {
+  const claimed = await claimExpiredQuestionTickets(env.admin, now);
+  if (!claimed.length) return { tickets: 0, runs: 0 };
+  const byRun = new Map<string, QuestionTicketRow[]>();
+  for (const t of claimed) {
+    const list = byRun.get(t.run_id) ?? [];
+    list.push(t);
+    byRun.set(t.run_id, list);
+  }
+  let runs = 0;
+  for (const [runId, tickets] of byRun) {
+    try {
+      const { data: run } = await env.admin.from("agent_runs")
+        .select("id, element_id, triggered_by, status, transcript").eq("id", runId).maybeSingle();
+      if (!run || run.status !== "awaiting_input") continue;
+      const resting = (run.transcript as { question?: { tickets?: { ticketId: string }[] } } | null)?.question?.tickets ?? [];
+      const mine = tickets.filter((t) => resting.some((r) => r.ticketId === t.id));
+      if (!mine.length) continue;
+      const settled = await settleRunBlockedByQuestions(env.admin, {
+        run: {
+          id: run.id as string,
+          element_id: (run.element_id as string | null) ?? null,
+          triggered_by: (run.triggered_by as string | null) ?? null,
+        },
+        tickets: mine, expectStatus: "awaiting_input", agentName: "Alcon Agent",
+        actorUserId: (run.triggered_by as string | null) ?? null, now,
+      });
+      if (settled) runs += 1;
+    } catch (e) {
+      console.error("automations: could not settle expired question run", runId, e instanceof Error ? e.message : e);
+    }
+  }
+  return { tickets: claimed.length, runs };
+}
+
 interface HeartbeatSpace {
   id: string; heartbeat_owner_id: string; heartbeat_cadence_minutes: number;
   heartbeat_next_at: string; heartbeat_timezone: string | null;
@@ -467,6 +514,18 @@ async function tick(env: Env): Promise<Record<string, number>> {
     credentialStashesExpired = row?.stashes_expired ?? 0;
   } catch (e) {
     console.error("automations: could not lapse credential requests", e instanceof Error ? e.message : e);
+  }
+
+  // Question tickets whose window ran out unanswered (B12): the
+  // tickets expire, and a run still resting on them ends as blocked
+  // with its questions preserved — the honest end, never a guess.
+  let questionTicketsExpired = 0, questionRunsBlocked = 0;
+  try {
+    const lapsed = await expireQuestionTickets(env, now);
+    questionTicketsExpired = lapsed.tickets;
+    questionRunsBlocked = lapsed.runs;
+  } catch (e) {
+    console.error("automations: could not expire question tickets", e instanceof Error ? e.message : e);
   }
 
   // Drafted connections whose review window ran out undecided (G4):
@@ -643,7 +702,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

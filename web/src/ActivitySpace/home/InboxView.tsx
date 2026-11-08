@@ -6,6 +6,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InvitationCard } from '@/Function/membership/InvitationCard';
 import { WorkflowApprovalCard } from '@/Function/audit/WorkflowApprovalCard';
 import { CopilotApprovalInboxCard } from './CopilotApprovalInboxCard';
+import { QuestionTicketInboxCard } from './QuestionTicketInboxCard';
 import { DraftReviewInboxCard } from '@/AIP/connectors/DraftReviewInboxCard';
 import { PromotionReviewInboxCard } from '@/AIP/harness/PromotionReviewInboxCard';
 import { HeartbeatInboxCard } from './HeartbeatInboxCard';
@@ -82,6 +83,10 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           <h1 className="text-2xl font-semibold">{selected.title}</h1>
           {selected.body && <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{selected.body}</p>}
           <p className="mt-6 text-[13px] text-muted-foreground">{t('This Space shows the AI audit only. Elements open once its owner switches it to full in Settings.')}</p>
+        </article>
+      ) : selected.question_ticket_id ? (
+        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+          <QuestionTicketInboxCard key={selected.question_ticket_id} ticketId={selected.question_ticket_id} />
         </article>
       ) : selected.agent_action_id ? (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">

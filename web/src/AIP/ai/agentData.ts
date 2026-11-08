@@ -1,7 +1,7 @@
 'use client';
 import { formatError } from '@/Function/shared/formatError';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
-import type { AgentAction, AgentOutput, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep } from '@/types/database';
+import type { AgentAction, AgentOutput, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep, QuestionTicket } from '@/types/database';
 import { parseProposedReadings, parseRunVerdict, type ProposedReading, type RunVerdict } from '@/Function/audit/auditModel';
 
 /**
@@ -431,6 +431,83 @@ export function useAgentAction(actionId: string | null) {
   return {
     action, run, loading, error, refresh,
     canDecide: !!action && action.status === 'pending' && !!run && !!me && run.triggered_by === me,
+  };
+}
+
+// ── Question tickets (B12) ────────────────────────────────────────────
+// A run's question for a person, answered where the notification
+// landed: the Inbox. The answer goes through the engine's answer
+// entry — the ticket's id and the person's pick (an option the
+// ticket offered, or their own words) — and the run resumes with
+// the answer as the question call's result, verbatim.
+
+/** One question ticket by id — the Inbox's question card reads its own. */
+export async function fetchQuestionTicketById(ticketId: string): Promise<QuestionTicket | null> {
+  const { data, error } = await supabase
+    .from('question_tickets')
+    .select('*')
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as QuestionTicket) ?? null;
+}
+
+/** Answer a run's question ticket: one of its options, or free text.
+ *  The engine validates the answer against the ticket before the run
+ *  is touched, and refuses anyone but the run's starter. */
+export async function answerQuestionTicket(opts: {
+  runId: string;
+  ticketId: string;
+  option?: string;
+  text?: string;
+}): Promise<void> {
+  await invokeEngine({
+    runId: opts.runId,
+    answer: {
+      ticketId: opts.ticketId,
+      ...(opts.option !== undefined ? { option: opts.option } : {}),
+      ...(opts.text !== undefined ? { text: opts.text } : {}),
+    },
+  });
+}
+
+/** A ticket and the run resting on it, for the Inbox's question card.
+ *  The same rule as useAgentAction: only the run's starter may
+ *  answer — the engine refuses anyone else; `canAnswer` lets the
+ *  card say so instead of offering buttons. */
+export function useQuestionTicket(ticketId: string | null) {
+  const [ticket, setTicket] = useState<QuestionTicket | null>(null);
+  const [run, setRun] = useState<{ id: string; status: AgentRunStatus; triggered_by: string | null } | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!ticketId) { setTicket(null); setRun(null); return; }
+    setLoading(true);
+    try {
+      const [tk, uid] = await Promise.all([fetchQuestionTicketById(ticketId), getCurrentUserId()]);
+      setMe(uid ?? null);
+      setTicket(tk);
+      if (tk) {
+        const { data } = await supabase.from('agent_runs')
+          .select('id, status, triggered_by').eq('id', tk.run_id).maybeSingle();
+        setRun((data as typeof run) ?? null);
+      } else setRun(null);
+      setError(null);
+    } catch (e) {
+      setError(formatError(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [ticketId]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the server when the card's ticket changes
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  return {
+    ticket, run, loading, error, refresh,
+    canAnswer: !!ticket && ticket.status === 'open' && !!run && run.status === 'awaiting_input' && !!me && run.triggered_by === me,
   };
 }
 
