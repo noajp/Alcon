@@ -99,7 +99,7 @@ import {
   copilotApprovalExpiresAt, resumedAssistantMessage, seedMessagesFromPanel, withApprovalDecision,
   type PanelMessage, type PanelToolEvent,
 } from "../_shared/copilotSession.ts";
-import { claimFor, driverForRun, entryForBody, messageAllowed } from "./dispatch.ts";
+import { claimFor, driverForRun, entryForBody, heartbeatEntryAllowed, messageAllowed } from "./dispatch.ts";
 import { ASK_TOOL, FINISH_TOOL, PROPOSE_TOOL, draftKindOf, draftOpening, draftSystemPrompt, draftTools } from "./drafter.ts";
 import {
   AI_DRAFTED_PRESET, DRAFT_OPEN_STATUSES, openDraftsForNames, reconcileDraft, unaccountedDrops, validateDraftCandidate,
@@ -109,6 +109,10 @@ import { applyCandidate, askDraft, loadDraft, transitionDraft, type DraftRow } f
 import { draftRounds, materializeDraft, runDraftTestRound, summarizeRound } from "../_shared/draftTest.ts";
 import { REGISTRY_URL, entriesOf } from "../_shared/connectorDirectory.ts";
 import { draftDue } from "./draft.ts";
+import {
+  buildHeartbeatSnapshot, carryDigestFingerprints, digestTitleFor, fingerprintOf,
+  HEARTBEAT_KIND_LABEL, type HeartbeatSignal,
+} from "../_shared/heartbeatSnapshot.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
 import { requestContent, type Attachment } from "../_shared/attachments.ts";
 
@@ -125,6 +129,11 @@ const MAX_TOOLS = 120;
 const WEIGHT_LABEL = { light: "軽い", standard: "標準", heavy: "重い" } as const;
 /** No single run may spend more than this, whatever the budget left. */
 const MAX_RUN_COST_USD = 5;
+/** No single heartbeat wake may spend more than this: triage is a
+ *  small judgement, and the cap plus the turn limit stop a wake from
+ *  ever becoming the work it watches. */
+const MAX_HEARTBEAT_WAKE_COST_USD = 0.05;
+const HEARTBEAT_MAX_TURNS = 3;
 /** A definition may raise a run's cap to its own budget, never past this. */
 const MAX_DEFINED_RUN_COST_USD = 50;
 /** A run that has written no step for this long is stuck; its starter may resume it. */
@@ -152,6 +161,10 @@ type Transcript = {
   pending?: SavedPending;
   /** A chat run's kept view context: where its person was, last told. */
   context?: CopilotContextLike;
+  /** A heartbeat run's digest memory: what its wake told, so the next
+   *  wake does not tell it again (dedup reads the last completed
+   *  wake's, in _shared/heartbeatSnapshot.ts). */
+  digest?: { at: string; fingerprints: string[] };
 };
 type Run = {
   id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
@@ -279,6 +292,9 @@ Deno.serve(async (req: Request) => {
   if (driver === "chat" && !run.ai_session_id) return json({ error: "この会話は削除されています。承認は期限で自動的に取り消されます。" }, 409);
   const said = typeof body.message === "string" ? body.message.trim() : "";
   const entry = entryForBody(body);
+  // A heartbeat takes no words and no decisions: it is driven by its
+  // schedule's start, and by the tick's revival of a cut-off wake.
+  if (driver === "heartbeat" && !heartbeatEntryAllowed(entry)) return json({ error: "ハートビートはスケジュールからのみ駆動されます。" }, 400);
   if (entry === "message") {
     if (!messageAllowed(driver)) return json({ error: "この実行は会話ではありません。" }, 400);
     // A message of files alone is still a message: its words are the
@@ -322,7 +338,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl, approvalMode };
-  const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : execute(args))
+  const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : driver === "heartbeat" ? heartbeat(args) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
       await pauseOnError(admin, run, errorMessage(e));
@@ -1976,6 +1992,395 @@ async function draft(a: ExecArgs, said: string): Promise<void> {
       return;
     case "refusal":
       await rest("モデルがこの依頼を断りました", outcome.detail.slice(0, 300));
+      return;
+  }
+}
+
+// ── Athena's heartbeat driver: a Space's wake ─────────────────────────
+// serve() claimed the run (status running) for a schedule's start, or
+// for the tick's revival of a wake the platform cut off. The wake's
+// three layers stay apart, here as everywhere in the design: the tick
+// decided WHEN (deterministic), this driver inspects WHAT waits
+// (deterministic), and only the speaking — whether a digest is worth
+// sending, and how it reads — is the model's, through one internal
+// tool. A wake always leaves its record: the run and its steps are the
+// evidence it happened, silent or not. It takes no other action, in
+// any approval mode: nobody asked it to work, so it only ever speaks.
+
+const NOTIFY_DIGEST_TOOL: RunToolDef = {
+  name: "notify_digest",
+  description:
+    "放置された待ちのダイジェストを、有効化したオーナーへ1件だけ通知する。items には提示された候補の signalId と見出しだけを渡す（候補に無い対象については通知できない）。" +
+    "通知しない判断なら、この道具は呼ばず、理由を書いて終える。",
+  input_schema: {
+    type: "object",
+    properties: {
+      summary: { type: "string", description: "ダイジェスト全体の総括（1〜2文）" },
+      items: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            signalId: { type: "string" },
+            headline: { type: "string", description: "何が・どれだけ待っているかの短い見出し" },
+          },
+          required: ["signalId", "headline"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["summary", "items"],
+    additionalProperties: false,
+  },
+};
+
+function heartbeatSystemPrompt(agentName: string): string {
+  return [
+    `あなたは ${agentName}。この Space のハートビートとして起きました。`,
+    "あなたの責任は1つだけです: 有効化したオーナーが見られる待ちのうち、長く放置されたものを、要るときだけ持ち上げること。",
+    "- 通知しないことが既定の姿勢です。発生時の通知は既に出ていて、これは「放置」の再浮上です。本当に人の目が要るものだけを選んでください。",
+    "- 確信が持てない候補は落としてください。間違って起こすより、黙る方がましです。",
+    "- 通知するときは notify_digest を1回だけ呼びます。items には提示された候補の signalId と、人の言葉の短い見出しを。候補に無いものは作れません。",
+    "- 通知しないときは、道具を呼ばず、理由を1〜2文で書いて終えてください。その文章が判断の記録として残ります。",
+    "- あなたは実行しません。承認の代行、実行の開始や再開は、どの権限モードでもハートビートの仕事ではありません。",
+  ].join("\n");
+}
+
+/** The Space's AI Worker a heartbeat speaks as: the run's own Worker
+ *  when the tick named one, else the Space's in-Alcon worker (the
+ *  automations selection: an active AI worker not handed to Claude
+ *  Code, "Claude" preferred). Null runs as the default agent. */
+async function loadHeartbeatWorker(admin: SupabaseClient, run: Run): Promise<WorkerConfigRow | null> {
+  if (run.worker_id) {
+    const { data } = await admin.from("workers").select("name, ai_config, ai_model").eq("id", run.worker_id).maybeSingle();
+    if (data) return data as WorkerConfigRow;
+  }
+  if (!run.activity_space_id) return null;
+  const { data } = await admin.from("workers").select("name, ai_config, ai_model")
+    .eq("activity_space_id", run.activity_space_id).eq("type", "ai_agent").eq("status", "active");
+  const inAlcon = ((data ?? []) as WorkerConfigRow[])
+    .filter((w) => (w.ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
+  return inAlcon.find((w) => w.name === "Claude") ?? inAlcon[0] ?? null;
+}
+
+/**
+ * The waits, read as the enabling owner (their RLS is the wake's field
+ * of view: a wait they cannot see is not theirs to be told about).
+ * Each source is read on its own; one source failing empties only
+ * itself, never the inspection.
+ */
+async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Promise<HeartbeatSignal[]> {
+  const signals: HeartbeatSignal[] = [];
+  const guard = async <T,>(read: PromiseLike<{ data: T | null }>, fallback: T): Promise<T> => {
+    try { return (await read).data ?? fallback; } catch { return fallback; }
+  };
+
+  // Element titles for the run- and action-shaped waits, in one batch.
+  const titleOf = async (elementIds: (string | null)[]): Promise<Map<string, string>> => {
+    const ids = [...new Set(elementIds.filter((x): x is string => !!x))];
+    if (!ids.length) return new Map();
+    const rows = await guard(userDb.from("elements").select("id, title").in("id", ids), [] as { id: string; title: string }[]);
+    return new Map(rows.map((e) => [e.id, e.title]));
+  };
+
+  // ── Approvals waiting (Element's, and the Copilot's expiring ones) ──
+  const actions = await guard(
+    userDb.from("agent_actions").select("id, element_id, summary, created_at, expires_at")
+      .eq("status", "pending").order("created_at", { ascending: true }).limit(40),
+    [] as { id: string; element_id: string | null; summary: string; created_at: string; expires_at: string | null }[],
+  );
+  const actionTitles = await titleOf(actions.map((x) => x.element_id));
+  for (const x of actions) {
+    const label = (x.element_id ? actionTitles.get(x.element_id) : null) ?? x.summary;
+    if (x.expires_at) {
+      signals.push({ kind: "approval_copilot", id: x.id, since: x.created_at, expiresAt: x.expires_at, label, place: "Copilot の会話で判断できます" });
+    } else {
+      signals.push({ kind: "approval_element", id: x.id, since: x.created_at, label, place: "Element で判断できます" });
+    }
+  }
+
+  // ── Runs waiting: for an answer, for review, on their readings,
+  //    stopped on an error, or failed ──
+  const runs = await guard(
+    userDb.from("agent_runs").select("id, status, element_id, summary, proposed_readings, updated_at, finished_at")
+      .eq("activity_space_id", spaceId)
+      .in("status", ["awaiting_input", "awaiting_review", "paused", "failed", "completed"])
+      .order("updated_at", { ascending: true }).limit(60),
+    [] as { id: string; status: string; element_id: string | null; summary: string | null; proposed_readings: unknown; updated_at: string; finished_at: string | null }[],
+  );
+  const runTitles = await titleOf(runs.map((r) => r.element_id));
+  for (const r of runs) {
+    const label = (r.element_id ? runTitles.get(r.element_id) : null) ?? r.summary ?? "実行";
+    if (r.status === "awaiting_input") {
+      signals.push({ kind: "run_answer", id: r.id, since: r.updated_at, version: r.updated_at, label, place: "会話で答えられます" });
+    } else if (r.status === "awaiting_review") {
+      signals.push({ kind: "run_review", id: r.id, since: r.updated_at, label, place: "Element の実行パネルで確認できます" });
+    } else if (r.status === "paused") {
+      signals.push({ kind: "run_paused", id: r.id, since: r.updated_at, version: r.updated_at, label, place: "Element の実行パネルで再開できます" });
+    } else if (r.status === "failed") {
+      signals.push({ kind: "run_failed", id: r.id, since: r.finished_at ?? r.updated_at, label, place: "Element の実行パネルで確認できます" });
+    }
+    const held = parseProposedReadings(r.proposed_readings)
+      ?.some((p) => !p.applied && p.heldReason === "awaiting-acceptance");
+    if (held) {
+      signals.push({ kind: "readings", id: r.id, since: r.finished_at ?? r.updated_at, label, place: "Element の仕事を受け入れると反映されます" });
+    }
+  }
+
+  // ── Work itself waiting for a person's review ──
+  const reviewing = await guard(
+    userDb.from("elements").select("id, title, updated_at, objects!inner(domains!inner(activity_space_id))")
+      .eq("status", "review").eq("objects.domains.activity_space_id", spaceId)
+      .order("updated_at", { ascending: true }).limit(20),
+    [] as { id: string; title: string; updated_at: string }[],
+  );
+  for (const e of reviewing) {
+    signals.push({ kind: "element_review", id: e.id, since: e.updated_at, version: e.updated_at, label: e.title, place: "Element で確認できます" });
+  }
+
+  // ── Drafted connections waiting: for review, or for an answer ──
+  const drafts = await guard(
+    userDb.from("integration_drafts").select("id, name, status, expires_at, updated_at")
+      .eq("activity_space_id", spaceId).in("status", ["awaiting_review", "awaiting_input"])
+      .order("updated_at", { ascending: true }).limit(20),
+    [] as { id: string; name: string; status: string; expires_at: string | null; updated_at: string }[],
+  );
+  for (const d of drafts) {
+    if (d.status === "awaiting_review") {
+      signals.push({ kind: "draft_review", id: d.id, since: d.updated_at, version: "awaiting_review", expiresAt: d.expires_at, label: d.name, place: "接続の審査画面で判断できます" });
+    } else {
+      signals.push({ kind: "draft_input", id: d.id, since: d.updated_at, version: "awaiting_input", label: d.name, place: "起草の画面で答えられます" });
+    }
+  }
+
+  // ── Automations standing in failure ──
+  const automations = await guard(
+    userDb.from("automations").select("id, name, last_fired_at, updated_at")
+      .eq("activity_space_id", spaceId).eq("last_status", "failed")
+      .order("last_fired_at", { ascending: true }).limit(20),
+    [] as { id: string; name: string; last_fired_at: string | null; updated_at: string }[],
+  );
+  for (const au of automations) {
+    const since = au.last_fired_at ?? au.updated_at;
+    signals.push({ kind: "automation_failed", id: au.id, since, version: since, label: au.name, place: "自動化の画面で確認できます" });
+  }
+
+  return signals;
+}
+
+async function heartbeat(a: ExecArgs): Promise<void> {
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
+  const { run, admin, userDb, user } = a;
+  const spaceId = run.activity_space_id;
+  const complete = async (summary: string) => {
+    await admin.from("agent_runs").update({
+      status: "completed", summary: summary.slice(0, 300), error: null,
+      finished_at: new Date().toISOString(), continuation_token: null,
+    }).eq("id", run.id).eq("status", "running");
+  };
+  if (!spaceId) { await complete("通知なし"); return; } // a heartbeat run is its Space's; the row cannot exist otherwise
+
+  const { data: spaceRow } = await admin.from("activity_spaces")
+    .select("name, heartbeat_notify_after_hours, heartbeat_monthly_budget_usd")
+    .eq("id", spaceId).maybeSingle();
+  const thresholdHours = Number(spaceRow?.heartbeat_notify_after_hours ?? 24) || 24;
+  const subCap = Number(spaceRow?.heartbeat_monthly_budget_usd ?? 2);
+
+  // What the last completed wake told: dedup reads its digest, and a
+  // wake that told nothing still carries the memory forward (the
+  // fingerprints are re-derived against what is still pending).
+  const { data: prevRuns } = await admin.from("agent_runs").select("transcript")
+    .eq("activity_space_id", spaceId).eq("mode", "heartbeat").eq("status", "completed")
+    .neq("id", run.id).order("created_at", { ascending: false }).limit(1);
+  const prevFingerprints = ((prevRuns?.[0]?.transcript as Transcript | null)?.digest?.fingerprints ?? [])
+    .filter((x): x is string => typeof x === "string");
+
+  // The month's heartbeat spend against its sub-cap (the Space's whole
+  // budget still stands over the wake through loadRunBudget, below).
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+  const { data: monthRuns } = await admin.from("agent_runs").select("cost_usd")
+    .eq("activity_space_id", spaceId).eq("mode", "heartbeat")
+    .gte("created_at", monthStart.toISOString()).neq("id", run.id);
+  const monthSpent = ((monthRuns ?? []) as { cost_usd: number | string }[])
+    .reduce((s, r) => s + Number(r.cost_usd || 0), 0);
+
+  // ── Inspection (deterministic): the snapshot this wake judges ──────
+  const now = new Date();
+  const signals = await readHeartbeatSignals(userDb, spaceId);
+  const snap = buildHeartbeatSnapshot(signals, { now, thresholdHours, previousFingerprints: prevFingerprints });
+  const pendingFps = signals.map((s) => fingerprintOf(s));
+  const byKind = new Map<string, { count: number; oldest: number }>();
+  for (const p of snap.pending) {
+    const cur = byKind.get(p.kind) ?? { count: 0, oldest: 0 };
+    cur.count += 1; cur.oldest = Math.max(cur.oldest, p.waitedHours);
+    byKind.set(p.kind, cur);
+  }
+  const kindLines = [...byKind.entries()].map(([kind, v]) =>
+    `${HEARTBEAT_KIND_LABEL[kind as keyof typeof HEARTBEAT_KIND_LABEL]} ${v.count}件（最古 ${Math.floor(v.oldest)}時間）`);
+  const inspectedTotal = snap.pending.length;
+  await addStep(admin, run.id, "status",
+    inspectedTotal ? `ハートビート: ${kindLines.join("、")}を確認` : "ハートビート: 待ちはありません",
+    [
+      inspectedTotal ? `閾値（${thresholdHours}時間）を超えた待ち: ${inspectedTotal}件` : "閾値を超えた待ちはありませんでした。",
+      snap.candidates.length ? `通知の候補: ${snap.candidates.length}件` : null,
+      snap.silenced ? `通知済みのため静かにする待ち: ${snap.silenced}件` : null,
+    ].filter(Boolean).join("\n"));
+
+  const saveTranscript = async (state: LoopState | null, notified: string[]) => {
+    const transcript: Transcript = {
+      messages: state?.messages ?? [], turns: state?.turns ?? 0, nudges: 0, revisions: 0,
+      digest: { at: now.toISOString(), fingerprints: carryDigestFingerprints(prevFingerprints, pendingFps, notified) },
+    };
+    const clean = JSON.parse(JSON.stringify(transcript).replace(/\u0000/g, ""));
+    await admin.from("agent_runs").update({ transcript: clean }).eq("id", run.id);
+  };
+
+  if (!snap.candidates.length) { await saveTranscript(null, []); await complete("通知なし"); return; }
+  if (monthSpent >= subCap) {
+    await addStep(admin, run.id, "status", "今月は上限のため点検のみ",
+      `ハートビートの今月の費用がサブ上限（$${subCap}）に達しているため、候補 ${snap.candidates.length} 件の通知判断はしませんでした。`);
+    await saveTranscript(null, []);
+    await complete("点検のみ（月次上限）");
+    return;
+  }
+
+  // ── Speech (the model's, and nothing else): pick from the snapshot ─
+  const worker = await loadHeartbeatWorker(admin, run);
+  const config = resolveAgentConfig(worker, null, null, run.model);
+  const { agentName, model } = config;
+  const inspectionOnly = async (reason: string) => {
+    await addStep(admin, run.id, "status", "点検のみで終えます", reason);
+    await saveTranscript(null, []);
+    await complete("通知なし");
+  };
+  if (config.disabledReason) { await inspectionOnly(config.disabledReason); return; }
+  if (config.providerId) {
+    await inspectionOnly(`${agentName} のモデル接続先は、ハートビートの通知判断ではまだ使えません。点検のみで終えます。`);
+    return;
+  }
+  if (!a.anthropicKey) { await inspectionOnly("ANTHROPIC_API_KEY が設定されていないため、通知判断はしませんでした。"); return; }
+  const modelClient = new Anthropic({ apiKey: a.anthropicKey });
+  await admin.from("agent_runs").update({ model }).eq("id", run.id);
+
+  const { budget, spentBefore } = await loadRunBudget(admin, run, user.id);
+  let usage = { input: run.input_tokens, output: run.output_tokens, cost: Number(run.cost_usd || 0) };
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  const bySignalId = new Map(snap.candidates.map((c) => [c.signalId, c]));
+  let notified: string[] = [];
+  const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (call.name !== NOTIFY_DIGEST_TOOL.name) {
+      return { content: `この wake で使える道具は notify_digest だけです: ${call.name}`, is_error: true };
+    }
+    if (notified.length) return { content: "この wake の通知はすでに送りました。" };
+    const itemsIn = Array.isArray(call.input.items) ? call.input.items : [];
+    const items = itemsIn.flatMap((x) => {
+      const o = (x ?? {}) as { signalId?: unknown; headline?: unknown };
+      const c = bySignalId.get(String(o.signalId ?? ""));
+      return c ? [{ c, headline: String(o.headline ?? "").trim().slice(0, 200) }] : [];
+    });
+    if (!items.length) {
+      return { content: "候補に無い signalId ばかりでした。提示された候補の id だけを使ってください。", is_error: true };
+    }
+    const summary = String(call.input.summary ?? "").trim().slice(0, 500);
+    const title = digestTitleFor(items.map((i) => i.c));
+    const lines = items.slice(0, 3).map((i) => `・${i.headline || i.c.label}（${i.c.place}）`);
+    if (items.length > 3) lines.push(`ほか ${items.length - 3} 件`);
+    const body = [summary, ...lines].filter(Boolean).join("\n").slice(0, 2000);
+    const { error } = await admin.from("notifications").insert({
+      recipient_id: run.triggered_by, actor_name: agentName, kind: "heartbeat",
+      agent_run_id: run.id, title, body,
+    });
+    if (error) return { content: `通知を送れませんでした: ${error.message}`, is_error: true };
+    notified = items.map((i) => i.c.signalId);
+    await addStep(admin, run.id, "action", `ダイジェストを通知: ${items.length}件`, `${title}\n${body}`);
+    return { content: `通知しました（${items.length}件）。短く終えてください。` };
+  };
+
+  const opening = [
+    `【ハートビート点検 — Space「${spaceRow?.name ?? ""}」】`,
+    `閾値（${thresholdHours}時間）を超えて放置されている待ちが ${snap.candidates.length} 件あります。通知するか、しないかを判断してください。`,
+    "",
+    ...snap.candidates.map((c) => `- [${c.signalId}] ${HEARTBEAT_KIND_LABEL[c.kind]}: ${c.label} — ${Math.floor(c.waitedHours)}時間待ち`
+      + (c.expiryHours !== null && c.expiryHours < thresholdHours ? `（失効まで約 ${Math.max(0, Math.floor(c.expiryHours))} 時間）` : "")
+      + (c.escalated ? "（一度通知済みで、さらに放置されています）" : "")
+      + `。判断の場所: ${c.place}`),
+  ].join("\n");
+  const state: LoopState = { messages: [{ role: "user", content: opening }], turns: 0, nudges: 0, revisions: 0 };
+  const cache = { cache_control: { type: "ephemeral" as const } };
+  const system = [{ type: "text" as const, text: heartbeatSystemPrompt(agentName), ...cache }];
+  const toolParams = toolParamsFor([NOTIFY_DIGEST_TOOL], cache, false);
+  const deadline = Date.now() + SLICE_MS;
+  const sliceSignal = () => AbortSignal.timeout(Math.max(deadline - Date.now(), 1));
+
+  const outcome = await runLoop(state, {
+    callModel: async (messages) => {
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.beta.messages.create({
+        model,
+        max_tokens: 4000,
+        system,
+        // deno-lint-ignore no-explicit-any
+        tools: toolParams as any,
+        // deno-lint-ignore no-explicit-any
+        messages: messages as any,
+        output_config: { effort: "low" },
+      // deno-lint-ignore no-explicit-any
+      } as any, { signal: sliceSignal() });
+      const blocks = (res.content ?? []) as { type: string; text?: string }[];
+      const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
+      if (words && blocks.some((b) => b.type === "tool_use")) await addStep(admin, run.id, "thought", words.split("\n")[0].slice(0, 200), words);
+      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
+    },
+    kindOf: () => "internal",
+    needsApproval: () => false,
+    execute: (call) => executeCall(call),
+    onUsage: recordUsage,
+    afterTurn: () => saveTranscript(state, notified),
+    budgetExceeded: () => spentBefore + usage.cost >= budget
+      || usage.cost >= MAX_HEARTBEAT_WAKE_COST_USD
+      || monthSpent + usage.cost >= subCap,
+    cancelled: async () => {
+      const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
+      return data?.status === "cancelled";
+    },
+    nudge: "通知するなら notify_digest を呼んでください。しないなら、理由を書いて終えてください。",
+  }, { maxTurnsThisCall: HEARTBEAT_MAX_TURNS, maxTotalTurns: HEARTBEAT_MAX_TURNS, deadline });
+
+  await saveTranscript(state, notified);
+  const toldSummary = `${notified.length}件を通知`;
+  switch (outcome.kind) {
+    case "finished":
+      if (!notified.length && outcome.finish.message) {
+        await addStep(admin, run.id, "thought", "通知しないと判断しました", outcome.finish.message.slice(0, 2000));
+      }
+      await complete(notified.length ? toldSummary : "通知なし");
+      return;
+    case "budget":
+      await addStep(admin, run.id, "error", "予算の上限に達しました",
+        usage.cost >= MAX_HEARTBEAT_WAKE_COST_USD
+          ? `この wake の上限（$${MAX_HEARTBEAT_WAKE_COST_USD}）に達しました。`
+          : "予算の上限に達したため、この wake の判断を終えます。");
+      await complete(notified.length ? toldSummary : "点検のみ（月次上限）");
+      return;
+    case "refusal":
+      await addStep(admin, run.id, "thought", "モデルが判断を断りました", outcome.detail.slice(0, 500));
+      await complete(notified.length ? toldSummary : "通知なし");
+      return;
+    case "cancelled":
+      await addStep(admin, run.id, "status", "停止しました");
+      return;
+    default: // yield / limit: a wake takes no continuation; it closes as it stands
+      await addStep(admin, run.id, "status", "判断の上限で区切りました", "この wake は続きを持たないため、現在の状態で閉じます。次回の wake が改めて点検します。");
+      await complete(notified.length ? toldSummary : "通知なし");
       return;
   }
 }

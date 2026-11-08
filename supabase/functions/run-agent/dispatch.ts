@@ -19,15 +19,18 @@ export interface RunSubject {
  * One driver per subject: an Element's work, a Strategy conversation, a
  * Copilot chat, a connection draft. A run with no subject cannot exist
  * (the subject check sees to that); it would fall to execute, which
- * refuses it for having no Element.
+ * refuses it for having no Element. The one run with no subject column
+ * at all is the heartbeat: its subject is the Space itself, carried in
+ * activity_space_id, and its mode is its marker.
  */
-export type DriverKind = "execute" | "converse" | "chat" | "draft";
+export type DriverKind = "execute" | "converse" | "chat" | "draft" | "heartbeat";
 
 export function driverForRun(run: RunSubject): DriverKind {
   if (run.element_id) return "execute";
   if (run.strategy_id) return "converse";
   if (run.integration_draft_id) return "draft";
   if (run.ai_session_id || run.mode === "copilot") return "chat";
+  if (run.mode === "heartbeat") return "heartbeat";
   return "execute";
 }
 
@@ -77,4 +80,18 @@ export function claimFor(entry: EntryKind): ClaimRule {
     case "resume": return { from: ["paused"] };
     case "start": return { from: ["queued"] };
   }
+}
+
+/**
+ * Pure. The entries a heartbeat run may be driven by. A fresh wake is a
+ * plain start from queued — the only claim a heartbeat ever takes on
+ * its own behalf. The tick's stale revival (resume, or continue with
+ * the run's token) is admitted as what it is: the same wake executed
+ * again after the platform cut it off, with dedup keeping a repeated
+ * wake from notifying twice. A person's words and an approval decision
+ * never drive it — nobody converses with a heartbeat, and it holds no
+ * approval to decide.
+ */
+export function heartbeatEntryAllowed(entry: EntryKind): boolean {
+  return entry === "start" || entry === "resume" || entry === "continue";
 }

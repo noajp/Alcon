@@ -1,5 +1,5 @@
 import {
-  AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, CalendarClock, Bell, Plug, TriangleAlert,
+  AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, CalendarClock, Bell, Plug, TriangleAlert, HeartPulse,
 } from '@/ui/icons';
 import type { NotificationKind } from '@/hooks/useSupabase';
 import { MessageIcon } from '@/Function/shared/conceptIcons';
@@ -27,6 +27,7 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMe
   invite:             { icon: UserPlus,      color: 'text-[var(--accent-default)]', label: 'Invitation' },
   asset_announced:    { icon: Plug,          color: 'text-[var(--accent-default)]', label: 'Asset announced' },
   measure_missed:     { icon: TriangleAlert, color: 'text-[var(--status-danger)]', label: 'Success condition missed' },
+  heartbeat:          { icon: HeartPulse,    color: 'text-rose-400',    label: 'Heartbeat' },
 };
 
 export const NOTIFICATION_KINDS = Object.keys(NOTIFICATION_KIND_META) as NotificationKind[];

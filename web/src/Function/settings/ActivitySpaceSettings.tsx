@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { HeartbeatSettings } from './HeartbeatSettings';
 import { InviteUserDialog } from './InviteUserDialog';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
@@ -299,6 +300,8 @@ export function ActivitySpaceSettings() {
         {!isOwner && <p className="text-[12px] text-muted-foreground">{t("Only the Space's owner can change what it shows.")}</p>}
         {scopeError && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{t('Could not change what the Space shows.')}</p>}
       </SettingsSection>
+
+      <HeartbeatSettings spaceId={active.id} isOwner={isOwner} />
 
       <div className="mb-2 mt-6 flex items-end justify-between">
         <div>

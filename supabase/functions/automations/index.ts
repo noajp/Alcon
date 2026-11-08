@@ -12,10 +12,15 @@
 //                                      seven days (Element approvals never
 //                                      expire), and AI-drafted connections
 //                                      whose review window ran out (G4).
+//                                      The same tick fires Space heartbeats
+//                                      whose wake is due.
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
 //                                      by the automation's owner
+//   POST { heartbeat: spaceId }        "Wake now" from the Space settings,
+//      (signed in)                     by a Space owner; the wake stands as
+//                                      the owner who enabled the heartbeat
 //
 // Firing makes one Element in the automation's Object, with its harness and
 // the Space's AI Worker, starts an AI run on it as the owner (run-agent, the
@@ -24,6 +29,7 @@
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { nextCronRun } from "../_shared/cron.ts";
+import { inQuietHours, nextHeartbeatAt, quietAdjusted, quietHoursOf } from "../_shared/heartbeatSchedule.ts";
 import { sessionFor } from "../_shared/actAs.ts";
 import { checkHarness, parseDefinition } from "../_shared/definition.ts";
 import { usableDefinition } from "../_shared/definitionResolution.ts";
@@ -43,6 +49,7 @@ const json = (payload: unknown, status = 200) =>
 const MAX_BODY = 100_000;
 const WEBHOOK_PER_MINUTE = 30;
 const SCHEDULES_PER_TICK = 20;
+const HEARTBEATS_PER_TICK = 5;
 const QUEUED_STUCK_MS = 2 * 60_000;
 // run-agent's STALE_MS, mirrored: a run that has written no step for this
 // long is stuck, and its starter may resume it.
@@ -187,6 +194,65 @@ async function expireCopilotApproval(env: Env, actionId: string, runId: string):
   return true;
 }
 
+interface HeartbeatSpace {
+  id: string; heartbeat_owner_id: string; heartbeat_cadence_minutes: number;
+  heartbeat_next_at: string; heartbeat_timezone: string | null;
+  heartbeat_quiet_start: string | null; heartbeat_quiet_end: string | null;
+}
+
+/**
+ * One wake of a Space's heartbeat: a run whose subject is the Space
+ * itself, driven as the owner who enabled it — the same act-as
+ * discipline as an automation's firing, but no Element is made: the
+ * run inspects and, at most, speaks. The run is inserted with the
+ * service role (no insert policy carries a heartbeat branch; creating
+ * the wake is a server act, tick's or the settings screen's).
+ *
+ * If the enabling owner can no longer be acted as (they left, or no
+ * session can be issued for them), the heartbeat is switched off
+ * rather than left to fail silently every cadence, and the Space's
+ * remaining owners are told — the same refusal to die quietly as an
+ * unreadable cron.
+ */
+async function fireHeartbeat(env: Env, s: HeartbeatSpace): Promise<"fired" | "disabled"> {
+  let owner: Awaited<ReturnType<typeof sessionFor>>;
+  try {
+    owner = await sessionFor(env.admin, env.url, env.anonKey, s.heartbeat_owner_id);
+  } catch {
+    await env.admin.from("activity_spaces")
+      .update({ heartbeat_enabled: false, heartbeat_next_at: null }).eq("id", s.id);
+    const { data: owners } = await env.admin.from("activity_space_members")
+      .select("user_id").eq("activity_space_id", s.id).eq("role", "owner").neq("user_id", s.heartbeat_owner_id);
+    for (const o of owners ?? []) {
+      await env.admin.from("notifications").insert({
+        recipient_id: o.user_id as string, actor_name: "Alcon Agent", kind: "status_change",
+        title: "ハートビートを止めました",
+        body: "有効化したオーナーとして実行できなくなったため、この Space のハートビートを無効化しました。設定から再度有効化できます。",
+      }).then(() => {}, () => {});
+    }
+    return "disabled";
+  }
+  const workerId = await aiWorkerOf(env.admin, s.id);
+  const { data: run, error } = await env.admin.from("agent_runs")
+    .insert({
+      activity_space_id: s.id, triggered_by: s.heartbeat_owner_id, triggered_from: "heartbeat",
+      mode: "heartbeat", status: "queued", worker_id: workerId,
+    })
+    .select("id").single();
+  if (error || !run) throw new Error(`ハートビートの実行を作れませんでした: ${error?.message ?? "unknown"}`);
+  try {
+    await startRun(env, owner.jwt, run.id as string);
+  } catch (e) {
+    // The wake's record must not strand in queued (no sweep claims a
+    // heartbeat's queued run): the failure is the wake's outcome.
+    await env.admin.from("agent_runs").update({
+      status: "failed", error: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300),
+      finished_at: new Date().toISOString(),
+    }).eq("id", run.id).eq("status", "queued");
+  }
+  return "fired";
+}
+
 async function tick(env: Env): Promise<Record<string, number>> {
   const now = new Date();
   let fired = 0, scheduled = 0, resumed = 0, expired = 0;
@@ -281,7 +347,46 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: could not expire draft", row.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired };
+  // Heartbeats whose wake is due. The tick's arrival is stamped on
+  // every enabled Space first: the pg_cron registration is per
+  // environment, and this stamp is how the settings screen can say
+  // whether the drive is reaching the Space at all.
+  let heartbeats = 0, heartbeatsDeferred = 0, heartbeatsDisabled = 0;
+  await env.admin.from("activity_spaces")
+    .update({ heartbeat_last_tick_at: now.toISOString() }).eq("heartbeat_enabled", true);
+  const { data: dueSpaces } = await env.admin.from("activity_spaces")
+    .select("id, heartbeat_owner_id, heartbeat_cadence_minutes, heartbeat_next_at, heartbeat_timezone, heartbeat_quiet_start, heartbeat_quiet_end")
+    .eq("heartbeat_enabled", true).not("heartbeat_next_at", "is", null).lte("heartbeat_next_at", now.toISOString())
+    .order("heartbeat_next_at").limit(HEARTBEATS_PER_TICK);
+  for (const s of (dueSpaces ?? []) as unknown as HeartbeatSpace[]) {
+    if (!s.heartbeat_owner_id || !s.heartbeat_next_at) continue;
+    const tz = s.heartbeat_timezone || "Asia/Tokyo";
+    const quiet = quietHoursOf(s);
+    if (inQuietHours(now, tz, quiet)) {
+      // Due inside quiet hours: not fired, deferred to the window's end.
+      const until = quietAdjusted(now, tz, quiet);
+      const { data: moved } = await env.admin.from("activity_spaces")
+        .update({ heartbeat_next_at: until.toISOString() })
+        .eq("id", s.id).eq("heartbeat_next_at", s.heartbeat_next_at).eq("heartbeat_enabled", true)
+        .select("id").maybeSingle();
+      if (moved) heartbeatsDeferred += 1;
+      continue;
+    }
+    const next = nextHeartbeatAt(new Date(s.heartbeat_next_at), s.heartbeat_cadence_minutes, now, tz, quiet);
+    // Claim this wake: only the tick that moves next_at fires it.
+    const { data: claimed } = await env.admin.from("activity_spaces")
+      .update({ heartbeat_next_at: next.toISOString(), heartbeat_last_wake_at: now.toISOString() })
+      .eq("id", s.id).eq("heartbeat_next_at", s.heartbeat_next_at).eq("heartbeat_enabled", true)
+      .select("id").maybeSingle();
+    if (!claimed) continue;
+    try {
+      const r = await fireHeartbeat(env, s);
+      if (r === "fired") heartbeats += 1; else heartbeatsDisabled += 1;
+    } catch (e) {
+      console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
+    }
+  }
+  return { fired, scheduled, resumed, expired, draftsExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {
@@ -328,8 +433,38 @@ Deno.serve(async (req) => {
   const userDb = createClient(url, anonKey, { global: { headers: { Authorization: `Bearer ${jwt}` } }, auth: { persistSession: false } });
   const { data: { user } } = await userDb.auth.getUser(jwt);
   if (!user) return json({ error: "session expired or invalid" }, 401);
-  let body: { fire?: string };
+  let body: { fire?: string; heartbeat?: string };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
+
+  // Wake now, by a Space owner. The wake stands as the heartbeat's
+  // configured actor (the owner who enabled it), not as the person who
+  // pressed the button, and the cadence's schedule is left alone — this
+  // is an extra wake, not a moved one.
+  if (body.heartbeat) {
+    const { data: space } = await env.admin.from("activity_spaces")
+      .select("id, heartbeat_enabled, heartbeat_owner_id, heartbeat_cadence_minutes, heartbeat_next_at, heartbeat_timezone, heartbeat_quiet_start, heartbeat_quiet_end")
+      .eq("id", body.heartbeat).maybeSingle();
+    if (!space?.heartbeat_enabled || !space.heartbeat_owner_id) {
+      return json({ error: "この Space のハートビートは有効になっていません。" }, 409);
+    }
+    const { data: me } = await userDb.from("activity_space_members").select("role")
+      .eq("activity_space_id", body.heartbeat).eq("user_id", user.id).maybeSingle();
+    if (me?.role !== "owner") return json({ error: "ハートビートを起こせるのは Space のオーナーだけです。" }, 403);
+    const { data: live } = await env.admin.from("agent_runs").select("id")
+      .eq("activity_space_id", body.heartbeat).eq("mode", "heartbeat").in("status", ["queued", "running"]).limit(1);
+    if (live?.length) return json({ error: "ハートビートの wake がすでに動いています。" }, 409);
+    const result = await fireHeartbeat(env, {
+      id: space.id as string,
+      heartbeat_owner_id: space.heartbeat_owner_id as string,
+      heartbeat_cadence_minutes: space.heartbeat_cadence_minutes as number,
+      heartbeat_next_at: (space.heartbeat_next_at as string | null) ?? new Date().toISOString(),
+      heartbeat_timezone: space.heartbeat_timezone as string | null,
+      heartbeat_quiet_start: space.heartbeat_quiet_start as string | null,
+      heartbeat_quiet_end: space.heartbeat_quiet_end as string | null,
+    });
+    return json({ wake: result }, result === "fired" ? 200 : 409);
+  }
+
   if (!body.fire) return json({ error: "fire is required" }, 400);
   const { data } = await userDb.from("automations").select("*").eq("id", body.fire).maybeSingle();
   const a = data as Automation | null;
