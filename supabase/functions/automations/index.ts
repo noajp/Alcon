@@ -357,6 +357,20 @@ async function tick(env: Env): Promise<Record<string, number>> {
     catch (e) { console.error("automations: could not expire", a.id, e instanceof Error ? e.message : e); }
   }
 
+  // Credential capture asks past their window, and one-time
+  // credentials nobody took inside their ten minutes (secure-login
+  // PR2): the sweep lapses both — an untaken one-time secret is
+  // deleted outright, never left standing (expire_credential_requests).
+  let credentialRequestsExpired = 0, credentialStashesExpired = 0;
+  try {
+    const { data: lapsed } = await env.admin.rpc("expire_credential_requests");
+    const row = (lapsed ?? [])[0] as { requests_expired?: number; stashes_expired?: number } | undefined;
+    credentialRequestsExpired = row?.requests_expired ?? 0;
+    credentialStashesExpired = row?.stashes_expired ?? 0;
+  } catch (e) {
+    console.error("automations: could not lapse credential requests", e instanceof Error ? e.message : e);
+  }
+
   // Drafted connections whose review window ran out undecided (G4):
   // the draft expires and its staged row goes with it, so an unreviewed
   // definition never lingers as a connection-shaped leftover.
@@ -476,7 +490,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, credentialRequestsExpired, credentialStashesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

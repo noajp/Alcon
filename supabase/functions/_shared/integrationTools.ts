@@ -40,6 +40,7 @@ import { isGoogleDriveRow } from "./googleOAuth.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
+import { takeStashedCredentialForIntegration } from "./credentialRequests.ts";
 import { driveOperationLabel, runDriveTool } from "./googleDrive.ts";
 import { catalogOperation, catalogTool, decideCall, isCatalogTool, summaryOf } from "./catalog.ts";
 
@@ -118,10 +119,22 @@ export function bindingOf(it: IntegrationTool): Promise<IntegrationBinding> {
  * a session initialized against the server. Nothing here runs at assembly
  * time, so an integration no call touches is never bound at all.
  */
-export function lazyBinding(admin: SupabaseClient, row: IntegrationRow): () => Promise<IntegrationBinding> {
+export function lazyBinding(
+  admin: SupabaseClient,
+  row: IntegrationRow,
+  opts?: { consumeStash?: boolean },
+): () => Promise<IntegrationBinding> {
   return async () => {
     const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
-    const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
+    let secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
+    // Use-once (secure-login PR2): an execution binding — never a
+    // test's or a draft's — whose slot is empty may take the one-time
+    // credential a person stashed for this connection's pending
+    // capture request. The take is single and deletes the value; it
+    // lives in this binding's memory only and is never written back.
+    if (!secret && opts?.consumeStash && (row.auth_type === "bearer" || row.auth_type === "header")) {
+      secret = await takeStashedCredentialForIntegration(admin, row.id).catch(() => null);
+    }
     if (row.kind === "mcp") {
       const session = new McpSession(row, secret);
       await session.initialize();
@@ -568,7 +581,10 @@ export async function buildSpaceIntegrationTools(args: {
 
     const fingerprint = await planFingerprint(row);
     const cached = cachedPlans.get(row.id);
-    const bind = lazyBinding(admin, row);
+    // The panel executes work, so its bindings may take a use-once
+    // stash (lazyBinding's rule) — a connection test never comes
+    // through here, so a test cannot spend one.
+    const bind = lazyBinding(admin, row, { consumeStash: true });
     const offer = (planned: PlannedIntegrationTool[], toolBind: IntegrationTool["bind"]) => {
       for (const p of planned) {
         if (defs.length >= MAX_INTEGRATION_TOOLS) break;

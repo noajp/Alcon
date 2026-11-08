@@ -17,6 +17,7 @@ import { useLatestRunStatuses } from '@/hooks/elementRunData';
 import { useDefinitions } from '@/hooks/definitionData';
 import { useIntegrations } from '@/AIP/connectors/data';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
+import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
 import { useIntegrationDrafts } from '@/AIP/connectors/draftData';
 import { openDraftForName } from '@/AIP/connectors/draftModel';
 import { missingConnectors, missingForWork, type ConnectorNeed } from '@/AIP/harness/installFlow';
@@ -200,6 +201,9 @@ function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, s
             {s.items.filter((w) => w.proposal?.kind === 'connect').map((w) => (
               <ConnectCard key={w.id} item={w} spaceId={spaceId} integrations={integrations} />
             ))}
+            {s.items.filter((w) => w.proposal?.kind === 'credential').map((w) => (
+              <CredentialCard key={w.id} item={w} spaceId={spaceId} />
+            ))}
           </div>
         ))}
     </div>
@@ -374,6 +378,17 @@ function ConnectCard({ item, spaceId, integrations }: {
   const stillMissing = missingConnectors(proposal.names, integrations);
   const needs = proposal.names.map((name) => stillMissing.find((n) => n.name === name) ?? { name, preset: null, kind: 'missing' as const });
   return <ConnectRequestCard spaceId={spaceId} needs={needs} waitingFor={proposal.waitingFor || null} />;
+}
+
+/** A credential capture the proposal created: the shared capture card,
+ *  fed the request the step carries. The card re-reads its row live —
+ *  the step is only the ask's address. No Continue here: this
+ *  conversation is itself a run, and its continuation is the person's
+ *  next message, as with the connect card on this surface. */
+function CredentialCard({ item, spaceId }: { item: WorkItem; spaceId: string | null }) {
+  const proposal = item.proposal;
+  if (!proposal || proposal.kind !== 'credential') return null;
+  return <CredentialRequestCard spaceId={spaceId} requestId={proposal.requestId} label={proposal.label} />;
 }
 
 /** The agent proposed delivering the person's words to a waiting run: the

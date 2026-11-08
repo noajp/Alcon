@@ -315,6 +315,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               canRememberApproval={canRememberApproval}
               spaceId={getActiveSpaceId()}
               onContinueConnection={!streaming && m.role === 'assistant' ? (c) => send(`${c.waitingFor}を続けてください（${c.names.join('、')}を接続しました）`, { context: contextNow() }) : undefined}
+              onContinueCredential={!streaming && m.role === 'assistant' ? (c) => send(`${c.waitingFor || '待っていた作業'}を続けてください（${c.label}の認証情報を入力しました）`, { context: contextNow() }) : undefined}
               onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve, opts) => void decideApproval(a, approve, opts) : undefined} />
           ))}
           {error && (

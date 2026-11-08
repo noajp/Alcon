@@ -59,7 +59,19 @@ describe('liveTurnFromSteps', () => {
   });
 
   it('no steps yet reads as an empty turn', () => {
-    expect(liveTurnFromSteps([])).toEqual({ content: '', toolEvents: [], connections: [] });
+    expect(liveTurnFromSteps([])).toEqual({ content: '', toolEvents: [], connections: [], credentials: [] });
+  });
+
+  it('maps credential_request steps to the turn’s capture asks', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('credential_request', 'GitHub の認証情報が必要です', JSON.stringify({ requestId: 'req-1', label: 'GitHub' })),
+      step('credential_request', '壊れた詳細', 'not json'),
+      step('credential_request', 'ID なし', JSON.stringify({ label: 'GitHub' })),
+      step('reply', 'カードを出しました', 'カードを出しました'),
+    ]);
+    expect(live.credentials).toEqual([{ requestId: 'req-1', label: 'GitHub', waitingFor: '' }]);
+    expect(live.content).toBe('カードを出しました');
   });
 
   it('maps connection_request steps to the turn’s proposals', () => {

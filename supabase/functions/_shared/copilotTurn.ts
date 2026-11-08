@@ -20,6 +20,7 @@ import {
   integrationPromptSection, manifestDenyRefusal, type SpaceIntegrationTools,
 } from "./integrationTools.ts";
 import { CONNECTION_PROPOSED_REPLY, PROPOSE_CONNECTION_TOOL, resolveConnectionProposal } from "./connectProposal.ts";
+import { createCredentialRequestsForNames, notifyCredentialRequestOwners } from "./credentialRequests.ts";
 import type { VerifyCheck } from "./verifyReads.ts";
 
 export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人と AI が一緒に進める運用基盤）の AI です。ユーザーの依頼を受けて、道具で Alcon のデータを読み書きし、仕事を最後までやり遂げます。
@@ -78,6 +79,12 @@ export interface CopilotTurnEvents {
      *  records it as a connection_request step and keeps it with the turn's
      *  message, so the panel renders the Connect card. */
     connectionProposal?: { names: string[]; waitingFor: string };
+    /** Credential capture requests the proposal's judgement created
+     *  server-side (an empty or refused token slot among the named
+     *  connections): the driver records each as a credential_request
+     *  step and keeps it with the turn's message, so the panel renders
+     *  the capture card. Ids and display labels only — never a value. */
+    credentialRequests?: { requestId: string; label: string; waitingFor: string }[];
   }): void;
 }
 
@@ -255,11 +262,47 @@ export async function buildCopilotTurn(args: {
           events?.onToolResult?.({ name: call.name, ok: false, error: r.error });
           return { content: JSON.stringify({ error: r.error }), is_error: true };
         }
-        if (r.kind === "already") {
-          events?.onToolResult?.({ name: call.name, ok: true });
-          return { content: `${r.asked.join("、")} はすでに接続されています。接続の提案は要りません。` };
+        // Credential capture (secure-login PR2): the proposal event is
+        // a server-side fact, and the creators judge the Space's rows
+        // themselves — a named token connection whose slot is empty or
+        // whose credential was refused gets a capture request, whether
+        // the proposal reads "proposed" or "already connected" (an
+        // empty slot is invisible to the connection judgement). The
+        // model supplied only names; every field of the request is
+        // derived from the rows. Creation never fails the proposal.
+        const askedNames = r.kind === "proposed" ? r.names : r.asked;
+        const waitingFor = r.kind === "proposed"
+          ? r.waitingFor
+          : (typeof call.input?.waitingFor === "string" ? call.input.waitingFor.trim().slice(0, 300) : "");
+        let credentialRequests: { requestId: string; label: string; waitingFor: string }[] | undefined;
+        if (admin && ctx.spaceId && waitingFor) {
+          const made = await createCredentialRequestsForNames(admin, {
+            spaceId: ctx.spaceId, userId: actor.userId, names: askedNames, waitingFor,
+          }).catch(() => []);
+          if (made.length) {
+            credentialRequests = made.map((m) => ({ requestId: m.request.id, label: m.row.name, waitingFor }));
+            for (const m of made) {
+              if (m.created) {
+                await notifyCredentialRequestOwners(admin, {
+                  spaceId: ctx.spaceId, requesterId: actor.userId, label: m.row.name, waitingFor,
+                }).catch(() => 0);
+              }
+            }
+          }
         }
-        events?.onToolResult?.({ name: call.name, ok: true, connectionProposal: { names: r.names, waitingFor: r.waitingFor } });
+        if (r.kind === "already") {
+          events?.onToolResult?.({ name: call.name, ok: true, ...(credentialRequests ? { credentialRequests } : {}) });
+          return {
+            content: credentialRequests
+              ? `${r.asked.join("、")} は接続されていますが、認証情報が入っていない（または拒否された）ため、会話に入力のカードを出しました。入力されたとは言わないでください。`
+              : `${r.asked.join("、")} はすでに接続されています。接続の提案は要りません。`,
+          };
+        }
+        events?.onToolResult?.({
+          name: call.name, ok: true,
+          connectionProposal: { names: r.names, waitingFor: r.waitingFor },
+          ...(credentialRequests ? { credentialRequests } : {}),
+        });
         return { content: CONNECTION_PROPOSED_REPLY };
       }
       const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "panel" });

@@ -8,10 +8,11 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import type { AgentAction } from '@/types/database';
-import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotMessage, ToolEvent } from './useAlconCopilot';
+import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotCredentialAsk, CopilotMessage, ToolEvent } from './useAlconCopilot';
 import { toolVerb } from './copilotFiles';
 import { splitAnswer } from './chartSpec';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
+import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
 import { missingConnectors } from '@/AIP/harness/installFlow';
 import { useIntegrations } from '@/AIP/connectors/data';
 
@@ -21,7 +22,7 @@ const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: ()
  *  bare asterisks; its work shows as steps above it. Under each turn, as in
  *  Claude's chat: copy, and on the latest exchange retry (an answer) or edit
  *  (a question); the time shows beside them. */
-export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval, spaceId, onContinueConnection }: {
+export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval, spaceId, onContinueConnection, onContinueCredential }: {
   message: CopilotMessage;
   streaming: boolean;
   /** Present on the latest answer once it is in. */
@@ -36,6 +37,8 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   spaceId?: string | null;
   /** Continue the work a connection proposal was waiting on (person-pressed). */
   onContinueConnection?: (proposal: CopilotConnectionProposal) => void;
+  /** Continue the work a credential capture was waiting on (person-pressed). */
+  onContinueCredential?: (ask: CopilotCredentialAsk) => void;
 }) {
   const { t } = useI18n();
   if (message.role === 'user') {
@@ -72,6 +75,10 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
       {message.connections?.map((c, i) => (
         <ConnectProposalCard key={i} spaceId={spaceId ?? null} proposal={c}
           onContinue={onContinueConnection ? () => onContinueConnection(c) : undefined} />
+      ))}
+      {message.credentials?.map((c) => (
+        <CredentialRequestCard key={c.requestId} spaceId={spaceId ?? null} requestId={c.requestId} label={c.label}
+          onContinue={onContinueCredential ? () => onContinueCredential(c) : undefined} />
       ))}
       {settled && message.content && (
         <div className={`flex items-center gap-0.5 transition-opacity ${onRetry ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
