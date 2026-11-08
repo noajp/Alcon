@@ -216,7 +216,7 @@ function agentRun(patch: Partial<AgentRunRecord>): AgentRunRecord {
   return {
     id: 'ar1', element_id: 'e1', domain_id: null, worker_id: null, status: 'running', mode: 'execute',
     summary: null, error: null, started_at: '2026-11-06T01:00:00Z', finished_at: null, created_at: '2026-11-06T01:00:00Z',
-    cost_usd: 0, verdict: null, proposed_readings: null, elementTitle: '経費処理', elementStatus: 'todo', objectName: null,
+    cost_usd: 0, verdict: null, finishDetail: null, proposed_readings: null, elementTitle: '経費処理', elementStatus: 'todo', objectName: null,
     pendingActions: 0, ...patch,
   };
 }

@@ -10,7 +10,10 @@
 // byte (a test keeps them equal): change this one and copy it over.
 //
 //   # 目的 / Goal              what the work is for
-//   # 条件 / Conditions        the rules it works under
+//   # 条件 / Conditions        the rules it works under — including freshness
+//                              declarations ("- 価格の鮮度: 30分まで"): how old
+//                              a fact of a type may be before a finish's claim
+//                              to it counts as stale (see DEFAULT_FRESHNESS)
 //   # 指標 / Metric            "- スコア（大きいほど良い）: how it is measured" — makes it a loop
 //   # 進め方 / Procedure       one round, or the steps
 //   # 止める条件 / Stop        目標 600,000 / $30 まで / 50 周まで, and free text
@@ -35,7 +38,14 @@ export interface ParsedDefinition {
   output: DefinitionOutput | null;
   /** The connectors the work needs, by name as the Space connected them. */
   connectors: string[];
+  /** Freshness bounds declared in Conditions, by data type: the max age (ms)
+   *  a fact of that type may have before a finish's claim to it is stale.
+   *  Declared only — freshnessTableOf layers these over the defaults. */
+  freshness: FreshnessTable;
 }
+
+/** How old a fact of a data type may be, in ms, before a claim to it is stale. */
+export type FreshnessTable = Record<string, number>;
 
 export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown" | "assignment";
 
@@ -115,7 +125,83 @@ export function parseDefinition(body: string): ParsedDefinition {
     if (body) output = { format, body };
   }
   const connectors = [...new Set(bullets(sections.connectors).map((c) => c.split(/[（(:：]/)[0].trim()).filter(Boolean))];
-  return { sections, metric, stop, checks, output, connectors };
+  const freshness = parseFreshness(sections.conditions);
+  return { sections, metric, stop, checks, output, connectors, freshness };
+}
+
+// ── Freshness: how old a fact may be before a claim to it is stale ─────────
+// A finish states facts as typed claims (finishClaims.ts); code, not the
+// verifier, judges whether a claim's source is fresh enough for its data
+// type. Every definition inherits the shipped bounds below; its Conditions
+// may override per type ("- 価格の鮮度: 30分まで", "- freshness (stock): 12
+// hours") or declare bounds for its own types. A type with no bound anywhere
+// carries no freshness obligation — a source is still required when the run
+// read the world.
+
+const MINUTE_MS = 60_000;
+
+/** The freshness bounds every definition inherits (owner-tunable posture). */
+export const DEFAULT_FRESHNESS: FreshnessTable = {
+  price: 30 * MINUTE_MS,               // prices / quotes: 30 minutes
+  availability: 24 * 60 * MINUTE_MS,   // inventory / availability: 1 day
+  org: 30 * 24 * 60 * MINUTE_MS,       // org / people facts: 30 days
+  legal: 7 * 24 * 60 * MINUTE_MS,      // regulatory / legal text: 7 days
+};
+
+const FRESHNESS_TYPES: [string, RegExp][] = [
+  ["price", /価格|料金|相場|単価|見積|price|quote|cost/i],
+  ["availability", /在庫|空き|空席|予約状況|availability|inventory|stock/i],
+  ["org", /組織|人物|会社|担当者|org|people|person|company/i],
+  ["legal", /法規|法令|規約|約款|legal|regulation/i],
+];
+
+/** Pure. The shipped data type a name or sentence names, or null. */
+export function freshnessKeyFor(text: string): string | null {
+  return FRESHNESS_TYPES.find(([, re]) => re.test(text))?.[0] ?? null;
+}
+
+/** Pure. The key a freshness table is indexed by for a type name: the
+ *  shipped type when the name names one, else the folded name itself — so a
+ *  definition's own type ("天気") and a claim's type meet at the same key. */
+export function freshnessLookupKey(name: string): string {
+  return freshnessKeyFor(name) ?? fold(name);
+}
+
+/** Pure. A duration written in a Conditions bullet ("30分", "12 hours"):
+ *  its length in ms and where it starts, so the text before it can be read
+ *  as the type's name. */
+function parseDuration(text: string): { ms: number; index: number } | null {
+  const m = /(\d+(?:\.\d+)?)\s*(ヶ月|カ月|月|分|時間|日|週|minutes?|mins?|hours?|hrs?|days?|weeks?|months?)/i.exec(text);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const u = m[2].toLowerCase();
+  const unit = u === "分" || u.startsWith("min") ? MINUTE_MS
+    : u === "時間" || u.startsWith("hour") || u.startsWith("hr") ? 60 * MINUTE_MS
+    : u === "日" || u.startsWith("day") ? 24 * 60 * MINUTE_MS
+    : u === "週" || u.startsWith("week") ? 7 * 24 * 60 * MINUTE_MS
+    : 30 * 24 * 60 * MINUTE_MS; // ヶ月・カ月・月・months
+  return { ms: n * unit, index: m.index };
+}
+
+/** Pure. The freshness bounds a Conditions section declares, by lookup key. */
+function parseFreshness(conditions: string): FreshnessTable {
+  const out: FreshnessTable = {};
+  for (const b of bullets(conditions)) {
+    if (!/鮮度|fresh/i.test(b)) continue;
+    const d = parseDuration(b);
+    if (!d) continue;
+    const named = freshnessKeyFor(b);
+    if (named) { out[named] = d.ms; continue; }
+    const name = b.slice(0, d.index).replace(/鮮度|fresh(ness)?/gi, "").replace(/[（()）]/g, "").replace(/[\s:：=のはまで]+$/u, "").trim();
+    if (name) out[fold(name)] = d.ms;
+  }
+  return out;
+}
+
+/** Pure. The bounds a run lives under: the shipped defaults, overridden per
+ *  type by the definition's own declarations. */
+export function freshnessTableOf(def: ParsedDefinition | null): FreshnessTable {
+  return { ...DEFAULT_FRESHNESS, ...(def?.freshness ?? {}) };
 }
 
 // ── Checking a harness ───────────────────────────────────────────────────────

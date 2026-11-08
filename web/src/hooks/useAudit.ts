@@ -11,7 +11,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useWorkersByIds } from '@/hooks/teamData';
 import { addDays } from '@/Function/shared/dateUtils';
 import {
-  agentRunEvents, mergeAuditTimeline, parseProposedReadings, parseRunVerdict,
+  agentRunEvents, mergeAuditTimeline, parseFinishDetail, parseProposedReadings, parseRunVerdict,
   type AgentRunRecord, type StepEvent,
 } from '@/Function/audit/auditModel';
 import type {
@@ -70,7 +70,7 @@ interface AgentRunRow {
   id: string; element_id: string; domain_id: string | null; worker_id: string | null;
   status: AgentRunStatus; mode: AgentRunRecord['mode']; summary: string | null; error: string | null;
   started_at: string | null; finished_at: string | null; created_at: string; cost_usd: number | string;
-  verdict: unknown; proposed_readings: unknown;
+  verdict: unknown; proposed_readings: unknown; finish_detail: unknown;
 }
 
 /**
@@ -88,7 +88,7 @@ interface AgentRunRow {
  */
 async function loadAgentRuns(spaceId: string, since: string, signal: AbortSignal): Promise<{ runs: AgentRunRecord[]; truncated: boolean }> {
   const { data, error } = await supabase.from('agent_runs')
-    .select('id, element_id, domain_id, worker_id, status, mode, summary, error, started_at, finished_at, created_at, cost_usd, verdict, proposed_readings')
+    .select('id, element_id, domain_id, worker_id, status, mode, summary, error, started_at, finished_at, created_at, cost_usd, verdict, proposed_readings, finish_detail')
     .eq('activity_space_id', spaceId)
     .not('element_id', 'is', null)
     .or(`created_at.gte.${since},status.in.(${OPEN_AGENT_STATUSES.join(',')})`)
@@ -96,7 +96,7 @@ async function loadAgentRuns(spaceId: string, since: string, signal: AbortSignal
     .limit(AGENT_AUDIT_RUN_LIMIT)
     .abortSignal(signal);
   if (error) throw new Error(`Unable to read agent runs: ${error.message}`);
-  const rows = (data ?? []) as AgentRunRow[];
+  const rows = (data ?? []) as unknown as AgentRunRow[];
   if (!rows.length) return { runs: [], truncated: false };
 
   const elements = await selectIn<{ id: string; title: string; status: string | null; object_id: string | null }>(
@@ -123,6 +123,7 @@ async function loadAgentRuns(spaceId: string, since: string, signal: AbortSignal
         started_at: row.started_at, finished_at: row.finished_at, created_at: row.created_at,
         cost_usd: typeof row.cost_usd === 'number' ? row.cost_usd : Number(row.cost_usd) || 0,
         verdict: parseRunVerdict(row.verdict),
+        finishDetail: parseFinishDetail(row.finish_detail),
         proposed_readings: parseProposedReadings(row.proposed_readings),
         elementTitle: element?.title ?? '',
         elementStatus: element?.status ?? null,

@@ -338,6 +338,45 @@ export function AgentRunPanel({ run, onClose }: { run: AgentRunRecord; onClose: 
           {verdict.checkedAt && <p className={`${FONT.sm} mt-1 text-muted-foreground`}>{t('Checked at')} {new Date(verdict.checkedAt).toLocaleString(locale)}{verdict.evidence.verifyStepIdx !== null ? ` · #${verdict.evidence.verifyStepIdx}` : ''}</p>}
         </div>
       )}
+      {(verdict?.claims || run.finishDetail) && (
+        <div className="px-4 pb-4">
+          <p className={`${FONT.sm} flex flex-wrap items-baseline gap-x-2`}>
+            <span className="text-foreground">{t('Claims')}</span>
+            {verdict?.claims && <span className="text-muted-foreground">{t('Sourced {sourced} of {total}', { sourced: verdict.claims.sourced, total: verdict.claims.total })}</span>}
+            {verdict?.claims && verdict.claims.stale > 0 && <span className="text-[var(--status-warning)]">{t('{n} stale', { n: verdict.claims.stale })}</span>}
+          </p>
+          {verdict?.claimGaps && verdict.claimGaps.length > 0 && (
+            <>
+              <p className={`${FONT.sm} mt-1 text-muted-foreground`}>{t('Mechanical findings')}</p>
+              <ul className={`${FONT.sm} mt-0.5 list-disc space-y-0.5 pl-5 text-muted-foreground`}>
+                {verdict.claimGaps.map((gap, i) => <li key={i}>{gap}</li>)}
+              </ul>
+            </>
+          )}
+          {run.finishDetail && run.finishDetail.claims.length > 0 && (
+            <ul className={`${FONT.sm} mt-1 space-y-1`}>
+              {run.finishDetail.claims.map((claim, i) => (
+                <li key={i}>
+                  <span className="text-foreground">{claim.text}</span>{' '}
+                  <span className="text-muted-foreground">
+                    {claim.source
+                      ? `${t('Source')}: ${claim.source === 'run-record' ? t('Run record') : claim.source}${claim.retrievedAt ? ` · ${new Date(claim.retrievedAt).toLocaleString(locale)}` : ''}${claim.type ? ` · ${claim.type}` : ''}`
+                      : t('No source')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {run.finishDetail && run.finishDetail.unconfirmed.length > 0 && (
+            <>
+              <p className={`${FONT.sm} mt-2 text-[var(--status-warning)]`}>{t('Unconfirmed')}</p>
+              <ul className={`${FONT.sm} mt-0.5 list-disc space-y-0.5 pl-5 text-muted-foreground`}>
+                {run.finishDetail.unconfirmed.map((u, i) => <li key={i}>{u}</li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
       {readings.length > 0 && (
         <div className="space-y-0.5 px-4 pb-4">
           {readings.map(r => {

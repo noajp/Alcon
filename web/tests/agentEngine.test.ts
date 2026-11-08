@@ -274,6 +274,74 @@ describe('artifact files', () => {
   });
 });
 
+describe('typed finish gate', () => {
+  const finishTurn = (id: string) => ({ content: [toolUse(id, 'finish', { outcome: 'completed', summary: 's', message: 'm' })] });
+
+  it('fails a finish on structure alone — the verifier is never consulted for it', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2')]);
+    let verifyCalls = 0; let mechCalls = 0;
+    const { deps: d } = deps(m, {
+      mechanicalCheck: () => { mechCalls++; return mechCalls === 1 ? { gaps: ['主張「PR を作成した」に出典がありません'] } : { gaps: [] }; },
+      verify: async () => { verifyCalls++; return { pass: true, gaps: [] }; },
+    });
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    expect(state.revisions).toBe(1);
+    // The verifier judged only the mechanically sound second finish.
+    expect(verifyCalls).toBe(1);
+    expect(mechCalls).toBe(2);
+    const sentBack = state.messages[2] as { content: { is_error?: boolean; content: string }[] };
+    expect(sentBack.content[0].is_error).toBe(true);
+    expect(sentBack.content[0].content).toContain('主張「PR を作成した」に出典がありません');
+    // The revision points the agent at the typed fields, not at prose.
+    expect(sentBack.content[0].content).toContain('claims');
+    expect(sentBack.content[0].content).toContain('unconfirmed');
+  });
+
+  it('lets a mechanically sound finish stand with no verifier at all', async () => {
+    const m = scripted([finishTurn('f1')]);
+    const { deps: d } = deps(m, { mechanicalCheck: () => ({ gaps: [] }) });
+    const state = fresh();
+    expect((await runLoop(state, d, limits())).kind).toBe('finished');
+    expect(state.revisions ?? 0).toBe(0);
+  });
+
+  it('lets a finish stand after the revision limit on mechanical findings too', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2'), finishTurn('f3')]);
+    let calls = 0;
+    const { deps: d } = deps(m, { mechanicalCheck: () => { calls++; return { gaps: ['古い'] }; } });
+    expect((await runLoop(fresh(), d, limits())).kind).toBe('finished');
+    expect(calls).toBe(loop.MAX_REVISIONS);
+  });
+
+  it('does not gate a partial or blocked finish mechanically either', async () => {
+    const m = scripted([{ content: [toolUse('f', 'finish', { outcome: 'blocked', summary: 's', message: 'm' })] }]);
+    let called = false;
+    const { deps: d } = deps(m, { mechanicalCheck: () => { called = true; return { gaps: ['x'] }; } });
+    await runLoop(fresh(), d, limits());
+    expect(called).toBe(false);
+  });
+
+  it('an unconfirmed-only finish completes: the list marks it, it never fails it', async () => {
+    const m = scripted([finishTurn('f1')]);
+    let verifyCalls = 0;
+    const { deps: d } = deps(m, {
+      execute: async (c: { name: string }) => (c.name === 'finish'
+        ? { content: 'ok', finish: { outcome: 'completed', summary: 's', message: 'm', unconfirmed: ['在庫は未確認'] } }
+        : { content: 'ok' }),
+      mechanicalCheck: () => ({ gaps: [] }),
+      verify: async () => { verifyCalls++; return { pass: true, gaps: [] }; },
+    });
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    if (out.kind === 'finished') expect(out.finish.unconfirmed).toEqual(['在庫は未確認']);
+    expect(state.revisions ?? 0).toBe(0);
+    expect(verifyCalls).toBe(1);
+  });
+});
+
 describe('verifier', () => {
   it('reads a verdict, and nothing it cannot read', () => {
     expect(verify.readVerdict('{"pass":false,"gaps":["a","",3,"b"]}')).toEqual({ pass: false, gaps: ['a', 'b'] });
@@ -288,6 +356,30 @@ describe('verifier', () => {
       artifacts: [{ title: '候補一覧', content: '| 物件 | URL |' }], usedWeb: true,
     });
     for (const t of ['物件を集める', '10 件以上', '候補を複数挙げる', '12 件集めた', '候補一覧', 'Web で調べている']) expect(p).toContain(t);
+  });
+
+  it('hands the verifier the typed claims and the mechanical counts as data', () => {
+    const p = verify.verifyPrompt({
+      element: { title: '相場を調べる', description: null }, intents: [],
+      finish: {
+        outcome: 'completed', summary: '調べた', message: '報告',
+        claims: [
+          { text: '価格は 1,200 円', source: 'https://example.com/p', retrievedAt: '2026-11-09T11:50:00Z', type: 'price' },
+          { text: 'PR を作成した', source: 'run-record', retrievedAt: null, type: null },
+        ],
+        unconfirmed: ['在庫は未確認'],
+      },
+      artifacts: [], usedWeb: true,
+      claimCheck: { counts: { total: 2, sourced: 2, stale: 0 }, gaps: [] },
+    });
+    for (const t of ['価格は 1,200 円', 'https://example.com/p', 'run-record', '出典 2/2', '在庫は未確認']) expect(p).toContain(t);
+  });
+
+  it('no longer asks the verifier to grade sourcing or freshness — code owns those', () => {
+    expect(verify.VERIFY_SYSTEM).not.toContain('出典の URL が添えられているか');
+    expect(verify.VERIFY_SYSTEM).not.toContain('「未確認」と明記されていれば可');
+    expect(verify.VERIFY_SYSTEM).toContain('コードが機械的に検査済み');
+    expect(verify.VERIFY_SYSTEM).toContain('unconfirmed');
   });
 });
 
@@ -310,6 +402,16 @@ describe('agent tools', () => {
     expect(tools.baseKindOf('finish')).toBe('finish');
     expect(tools.baseKindOf('updateElement')).toBe('board');
     expect(tools.baseKindOf('linear_ab12__create_issue')).toBeNull();
+  });
+
+  it('asks the finish call for typed claims and an unconfirmed list', () => {
+    const finish = tools.baseAgentTools().find((t: { name: string }) => t.name === 'finish');
+    const props = finish.input_schema.properties;
+    expect(Object.keys(props)).toEqual(expect.arrayContaining(['claims', 'unconfirmed']));
+    expect(props.claims.items.required).toEqual(['text']);
+    expect(Object.keys(props.claims.items.properties)).toEqual(expect.arrayContaining(['text', 'source', 'retrievedAt', 'type']));
+    expect(props.unconfirmed.items).toEqual({ type: 'string' });
+    expect(finish.input_schema.required).toEqual(['outcome', 'summary', 'message']);
   });
 
   it('summarises a batch of writes in one line', () => {

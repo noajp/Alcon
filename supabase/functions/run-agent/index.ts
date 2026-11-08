@@ -93,8 +93,9 @@ import {
 } from "../_shared/approvalPolicy.ts";
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
+import { checkFinishClaims, finishDetailOf, normalizeClaims, normalizeUnconfirmed, type ClaimCheck } from "../_shared/finishClaims.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
-import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
+import { checkHarness, checkOutput, checksDue, definitionPrompt, freshnessTableOf, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, canonicalCalls,
@@ -1070,11 +1071,17 @@ async function execute(a: ExecArgs): Promise<void> {
       }
       case "finish": {
         const outcome = ["completed", "partial", "blocked"].includes(String(input.outcome)) ? String(input.outcome) as FinishPayload["outcome"] : "completed";
+        const claims = normalizeClaims(input.claims);
+        const unconfirmed = normalizeUnconfirmed(input.unconfirmed);
         const finish: FinishPayload = {
           outcome, summary: String(input.summary ?? "").trim().slice(0, 300) || "完了", message: String(input.message ?? "").trim(),
           // Copied through unvalidated: the gate validates the proposals at
           // finish time, when the bound measures and the verdict are known.
           ...(Array.isArray(input.readings) ? { readings: input.readings as { measureId: string; value: number }[] } : {}),
+          // The facts the finish states, typed (finishClaims.ts): the
+          // mechanical check judges them at the gate; the record seals them.
+          ...(claims.length ? { claims } : {}),
+          ...(unconfirmed.length ? { unconfirmed } : {}),
         };
         return { content: "完了報告を受け取りました。", finish };
       }
@@ -1343,6 +1350,27 @@ async function execute(a: ExecArgs): Promise<void> {
   let lastCheck: VerdictInputs["lastCheck"] = null;
   let checkAttempted = false;
 
+  // The mechanical check of a finish's claims, run by code at the gate
+  // before the verifier is consulted (finishClaims.ts): a claim's source
+  // and freshness are facts code can settle, so the model never grades
+  // them. The holder keeps the latest attempt's counts — verifyFinish
+  // hands them to the verifier as data, and the terminal finishRun seals
+  // them into the verdict record.
+  let attemptCheck: ClaimCheck | null = null;
+  const freshness = freshnessTableOf(parsedAll);
+  const usedReadsOf = (): boolean => state.messages.some((m) => Array.isArray(m.content) && m.content.some((b) => {
+    if (b.type === "server_tool_use") return true; // web search / fetch
+    if (b.type !== "tool_use" || !b.name) return false;
+    const it = integrationTools.get(b.name);
+    return it ? integrationCallIsRead(it, { id: "", name: b.name, input: (b.input ?? {}) as Record<string, unknown> }) : false;
+  }));
+  const checkClaimsOf = (finish: FinishPayload): ClaimCheck =>
+    checkFinishClaims(finish.claims ?? [], { usedReads: usedReadsOf(), freshness, now: Date.now() });
+  const mechanicalCheck = (finish: FinishPayload) => {
+    attemptCheck = checkClaimsOf(finish);
+    return { gaps: attemptCheck.gaps };
+  };
+
   // The verifier reads the task, the Strategy's success conditions and this
   // run's outputs fresh, in its own context, on the run's model at low effort.
   // Any failure to answer lets the finish stand rather than trap the run.
@@ -1372,7 +1400,7 @@ async function execute(a: ExecArgs): Promise<void> {
         model,
         max_tokens: 4000,
         system: VERIFY_SYSTEM,
-        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb, definition: definition?.body ?? null }) }],
+        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb, definition: definition?.body ?? null, claimCheck: attemptCheck }) }],
         output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
       // deno-lint-ignore no-explicit-any
       } as any, { signal: sliceSignal() });
@@ -1506,6 +1534,7 @@ async function execute(a: ExecArgs): Promise<void> {
     },
     onUsage: recordUsage,
     verify: run.mode === "reply" || external ? undefined : verifyFinish,
+    mechanicalCheck: run.mode === "reply" || external ? undefined : mechanicalCheck,
     afterTurn: async () => { await flushLifted(); await saveTranscript(); },
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= runCap,
     cancelled: async () => {
@@ -1521,9 +1550,12 @@ async function execute(a: ExecArgs): Promise<void> {
       await saveTranscript();
       // A reply run's finish is a reply, not checked work: its verdict stays
       // null. Any other run's record is built from the verifier's holder —
-      // a checked pass/fail, or an honest "unchecked" with its reason.
+      // a checked pass/fail, or an honest "unchecked" with its reason. The
+      // claim accounting is recomputed from the standing finish itself:
+      // the counts describe that finish, whatever path it took to stand.
       const verdict = run.mode === "reply" ? null : buildRunVerdict({
         lastCheck, checkAttempted, revisions: state.revisions ?? 0, finish: outcome.finish, external,
+        claimCheck: checkClaimsOf(outcome.finish),
       });
       const sealed = await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
       // Memory: a sealed finish is distilled into episodes — the curated
@@ -3834,8 +3866,11 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     status: runStatus, summary: finish.summary, result: finish.message, finished_at: status ? null : new Date().toISOString(),
     error: status === "paused" ? finish.summary : null, continuation_token: null,
     // The verdict is sealed with the finish that stood — written here, at a
-    // terminal finish only, and never updated afterwards.
+    // terminal finish only, and never updated afterwards. So is the finish
+    // itself, typed: its claims and unconfirmed list (finishClaims.ts), the
+    // record the verdict's accounting counts and the Reviews filter reads.
     ...(verdict ? { verdict } : {}),
+    ...(status === undefined ? { finish_detail: finishDetailOf(finish) } : {}),
     ...(proposals ? { proposed_readings: proposals } : {}),
   }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
   if (!closed) return false;
