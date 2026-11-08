@@ -107,6 +107,11 @@ export interface ConversationContext {
    *  not connected (or has switched off) — the work cannot use them until
    *  a person connects them. Names as written in the definition. */
   missingConnectors: string[];
+  /** The open AI drafts (G4) answering the still-missing names above: a
+   *  connection whose definition is being drafted or tested, or that
+   *  waits for its review or for a person's answer — by the name the
+   *  definition wrote, with the draft's status. */
+  connectorDrafts: { name: string; status: string }[];
   today: string;
 }
 
@@ -138,7 +143,7 @@ export function conversationSystemPrompt(agentName: string): string {
 - 実行の状態（進み具合、止まっている所、検証の結果）を聞かれたら、まず getInitiativeExecution で現在の状態を読んでから答える。推測で状態を言わない。
 - 詰まりは barriers と blockers から、どの Element が・何に・なぜ止まっているかを短く説明する。検証で落ちた実行は verdict の gaps を引く。保留中の指標報告（heldReadings）は「レビューで承認されると記録される」と伝える。
 - 着手できる仕事があり、人が進めたいと言ったら、propose_run_start で開始のカードを出す。開始したとは言わない。決めるのは人で、開始はカードが押されてから。
-- 仕事に必要なコネクタが未接続なら、道具が無いふりをして迂回したり、黙って進めたりしない。未接続であることと、それがどの仕事を止めているかを短く伝え、propose_connection で接続のカードを出す。接続したとは言わない。接続はカードから人が行う。
+- 仕事に必要なコネクタが未接続なら、道具が無いふりをして迂回したり、黙って進めたりしない。未接続であることと、それがどの仕事を止めているかを短く伝え、propose_connection で接続のカードを出す。接続したとは言わない。接続はカードから人が行う。文脈に起草の状態（起草中・テスト中・審査待ち・要対応）が付いた名前は、その進み具合も併せて伝える。
 - 実行が人の答えを待っていて（state が waiting、latestRun が awaiting_input）、人が答えを言ったら、propose_answer でその言葉をそのまま届けるカードを出す。自分で答えを作らない。
 - 状態の説明と提案までが会話の仕事。Element の状態変更や承認そのものはしない。
 
@@ -150,6 +155,16 @@ export function conversationSystemPrompt(agentName: string): string {
 function lines(items: string[], empty = "(なし)"): string {
   return items.length ? items.join("\n") : empty;
 }
+
+/** What an open draft's status says next to its connector's name in the
+ *  opening (Japanese — the context the model reads). A status outside
+ *  the table is shown as written, never hidden. */
+const CONNECTOR_DRAFT_STATE: Record<string, string> = {
+  drafting: "接続の定義を AI が起草中",
+  testing: "起草した定義をテスト中",
+  awaiting_review: "審査待ち — Space の持ち主の承認を待っている",
+  awaiting_input: "要対応 — 起草が人の答えを待っている",
+};
 
 /** Pure. The first message of a conversation: where the Strategy stands, then what the person said. */
 export function conversationOpening(ctx: ConversationContext, said: string): string {
@@ -178,8 +193,11 @@ ${ctx.definition ? `「${ctx.definition.name}」\n${ctx.definition.body.slice(0,
 ${lines(ctx.integrations.map((i) => `- ${i.name}（${i.kind}、${i.delegation === "full_delegation" ? "全委任" : "書き込みは承認制"}）`))}
 ${ctx.missingConnectors.length ? `
 ## 未接続のコネクタ
-${lines(ctx.missingConnectors.map((n) => `- ${n}`))}
-この Strategy の定義が使うコネクタのうち、まだ接続されていない（または無効な）もの。仕事がこれらを必要としたら、黙って進めず、propose_connection で接続を提案する。
+${lines(ctx.missingConnectors.map((n) => {
+  const draft = ctx.connectorDrafts.find((d) => d.name === n);
+  return `- ${n}${draft ? `（${CONNECTOR_DRAFT_STATE[draft.status] ?? draft.status}）` : ""}`;
+}))}
+この Strategy の定義が使うコネクタのうち、まだ接続されていない（または無効な）もの。仕事がこれらを必要としたら、黙って進めず、propose_connection で接続を提案する。状態が付いた名前は、接続の定義の起草が進んでいる（または審査・回答を待っている）もの。その進み具合を人に伝え、接続のカードにも起草の状態がそのまま出る。
 ` : ""}
 今日の日付: ${ctx.today}
 

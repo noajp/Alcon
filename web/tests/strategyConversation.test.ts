@@ -80,7 +80,7 @@ describe('the conversation run', () => {
   it('the opening ends with what the person said, after the separator the page strips', () => {
     const opening = conversation.conversationOpening({
       strategy: { id: 's1', name: '新規事業', description: null, intents: [{ id: 'i1', kind: 'measure', title: '売上 1 億', status: 'on_track' }], objects: [], children: [], elements: [] },
-      canEdit: true, definition: null, integrations: [], missingConnectors: [], today: '2026-11-05',
+      canEdit: true, definition: null, integrations: [], missingConnectors: [], connectorDrafts: [], today: '2026-11-05',
     }, '目的から決めたい');
     expect(opening).toContain('成功条件: 売上 1 億');
     expect(opening.endsWith(`${OPENING_SEPARATOR}目的から決めたい`)).toBe(true);
@@ -89,11 +89,28 @@ describe('the conversation run', () => {
   it('the opening names the connectors the definition needs but the Space has not connected', () => {
     const opening = conversation.conversationOpening({
       strategy: { id: 's1', name: '新規事業', description: null, intents: [], objects: [], children: [], elements: [] },
-      canEdit: true, definition: null, integrations: [], missingConnectors: ['GitHub'], today: '2026-11-05',
+      canEdit: true, definition: null, integrations: [], missingConnectors: ['GitHub'], connectorDrafts: [], today: '2026-11-05',
     }, '進めて');
     expect(opening).toContain('## 未接続のコネクタ');
     expect(opening).toContain('- GitHub');
     expect(opening).toContain('propose_connection');
+  });
+
+  it('the opening says where the AI draft for a missing connector stands', () => {
+    const opening = conversation.conversationOpening({
+      strategy: { id: 's1', name: '新規事業', description: null, intents: [], objects: [], children: [], elements: [] },
+      canEdit: true, definition: null, integrations: [], missingConnectors: ['Foo', 'Bar'],
+      connectorDrafts: [{ name: 'Foo', status: 'awaiting_review' }, { name: 'Bar', status: 'drafting' }],
+      today: '2026-11-05',
+    }, '進めて');
+    expect(opening).toContain('- Foo（審査待ち');
+    expect(opening).toContain('- Bar（接続の定義を AI が起草中）');
+    // A name with no draft keeps the plain line.
+    const plain = conversation.conversationOpening({
+      strategy: { id: 's1', name: '新規事業', description: null, intents: [], objects: [], children: [], elements: [] },
+      canEdit: true, definition: null, integrations: [], missingConnectors: ['Foo'], connectorDrafts: [], today: '2026-11-05',
+    }, '進めて');
+    expect(plain).toContain('- Foo\n');
   });
 });
 
