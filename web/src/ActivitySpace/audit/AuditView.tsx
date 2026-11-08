@@ -9,6 +9,7 @@ import { useAuditSource } from './auditSource';
 import { AuditOverview } from './AuditOverview';
 import { AuditWorkflowPage } from './AuditWorkflowPage';
 import { AuditLog } from './AuditLog';
+import { AuditCredentials } from './AuditCredentials';
 
 // The Audit App: what the AI agents did in this Space's work, read from the
 // ledger the gateway writes (ADR 0044) — or, while the Space has none, from
@@ -39,6 +40,13 @@ export function AuditView({ navigation, onNavigate }: {
       onTab={next => go({ ...route, tab: next, runId: next === 'runs' ? route.runId : null })}
       onOpenRun={id => go({ ...route, tab: 'runs', runId: `ledger:${id}` })}
       onCloseRun={() => go({ ...route, runId: null })} />;
+  }
+
+  if (route.view === 'credentials') {
+    // The credential trail stands apart from the ledger and the
+    // sample: it is the Space's own record, owners-only, and a run a
+    // row names opens in the log like everywhere else.
+    return <AuditCredentials spaceId={source.spaceId} onOpenRun={id => go({ view: 'log', runId: `agent:${id}` })} />;
   }
 
   if (route.view === 'log') {

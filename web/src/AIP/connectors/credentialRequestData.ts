@@ -48,6 +48,33 @@ export function useCredentialRequest(requestId: string | null) {
   };
 }
 
+/** Whether any of a conversation's capture asks still stands
+ *  (secure-login PR4): the chat hint's fact — while an ask is
+ *  pending, the composer's neighbourhood says the password belongs
+ *  in the card, not the chat (the T2 residual: a person who cannot
+ *  find the form may paste the value into the conversation instead).
+ *  Polls gently while an ask stands, like the card itself. */
+export function useAnyCredentialRequestPending(requestIds: readonly string[]): boolean {
+  const ids = [...new Set(requestIds)].sort();
+  const query = useQuery({
+    queryKey: ['credential-requests-pending', ids.join(',')],
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase
+        .from('credential_requests')
+        .select('id')
+        .in('id', ids)
+        .eq('status', 'pending')
+        .limit(1);
+      if (error) throw error;
+      return (data ?? []).length > 0;
+    },
+    enabled: ids.length > 0,
+    staleTime: 5_000,
+    refetchInterval: (q) => (q.state.data === true ? 8_000 : false),
+  });
+  return query.data === true;
+}
+
 /** Save for the token class: the value goes to the connection's
  *  existing Vault slot through set_integration_secret — no new write
  *  path — and complete_credential_request then seals the ask, which

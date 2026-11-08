@@ -5,9 +5,11 @@
 //              grants, record integrity)
 //   log        every run, newest first; `attention` narrows it to the runs
 //              that ask something of a person
+//   credentials  the credential trail (secure-login PR4): every touch of
+//              a credential in the Space, owners-only by the trail's RLS
 // A run id opens the run's steps beside the log or the workflow's runs.
 
-const AUDIT_VIEWS = ['overview', 'workflow', 'log'] as const;
+const AUDIT_VIEWS = ['overview', 'workflow', 'log', 'credentials'] as const;
 export type AuditViewId = typeof AUDIT_VIEWS[number];
 
 export type WorkflowTab = 'overview' | 'runs' | 'flow' | 'grants' | 'integrity';

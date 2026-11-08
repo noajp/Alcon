@@ -18,6 +18,7 @@ import { useDefinitions } from '@/hooks/definitionData';
 import { useIntegrations } from '@/AIP/connectors/data';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
 import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
+import { CredentialChatHint } from '@/AIP/connectors/CredentialChatHint';
 import { useIntegrationDrafts } from '@/AIP/connectors/draftData';
 import { openDraftForName } from '@/AIP/connectors/draftModel';
 import { missingConnectors, missingForWork, type ConnectorNeed } from '@/AIP/harness/installFlow';
@@ -53,6 +54,13 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
   const [input, setInput] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const items = useMemo(() => conversationItems(talk.steps), [talk.steps]);
+  // The capture asks this conversation carries: while one stands,
+  // the composer says the password belongs in its card (PR4).
+  const credentialRequestIds = useMemo(() => items.flatMap((item) => item.kind === 'agent'
+    ? item.segments.flatMap((s) => s.kind === 'work'
+      ? s.items.flatMap((w) => (w.proposal?.kind === 'credential' ? [w.proposal.requestId] : []))
+      : [])
+    : []), [items]);
   // For the proposal cards' revalidation: the Elements as they stand now,
   // and each one's latest run — a proposal is only as fresh as its press.
   const elementIds = useMemo(() => objects.flatMap((o) => (o.elements ?? []).map((e) => e.id)), [objects]);
@@ -135,6 +143,7 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
 
       <PlanCard objects={objects} onPlan={() => onPlan('')} />
 
+      <CredentialChatHint requestIds={credentialRequestIds} />
       <form onSubmit={(e) => { e.preventDefault(); submit(); }}
         className="flex items-end gap-1.5 rounded-lg border border-border/40 bg-[var(--surface-rail)] px-2 py-1.5 shadow-[var(--shadow-island)] focus-within:border-border">
         <textarea

@@ -39,6 +39,7 @@ import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { manifestFromTools, parseManifest } from "../_shared/connectorManifest.ts";
 import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
+import { recordIntegrationAuthFailure } from "../_shared/credentialUseAudit.ts";
 import { planManifestTools } from "../_shared/integrationTools.ts";
 import { planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
 
@@ -241,6 +242,14 @@ Deno.serve(async (req: Request) => {
   }
   const { error: writeErr } = await admin.from("integrations").update(patch).eq("id", integrationId);
   if (writeErr) return json({ error: "could not save the result", last_test: lastTest }, 500);
+
+  // The audit's share of a refused credential (secure-login PR4,
+  // §3.8): the test's auth failure joins the trail as test_failed,
+  // beside the last_test verdict above. Best-effort by the writer's
+  // own contract — the test's answer never waits on the record.
+  if (!lastTest.ok && lastTest.code === "auth_failed") {
+    await recordIntegrationAuthFailure(admin, { spaceId: row.activity_space_id, integrationId });
+  }
 
   // A capability someone is waiting on may have just landed: the rebuilt
   // manifest's command names are matched against the pending-capability

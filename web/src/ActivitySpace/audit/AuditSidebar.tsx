@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleAlert, LayoutDashboard, ScrollText, Workflow } from '@/ui/icons';
+import { CircleAlert, KeyRound, LayoutDashboard, ScrollText, Workflow } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToolSidebar } from '@/Function/shared/tool/ToolSidebar';
 import type { NavigationState } from '@/types/navigation';
@@ -45,6 +45,7 @@ export function AuditSidebar({ navigation, onNavigate }: {
       })) },
       { id: 'records', label: t('Records'), items: [
         { id: 'log', label: t('Audit log'), icon: ScrollText, active: route.view === 'log' && !route.attention, onClick: () => go({ view: 'log' }) },
+        { id: 'credentials', label: t('Credential history'), icon: KeyRound, active: route.view === 'credentials', onClick: () => go({ view: 'credentials' }) },
       ] },
     ]}
   />;

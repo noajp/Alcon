@@ -145,6 +145,8 @@ import {
   buildHeartbeatSnapshot, carryDigestFingerprints, digestTitleFor, fingerprintOf,
   HEARTBEAT_KIND_LABEL, type HeartbeatSignal,
 } from "../_shared/heartbeatSnapshot.ts";
+import { credentialAnomalySignals, type CredentialUseFact } from "../_shared/credentialAnomalies.ts";
+import { recordIntegrationAuthFailure, recordIntegrationUse } from "../_shared/credentialUseAudit.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
 import { captureMemories, captureScopeOf, landingWorthDistilling, loadStepTitles } from "./memoryCapture.ts";
 import { loadMemoryContext, recordMemoryUses } from "../_shared/memoryDb.ts";
@@ -686,6 +688,10 @@ async function execute(a: ExecArgs): Promise<void> {
     }).catch(() => 0);
   };
   if (run.activity_space_id) {
+    // The credential audit's name for this run's spends (secure-login
+    // PR4, §3.8): every binding this assembly creates resolves under
+    // it, so the trail can say which run spent which credential.
+    const auditUse = { spaceId: run.activity_space_id, runId: run.id };
     const { data: rows } = await userDb.from("integrations")
       .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide, updated_at, secret_id, external_account, last_test")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
@@ -750,6 +756,9 @@ async function execute(a: ExecArgs): Promise<void> {
             integrationSummary.push(downIntegration(row.name, "Google にサインインしていない（Settings › Customize でサインインが必要）"));
             continue;
           }
+          // Drive binds eagerly: the resolution itself is this slice's
+          // spend of the credential, recorded like a binding's (PR4).
+          await recordIntegrationUse(admin, { ...auditUse, integrationId: row.id });
           for (const t of DRIVE_TOOLS) {
             if (integrationDefs.length >= MAX_TOOLS) break;
             const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${t.name}`, integrationTools);
@@ -783,7 +792,7 @@ async function execute(a: ExecArgs): Promise<void> {
             integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
           };
           if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
-            offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row, { consumeStash: true }));
+            offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row, { consumeStash: true, auditUse }));
           } else {
             let refreshed: { planned: PlannedIntegrationTool[]; bound: Promise<IntegrationBinding> } | null = null;
             try {
@@ -797,6 +806,9 @@ async function execute(a: ExecArgs): Promise<void> {
               const session = new McpSession(row, secret);
               await session.initialize();
               const tools = await session.listTools();
+              // The refresh opened an authenticated session with the
+              // credential: a spend, recorded like a binding's (PR4).
+              if (secret) await recordIntegrationUse(admin, { ...auditUse, integrationId: row.id });
               refreshed = {
                 planned: planManifestTools(row, manifest, tools, integrationTools),
                 bound: Promise.resolve<IntegrationBinding>({ secret, session }),
@@ -812,6 +824,7 @@ async function execute(a: ExecArgs): Promise<void> {
               if (isAuthFailure(message)) {
                 await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: message.slice(0, 300) } }).eq("id", row.id);
                 await noteCredentialNeed(row as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
+                await recordIntegrationAuthFailure(admin, { spaceId: auditUse.spaceId, integrationId: row.id });
               }
             }
             if (refreshed) {
@@ -819,14 +832,14 @@ async function execute(a: ExecArgs): Promise<void> {
               const bound = refreshed.bound;
               offerPlanned(refreshed.planned, () => bound);
             } else if (cached) {
-              offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row, { consumeStash: true }));
+              offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row, { consumeStash: true, auditUse }));
             }
           }
         } else if (manifest) {
           // An API with a manifest: its declared commands, never a raw
           // request. The plan is pure, so the cache only saves the
           // planning; the secret binds when a call runs.
-          const bind = lazyBinding(admin, row, { consumeStash: true });
+          const bind = lazyBinding(admin, row, { consumeStash: true, auditUse });
           let planned: PlannedIntegrationTool[];
           if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
             planned = adoptPlannedTools(cached.plan, integrationTools);
@@ -842,7 +855,7 @@ async function execute(a: ExecArgs): Promise<void> {
           integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: planned.length, declared: true, guide: row.guide });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
-          integrationTools.set(name, { integration: row, remote: null, bind: lazyBinding(admin, row, { consumeStash: true }) });
+          integrationTools.set(name, { integration: row, remote: null, bind: lazyBinding(admin, row, { consumeStash: true, auditUse }) });
           integrationDefs.push({
             name,
             description: `[${row.name}] ${row.description ?? ""} の API（base: ${row.endpoint}）に HTTP リクエストを送る。GET / HEAD は読み取り、それ以外は書き込み。`.slice(0, 1024),
@@ -858,6 +871,7 @@ async function execute(a: ExecArgs): Promise<void> {
         if (isAuthFailure(message)) {
           await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: message.slice(0, 300) } }).eq("id", row.id);
           await noteCredentialNeed(row as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
+          await recordIntegrationAuthFailure(admin, { spaceId: auditUse.spaceId, integrationId: row.id });
         }
         integrationSummary.push(downIntegration(row.name, isAuthFailure(message)
           ? (row.auth_type === "oauth" ? "認証が切れている（Settings › Customize でサインインし直す必要がある）" : "認証に失敗した（Settings › Customize で認証情報を直す必要がある）")
@@ -1021,6 +1035,9 @@ async function execute(a: ExecArgs): Promise<void> {
       // run full of failing calls raises one ask.
       await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: r.text.slice(0, 300) } }).eq("id", it.integration.id);
       await noteCredentialNeed(it.integration as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
+      if (run.activity_space_id) {
+        await recordIntegrationAuthFailure(admin, { spaceId: run.activity_space_id, integrationId: it.integration.id });
+      }
     }
     if (r.verify) {
       // The read-back's outcome is a first-class entry in the run's
@@ -1317,6 +1334,13 @@ async function execute(a: ExecArgs): Promise<void> {
       } else if (outcome.code === "still_walled") {
         await setSiteCredentialLastTest(admin, target.stored.id, {
           ok: false, at: new Date().toISOString(), code: "auth_failed", detail: "the sign-in did not open the login wall",
+        }).catch(() => {});
+        // The audit's share of the same fact (PR4): the credential
+        // was proven bad, in the event vocabulary the heartbeat's
+        // repeated-failure signal counts.
+        await recordSignInUse(admin, {
+          spaceId, runId: run.id, event: "test_failed", origin: target.origin, detail: "auth_failed",
+          credential: { kind: "site", id: target.stored.id },
         }).catch(() => {});
         // A refused password is a reauth need (§3.6): the card
         // reappears for the owners, prefilled, password empty.
@@ -3427,6 +3451,35 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
     }
   }
 
+  // ── Credential anomalies (secure-login PR4) ──
+  // The credential trail is owner-readable only; the heartbeat reads
+  // as the enabling owner, so a Space whose heartbeat owner cannot
+  // read the trail yields no rows and no signals — never an error.
+  // The derivation is the shared pure one (credentialAnomalies.ts):
+  // repeated release refusals, repeated auth failures, credentials
+  // stored and never spent, one-time spends no run claimed. Like
+  // every heartbeat signal these are candidates for a telling, not
+  // an action: nothing here touches a credential.
+  const credentialUses = await guard(
+    userDb.from("credential_uses").select("id, credential_kind, integration_id, site_credential_id, event, run_id, origin, created_at")
+      .eq("activity_space_id", spaceId).order("created_at", { ascending: false }).limit(500),
+    [] as CredentialUseFact[],
+  );
+  if (credentialUses.length) {
+    const conns = await guard(
+      userDb.from("integrations").select("id, name").eq("activity_space_id", spaceId),
+      [] as { id: string; name: string }[],
+    );
+    const sites = await guard(
+      userDb.from("site_credentials").select("id, origin").eq("activity_space_id", spaceId),
+      [] as { id: string; origin: string }[],
+    );
+    signals.push(...credentialAnomalySignals(credentialUses, {
+      integrationName: new Map(conns.map((c) => [c.id, c.name])),
+      siteOrigin: new Map(sites.map((s) => [s.id, s.origin])),
+    }, new Date()));
+  }
+
   return signals;
 }
 
@@ -3734,7 +3787,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   }, admin).catch(() => null);
   if (mem) await noteMemoryUse(admin, run.id, mem.usedIds, (type, title) => bound(type, title));
   const turn: CopilotTurn = await buildCopilotTurn({
-    userDb, admin, context, supabaseUrl: a.supabaseUrl, approvalMode: turnMode,
+    userDb, admin, context, supabaseUrl: a.supabaseUrl, approvalMode: turnMode, runId: run.id,
     ...(mem ? { memories: mem.text } : {}),
     actor: { agent: COPILOT_AGENT_NAME, userId: user.id },
     events: {
