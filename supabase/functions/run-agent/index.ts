@@ -232,7 +232,10 @@ Deno.serve(async (req: Request) => {
   const conversation = !!run.strategy_id && !run.element_id;
   // A Copilot session's anchor run: driven only by decisions on the
   // approval it holds (and the continuations those set in motion).
-  const copilotRun = !!run.ai_session_id && !run.element_id && !run.strategy_id;
+  const copilotRun = (!!run.ai_session_id || run.mode === "copilot") && !run.element_id && !run.strategy_id;
+  // An anchor whose conversation was deleted keeps its record but has no
+  // turn left to continue; its approval lapses on the automations tick.
+  if (copilotRun && !run.ai_session_id) return json({ error: "この会話は削除されています。承認は期限で自動的に取り消されます。" }, 409);
   const said = typeof body.message === "string" ? body.message.trim() : "";
   if (body.message !== undefined) {
     if (!conversation) return json({ error: "この実行は会話ではありません。" }, 400);

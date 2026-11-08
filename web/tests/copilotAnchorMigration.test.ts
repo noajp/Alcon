@@ -20,13 +20,13 @@ describe('copilot anchor runs migration', () => {
     expect(migration).toContain('add column if not exists ai_session_id uuid references public.ai_sessions(id) on delete set null');
     expect(migration).toContain('agent_runs_one_open_per_session');
     expect(migration).toContain("status in (''queued'', ''running'', ''awaiting_approval'', ''paused'')");
-    expect(migration).toContain('or ai_session_id is not null');
+    expect(migration).toContain("or ai_session_id is not null or mode = ''copilot''");
     expect(migration).toContain('(select s.activity_space_id from public.ai_sessions s where s.id = new.ai_session_id)');
     expect(migration).toContain('grant insert (ai_session_id), select (ai_session_id) on public.agent_runs to authenticated');
   });
 
   it('opens the anchor only to its starter', () => {
-    expect(migration).toContain('when ai_session_id is not null then triggered_by = (select auth.uid())');
+    expect(migration).toContain("when ai_session_id is not null or mode = ''copilot'' then triggered_by = (select auth.uid())");
     expect(migration).toContain('s.user_id = (select auth.uid())');
   });
 
@@ -38,12 +38,23 @@ describe('copilot anchor runs migration', () => {
   });
 
   it("keeps an Element action's visibility exactly as it was", () => {
-    // The old policy, word for word, as the first branch of the new one:
-    // an Element's approver sees neither more nor less than before.
-    expect(migration).toContain('(element_id is not null and public.user_can_see_element(element_id))');
+    // The policy as 20261025210000 left it, word for word, as the first
+    // branch of the new one: a Domain viewer still reads an Element's
+    // approvals, and nobody sees more than before.
+    const viewerRole = read('20261025210000_domain_viewer_role.sql');
+    expect(viewerRole).toContain('using (public.user_can_read_element(element_id))');
+    expect(migration).toContain('(element_id is not null and public.user_can_read_element(element_id))');
+    expect(migration).not.toContain("public.user_can_see_element(element_id))'");
     // Non-Element runs are read through the run, never through a null Element.
     expect(migration).toContain('r.id = agent_actions.run_id and r.element_id is null');
-    expect(migration).toContain('(r.ai_session_id is not null and r.triggered_by = (select auth.uid()))');
+    expect(migration).toContain("((r.ai_session_id is not null or r.mode = ''copilot'') and r.triggered_by = (select auth.uid()))");
+  });
+
+  it('keeps an anchor whose conversation was deleted', () => {
+    // Deleting a session nulls the link; the subject check must still
+    // accept the run, or the delete itself would fail on it.
+    expect(migration).toContain('references public.ai_sessions(id) on delete set null');
+    expect(migration).toContain("or mode = ''copilot''");
   });
 
   it('links the approval into notifications for the Inbox', () => {

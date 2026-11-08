@@ -72,6 +72,8 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     const kept = await loadMessages(id);
     if (!kept) return;
     load(kept as CopilotMessage[]);
+    // A kept conversation is already filed; its saves never move it.
+    folderForNew.current = null;
     adoptSession(id);
   }, [loadMessages, load, adoptSession]);
 
@@ -95,7 +97,11 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
       ...(approvals?.length ? { approvals } : {}),
       ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
     }));
-    void saveSession(sessionId, { title: titleOf(messages), folder_id: folderForNew.current, messages: kept })
+    // The folder a new conversation was started in files it once, on its
+    // first save; later saves leave it where the person has moved it.
+    const folderId = folderForNew.current;
+    folderForNew.current = null;
+    void saveSession(sessionId, { title: titleOf(messages), folder_id: folderId, messages: kept })
       .then((id) => { if (id && id !== sessionId) adoptSession(id); });
   }, [streaming, messages, sessionId, saveSession, adoptSession]);
 

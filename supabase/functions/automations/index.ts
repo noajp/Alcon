@@ -151,9 +151,11 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
  * carry an expiry; an Element's approval blocks one task and waits.
  */
 async function expireCopilotApproval(env: Env, actionId: string, runId: string): Promise<boolean> {
-  const { data: run } = await env.admin.from("agent_runs").select("id, ai_session_id, triggered_by, transcript")
+  const { data: run } = await env.admin.from("agent_runs").select("id, mode, ai_session_id, triggered_by, transcript")
     .eq("id", runId).maybeSingle();
-  if (!run?.ai_session_id) return false;
+  // A Copilot anchor — its conversation may have been deleted since
+  // (the run stays, unlinked); its approval lapses all the same.
+  if (!run || (!run.ai_session_id && run.mode !== "copilot")) return false;
   const { data: claimed } = await env.admin.from("agent_actions").update({ status: "expired" })
     .eq("id", actionId).eq("status", "pending").select("id").maybeSingle();
   if (!claimed) return false;
@@ -169,8 +171,10 @@ async function expireCopilotApproval(env: Env, actionId: string, runId: string):
   }
   await env.admin.from("agent_runs").update({ status: "paused", summary: "承認の期限が切れました" })
     .eq("id", runId).eq("status", "awaiting_approval");
-  await updateCopilotSessionMessages(env.admin, run.ai_session_id as string, (messages) =>
-    withApprovalDecision(messages, actionId, { status: "expired" }));
+  if (run.ai_session_id) {
+    await updateCopilotSessionMessages(env.admin, run.ai_session_id as string, (messages) =>
+      withApprovalDecision(messages, actionId, { status: "expired" }));
+  }
   if (run.triggered_by) {
     await env.admin.from("notifications").insert({
       recipient_id: run.triggered_by, actor_name: COPILOT_AGENT_NAME, kind: "status_change",

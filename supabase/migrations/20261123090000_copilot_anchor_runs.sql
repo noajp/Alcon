@@ -49,10 +49,13 @@ begin
     execute 'grant insert (ai_session_id), select (ai_session_id) on public.agent_runs to authenticated';
   end if;
 
-  -- The subject check, composed of the subjects that exist here.
+  -- The subject check, composed of the subjects that exist here. An
+  -- anchor outlives its conversation: deleting the session nulls the link
+  -- (on delete set null) and the run stays, mode 'copilot', with its usage
+  -- — which the Space's monthly budget counts — and its steps.
   v_check := 'element_id is not null'
     || case when has_strategies then ' or strategy_id is not null' else '' end
-    || case when has_sessions then ' or ai_session_id is not null' else '' end;
+    || case when has_sessions then ' or ai_session_id is not null or mode = ''copilot''' else '' end;
   execute 'alter table public.agent_runs drop constraint if exists agent_runs_subject_check';
   execute 'alter table public.agent_runs add constraint agent_runs_subject_check check (' || v_check || ')';
 
@@ -77,7 +80,7 @@ begin
   -- (the session itself is nobody else's to read).
   v_using := 'case when element_id is not null then public.user_can_read_element(element_id)'
     || case when has_strategies then ' when strategy_id is not null then exists (select 1 from public.strategies s where s.id = agent_runs.strategy_id)' else '' end
-    || case when has_sessions then ' when ai_session_id is not null then triggered_by = (select auth.uid())' else '' end
+    || case when has_sessions then ' when ai_session_id is not null or mode = ''copilot'' then triggered_by = (select auth.uid())' else '' end
     || ' else false end';
   execute 'drop policy if exists agent_runs_select on public.agent_runs';
   execute 'create policy agent_runs_select on public.agent_runs for select using (' || v_using || ')';
@@ -109,13 +112,14 @@ begin
   execute 'alter table public.agent_actions add constraint agent_actions_status_check check (status in (''pending'', ''approved'', ''rejected'', ''executed'', ''failed'', ''expired''))';
 
   -- Visibility follows the run's subject. An Element's action keeps the
-  -- exact rule it has always had — its own element_id through
-  -- user_can_see_element — so nothing an Element's approver could see
-  -- changes; only a run with no Element is read through the run.
-  v_using := '(element_id is not null and public.user_can_see_element(element_id))'
+  -- exact rule it has (20261025210000: its own element_id through
+  -- user_can_read_element, so a Domain viewer reads it too) — nothing an
+  -- Element's reader could see changes; only a run with no Element is
+  -- read through the run.
+  v_using := '(element_id is not null and public.user_can_read_element(element_id))'
     || ' or exists (select 1 from public.agent_runs r where r.id = agent_actions.run_id and r.element_id is null and ('
     || case when has_strategies then '(r.strategy_id is not null and exists (select 1 from public.strategies s where s.id = r.strategy_id))' else 'false' end
-    || case when has_sessions then ' or (r.ai_session_id is not null and r.triggered_by = (select auth.uid()))' else '' end
+    || case when has_sessions then ' or ((r.ai_session_id is not null or r.mode = ''copilot'') and r.triggered_by = (select auth.uid()))' else '' end
     || '))';
   execute 'drop policy if exists agent_actions_select on public.agent_actions';
   execute 'create policy agent_actions_select on public.agent_actions for select to authenticated using (' || v_using || ')';
