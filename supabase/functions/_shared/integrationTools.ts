@@ -38,6 +38,7 @@ import {
 } from "./integrationClient.ts";
 import { isGoogleDriveRow } from "./googleOAuth.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
+import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
 import { driveOperationLabel, runDriveTool } from "./googleDrive.ts";
 import { catalogOperation, catalogTool, decideCall, isCatalogTool, summaryOf } from "./catalog.ts";
@@ -346,7 +347,7 @@ export function manifestDenyRefusal(commandName: string): string {
   return `${commandName} はこの引数では許可されていません（連携のルール）。別の引数にするか、人に頼んでください。`;
 }
 
-export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall): Promise<{ text: string; isError: boolean }> {
+export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall): Promise<{ text: string; isError: boolean; verify?: VerifyCheck }> {
   if (it.command && it.manifest && decide(it.manifest, it.command, call.input).permission === "deny") {
     return { text: manifestDenyRefusal(it.command.name), isError: true };
   }
@@ -366,7 +367,43 @@ export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall
     : it.remote && binding.session
       ? await binding.session.callTool(it.remote.name, call.input)
       : await callHttp(it.integration, binding.secret, httpInput);
-  return { text: r.text, isError: r.isError };
+  if (r.isError || !it.command?.verify || !it.manifest) return r;
+  // Manifest v2 (B2): the write declares a read-back. It runs through this
+  // same executor as the read command it names — the deny recheck above
+  // included, since a verify read is a read like any other: it cannot ask
+  // and cannot be gated. The read command carries no verify of its own
+  // (the parser forbids it), so this recursion is exactly one level deep.
+  // A failed verify never re-runs the write.
+  const manifest = it.manifest;
+  const declaration = it.command.verify;
+  const verify = await runVerifyRead({
+    manifest, declaration, writeInput: call.input, writeResultText: r.text,
+    deps: {
+      callRead: async (readCommand, input) => {
+        const readTool: IntegrationTool = {
+          ...it, command: readCommand,
+          remote: readCommand.mcp
+            ? (it.remote ? { ...it.remote, name: readCommand.mcp } : it.remote)
+            : null,
+        };
+        const rr = await executeIntegrationTool(readTool, { id: `${call.id}:verify`, name: call.name, input });
+        return { text: rr.text, isError: rr.isError };
+      },
+    },
+  });
+  if (verify.ok) return { text: r.text, isError: false, verify };
+  if (verify.unverified) {
+    // Absence of evidence is not evidence: the write stands, and the
+    // result says plainly that it stands unconfirmed.
+    return { text: `${r.text}\n（書き込み後の読み戻し確認はできませんでした: ${verify.unverified}）`, isError: false, verify };
+  }
+  // A mismatch is a fact about the world, returned as an error naming the
+  // fields (errors as useful feedback), so the caller's loop can correct
+  // the write while correction is still cheap.
+  return {
+    text: `${r.text}\n\n書き込みは実行されましたが、読み戻した状態が意図と一致しませんでした。${verifyDiffText(verify.diff ?? [])}。実際の状態を読み直して、必要なら書き込みを直してください。`,
+    isError: true, verify,
+  };
 }
 
 // ── Manifest → tools (pure) ─────────────────────────────────────────────────

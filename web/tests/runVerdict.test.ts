@@ -129,6 +129,39 @@ describe('parseRunVerdict', () => {
   });
 });
 
+describe('verdict verify accounting (B2)', () => {
+  const TALLY = { checked: 3, ok: 1, mismatched: 1, unverified: 1 };
+
+  it('seals the tally on a checked record and on an unchecked one alike', () => {
+    const checked = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, verifyTally: TALLY });
+    expect(checked.verify).toEqual(TALLY);
+    const unchecked = buildRunVerdict({ ...BASE, checkAttempted: true, verifyTally: TALLY });
+    expect(unchecked.verify).toEqual(TALLY);
+  });
+
+  it('carries nothing when no declared write ran (an empty or absent tally)', () => {
+    expect(buildRunVerdict({ ...BASE, lastCheck: CHECK }).verify).toBeUndefined();
+    expect(buildRunVerdict({ ...BASE, lastCheck: CHECK, verifyTally: { checked: 0, ok: 0, mismatched: 0, unverified: 0 } }).verify).toBeUndefined();
+    expect(buildRunVerdict({ ...BASE, lastCheck: CHECK, verifyTally: null }).verify).toBeUndefined();
+  });
+
+  it('round-trips through both parsers, and rejects an inexact tally on both', () => {
+    const built = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, verifyTally: TALLY });
+    expect(parseRunVerdict(JSON.parse(JSON.stringify(built)))).toEqual(built);
+    expect(webParseRunVerdict(JSON.parse(JSON.stringify(built)))).toEqual(built);
+    for (const bad of [
+      { ...built, verify: { checked: 3, ok: 2, mismatched: 1, unverified: 1 } }, // outcomes do not sum to the checks
+      { ...built, verify: { checked: 3, ok: 1, mismatched: 1 } },
+      { ...built, verify: { checked: -1, ok: 0, mismatched: 0, unverified: 0 } },
+      { ...built, verify: 'lots' },
+      { ...built, verify: null },
+    ]) {
+      expect(parseRunVerdict(bad)).toBeNull();
+      expect(webParseRunVerdict(bad)).toBeNull();
+    }
+  });
+});
+
 describe('parseProposedReadings', () => {
   const good = [{ measureId: 'm1', value: 42, applied: true, appliedAt: '2026-11-07T02:00:00Z', appliedBy: 'u1', heldReason: null }];
 

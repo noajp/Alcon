@@ -441,6 +441,10 @@ export interface RunVerdict {
   /** v2 only: the mechanical findings on the standing finish (≤5), kept
    *  apart from the verifier's semantic `gaps`. Absent on v1. */
   claimGaps?: string[];
+  /** v2 only, optional within it: the run's verify accounting — declared
+   *  writes read back (checked) and how each ended. Absent when no
+   *  verify-declared write ran. */
+  verify?: { checked: number; ok: number; mismatched: number; unverified: number };
 }
 
 const VERDICT_RESULTS: readonly string[] = ['pass', 'fail', 'unchecked'];
@@ -489,10 +493,21 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!count(c.total) || !count(c.sourced) || !count(c.stale)) return null;
   if ((c.sourced as number) > (c.total as number) || (c.stale as number) > (c.total as number)) return null;
   if (!Array.isArray(r.claimGaps) || !r.claimGaps.every((g) => typeof g === 'string')) return null;
-  return {
+  const withClaims: RunVerdict = {
     ...base,
     claims: { total: c.total as number, sourced: c.sourced as number, stale: c.stale as number },
     claimGaps: [...(r.claimGaps as string[])],
+  };
+  // Optional within v2, exact when present — as the server reads it.
+  if (r.verify === undefined) return withClaims;
+  const verify = r.verify;
+  if (!verify || typeof verify !== 'object' || Array.isArray(verify)) return null;
+  const vt = verify as Record<string, unknown>;
+  if (!count(vt.checked) || !count(vt.ok) || !count(vt.mismatched) || !count(vt.unverified)) return null;
+  if ((vt.ok as number) + (vt.mismatched as number) + (vt.unverified as number) !== (vt.checked as number)) return null;
+  return {
+    ...withClaims,
+    verify: { checked: vt.checked as number, ok: vt.ok as number, mismatched: vt.mismatched as number, unverified: vt.unverified as number },
   };
 }
 

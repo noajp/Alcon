@@ -263,3 +263,137 @@ describe('critical commands', () => {
     for (const f of fixtures) expect(criticalClassOfManifestCommand(f), f.name).toBe(cm.criticalClassOf(f));
   });
 });
+
+describe('manifest v2: verify and reversibility', () => {
+  const V2 = {
+    version: 2,
+    commands: [
+      { name: 'get_file', effect: 'read', mcp: 'get_file' },
+      { name: 'write_file', effect: 'write', mcp: 'write_file',
+        verify: { command: 'get_file', expect: { content: 'content', kind: 'file' }, delay_ms: 700 },
+        reversibility: 'contained' },
+      { name: 'plain_write', effect: 'write', mcp: 'plain_write' },
+      { name: 'send_mail', effect: 'write', mcp: 'send_mail' },
+    ],
+  };
+
+  it('round-trips a v2 manifest: verify and reversibility survive parsing', () => {
+    const { manifest, errors } = cm.parseManifest(V2);
+    expect(errors).toEqual([]);
+    const w = manifest.commands.find((c: { name: string }) => c.name === 'write_file');
+    expect(w.verify).toEqual({ command: 'get_file', expect: { content: 'content', kind: 'file' }, delayMs: 700 });
+    expect(w.reversibility).toBe('contained');
+    expect(manifest.commands.find((c: { name: string }) => c.name === 'plain_write').verify).toBeNull();
+  });
+
+  it('parses a v1 manifest unchanged: no verify, no reversibility, no errors', () => {
+    const { manifest, errors } = cm.parseManifest(RAW);
+    expect(errors.length).toBe(3); // the v1 fixture's own three, as before
+    for (const c of manifest.commands) {
+      expect(c.verify).toBeNull();
+      expect(c.reversibility).toBeNull();
+    }
+  });
+
+  it('clamps an over-large delay to the cap instead of failing', () => {
+    const { manifest, errors } = cm.parseManifest({
+      commands: [
+        { name: 'get_file', effect: 'read', mcp: 'get_file' },
+        { name: 'write_file', effect: 'write', mcp: 'write_file', verify: { command: 'get_file', expect: { a: 'a' }, delay_ms: 99999 } },
+      ],
+    });
+    expect(errors).toEqual([]);
+    expect(manifest.commands.find((c: { name: string }) => c.name === 'write_file').verify.delayMs).toBe(5000);
+  });
+
+  it('is a parse error for a verify to name a write command — the command is left out', () => {
+    const { manifest, errors } = cm.parseManifest({
+      commands: [
+        { name: 'get_file', effect: 'read', mcp: 'get_file' },
+        { name: 'other_write', effect: 'write', mcp: 'other_write' },
+        { name: 'write_file', effect: 'write', mcp: 'write_file', verify: { command: 'other_write', expect: { a: 'a' } } },
+        { name: 'ghost_write', effect: 'write', mcp: 'ghost_write', verify: { command: 'not_a_command', expect: { a: 'a' } } },
+      ],
+    });
+    expect(manifest.commands.map((c: { name: string }) => c.name)).toEqual(['get_file', 'other_write']);
+    expect(errors.join('\n')).toContain('verify の other_write は read のコマンドではありません');
+    expect(errors.join('\n')).toContain('verify の not_a_command は read のコマンドではありません');
+  });
+
+  it('is a parse error for a verify to sit on a read, or to be malformed', () => {
+    const onRead = cm.parseManifest({
+      commands: [
+        { name: 'get_file', effect: 'read', mcp: 'get_file' },
+        { name: 'get_other', effect: 'read', mcp: 'get_other', verify: { command: 'get_file', expect: { a: 'a' } } },
+      ],
+    });
+    expect(onRead.manifest.commands.map((c: { name: string }) => c.name)).toEqual(['get_file']);
+    expect(onRead.errors.join('\n')).toContain('verify は write のコマンドにだけ宣言できます');
+    for (const bad of [{ expect: { a: 'a' } }, { command: 'get_file' }, { command: 'get_file', expect: {} }, { command: 'get_file', expect: { a: 'a' }, delay_ms: 'soon' }, 'verify!']) {
+      const r = cm.parseManifest({
+        commands: [
+          { name: 'get_file', effect: 'read', mcp: 'get_file' },
+          { name: 'write_file', effect: 'write', mcp: 'write_file', verify: bad },
+        ],
+      });
+      expect(r.manifest.commands.map((c: { name: string }) => c.name), JSON.stringify(bad)).toEqual(['get_file']);
+      expect(r.errors.join('\n')).toContain('verify の形が読めません');
+    }
+  });
+
+  it('derives reversibility when undeclared: critical → none, other writes → wide, reads → no lane', () => {
+    const { manifest } = cm.parseManifest(V2);
+    const byName = (n: string) => manifest.commands.find((c: { name: string }) => c.name === n);
+    expect(cm.reversibilityOf(byName('write_file'))).toBe('contained'); // declared wins
+    expect(cm.reversibilityOf(byName('plain_write'))).toBe('wide');
+    expect(cm.reversibilityOf(byName('send_mail'))).toBe('none'); // send is a critical class
+    expect(cm.reversibilityOf(byName('get_file'))).toBeNull();
+    const typo = cm.parseManifest({ commands: [{ name: 'w', effect: 'write', mcp: 'w', reversibility: 'somewhat' }] }).manifest;
+    expect(cm.reversibilityOf(typo.commands[0])).toBe('wide'); // an unreadable value is absent
+  });
+
+  it('stamps the built-in GitHub declarations when a connection test rebuilds the manifest', () => {
+    const tools = [
+      { name: 'get_file_contents', readOnly: true },
+      { name: 'create_or_update_file', readOnly: false },
+      { name: 'get_pull_request', readOnly: true },
+      { name: 'create_pull_request', readOnly: false },
+    ];
+    const next = cm.manifestFromTools(tools, null);
+    const cmds = next.commands as { name: string; mcp: string; verify?: unknown; reversibility?: unknown }[];
+    const file = cmds.find((c) => c.mcp === 'create_or_update_file');
+    expect(file?.verify).toEqual({ command: 'get_file_contents', expect: { content: 'content' } });
+    expect(file?.reversibility).toBe('contained');
+    const pr = cmds.find((c) => c.mcp === 'create_pull_request');
+    expect(pr?.verify).toEqual({ command: 'get_pull_request', expect: { head: 'head', base: 'base' } });
+    expect(pr?.reversibility).toBe('contained');
+    // And what was stamped parses clean: the declaration names a read of the same manifest.
+    const { manifest, errors } = cm.parseManifest(next);
+    expect(errors).toEqual([]);
+    expect(manifest.commands.find((c: { name: string }) => c.name === 'create_or_update_file').verify?.command).toBe('get_file_contents');
+  });
+
+  it('stamps nothing when the verify target is not listed read-only by the same server', () => {
+    const next = cm.manifestFromTools([{ name: 'create_or_update_file', readOnly: false }], null);
+    const file = (next.commands as { mcp: string; verify?: unknown; reversibility?: unknown }[])[0];
+    expect(file.verify).toBeUndefined();
+    expect(file.reversibility).toBe('contained'); // the lane declaration does not depend on the read
+  });
+
+  it('keeps a stored declaration across a rebuild — the person’s verify wins over the built-in', () => {
+    const before = {
+      version: 1,
+      commands: [
+        { name: 'write_it', action: 'files.write', effect: 'write', mcp: 'create_or_update_file',
+          verify: { command: 'get_file_contents', expect: { sha: 'sha' }, delay_ms: 100 }, reversibility: 'wide' },
+      ],
+    };
+    const next = cm.manifestFromTools(
+      [{ name: 'create_or_update_file', readOnly: false }, { name: 'get_file_contents', readOnly: true }],
+      before,
+    );
+    const kept = (next.commands as { mcp: string; verify?: unknown; reversibility?: unknown }[]).find((x) => x.mcp === 'create_or_update_file');
+    expect(kept?.verify).toEqual({ command: 'get_file_contents', expect: { sha: 'sha' }, delay_ms: 100 });
+    expect(kept?.reversibility).toBe('wide');
+  });
+});

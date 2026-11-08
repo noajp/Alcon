@@ -14,8 +14,15 @@
 // each class with human outcomes separately. v1 records (written before
 // claims existed) stay readable forever; a v1 record simply has no
 // accounting, and parseRunVerdict says so by their absence.
+//
+// B2 adds the run's verify accounting to v2, likewise counted by code
+// (verifyReads.ts): how many declared writes were read back, how many
+// matched, mismatched, or could not be checked. It is optional within
+// v2 — absent when no verify-declared write ran, which is most runs —
+// because the accounting describes the run's writes, not its finish.
 
 import type { ClaimCheck } from "./finishClaims.ts";
+import type { VerifyTally } from "./verifyReads.ts";
 
 export type RunVerdictResult = "pass" | "fail" | "unchecked";
 
@@ -61,6 +68,13 @@ export interface RunVerdict {
    * Absent on v1 records.
    */
   claimGaps?: string[];
+  /**
+   * v2 only, and optional within it: the run's verify accounting —
+   * declared writes read back (checked), and how each read-back ended
+   * (ok / mismatched / unverified). Absent when no verify-declared
+   * write ran in the run.
+   */
+  verify?: VerifyTally;
 }
 
 export interface VerdictInputs {
@@ -77,12 +91,22 @@ export interface VerdictInputs {
    * because the counts describe the finish, not the check.
    */
   claimCheck: ClaimCheck;
+  /**
+   * The run's verify accounting, counted by code as its declared writes
+   * landed (verifyReads.ts). Optional: a driver with no integration
+   * writes supplies none, and the record then carries none.
+   */
+  verifyTally?: VerifyTally | null;
 }
 
 const claimFields = (input: VerdictInputs): Pick<RunVerdict, "claims" | "claimGaps"> => ({
   claims: { ...input.claimCheck.counts },
   claimGaps: input.claimCheck.gaps.slice(0, 5),
 });
+
+const verifyFields = (input: VerdictInputs): Pick<RunVerdict, "verify"> => (
+  input.verifyTally && input.verifyTally.checked > 0 ? { verify: { ...input.verifyTally } } : {}
+);
 
 const noCheck = (input: VerdictInputs, reason: RunVerdictReason): RunVerdict => ({
   v: 2,
@@ -96,6 +120,7 @@ const noCheck = (input: VerdictInputs, reason: RunVerdictReason): RunVerdict => 
   reason,
   evidence: { verifyStepIdx: null, artifactIds: [] },
   ...claimFields(input),
+  ...verifyFields(input),
 });
 
 /**
@@ -122,6 +147,7 @@ export function buildRunVerdict(input: VerdictInputs): RunVerdict {
       reason: check.pass ? null : "revisions-exhausted",
       evidence: { verifyStepIdx: check.verifyStepIdx, artifactIds: [...check.artifactIds] },
       ...claimFields(input),
+      ...verifyFields(input),
     };
   }
   // Attempted or not, from the record's side the fact is the same: the
@@ -177,9 +203,22 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!count(c.total) || !count(c.sourced) || !count(c.stale)) return null;
   if ((c.sourced as number) > (c.total as number) || (c.stale as number) > (c.total as number)) return null;
   if (!Array.isArray(r.claimGaps) || !r.claimGaps.every((g) => typeof g === "string")) return null;
-  return {
+  const withClaims: RunVerdict = {
     ...base,
     claims: { total: c.total as number, sourced: c.sourced as number, stale: c.stale as number },
     claimGaps: [...(r.claimGaps as string[])],
+  };
+  // The verify accounting is optional within v2 (absent = no declared
+  // write ran), but when present it must be exact: four counts whose
+  // outcomes sum to the checks.
+  if (r.verify === undefined) return withClaims;
+  const verify = r.verify;
+  if (!verify || typeof verify !== "object" || Array.isArray(verify)) return null;
+  const vt = verify as Record<string, unknown>;
+  if (!count(vt.checked) || !count(vt.ok) || !count(vt.mismatched) || !count(vt.unverified)) return null;
+  if ((vt.ok as number) + (vt.mismatched as number) + (vt.unverified as number) !== (vt.checked as number)) return null;
+  return {
+    ...withClaims,
+    verify: { checked: vt.checked as number, ok: vt.ok as number, mismatched: vt.mismatched as number, unverified: vt.unverified as number },
   };
 }

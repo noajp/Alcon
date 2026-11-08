@@ -94,6 +94,7 @@ import {
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
 import { checkFinishClaims, finishDetailOf, normalizeClaims, normalizeUnconfirmed, type ClaimCheck } from "../_shared/finishClaims.ts";
+import { emptyVerifyTally, tallyVerify, verifyDiffText, type VerifyCheck, type VerifyTally } from "../_shared/verifyReads.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, freshnessTableOf, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
@@ -943,7 +944,12 @@ async function execute(a: ExecArgs): Promise<void> {
     for (const s of subs ?? []) subelementIds.add(s.id as string);
   }
 
-  const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+  // The run's verify accounting (B2): every read-back a declared write
+  // carries is counted here as it lands — the tally the verdict record
+  // seals at the finish, beside the claim accounting.
+  let verifyTally: VerifyTally = emptyVerifyTally();
+
+  const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; verify?: VerifyCheck }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
     // The call itself is the shared executor (deny rules re-checked at the
@@ -951,13 +957,26 @@ async function execute(a: ExecArgs): Promise<void> {
     // the GitHub pulls it opened to this run's Element stays the run's own
     // post-step.
     const r = await executeIntegrationTool(it, call);
+    if (r.verify) {
+      // The read-back's outcome is a first-class entry in the run's
+      // trace, whatever it found — match, mismatch, or unverifiable.
+      verifyTally = tallyVerify(verifyTally, r.verify);
+      const op = operationOf(it, call.input);
+      if (r.verify.ok) {
+        await addStep(admin, run.id, "action", `読み戻し確認: ${op}`, "書き込み後の状態が意図と一致しました。");
+      } else if (r.verify.unverified) {
+        await addStep(admin, run.id, "action", `読み戻し確認ができませんでした: ${op}`, r.verify.unverified);
+      } else {
+        await addStep(admin, run.id, "action", `読み戻し確認で不一致: ${op}`, verifyDiffText(r.verify.diff ?? []));
+      }
+    }
     if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
       // The token the call ran with: bindingOf returns the binding the
       // executor just resolved (memoized on the tool for this slice).
       const binding = await bindingOf(it).catch(() => null);
       await linkOpenedPulls(r.text, binding?.secret ?? null);
     }
-    return { content: r.text, ...(r.isError ? { is_error: true } : {}) };
+    return { content: r.text, ...(r.isError ? { is_error: true } : {}), ...(r.verify ? { verify: r.verify } : {}) };
   };
 
   // A pull request the agent opened (or updated) through GitHub becomes one of
@@ -1001,7 +1020,7 @@ async function execute(a: ExecArgs): Promise<void> {
     return { content: "PC のブラウザから時間内に答えがありませんでした（PC が眠っているか、実行役が止まっている可能性）。", is_error: true };
   };
 
-  const executeCall = async (call: ToolCall, approved = false): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
+  const executeCall = async (call: ToolCall, approved = false): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload; verify?: VerifyCheck }> => {
     const input = call.input;
     switch (call.name) {
       case "record_plan": {
@@ -1529,7 +1548,7 @@ async function execute(a: ExecArgs): Promise<void> {
         liftedDisplays.push(approvalDisplayFor(call));
       }
       const r = await executeCall(call);
-      if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error);
+      if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error, r.verify);
       return r;
     },
     onUsage: recordUsage,
@@ -1556,6 +1575,7 @@ async function execute(a: ExecArgs): Promise<void> {
       const verdict = run.mode === "reply" ? null : buildRunVerdict({
         lastCheck, checkAttempted, revisions: state.revisions ?? 0, finish: outcome.finish, external,
         claimCheck: checkClaimsOf(outcome.finish),
+        verifyTally,
       });
       const sealed = await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
       // Memory: a sealed finish is distilled into episodes — the curated
@@ -3594,7 +3614,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       liftedDisplays.push(approvalDisplayForCall(turn.toolset?.tools ?? new Map(), call));
     }
     const r = await execute(call);
-    if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error);
+    if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error, r.verify);
     return r;
   };
 

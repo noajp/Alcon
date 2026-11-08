@@ -20,6 +20,7 @@ import {
   integrationPromptSection, manifestDenyRefusal, type SpaceIntegrationTools,
 } from "./integrationTools.ts";
 import { CONNECTION_PROPOSED_REPLY, PROPOSE_CONNECTION_TOOL, resolveConnectionProposal } from "./connectProposal.ts";
+import type { VerifyCheck } from "./verifyReads.ts";
 
 export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人と AI が一緒に進める運用基盤）の AI です。ユーザーの依頼を受けて、道具で Alcon のデータを読み書きし、仕事を最後までやり遂げます。
 
@@ -216,7 +217,7 @@ export async function buildCopilotTurn(args: {
     // stay "board" — the panel's catalog policy decides them, as before.
     kindOf: (name) => (toolset?.tools.has(name) ? "write" : "board"),
     needsApproval: (call) => verdictOf(call)?.final === "ask",
-    execute: async (call) => {
+    execute: async (call): Promise<{ content: string; is_error?: boolean; verify?: VerifyCheck }> => {
       const it = toolset?.tools.get(call.name);
       if (it) {
         // A deny verdict is refused here, by the policy itself, before
@@ -232,9 +233,12 @@ export async function buildCopilotTurn(args: {
         try {
           const r = await executeIntegrationTool(it, call);
           events?.onToolResult?.({ name: call.name, ok: !r.isError, error: r.isError ? r.text.slice(0, 300) : undefined });
+          // A verify read-back the call carried (B2) rides back with the
+          // result, so a caller keeping per-call records (a run's policy
+          // approvals) seals it beside the outcome.
           return r.isError
-            ? { content: JSON.stringify({ error: r.text }).slice(0, 100_000), is_error: true }
-            : { content: r.text.slice(0, 100_000) };
+            ? { content: JSON.stringify({ error: r.text }).slice(0, 100_000), is_error: true, ...(r.verify ? { verify: r.verify } : {}) }
+            : { content: r.text.slice(0, 100_000), ...(r.verify ? { verify: r.verify } : {}) };
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           events?.onToolResult?.({ name: call.name, ok: false, error: msg });
