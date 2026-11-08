@@ -182,6 +182,11 @@ export interface ActivitySpace {
   heartbeat_monthly_budget_usd?: number
   heartbeat_last_wake_at?: string | null
   heartbeat_last_tick_at?: string | null
+  /** Whether Athena distils this Space's finished work into memories.
+   *  A settings toggle (memory is internal bookkeeping, not an
+   *  approval matter); the owner or any member's screen may flip it
+   *  only where the column grant and the screen allow. */
+  memory_auto_capture?: boolean
 }
 
 export interface ActivitySpaceInsert {
@@ -207,6 +212,52 @@ export interface ActivitySpaceMember {
   user_id: string
   role: string  // 'owner' | 'member'
   created_at: string | null
+}
+
+// =====================================================
+// Memory — what one piece of work taught, kept for the next.
+// Two layers: 'episode' (auto-written after work, unreviewed, 90-day
+// life) and 'durable' (promoted, curated). The audit stays the sealed
+// whole record; a memory is the editable layer above it, always
+// linked back to its source run or session. Domain view of the
+// memories row (migration 20261129090000); the engine's twin of these
+// judgements is supabase/functions/_shared/memoryStore.ts.
+// =====================================================
+export type MemoryKind = 'event' | 'procedure' | 'fact'
+export type MemoryLayer = 'episode' | 'durable'
+export type MemoryStatus = 'active' | 'superseded' | 'archived' | 'expired'
+export type MemoryScope = 'space' | 'personal'
+export type MemoryOrigin = 'athena' | 'person'
+
+export interface Memory {
+  id: string
+  layer: MemoryLayer
+  kind: MemoryKind
+  status: MemoryStatus
+  scope: MemoryScope
+  activity_space_id: string | null
+  user_id: string | null
+  title: string
+  gist: string
+  body: string
+  topic_key: string | null
+  fingerprint: string | null
+  element_id: string | null
+  domain_id: string | null
+  strategy_id: string | null
+  integration_name: string | null
+  origin: MemoryOrigin
+  created_by: string | null
+  edited_by: string | null
+  source_run_id: string | null
+  source_session_id: string | null
+  supersedes_id: string | null
+  pinned: boolean
+  use_count: number
+  last_used_at: string | null
+  expires_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 // =====================================================
@@ -1210,6 +1261,9 @@ export type AgentRunStepType =
   // conversation itself starts and answers nothing.
   | 'start_request'
   | 'answer_request'
+  // Memory: a run kept what it learned (capture), or read what earlier
+  // work kept (retrieval, including an auto-promotion it completed).
+  | 'memory'
 
 export interface AgentRun {
   id: string

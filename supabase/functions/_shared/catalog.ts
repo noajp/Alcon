@@ -6,6 +6,7 @@ import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 import { BATCH_TOOLS, runBatchTool } from "./batchTools.ts";
 import { FILE_TOOLS, runFileTool } from "./fileTools.ts";
 import { HARNESS_TOOLS, runHarnessTool } from "./harnessTools.ts";
+import { MEMORY_TOOLS, runMemoryTool } from "./memoryTools.ts";
 import type { RunToolDef } from "./toolLoading.ts";
 
 // Every operation Alcon's AI can perform inside Alcon, in one list, with one
@@ -18,7 +19,7 @@ import type { RunToolDef } from "./toolLoading.ts";
 // Every call runs with the caller's JWT, so RLS decides what each call may
 // see and change, exactly as for that person in the app.
 
-export type ToolArea = "strategy" | "execution" | "table" | "board" | "files" | "harness";
+export type ToolArea = "strategy" | "execution" | "table" | "board" | "files" | "harness" | "memory";
 /** read: changes nothing. write: creates or changes. delete: removes. */
 export type ToolEffect = "read" | "write" | "delete";
 
@@ -31,6 +32,7 @@ const DELETES = new Set(["deleteElement", "deleteSubelement", "deleteObject", "b
 const READS = new Set([
   "listMyDomains", "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",
   "listInitiatives", "getInitiative", "getInitiativeExecution", "listFiles", "readFile", "listHarnesses", "readHarness",
+  "recall_memory",
 ]);
 
 function entries(defs: ToolDef[], area: ToolArea): CatalogTool[] {
@@ -45,6 +47,11 @@ export const CATALOG: CatalogTool[] = [
   ...entries(BATCH_TOOLS, "execution"),
   ...entries(FILE_TOOLS, "files"),
   ...entries(HARNESS_TOOLS, "harness"),
+  // Memory: recall reads in every entry; remember writes durable at a
+  // person's word, so it is offered where a conversation can carry
+  // that word (the panel, a Strategy conversation) — never to an
+  // Element's run, whose learning enters as episodes at its finish.
+  ...entries(MEMORY_TOOLS, "memory"),
   ...entries((WIDGET_TOOLS as ToolDef[]).filter((t) => t.name === "tableData"), "table"),
   ...entries((WIDGET_TOOLS as ToolDef[]).filter((t) => t.name === "widgetBoard"), "board"),
 ];
@@ -107,7 +114,7 @@ export const ENTRY_POLICIES: Record<Entry, EntryPolicy> = {
   // Elements is the Planner's (hand_to_planner).
   conversation: {
     effects: ["read"],
-    writeAreas: ["strategy", "files"],
+    writeAreas: ["strategy", "files", "memory"],
     also: ["removeIntent"],
     core: [...READ_CORE, "getInitiativeExecution", "updateInitiative", "createInitiative", "addIntent", "updateIntent", "removeIntent", "writeInitiativeDefinition", "readHarness"],
   },
@@ -176,7 +183,7 @@ export function summaryOf(description: string): string {
 export function catalogIndex(tools: (RunToolDef & { area?: ToolArea })[]): string {
   const deferred = tools.filter((t) => t.defer);
   if (!deferred.length) return "";
-  const label: Record<ToolArea, string> = { strategy: "Strategy", execution: "Execution", table: "Table", board: "ボード", files: "ファイル", harness: "ハーネス" };
+  const label: Record<ToolArea, string> = { strategy: "Strategy", execution: "Execution", table: "Table", board: "ボード", files: "ファイル", harness: "ハーネス", memory: "記憶" };
   const groups = new Map<string, string[]>();
   for (const t of deferred) {
     const g = t.area ? label[t.area] : "その他";
@@ -211,6 +218,7 @@ export async function runCatalogTool(
   try {
     if (name === "campaignMeasure") return await runMeasureTool(db, input);
     if (name === "createElements") return await runBatchTool(db, input, actor);
+    if (tool.area === "memory") return await runMemoryTool(db, name, input, actor);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(db, name, input);
     switch (tool.area) {
       case "strategy":

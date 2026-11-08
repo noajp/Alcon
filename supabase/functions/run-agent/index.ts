@@ -114,6 +114,8 @@ import {
   HEARTBEAT_KIND_LABEL, type HeartbeatSignal,
 } from "../_shared/heartbeatSnapshot.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
+import { captureMemories, captureScopeOf, landingWorthDistilling, loadStepTitles } from "./memoryCapture.ts";
+import { loadMemoryContext, recordMemoryUses } from "../_shared/memoryDb.ts";
 import { requestContent, type Attachment } from "../_shared/attachments.ts";
 
 const corsHeaders = {
@@ -402,6 +404,34 @@ async function addStep(admin: SupabaseClient, runId: string, type: string, title
   await admin.from("agent_run_steps").insert({ run_id: runId, idx, type, title: title.slice(0, 300), detail: detail ? String(detail).slice(0, 8000) : null });
   await admin.from("agent_runs").update({ step_count: idx + 1 }).eq("id", runId);
   return idx;
+}
+
+/** The memory ids a recall answer says entered the context. */
+function usedIdsOf(data: unknown): string[] {
+  if (!data || typeof data !== "object") return [];
+  const ids = (data as { usedIds?: unknown }).usedIds;
+  return Array.isArray(ids) ? ids.filter((v): v is string => typeof v === "string") : [];
+}
+
+/**
+ * Records a run's memory uses as steps on the run — the injection's
+ * bodies and a recall's — including any auto-promotion a third use
+ * completes (memoryDb). Best-effort: the bookkeeping never breaks the
+ * turn it rides on. The step writer is the driver's own, so a chat
+ * turn's steps keep their chained order.
+ */
+async function noteMemoryUse(
+  admin: SupabaseClient, runId: string, ids: string[],
+  step: (type: string, title: string) => Promise<unknown> = (type, title) => addStep(admin, runId, type, title),
+): Promise<void> {
+  if (!ids.length) return;
+  try {
+    const { recorded, promoted } = await recordMemoryUses(admin, runId, ids);
+    if (recorded) await step("memory", `記憶を参照しました（${recorded} 件）`);
+    if (promoted.length) await step("memory", `よく使う記憶を durable に昇格しました: ${promoted.join("、")}`);
+  } catch (e) {
+    console.error("run-agent: memory use recording failed", e instanceof Error ? e.message : e);
+  }
 }
 
 /** Rewrites one step in place — a chat draft step becoming the reply it
@@ -1000,6 +1030,8 @@ async function execute(a: ExecArgs): Promise<void> {
     if (baseKindOf(call.name) === "board") {
       const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved });
       await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
+      // A recall's bodies count as uses of those memories (PR3).
+      if (call.name === "recall_memory" && r.ok) await noteMemoryUse(admin, run.id, usedIdsOf(r.data));
       return r.ok ? { content: JSON.stringify(r.data).slice(0, 20_000) } : { content: r.error, is_error: true };
     }
     const it = integrationTools.get(call.name);
@@ -1033,7 +1065,10 @@ async function execute(a: ExecArgs): Promise<void> {
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
   } else {
-    const task = taskMessage(await loadContext(userDb, run, integrationSummary, recordScope ? await strategyTableLines(userDb, recordScope.strategyId) : null, boundMeasures));
+    const ctx = await loadContext(userDb, run, integrationSummary, recordScope ? await strategyTableLines(userDb, recordScope.strategyId) : null, boundMeasures);
+    const task = taskMessage(ctx);
+    // The injected bodies count as uses of those memories (PR3).
+    if (ctx.memoryUsedIds?.length) await noteMemoryUse(admin, run.id, ctx.memoryUsedIds);
     const defText = definition && parsedAll
       ? definition.scope === "element"
         ? definitionPrompt(definition.name, definition.body, parsedAll)
@@ -1306,7 +1341,31 @@ async function execute(a: ExecArgs): Promise<void> {
       const verdict = run.mode === "reply" ? null : buildRunVerdict({
         lastCheck, checkAttempted, revisions: state.revisions ?? 0, finish: outcome.finish, external,
       });
-      await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
+      const sealed = await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
+      // Memory: a sealed finish is distilled into episodes — the curated
+      // layer above this run's sealed record. Best-effort by construction
+      // (capture never throws); a run stopped meanwhile (not sealed)
+      // teaches nothing, and an external-provider run is skipped (the
+      // distillation calls are Anthropic-shaped).
+      if (sealed) {
+        const { data: el } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
+        await captureMemories({
+          admin, userId: user.id,
+          scope: captureScopeOf(run.activity_space_id), spaceId: run.activity_space_id,
+          material: {
+            finishSummary: outcome.finish.summary, finishMessage: outcome.finish.message,
+            stepTitles: await loadStepTitles(admin, run.id),
+            verdictGaps: verdict?.gaps ?? [],
+            integrationNames: integrationSummary.filter((i) => !i.down).map((i) => i.name),
+            subjectTitle: el?.title ?? null, subjectDescription: el?.description ?? null,
+          },
+          call: external ? null : { client: modelClient, model, recordUsage },
+          budgetOk: spentBefore + usage.cost < budget && usage.cost < runCap,
+          sourceRunId: run.id, sourceSessionId: null,
+          links: { elementId: run.element_id, domainId: run.domain_id, strategyId: recordScope?.strategyId ?? null },
+          noteKept: async (titles) => { await addStep(admin, run.id, "memory", `記憶に残しました: ${titles.join("、")}`); },
+        });
+      }
       return;
     }
 
@@ -1402,6 +1461,18 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     if (said) state.messages.push({ role: "user", content: said });
   } else {
     const ctx = await loadConversationContext(userDb, run, strategyId, user.id);
+    // Memory (PR3): what past work taught, relevant to this Strategy
+    // and what was just said — the opening carries it, and the bodies
+    // count as uses. Funnelled through loadMemoryContext, as at every
+    // entry, so retrieval switches off in one place.
+    const mem = await loadMemoryContext(userDb, {
+      query: [ctx.strategy.name, said].join(" "),
+      spaceId: run.activity_space_id, elementId: null,
+    }).catch(() => null);
+    if (mem) {
+      ctx.memories = mem.text;
+      await noteMemoryUse(admin, run.id, mem.usedIds);
+    }
     state = { messages: [{ role: "user", content: conversationOpening(ctx, said) }], turns: 0, nudges: 0 };
     await addStep(admin, run.id, "status", "会話を開始", `${agentName} / ${config.modelLabel}`);
   }
@@ -1417,6 +1488,9 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
   };
   await saveTranscript();
 
+  // This turn's substantive tool work — the landing capture's
+  // threshold (memoryCapture.landingWorthDistilling) counts it.
+  let toolCallsThisTurn = 0;
   const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
     if (call.name === PLANNER_TOOL.name) {
       const guidance = String(call.input.guidance ?? "").trim().slice(0, 4000);
@@ -1475,10 +1549,13 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
       await addStep(admin, run.id, "answer_request", "実行への答えを提案しました", detail);
       return { content: "会話に「答えを送る」カードを出しました。人が押すと Web がその言葉を実行へ送ります。送ったとは言わないでください。" };
     }
+    toolCallsThisTurn += 1;
     const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "conversation" });
     const writes = (catalogTool(call.name)?.effect ?? "read") !== "read";
     // The page draws the conversation from these steps: what was done, about what, and whether it failed.
     await addStep(admin, run.id, !r.ok ? "error" : writes ? "write" : "action", `Alcon: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);
+    // A recall's bodies count as uses of those memories (PR3).
+    if (call.name === "recall_memory" && r.ok) await noteMemoryUse(admin, run.id, usedIdsOf(r.data));
     return r.ok ? { content: JSON.stringify(r.data).slice(0, 20_000) } : { content: r.error, is_error: true };
   };
 
@@ -1544,6 +1621,27 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     case "finished":
       await wait(outcome.finish.summary);
       await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+      // Memory: a landed turn that did real tool work is distilled the
+      // same way a run's finish is — scope follows the conversation's
+      // own boundary (its Space, or the person when it has none).
+      if (landingWorthDistilling(toolCallsThisTurn)) {
+        const { data: strategy } = await userDb.from("strategies").select("name").eq("id", strategyId).maybeSingle();
+        await captureMemories({
+          admin, userId: user.id,
+          scope: captureScopeOf(run.activity_space_id), spaceId: run.activity_space_id,
+          material: {
+            finishSummary: outcome.finish.summary, finishMessage: outcome.finish.message,
+            stepTitles: await loadStepTitles(admin, run.id),
+            verdictGaps: [], integrationNames: [],
+            subjectTitle: strategy?.name ?? null, subjectDescription: null, personSaid: said || null,
+          },
+          call: { client: modelClient, model, recordUsage },
+          budgetOk: spentBefore + usage.cost < budget && usage.cost < MAX_RUN_COST_USD,
+          sourceRunId: run.id, sourceSessionId: null,
+          links: { strategyId },
+          noteKept: async (titles) => { await addStep(admin, run.id, "memory", `記憶に残しました: ${titles.join("、")}`); },
+        });
+      }
       return;
     case "yield": {
       // The answer is still being worked out: the next slice carries on.
@@ -2455,8 +2553,17 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   const stepLater = (type: string, title: string, detail?: string | null) => {
     stepChain = stepChain.then(() => bound(type, title, detail));
   };
+  // Memory (PR3): what past work taught, relevant to where the person
+  // is and what they just said. The turn's context block carries it
+  // (never the cached prompt); the bodies count as uses of the run.
+  const mem = await loadMemoryContext(userDb, {
+    query: said,
+    spaceId: context.spaceId ?? run.activity_space_id, elementId: context.elementId ?? null,
+  }).catch(() => null);
+  if (mem) await noteMemoryUse(admin, run.id, mem.usedIds, (type, title) => bound(type, title));
   const turn: CopilotTurn = await buildCopilotTurn({
     userDb, admin, context, supabaseUrl: a.supabaseUrl, approvalMode: turnMode,
+    ...(mem ? { memories: mem.text } : {}),
     actor: { agent: COPILOT_AGENT_NAME, userId: user.id },
     events: {
       onToolResult: (r) => {
@@ -2481,9 +2588,20 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       },
     },
   });
+  // This turn's tool work — the landing capture's threshold counts it.
+  let toolCallsThisTurn = 0;
   const execute = async (call: ToolCall) => {
+    toolCallsThisTurn += 1;
     callInputs.push({ name: call.name, input: call.input });
-    return turn.execute(call);
+    const r = await turn.execute(call);
+    // A recall's bodies count as uses of those memories (PR3): the
+    // answer's JSON carries the ids its bodies came from.
+    if (call.name === "recall_memory" && !r.is_error) {
+      try {
+        await noteMemoryUse(admin, run.id, usedIdsOf(JSON.parse(r.content)), (type, title) => bound(type, title));
+      } catch { /* a recall's bookkeeping never breaks the turn */ }
+    }
+    return r;
   };
   const displaysFor = (calls: ToolCall[]) => displaysUnderMode(calls.map((c) => approvalDisplayForCall(turn.toolset?.tools ?? new Map(), c)), turnMode);
 
@@ -2747,6 +2865,26 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       // its draft into the reply.
       await rest("awaiting_input", outcome.finish.summary);
       await notifyDone(outcome.finish.summary);
+      // Memory: a landed chat turn that did real tool work is distilled,
+      // with the session's own boundary as its scope (the view context
+      // only links the memories to what they were about).
+      if (landingWorthDistilling(toolCallsThisTurn)) {
+        await captureMemories({
+          admin, userId: user.id,
+          scope: captureScopeOf(run.activity_space_id), spaceId: run.activity_space_id,
+          material: {
+            finishSummary: outcome.finish.summary, finishMessage: text,
+            stepTitles: await loadStepTitles(admin, run.id),
+            verdictGaps: [], integrationNames: [],
+            subjectTitle: null, subjectDescription: null, personSaid: said || null,
+          },
+          call: { client: modelClient, model: DEFAULT_AGENT_MODEL, recordUsage },
+          budgetOk: spentBefore + usage.cost < budget && usage.cost < MAX_RUN_COST_USD,
+          sourceRunId: run.id, sourceSessionId: sessionId,
+          links: { elementId: context.elementId ?? null, strategyId: context.strategyId ?? null },
+          noteKept: async (titles) => { await bound("memory", `記憶に残しました: ${titles.join("、")}`); },
+        });
+      }
       return;
     }
     case "approval": {
@@ -2871,11 +3009,11 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
   };
 }
 
-async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: FinishPayload, status?: "paused", verdict?: RunVerdict | null, bound?: readonly BoundMeasure[]) {
+async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: FinishPayload, status?: "paused", verdict?: RunVerdict | null, bound?: readonly BoundMeasure[]): Promise<boolean> {
   const { admin, userDb, user } = a;
   // A run stopped meanwhile stays stopped, and says nothing.
   const { data: live } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
-  if (live?.status !== "running") return;
+  if (live?.status !== "running") return false;
 
   // Under a Strategy that lets its AI work go on ('auto'), work that passed
   // the verifier is done and unblocks the next; otherwise it waits for review.
@@ -2923,7 +3061,7 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     ...(verdict ? { verdict } : {}),
     ...(proposals ? { proposed_readings: proposals } : {}),
   }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
-  if (!closed) return;
+  if (!closed) return false;
 
   const label = finish.outcome === "blocked" ? "対応が必要です"
     : run.mode === "reply" ? "返信"
@@ -2957,6 +3095,7 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
       console.error("run-agent: advance failed", errorMessage(e));
     }
   }
+  return true;
 }
 
 /**
@@ -3197,7 +3336,7 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
       initiatives.push({ name: d.name, description: d.description, intents: (d.intents ?? []).slice(0, 12) });
     }
   }
-  return {
+  const ctx: TaskContext = {
     mode: run.mode === "reply" ? "reply" : "execute",
     prompt: run.prompt,
     element: {
@@ -3218,4 +3357,15 @@ async function loadContext(userDb: SupabaseClient, run: Run, integrations: TaskC
     tables,
     today: new Date().toISOString().slice(0, 10),
   };
+  // Memory (PR3): what past work taught, relevant to this Element. Read
+  // through the person's client (RLS is the scope) and funnelled
+  // through loadMemoryContext, so retrieval can be switched off at
+  // this one call site without touching capture. A failure here is a
+  // run without memories, never a failed run.
+  const mem = await loadMemoryContext(userDb, {
+    query: [el.title, el.description ?? ""].join(" "),
+    spaceId: run.activity_space_id, elementId: run.element_id,
+  }).catch(() => null);
+  if (mem) { ctx.memories = mem.text; ctx.memoryUsedIds = mem.usedIds; }
+  return ctx;
 }

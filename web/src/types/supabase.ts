@@ -67,6 +67,7 @@ export type Database = {
           id: string
           identifier: string | null
           logo: string | null
+          memory_auto_capture: boolean
           name: string
           order_index: number
           scope: string
@@ -93,6 +94,7 @@ export type Database = {
           id?: string
           identifier?: string | null
           logo?: string | null
+          memory_auto_capture?: boolean
           name: string
           order_index?: number
           scope?: string
@@ -119,6 +121,7 @@ export type Database = {
           id?: string
           identifier?: string | null
           logo?: string | null
+          memory_auto_capture?: boolean
           name?: string
           order_index?: number
           scope?: string
@@ -3662,6 +3665,151 @@ export type Database = {
           },
         ]
       }
+      memories: {
+        Row: {
+          activity_space_id: string | null
+          body: string
+          created_at: string
+          created_by: string | null
+          domain_id: string | null
+          edited_by: string | null
+          element_id: string | null
+          expires_at: string | null
+          fingerprint: string | null
+          gist: string
+          id: string
+          integration_name: string | null
+          kind: string
+          last_used_at: string | null
+          layer: string
+          origin: string
+          pinned: boolean
+          scope: string
+          search_text: string
+          source_run_id: string | null
+          source_session_id: string | null
+          status: string
+          strategy_id: string | null
+          supersedes_id: string | null
+          title: string
+          topic_key: string | null
+          updated_at: string
+          use_count: number
+          user_id: string | null
+        }
+        Insert: {
+          activity_space_id?: string | null
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          domain_id?: string | null
+          edited_by?: string | null
+          element_id?: string | null
+          expires_at?: string | null
+          fingerprint?: string | null
+          gist?: string
+          id?: string
+          integration_name?: string | null
+          kind?: string
+          last_used_at?: string | null
+          layer?: string
+          origin?: string
+          pinned?: boolean
+          scope: string
+          source_run_id?: string | null
+          source_session_id?: string | null
+          status?: string
+          strategy_id?: string | null
+          supersedes_id?: string | null
+          title: string
+          topic_key?: string | null
+          updated_at?: string
+          use_count?: number
+          user_id?: string | null
+        }
+        Update: {
+          activity_space_id?: string | null
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          domain_id?: string | null
+          edited_by?: string | null
+          element_id?: string | null
+          expires_at?: string | null
+          fingerprint?: string | null
+          gist?: string
+          id?: string
+          integration_name?: string | null
+          kind?: string
+          last_used_at?: string | null
+          layer?: string
+          origin?: string
+          pinned?: boolean
+          scope?: string
+          source_run_id?: string | null
+          source_session_id?: string | null
+          status?: string
+          strategy_id?: string | null
+          supersedes_id?: string | null
+          title?: string
+          topic_key?: string | null
+          updated_at?: string
+          use_count?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memories_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memories_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "memories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memory_uses: {
+        Row: {
+          created_at: string
+          id: string
+          memory_id: string
+          run_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          memory_id: string
+          run_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          memory_id?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memory_uses_memory_id_fkey"
+            columns: ["memory_id"]
+            isOneToOne: false
+            referencedRelation: "memories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memory_uses_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       note_contents: {
         Row: {
           html: string | null
@@ -4361,6 +4509,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string
+          memory_auto_capture: boolean
           updated_at: string | null
         }
         Insert: {
@@ -4369,6 +4518,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id: string
+          memory_auto_capture?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -4377,6 +4527,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          memory_auto_capture?: boolean
           updated_at?: string | null
         }
         Relationships: []
@@ -6024,6 +6175,38 @@ export type Database = {
           owner_label: string
           snippet: string
           strategy_id: string
+        }[]
+      }
+      search_memories: {
+        Args: {
+          p_element_id?: string | null
+          p_limit?: number
+          p_query: string
+          p_space_id?: string | null
+        }
+        Returns: {
+          activity_space_id: string | null
+          body: string
+          created_at: string
+          created_by: string | null
+          domain_id: string | null
+          element_id: string | null
+          gist: string
+          id: string
+          integration_name: string | null
+          kind: string
+          last_used_at: string | null
+          layer: string
+          origin: string
+          pinned: boolean
+          score: number
+          scope: string
+          status: string
+          strategy_id: string | null
+          title: string
+          topic_key: string | null
+          use_count: number
+          user_id: string | null
         }[]
       }
       set_domain_member_role: {

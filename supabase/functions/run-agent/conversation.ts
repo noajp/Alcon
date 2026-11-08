@@ -112,6 +112,10 @@ export interface ConversationContext {
    *  waits for its review or for a person's answer — by the name the
    *  definition wrote, with the draft's status. */
   connectorDrafts: { name: string; status: string }[];
+  /** Memory (PR3): the rendered memory section for this Strategy's
+   *  conversation, appended to the opening. Absent when nothing is
+   *  remembered. */
+  memories?: string;
   today: string;
 }
 
@@ -198,7 +202,7 @@ ${lines(ctx.missingConnectors.map((n) => {
   return `- ${n}${draft ? `（${CONNECTOR_DRAFT_STATE[draft.status] ?? draft.status}）` : ""}`;
 }))}
 この Strategy の定義が使うコネクタのうち、まだ接続されていない（または無効な）もの。仕事がこれらを必要としたら、黙って進めず、propose_connection で接続を提案する。状態が付いた名前は、接続の定義の起草が進んでいる（または審査・回答を待っている）もの。その進み具合を人に伝え、接続のカードにも起草の状態がそのまま出る。
-` : ""}
+` : ""}${ctx.memories ? `\n${ctx.memories}\n` : ""}
 今日の日付: ${ctx.today}
 
 ---

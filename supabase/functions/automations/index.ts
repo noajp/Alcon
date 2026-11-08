@@ -13,7 +13,8 @@
 //                                      expire), and AI-drafted connections
 //                                      whose review window ran out (G4).
 //                                      The same tick fires Space heartbeats
-//                                      whose wake is due.
+//                                      whose wake is due, and retires memory
+//                                      episodes whose 90 days ran out.
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -347,6 +348,23 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: could not expire draft", row.id, e instanceof Error ? e.message : e);
     }
   }
+  // Memory episodes whose 90 days ran out: an unpinned episode expires.
+  // It leaves retrieval (search reads active rows only) but stays on
+  // the record as expired, so where a memory came from is never lost
+  // with the memory. Pinned episodes and everything durable are the
+  // sweep's to leave alone — a pin is a person's word to keep it.
+  let episodesExpired = 0;
+  const { data: staleEpisodes } = await env.admin.from("memories").select("id")
+    .eq("layer", "episode").eq("status", "active").eq("pinned", false)
+    .not("expires_at", "is", null).lt("expires_at", now.toISOString())
+    .limit(50);
+  for (const row of staleEpisodes ?? []) {
+    const { data: moved } = await env.admin.from("memories")
+      .update({ status: "expired", updated_at: now.toISOString() })
+      .eq("id", row.id as string).eq("status", "active").eq("pinned", false)
+      .select("id").maybeSingle();
+    if (moved) episodesExpired += 1;
+  }
   // Heartbeats whose wake is due. The tick's arrival is stamped on
   // every enabled Space first: the pg_cron registration is per
   // environment, and this stamp is how the settings screen can say
@@ -386,7 +404,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {
