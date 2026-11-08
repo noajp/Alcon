@@ -49,6 +49,17 @@ export type Database = {
         Row: {
           ai_monthly_budget_usd: number
           approval_mode: string
+          heartbeat_cadence_minutes: number
+          heartbeat_enabled: boolean
+          heartbeat_last_tick_at: string | null
+          heartbeat_last_wake_at: string | null
+          heartbeat_monthly_budget_usd: number
+          heartbeat_next_at: string | null
+          heartbeat_notify_after_hours: number
+          heartbeat_owner_id: string | null
+          heartbeat_quiet_end: string | null
+          heartbeat_quiet_start: string | null
+          heartbeat_timezone: string
           color: string | null
           created_at: string
           created_by: string
@@ -64,6 +75,17 @@ export type Database = {
         Insert: {
           ai_monthly_budget_usd?: number
           approval_mode?: string
+          heartbeat_cadence_minutes?: number
+          heartbeat_enabled?: boolean
+          heartbeat_last_tick_at?: string | null
+          heartbeat_last_wake_at?: string | null
+          heartbeat_monthly_budget_usd?: number
+          heartbeat_next_at?: string | null
+          heartbeat_notify_after_hours?: number
+          heartbeat_owner_id?: string | null
+          heartbeat_quiet_end?: string | null
+          heartbeat_quiet_start?: string | null
+          heartbeat_timezone?: string
           color?: string | null
           created_at?: string
           created_by?: string
@@ -79,6 +101,17 @@ export type Database = {
         Update: {
           ai_monthly_budget_usd?: number
           approval_mode?: string
+          heartbeat_cadence_minutes?: number
+          heartbeat_enabled?: boolean
+          heartbeat_last_tick_at?: string | null
+          heartbeat_last_wake_at?: string | null
+          heartbeat_monthly_budget_usd?: number
+          heartbeat_next_at?: string | null
+          heartbeat_notify_after_hours?: number
+          heartbeat_owner_id?: string | null
+          heartbeat_quiet_end?: string | null
+          heartbeat_quiet_start?: string | null
+          heartbeat_timezone?: string
           color?: string | null
           created_at?: string
           created_by?: string
@@ -3738,6 +3771,7 @@ export type Database = {
           actor_id: string | null
           actor_name: string | null
           agent_action_id: string | null
+          agent_run_id: string | null
           body: string | null
           comment_id: string | null
           created_at: string
@@ -3760,6 +3794,7 @@ export type Database = {
           actor_id?: string | null
           actor_name?: string | null
           agent_action_id?: string | null
+          agent_run_id?: string | null
           body?: string | null
           comment_id?: string | null
           created_at?: string
@@ -3782,6 +3817,7 @@ export type Database = {
           actor_id?: string | null
           actor_name?: string | null
           agent_action_id?: string | null
+          agent_run_id?: string | null
           body?: string | null
           comment_id?: string | null
           created_at?: string
@@ -6014,6 +6050,19 @@ export type Database = {
       set_space_approval_mode: {
         Args: { p_mode: string; p_space_id: string }
         Returns: string
+      }
+      set_space_heartbeat: {
+        Args: {
+          p_cadence_minutes: number
+          p_enabled: boolean
+          p_monthly_budget_usd: number
+          p_notify_after_hours: number
+          p_quiet_end: string | null
+          p_quiet_start: string | null
+          p_space_id: string
+          p_timezone: string
+        }
+        Returns: boolean
       }
       space_ai_spend_this_month: {
         Args: { p_space_id: string }

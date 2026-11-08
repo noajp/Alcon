@@ -168,6 +168,20 @@ export interface ActivitySpace {
   scope?: 'audit' | 'full'
   /** How Athena's writes are held in this Space: 'ask' every write, 'auto' critical only, 'free' none (policy approvals). */
   approval_mode?: 'ask' | 'auto' | 'free'
+  /** The Space's heartbeat: whether Athena wakes on a cadence to raise
+   *  what has been left waiting, and as whom. Changed only through the
+   *  set_space_heartbeat RPC (owner only). */
+  heartbeat_enabled?: boolean
+  heartbeat_owner_id?: string | null
+  heartbeat_cadence_minutes?: number
+  heartbeat_next_at?: string | null
+  heartbeat_timezone?: string
+  heartbeat_quiet_start?: string | null
+  heartbeat_quiet_end?: string | null
+  heartbeat_notify_after_hours?: number
+  heartbeat_monthly_budget_usd?: number
+  heartbeat_last_wake_at?: string | null
+  heartbeat_last_tick_at?: string | null
 }
 
 export interface ActivitySpaceInsert {
@@ -1095,6 +1109,7 @@ export type NotificationKind =
   | 'invite'
   | 'asset_announced'
   | 'measure_missed'
+  | 'heartbeat'
 
 export interface Notification {
   id: string
@@ -1118,6 +1133,8 @@ export interface Notification {
   workflow_approval_id?: string | null
   /** The agent approval an 'approval_requested' notification is about, when it has no Element (a Copilot session's). */
   agent_action_id?: string | null
+  /** The heartbeat wake a 'heartbeat' digest came from; its run record is the digest's detail. */
+  agent_run_id?: string | null
   /** The AI-drafted connection an 'approval_requested' notification is about (G4). */
   integration_draft_id?: string | null
   title: string
@@ -1169,7 +1186,7 @@ export type AgentRunStatus =
   | 'failed'
   | 'cancelled'
 
-export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot' | 'draft'
+export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot' | 'draft' | 'heartbeat'
 
 export type AgentRunStepType =
   | 'plan'
