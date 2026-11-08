@@ -18,7 +18,13 @@
 //                                      same tick settles promotion drafts
 //                                      whose rehearsal run has finished
 //                                      (into review, back to drafting, or
-//                                      failed at the revision cap).
+//                                      failed at the revision cap). The
+//                                      same tick collects outcome records
+//                                      for finished runs (B4): the machine
+//                                      half from each run's sealed record,
+//                                      the human signal from the acts that
+//                                      already exist, and the rollups —
+//                                      measurement only, no behavior.
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -44,6 +50,7 @@ import { COPILOT_AGENT_NAME, updateCopilotSessionMessages } from "../_shared/cop
 import { deleteStagedRow, loadDraft, transitionDraft } from "../_shared/integrationDrafts.ts";
 import { loadPromotionDraft, transitionPromotionDraft } from "../_shared/promotionDrafts.ts";
 import { settlePromotionRehearsal } from "../_shared/promotionTest.ts";
+import { collectOutcomes } from "../_shared/outcomeCollector.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -417,6 +424,19 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: could not expire promotion", row.id, e instanceof Error ? e.message : e);
     }
   }
+  // Outcome records (B4): every finished run leaves one, pairing the
+  // machine's judgement with what the human eventually did. The
+  // collector is deterministic and derives everything from sealed
+  // rows; it changes no behavior, and a quiet tick costs nothing.
+  let outcomesInserted = 0, outcomesSignalled = 0, outcomeRollups = 0;
+  try {
+    const collected = await collectOutcomes(env.admin, now);
+    outcomesInserted = collected.inserted;
+    outcomesSignalled = collected.signalled;
+    outcomeRollups = collected.rollups;
+  } catch (e) {
+    console.error("automations: outcome collection failed", e instanceof Error ? e.message : e);
+  }
   // Heartbeats whose wake is due. The tick's arrival is stamped on
   // every enabled Space first: the pg_cron registration is per
   // environment, and this stamp is how the settings screen can say
@@ -456,7 +476,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {
