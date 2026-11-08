@@ -267,6 +267,27 @@ describe('content hashes', () => {
     expect(draftStructureOfWeb(withV2 as DraftContentLike)).toEqual(cd.draftStructureOf(withV2));
     expect(await draftStructureHashWeb(withV2 as DraftContentLike)).toBe(await cd.draftStructureHash(withV2));
   });
+
+  it('binds a manifest quota into the tested structure hash (B11), never the permission hash', async () => {
+    const withQuota = JSON.parse(JSON.stringify(MANIFEST));
+    withQuota.commands[2].quota = { writes_per_hour: 3 };
+    const contentQ = { ...content, manifest: withQuota };
+    // A quota is structure — how fast the command may write — so a
+    // draft that gains or changes one is a new tested structure; it
+    // is not a permission, so the permission hash stands.
+    expect(await cd.draftStructureHash(contentQ)).not.toBe(await cd.draftStructureHash(content));
+    const moved = JSON.parse(JSON.stringify(withQuota));
+    moved.commands[2].quota = { writes_per_hour: 5 };
+    expect(await cd.draftStructureHash({ ...content, manifest: moved })).not.toBe(await cd.draftStructureHash(contentQ));
+    expect(await cd.draftPermissionHash(contentQ)).toBe(await cd.draftPermissionHash(content));
+    // A malformed quota drops the command on both sides of the twin.
+    const bad = JSON.parse(JSON.stringify(withQuota));
+    bad.commands[2].quota = { writes_per_hour: 0 };
+    expect(draftStructureOfWeb({ ...content, manifest: bad } as DraftContentLike)).toEqual(cd.draftStructureOf({ ...content, manifest: bad }));
+    // The web twin agrees on a quota-carrying manifest, field for field.
+    expect(draftStructureOfWeb(contentQ as DraftContentLike)).toEqual(cd.draftStructureOf(contentQ));
+    expect(await draftStructureHashWeb(contentQ as DraftContentLike)).toBe(await cd.draftStructureHash(contentQ));
+  });
 });
 
 describe('failure classification', () => {
