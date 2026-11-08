@@ -81,9 +81,15 @@ import { conversationKindOf, conversationOpening, conversationSystemPrompt, conv
 import { CONNECTOR_PRESET_NAMES, foldConnectorName, missingConnectorNames } from "../_shared/connectorNeeds.ts";
 import { CONNECTION_PROPOSED_REPLY, resolveConnectionProposal } from "../_shared/connectProposal.ts";
 import {
-  CREDENTIAL_REQUEST_STEP, createCredentialRequestsForNames, credentialRequestTitle, credentialStepDetail,
+  CREDENTIAL_REQUEST_STEP, createCredentialRequestsForNames, createRunnerWallCredentialRequest, createSiteReauthCredentialRequest,
+  credentialRequestTitle, credentialStepDetail, normalizeSiteOrigin,
   ensureIntegrationCredentialRequest, notifyCredentialRequestOwners, type CaptureIntegrationRow,
 } from "../_shared/credentialRequests.ts";
+import {
+  SIGN_IN_TOOL, annotateOnceUseRun, hasSignInUse, loginWallOf, onceRequestForOrigin, pairFromTakeRow, parseSitePair,
+  recordSignInUse, setSiteCredentialLastTest, signInDisplayFor, signInNeedsAsk, signInOutcomeOf, signInStepTitle,
+  signInTarget, siteCredentialRowForOrigin, supersedePendingSiteRequests, type SignInTarget, type SitePair,
+} from "../_shared/signIn.ts";
 import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
@@ -101,7 +107,7 @@ import { checkFinishClaims, finishDetailOf, normalizeClaims, normalizeUnconfirme
 import { emptyVerifyTally, tallyVerify, verifyDiffText, type VerifyCheck, type VerifyTally } from "../_shared/verifyReads.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, freshnessTableOf, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
-import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
+import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, passwordFieldOf, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, signInResultText, type RunnerRow } from "./runnerTools.ts";
 import {
   runLoop, canonicalCalls,
   type Block, type LoopState, type ToolCall, type ToolKind, type FinishPayload, type Msg,
@@ -903,6 +909,11 @@ async function execute(a: ExecArgs): Promise<void> {
   );
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
   const kindOf = (name: string): ToolKind => {
+    // A sign-in submits a form with a stored credential: an effect in
+    // the world, not a read. It is the one runner call the approval
+    // gate may hold (D6 — the ask mode's first-ever card; the gate
+    // below decides, this only lets it be asked).
+    if (name === SIGN_IN_TOOL) return "write";
     const base = baseKindOf(name);
     // A catalog tool whose calls may wait for approval (a Strategy write) goes
     // through the approval path; needsApproval decides each call.
@@ -913,9 +924,25 @@ async function execute(a: ExecArgs): Promise<void> {
     if (isRunnerTool(name) || isMachineTool(name)) return "read";
     return "write"; // decided per call below
   };
+  // Sign-in resolutions the D6 gate made for this slice's calls,
+  // keyed by call id: the card is built from the same server facts
+  // the gate judged, and the executor reuses the resolution instead
+  // of probing twice in one turn. A decided call arrives in a later
+  // invocation with an empty map — it resolves fresh and binds to
+  // the card it rode on (callSignIn).
+  const signInGate = new Map<string, SignInTarget>();
+
   /** What the approval card is told about one call — the shared builder in
    *  _shared/integrationTools.ts, so the run's card and the panel's agree. */
-  const approvalDisplayFor = (c: ToolCall): ApprovalDisplay => approvalDisplayForCall(integrationTools, c);
+  const approvalDisplayFor = (c: ToolCall): ApprovalDisplay => {
+    if (c.name === SIGN_IN_TOOL) {
+      const t = signInGate.get(c.id);
+      if (t?.stored) {
+        return signInDisplayFor(c, { origin: t.origin, username: t.stored.username, runnerName: runner?.name ?? "PC のブラウザ" });
+      }
+    }
+    return approvalDisplayForCall(integrationTools, c);
+  };
 
   // ── The approval mode, composed over the policy's verdicts ───────────
   // The verdict and the mode composition live in _shared/approvalPolicy.ts;
@@ -1037,25 +1064,282 @@ async function execute(a: ExecArgs): Promise<void> {
   };
 
   // A call to the person's PC: queued for its runner, answered within a
-  // minute or given up (the runner may have gone offline since).
-  const callRunner = async (call: ToolCall, target: RunnerRow | null, read: (result: unknown) => string): Promise<{ content: string; is_error?: boolean }> => {
-    if (!target) return { content: "この道具の実行役は今つながっていません。ほかの道具で進めるか、つながっていないことを報告してください。", is_error: true };
-    await addStep(admin, run.id, "action", runnerStep(call.name, call.input));
+  // minute or given up (the runner may have gone offline since). The
+  // queue and the wait are separate halves because a sign-in call is
+  // staged between them (its payload is armed once the call exists).
+  const queueAssetCall = async (target: RunnerRow, tool: string, input: Record<string, unknown>): Promise<{ ok: true; id: string } | { ok: false; content: string }> => {
     const { data: queued, error } = await admin.from("asset_calls")
-      .insert({ asset_id: target.id, run_id: run.id, tool: runnerOperation(call.name), input: call.input }).select("id").single();
-    if (error || !queued) return { content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}`, is_error: true };
+      .insert({ asset_id: target.id, run_id: run.id, tool, input }).select("id").single();
+    if (error || !queued) return { ok: false, content: `PC に依頼できませんでした: ${error?.message ?? "unknown"}` };
+    return { ok: true, id: queued.id as string };
+  };
+  const awaitAssetCall = async (id: string): Promise<{ ok: true; result: unknown } | { ok: false; content: string }> => {
     // A page takes seconds; the slice's soft deadline may be near, but an
     // answer thrown away costs the runner's work, so wait it out (within the
     // platform's wall clock, which the slice deadline leaves room under).
     const until = Date.now() + 45_000;
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 700));
-      const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
-      if (c?.status === "done") return { content: read(c.result) };
-      if (c?.status === "failed") return { content: `PC のブラウザで失敗しました: ${c.error ?? ""}`, is_error: true };
+      const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", id).maybeSingle();
+      if (c?.status === "done") return { ok: true, result: c.result };
+      if (c?.status === "failed") return { ok: false, content: `PC のブラウザで失敗しました: ${c.error ?? ""}` };
     }
-    await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
-    return { content: "PC のブラウザから時間内に答えがありませんでした（PC が眠っているか、実行役が止まっている可能性）。", is_error: true };
+    await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", id).in("status", ["pending", "claimed"]);
+    return { ok: false, content: "PC のブラウザから時間内に答えがありませんでした（PC が眠っているか、実行役が止まっている可能性）。" };
+  };
+
+  // A login wall the runner reported in a page result becomes a
+  // capture ask when the origin has neither a stored credential nor
+  // a one-time stash waiting — the runner-wall seam (credentialRequests.ts)
+  // judges the stored half from the row; the stash half is checked
+  // here, because a person who already handed over a one-time login
+  // needs no second ask. The origin is the runner's own report,
+  // never the model's text. Best-effort, deduped by the creator.
+  const noteSignInWall = async (result: unknown): Promise<void> => {
+    if (!run.activity_space_id) return;
+    const origin = loginWallOf(result);
+    if (!origin) return;
+    try {
+      if (await onceRequestForOrigin(admin, run.activity_space_id, origin)) return;
+      const got = await createRunnerWallCredentialRequest(admin, {
+        spaceId: run.activity_space_id, userId: user.id, origin,
+        waitingFor: "実行中の作業", runId: run.id,
+      });
+      if (!got?.created) return;
+      await addStep(admin, run.id, CREDENTIAL_REQUEST_STEP, credentialRequestTitle(origin), credentialStepDetail(got.request, origin));
+      await notifyCredentialRequestOwners(admin, {
+        spaceId: run.activity_space_id, requesterId: user.id, label: origin, waitingFor: "実行中の作業", always: true,
+      }).catch(() => 0);
+    } catch { /* the ask is a courtesy on top of the run; never its failure */ }
+  };
+
+  const callRunner = async (call: ToolCall, target: RunnerRow | null, read: (result: unknown) => string): Promise<{ content: string; is_error?: boolean }> => {
+    if (!target) return { content: "この道具の実行役は今つながっていません。ほかの道具で進めるか、つながっていないことを報告してください。", is_error: true };
+    // A pc_type step is written when the call lands, not before: only
+    // the runner can say whether the field it filled was a password
+    // field, and a step written first would carry the typed text into
+    // the record before anyone could mask it. Masked unless the
+    // runner affirmatively reported an ordinary field.
+    const deferStep = call.name === "pc_type";
+    if (!deferStep) await addStep(admin, run.id, "action", runnerStep(call.name, call.input));
+    const queued = await queueAssetCall(target, runnerOperation(call.name), call.input);
+    if (!queued.ok) return { content: queued.content, is_error: true };
+    const settled = await awaitAssetCall(queued.id);
+    if (deferStep) {
+      await addStep(admin, run.id, "action", runnerStep(call.name, call.input, settled.ok ? passwordFieldOf(settled.result) !== false : true));
+    }
+    if (!settled.ok) return { content: settled.content, is_error: true };
+    await noteSignInWall(settled.result);
+    return { content: read(settled.result) };
+  };
+
+  /**
+   * Where a sign-in would land, resolved from the runner's own mouth:
+   * a probe read of its current page (a server-issued call, not a
+   * model one), then the Space's rows for that page's origin. Null
+   * when the page's address is not a site origin at all.
+   */
+  const resolveSignInTarget = async (call: ToolCall): Promise<{ target: SignInTarget; probe: unknown } | null> => {
+    if (!runner || !run.activity_space_id) return null;
+    const queued = await queueAssetCall(runner, "read", {});
+    if (!queued.ok) return null;
+    const settled = await awaitAssetCall(queued.id);
+    if (!settled.ok) return null;
+    const probeUrl = (settled.result as { url?: unknown } | null)?.url;
+    if (typeof probeUrl !== "string" || !probeUrl) return null;
+    const origin = normalizeSiteOrigin(probeUrl);
+    if (!origin) return null;
+    const [row, onceId] = await Promise.all([
+      siteCredentialRowForOrigin(admin, run.activity_space_id, origin),
+      onceRequestForOrigin(admin, run.activity_space_id, origin),
+    ]);
+    const target = signInTarget({
+      probeUrl, probeWall: loginWallOf(settled.result) === origin, input: call.input, row, onceRequestId: onceId,
+    });
+    return target ? { target, probe: settled.result } : null;
+  };
+
+  /**
+   * pc_sign_in: the only path a stored password ever travels. The
+   * legs, in order — each one server-side, each refusal audited and
+   * shown, the value itself in none of them:
+   *
+   *   1. resolve the target from the runner's reported page;
+   *   2. the model's claimed origin, when it claims one, must equal
+   *      the page's (a mismatch is refused before any value moves);
+   *   3. a call riding a person's D6 decision must still match the
+   *      card that was approved — origin and account alike;
+   *   4. the pair is read (stored) or taken (use-once, single-take)
+   *      only now, staged in the Vault under the call's id, and the
+   *      relay delivers it at claim time into the runner's memory;
+   *   5. the outcome is written where it belongs: the audit 'used'
+   *      row, the credential's last_test, the run's step — origin
+   *      and outcome only.
+   *
+   * No credential for the page is not an error of the world's: the
+   * wall ask is raised (the runner-wall seam) and the run is told,
+   * in the PR2 pattern — the starter's Resume is the continuation.
+   */
+  const callSignIn = async (call: ToolCall, approved: boolean): Promise<{ content: string; is_error?: boolean }> => {
+    if (!runner) return { content: "この道具の実行役は今つながっていません。ほかの道具で進めるか、つながっていないことを報告してください。", is_error: true };
+    if (!run.activity_space_id) return { content: "この実行は Space のものではないため、保存されたサインイン情報は使えません。", is_error: true };
+    const spaceId = run.activity_space_id;
+    const cached = signInGate.get(call.id);
+    const resolved = cached ? { target: cached, probe: null } : await resolveSignInTarget(call).catch(() => null);
+    if (!resolved) return { content: "ブラウザの今のページを確認できませんでした。pc_read でページを見てから、もう一度試してください。", is_error: true };
+    const { target } = resolved;
+
+    const refuse = async (detail: string, stepDetail: string, content: string) => {
+      const credential = target.stored ? { kind: "site", id: target.stored.id } as const
+        : target.onceRequestId ? { kind: "once" } as const : null;
+      if (credential) {
+        await recordSignInUse(admin, {
+          spaceId, runId: run.id, event: "release_refused", origin: target.origin, detail, credential,
+        }).catch(() => {});
+      }
+      await addStep(admin, run.id, "error", `PC: サインインを拒否しました ${target.origin}`, stepDetail);
+      return { content, is_error: true as const };
+    };
+
+    // Leg 2: the claim. A model that believes it is somewhere it is
+    // not gets nothing — and the refusal, not any value, is recorded.
+    if (target.claimMismatch) {
+      return await refuse("origin_mismatch",
+        "申告されたサイトとブラウザの実際のページが一致しないため、資格情報は渡しませんでした。",
+        `サインインしませんでした: ブラウザが実際に開いているのは ${target.origin} で、申告されたサイトと一致しません。pc_read で今のページを確認してください。`);
+    }
+
+    // Leg 3: a decided call is bound to its card — the origin and
+    // the account the person saw. Either having moved since means
+    // the consent no longer names this spend.
+    if (approved) {
+      const { data: actionRows } = await admin.from("agent_actions")
+        .select("input").eq("run_id", run.id).eq("tool_use_id", call.id)
+        .order("created_at", { ascending: false }).limit(5);
+      const display = ((actionRows ?? []) as { input?: { display?: ApprovalDisplay[] } }[])
+        .map((a) => a.input?.display?.[0]).find((d) => d?.operation === "sign_in");
+      if (display) {
+        const shownUsername = display.fields.find((f) => f.label === "Username")?.value ?? null;
+        if (display.destination !== target.origin || (target.stored !== null && shownUsername !== target.stored.username)) {
+          return await refuse("approval_mismatch",
+            "承認されたサイト／アカウントと現在のページ・保存情報が一致しないため、資格情報は渡しませんでした。",
+            "承認された内容（サイト／アカウント）と現在のページ・保存情報が一致しないため、サインインしませんでした。もう一度 pc_sign_in を呼ぶと、新しい確認が出ます。");
+        }
+      }
+    }
+
+    // The wall: nothing stored, nothing stashed. Raise the ask and
+    // tell the run plainly; a person's capture is what unblocks it.
+    if (!target.stored && !target.onceRequestId) {
+      const got = await createRunnerWallCredentialRequest(admin, {
+        spaceId, userId: user.id, origin: target.origin,
+        waitingFor: "実行中の作業", runId: run.id, usernameHint: target.storedUsername,
+      }).catch(() => null);
+      if (got?.created) {
+        await addStep(admin, run.id, CREDENTIAL_REQUEST_STEP, credentialRequestTitle(target.origin), credentialStepDetail(got.request, target.origin));
+        await notifyCredentialRequestOwners(admin, {
+          spaceId, requesterId: user.id, label: target.origin, waitingFor: "実行中の作業", always: true,
+        }).catch(() => 0);
+      }
+      const page = resolved.probe ? `\n\n${runnerResultText(resolved.probe)}` : "";
+      return {
+        content: `${target.origin} へのサインイン情報はこの Space に保存されておらず、使う回数限定の預かりもありません。オーナーに資格情報の入力を求めました（この実行のカードに表示されます）。入力が済んだら、実行を再開すると続きから進めます。${page}`,
+        is_error: true,
+      };
+    }
+
+    // The call is queued before any value moves: its stored row
+    // carries only the origin the fill must match, and the relay
+    // will not deliver it until its payload is staged below.
+    const queued = await queueAssetCall(runner, runnerOperation(call.name), { origin: target.origin });
+    if (!queued.ok) return { content: queued.content, is_error: true };
+    const dropQueued = async () => {
+      await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
+    };
+
+    // Leg 4: the pair exists in this process only from here to the
+    // staging call. For a stash, the take IS the spend — it happens
+    // only now, with every leg already passed and the call already
+    // queued, so a failure from here spends nothing it cannot drop.
+    let pair: SitePair | null = null;
+    if (target.stored) {
+      const { data: secretText } = await admin.rpc("get_site_credential", { p_site_credential_id: target.stored.id });
+      pair = parseSitePair(secretText);
+      if (!pair) {
+        await dropQueued();
+        return { content: "保存されたサインイン情報を読み解けませんでした。Settings › Customize の「サイトログイン」で入れ直してください。", is_error: true };
+      }
+    } else if (target.onceRequestId) {
+      const { data: taken } = await admin.rpc("take_credential_once", { p_request_id: target.onceRequestId });
+      pair = pairFromTakeRow((taken as unknown[] ?? [])[0]);
+      if (!pair) {
+        await dropQueued();
+        return { content: "使う回数限定のサインイン情報が見つかりませんでした（期限切れか、使用済みの可能性があります）。", is_error: true };
+      }
+    }
+    if (!pair) {
+      await dropQueued();
+      return { content: "サインイン情報を用意できませんでした。", is_error: true };
+    }
+
+    // The pair is staged in the Vault under the call's id; the relay
+    // takes it — once — as it hands the call over to the runner.
+    const { error: stageError } = await admin.rpc("stage_sign_in_payload", { p_call_id: queued.id, p_pair: JSON.stringify(pair) });
+    pair = null;
+    if (stageError) {
+      await dropQueued();
+      return { content: "サインイン情報を実行役に渡せませんでした。", is_error: true };
+    }
+    const settled = await awaitAssetCall(queued.id);
+    // Burn an undelivered payload, whatever the outcome was: if the
+    // relay delivered it, this take reads nothing; if it did not,
+    // the value dies here instead of lingering past its call.
+    await admin.rpc("take_sign_in_payload", { p_call_id: queued.id }).then(() => {}, () => {});
+    if (!settled.ok) return { content: settled.content, is_error: true };
+
+    // Leg 5: the records. Audit first (D6's memory), then the
+    // credential's own state, then the run's step — origin and
+    // outcome only, in every one of them.
+    const outcome = signInOutcomeOf(settled.result);
+    const outcomeLine = outcome.code === "signed_in" ? "サインインしました"
+      : outcome.code === "still_walled" ? "ログイン画面が残りました（保存された情報が合っていない可能性があります）"
+      : outcome.code === "page_moved" ? "ページが移動していたため、入力しませんでした"
+      : outcome.code === "no_form" ? "入力欄が見つかりませんでした"
+      : outcome.code === "no_pair" ? "資格情報が届きませんでした"
+      : "サインインできませんでした";
+    if (target.stored) {
+      await recordSignInUse(admin, {
+        spaceId, runId: run.id, event: "used", origin: target.origin, detail: outcome.code,
+        credential: { kind: "site", id: target.stored.id },
+      }).catch(() => {});
+      if (outcome.ok) {
+        await setSiteCredentialLastTest(admin, target.stored.id, { ok: true, at: new Date().toISOString() }).catch(() => {});
+      } else if (outcome.code === "still_walled") {
+        await setSiteCredentialLastTest(admin, target.stored.id, {
+          ok: false, at: new Date().toISOString(), code: "auth_failed", detail: "the sign-in did not open the login wall",
+        }).catch(() => {});
+        // A refused password is a reauth need (§3.6): the card
+        // reappears for the owners, prefilled, password empty.
+        const got = await createSiteReauthCredentialRequest(admin, {
+          spaceId, userId: user.id, origin: target.origin, siteCredentialId: target.stored.id,
+          username: target.stored.username, waitingFor: "実行中の作業", runId: run.id,
+        }).catch(() => null);
+        if (got?.created) {
+          await addStep(admin, run.id, CREDENTIAL_REQUEST_STEP, credentialRequestTitle(target.origin), credentialStepDetail(got.request, target.origin));
+          await notifyCredentialRequestOwners(admin, {
+            spaceId, requesterId: user.id, label: target.origin, waitingFor: "実行中の作業", always: true,
+          }).catch(() => 0);
+        }
+      }
+    } else if (target.onceRequestId) {
+      // The take already wrote the 'used' row; name its run on it.
+      await annotateOnceUseRun(admin, target.onceRequestId, run.id).catch(() => {});
+    }
+    if (outcome.ok) {
+      await supersedePendingSiteRequests(admin, spaceId, target.origin).catch(() => {});
+    }
+    await addStep(admin, run.id, "action", signInStepTitle(target.origin), outcomeLine);
+    return { content: signInResultText(settled.result), ...(outcome.ok ? {} : { is_error: true }) };
   };
 
   const executeCall = async (call: ToolCall, approved = false): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload; verify?: VerifyCheck }> => {
@@ -1159,6 +1443,7 @@ async function execute(a: ExecArgs): Promise<void> {
         return { content: errorMessage(e), is_error: true };
       }
     }
+    if (call.name === SIGN_IN_TOOL) return await callSignIn(call, approved);
     if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
     if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
     if (baseKindOf(call.name) === "board") {
@@ -1235,6 +1520,9 @@ async function execute(a: ExecArgs): Promise<void> {
         return await plan("サブ要素を完了", ok, ok ? null : "この Element のサブ要素ではありません");
       }
     }
+    // A rehearsal never signs in: the fill is a real submit on a real
+    // site, so it is planned like a machine write, never lived.
+    if (call.name === SIGN_IN_TOOL) return await plan("PC: サインイン", true, null);
     if (isRunnerTool(call.name)) return await live(call.name);
     if (isMachineTool(call.name)) return await plan(call.name, true, null);
     const it = integrationTools.get(call.name);
@@ -1526,7 +1814,27 @@ async function execute(a: ExecArgs): Promise<void> {
     kindOf,
     // A rehearsal never asks: its writes are blocked, not approved, so
     // nothing waits for a person mid-trial.
-    needsApproval: (call) => run.rehearsal ? false : verdictForCall(call).final === "ask",
+    needsApproval: async (call) => {
+      if (run.rehearsal) return false;
+      if (call.name === SIGN_IN_TOOL) {
+        // D6: only the ask mode ever holds a sign-in, and only a
+        // stored credential's first-ever use. The verdict machinery's
+        // facts cannot see this — it rests on the runner's page and
+        // the audit trail — so it is judged here, from the same
+        // server-side resolution the executor will use, and cached
+        // for the card and the call. An unreadable trail reads as
+        // never-used: when consent cannot be disproven, it is asked.
+        if (mode !== "ask" || !runner || !run.activity_space_id) return false;
+        const resolved = await resolveSignInTarget(call).catch(() => null);
+        if (!resolved) return false;
+        signInGate.set(call.id, resolved.target);
+        const usedBefore = resolved.target.stored
+          ? await hasSignInUse(admin, resolved.target.stored.id).catch(() => false)
+          : false;
+        return signInNeedsAsk({ mode, target: resolved.target, usedBefore });
+      }
+      return verdictForCall(call).final === "ask";
+    },
     execute: async (call) => {
       // The rehearsal gate stands in front of every executor: a call in
       // a rehearsal run can only ever read, plan, or keep the run's own

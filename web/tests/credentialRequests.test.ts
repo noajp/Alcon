@@ -12,6 +12,7 @@ const core = await import(new URL('../../supabase/functions/_shared/credentialRe
   ensureIntegrationCredentialRequest: (admin: unknown, args: Record<string, unknown>) => Promise<{ request: Record<string, unknown>; created: boolean } | null>;
   createCredentialRequestsForNames: (admin: unknown, args: Record<string, unknown>) => Promise<{ request: Record<string, unknown>; created: boolean; row: Record<string, unknown> }[]>;
   createRunnerWallCredentialRequest: (admin: unknown, args: Record<string, unknown>) => Promise<{ request: Record<string, unknown>; created: boolean } | null>;
+  createSiteReauthCredentialRequest: (admin: unknown, args: Record<string, unknown>) => Promise<{ request: Record<string, unknown>; created: boolean } | null>;
   takeStashedCredentialForIntegration: (admin: unknown, integrationId: string) => Promise<string | null>;
 };
 const {
@@ -276,5 +277,51 @@ describe('takeStashedCredentialForIntegration — the single take', () => {
     const value = await takeStashedCredentialForIntegration(admin, 'int-1');
     expect(value).toBeNull();
     expect(admin.rpcCalls).toEqual([]);
+  });
+});
+
+describe('createSiteReauthCredentialRequest — a refused password raises the ask again (PR3)', () => {
+  const siteRow = (over: Row = {}): Row => ({
+    id: 'sc-1', activity_space_id: 'sp-1', origin: 'https://example.com',
+    username: 'taro@example.com', secret_id: 'sec-1', ...over,
+  });
+  const args = {
+    spaceId: 'sp-1', userId: 'u-1', origin: 'https://example.com/login',
+    siteCredentialId: 'sc-1', username: 'taro@example.com', waitingFor: '実行中の作業', runId: 'run-1',
+  };
+
+  it('creates a pending site ask bound to the credential, prefilled, source reauth', async () => {
+    const state: Record<string, Row[]> = { credential_requests: [], site_credentials: [siteRow()] };
+    const admin = makeAdmin(state);
+    const got = await core.createSiteReauthCredentialRequest(admin, args);
+    expect(got?.created).toBe(true);
+    const req = state.credential_requests[0];
+    expect(req.kind).toBe('site_login');
+    expect(req.site_credential_id).toBe('sc-1');
+    expect(req.origin).toBe('https://example.com');
+    expect(req.username_hint).toBe('taro@example.com');
+    expect(req.status).toBe('pending');
+    expect((req.need as Row).source).toBe('reauth');
+    expect((req.need as Row).run_id).toBe('run-1');
+  });
+
+  it('reuses the live pending ask instead of stacking a second', async () => {
+    const state: Record<string, Row[]> = {
+      credential_requests: [{ id: 'req-old', activity_space_id: 'sp-1', kind: 'site_login', origin: 'https://example.com', status: 'pending', expires_at: FUTURE }],
+      site_credentials: [siteRow()],
+    };
+    const admin = makeAdmin(state);
+    const got = await core.createSiteReauthCredentialRequest(admin, args);
+    expect(got?.created).toBe(false);
+    expect(got?.request.id).toBe('req-old');
+    expect(state.credential_requests).toHaveLength(1);
+  });
+
+  it('a credential whose secret is gone is not a reauth — that is the wall seam\'s case', async () => {
+    const state: Record<string, Row[]> = { credential_requests: [], site_credentials: [siteRow({ secret_id: null })] };
+    const admin = makeAdmin(state);
+    const got = await core.createSiteReauthCredentialRequest(admin, args);
+    expect(got).toBeNull();
+    expect(state.credential_requests).toHaveLength(0);
   });
 });

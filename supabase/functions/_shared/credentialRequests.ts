@@ -297,6 +297,67 @@ export async function createRunnerWallCredentialRequest(
 }
 
 /**
+ * The re-auth sibling of the runner-wall seam (PR3): a stored site
+ * credential whose sign-in was refused (its last_test now reads
+ * auth_failed) becomes a capture need again — the card reappears
+ * prefilled with the locked origin and the stored username, password
+ * empty, and re-entry replaces the pair through the same RPC
+ * (design §3.6). The fact it starts from is the row itself: a row
+ * whose secret still stands but no longer opens the wall. A row
+ * with no secret is the wall seam's case, not this one's. Pending
+ * asks for the origin are reused, whichever seam raised them.
+ */
+export async function createSiteReauthCredentialRequest(
+  admin: SupabaseClient,
+  args: { spaceId: string; userId: string; origin: string; siteCredentialId: string; username: string; waitingFor: string; runId?: string | null },
+): Promise<{ request: CredentialRequestRow; created: boolean } | null> {
+  const origin = normalizeSiteOrigin(args.origin);
+  if (!origin || !args.spaceId) return null;
+  const { data: siteRows } = await admin.from("site_credentials")
+    .select("id, username, secret_id")
+    .eq("activity_space_id", args.spaceId)
+    .eq("id", args.siteCredentialId)
+    .limit(1);
+  const site = (siteRows ?? [])[0] as { id: string; username: string; secret_id: string | null } | undefined;
+  if (!site?.secret_id) return null; // no standing secret: not a re-auth, the wall seam's case
+  const now = new Date();
+  const { data: pending } = await admin.from("credential_requests")
+    .select(REQUEST_COLUMNS)
+    .eq("activity_space_id", args.spaceId)
+    .eq("kind", "site_login")
+    .eq("origin", origin)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const existing = (pending ?? [])[0] as CredentialRequestRow | undefined;
+  if (existing) {
+    if (isLive(existing, now)) return { request: existing, created: false };
+    await lapseRequest(admin, existing.id);
+  }
+  const need: Record<string, unknown> = {
+    source: "reauth",
+    waiting_for: args.waitingFor.slice(0, 300),
+    ...(args.runId ? { run_id: args.runId } : {}),
+  };
+  const expiresAt = new Date(now.getTime() + (args.runId ? RUN_REQUEST_TTL_MS : CHAT_REQUEST_TTL_MS)).toISOString();
+  const { data: inserted, error } = await admin.from("credential_requests")
+    .insert({
+      activity_space_id: args.spaceId,
+      kind: "site_login",
+      site_credential_id: site.id,
+      origin,
+      username_hint: site.username,
+      need,
+      requested_by: args.userId,
+      expires_at: expiresAt,
+    })
+    .select(REQUEST_COLUMNS)
+    .single();
+  if (error || !inserted) return null;
+  return { request: inserted as CredentialRequestRow, created: true };
+}
+
+/**
  * Tell the Space's owners a capture is needed (the owners' Inbox is
  * the notifications table). A run's need always notifies — its
  * starter may be anyone, and the saver must be an owner (D1). A chat

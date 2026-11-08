@@ -164,6 +164,28 @@ describe('agent loop', () => {
     expect(answer.content.map((r) => r.tool_use_id)).toEqual(['r', 'w1', 'w2']);
   });
 
+  it('a gate may answer from an async lookup: the write parks, nothing runs', async () => {
+    const m = scripted([{ content: [toolUse('r', 'read_inbox'), toolUse('w', 'send_email', { to: 'a' })] }]);
+    const { deps: d, executed } = deps(m, {
+      needsApproval: async (c: { name: string }) => { await new Promise((r) => setTimeout(r, 1)); return KIND[c.name] === 'write'; },
+    });
+    const out = await runLoop(fresh(), d, limits());
+    expect(out.kind).toBe('approval');
+    expect(out.pending.calls.map((c: { id: string }) => c.id)).toEqual(['w']);
+    expect(executed).toEqual(['read_inbox']);
+  });
+
+  it('an async gate that clears the write lets it run in the same turn', async () => {
+    const m = scripted([
+      { content: [toolUse('w', 'send_email', { to: 'a' })] },
+      { content: [toolUse('c', 'finish', { outcome: 'completed', summary: 's', message: 'm' })] },
+    ]);
+    const { deps: d, executed } = deps(m, { needsApproval: async () => false });
+    const out = await runLoop(fresh(), d, limits());
+    expect(out.kind).toBe('finished');
+    expect(executed).toEqual(['send_email', 'finish']);
+  });
+
   it('does not let a run finish in the same turn as writes still waiting', async () => {
     const m = scripted([{ content: [toolUse('w', 'send_email'), toolUse('f', 'finish', { outcome: 'completed', summary: 's', message: 'm' })] }]);
     const { deps: d, executed } = deps(m);
@@ -262,6 +284,44 @@ describe('PC runner', () => {
     expect(runner.runnerStep('pc_open', { url: 'https://suumo.jp' })).toBe('PC: 開く https://suumo.jp');
     const text = runner.runnerResultText({ url: 'https://x', title: 'T', text: '本文', links: [{ text: '次へ', href: 'https://x?p=2' }], note: 'n' });
     for (const t of ['URL: https://x', 'タイトル: T', '本文', '- 次へ → https://x?p=2', '注: n']) expect(text).toContain(t);
+  });
+
+  it('never puts typed text for a password field into the run record', () => {
+    // A caller that does not yet know the field says nothing: the
+    // title is the masked form, because a step title is a
+    // member-readable record and a typed password must never land
+    // in it.
+    const masked = runner.runnerStep('pc_type', { field: 'パスワード', text: 's3cret-value' }, true);
+    expect(masked).toContain('パスワード');
+    expect(masked).not.toContain('s3cret-value');
+    // An affirmatively ordinary field keeps the typed text, the
+    // record the person used to get.
+    const plain = runner.runnerStep('pc_type', { field: '検索', text: '三鷹' }, false);
+    expect(plain).toContain('三鷹');
+    // The runner's own report is the only source of that fact.
+    expect(runner.passwordFieldOf({ password_field: true })).toBe(true);
+    expect(runner.passwordFieldOf({ password_field: false })).toBe(false);
+    expect(runner.passwordFieldOf({})).toBeUndefined();
+  });
+
+  it('offers pc_sign_in with no way to carry a credential in its arguments', () => {
+    const def = runner.RUNNER_TOOLS.find((t: { name: string }) => t.name === 'pc_sign_in');
+    expect(def).toBeTruthy();
+    expect(Object.keys(def.input_schema.properties)).toEqual(['origin']);
+    expect(def.description).toContain('パスワードを引数に取ることは決してない');
+    expect(runner.runnerOperation('pc_sign_in')).toBe('sign_in');
+    expect(runner.isRunnerTool('pc_sign_in')).toBe(true);
+  });
+
+  it('records a sign-in as origin only, and words its outcome without a value', () => {
+    expect(runner.runnerStep('pc_sign_in', { origin: 'https://example.com' })).toBe('PC: サインイン https://example.com');
+    const ok = runner.signInResultText({ signed_in: true, url: 'https://example.com/home', title: 'T', text: 'ようこそ' });
+    expect(ok).toContain('サインインしました');
+    expect(ok).toContain('ようこそ');
+    const walled = runner.signInResultText({ signed_in: false, reason: 'still_walled', url: 'https://example.com/login', title: 'T', text: 'ログイン' });
+    expect(walled).toContain('ログイン画面が残りました');
+    const moved = runner.signInResultText({ signed_in: false, reason: 'page_moved' });
+    expect(moved).toContain('ページが移動');
   });
 });
 

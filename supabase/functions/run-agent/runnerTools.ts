@@ -50,6 +50,15 @@ export const RUNNER_TOOLS: ToolDef[] = [
     description: `PC のブラウザで前のページに戻って読む。${PAGE_NOTE}`,
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
+  {
+    name: "pc_sign_in",
+    description: "PC のブラウザで開いているページがログイン画面で止まっているときに使う。この Space に保存されたそのサイトのサインイン情報があれば、サーバーがブラウザに入力してログインを試みる。パスワードを引数に取ることは決してない（自分でパスワードを打ったり、チャットで聞いたりしない）。origin は、今いると思うサイトのアドレス（https://example.com の形、任意）。保存された情報がそのページのサイトと一致しない場合は何も入力されない。",
+    input_schema: {
+      type: "object",
+      properties: { origin: { type: "string", description: "今いると思うサイトのアドレス（任意）" } },
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**
@@ -123,17 +132,61 @@ export function pickRunner(rows: readonly RunnerRow[], now: number, capability: 
   return live[0] ?? null;
 }
 
-/** Pure. One line for the run log. */
-export function runnerStep(name: string, input: Record<string, unknown>): string {
+/**
+ * Pure. One line for the run log.
+ *
+ * A pc_type into a password field never shows its text: the typed
+ * value would land in a member-readable record verbatim (the leak
+ * the secure-login design closes). The runner reports whether the
+ * field it filled was a password field; `maskTypeText` is that
+ * report read conservatively — masked unless the runner affirmatively
+ * said the field was an ordinary one.
+ */
+export function runnerStep(name: string, input: Record<string, unknown>, maskTypeText = false): string {
   switch (name) {
     case "pc_open": return `PC: 開く ${String(input.url ?? "")}`;
     case "pc_click": return `PC: クリック「${String(input.text ?? "")}」`;
-    case "pc_type": return `PC: 入力「${String(input.field ?? "")}」← ${String(input.text ?? "")}`;
+    case "pc_type": return maskTypeText
+      ? `PC: 入力「${String(input.field ?? "")}」← ••••••（パスワード欄のため表示しません）`
+      : `PC: 入力「${String(input.field ?? "")}」← ${String(input.text ?? "")}`;
     case "pc_back": return "PC: 戻る";
+    case "pc_sign_in": return `PC: サインイン ${String(input.origin ?? "")}`.trim();
     case "vm_shell": return `VM: $ ${String(input.command ?? "").slice(0, 200)}`;
     case "vm_write_file": return `VM: 書く ${String(input.path ?? "")}`;
     case "vm_read_file": return `VM: 読む ${String(input.path ?? "")}`;
     default: return "PC: 読む";
+  }
+}
+
+/**
+ * Pure. Whether the field a pc_type filled was a password field, as
+ * the runner reported it in the result: true / false when it said,
+ * undefined when the answer carries no report (an old runner, a
+ * failed call) — the caller masks on anything but an affirmative
+ * false.
+ */
+export function passwordFieldOf(result: unknown): boolean | undefined {
+  const r = result && typeof result === "object" ? result as { password_field?: unknown } : {};
+  return typeof r.password_field === "boolean" ? r.password_field : undefined;
+}
+
+/**
+ * Pure. A sign-in's answer as the agent reads it: the outcome in the
+ * server's own words first (the runner's reason code, worded here —
+ * its free text never travels), then the page it landed on. Failure
+ * lines say what the agent may conclude: a refusal means nothing was
+ * typed; a wall that stayed means the stored pair did not open it.
+ */
+export function signInResultText(result: unknown): string {
+  const r = result && typeof result === "object" ? result as { signed_in?: unknown; reason?: unknown } : {};
+  const page = runnerResultText(result);
+  if (r.signed_in === true) return `サインインしました。\n\n${page}`;
+  switch (r.reason) {
+    case "page_moved": return `ページが移動していたため、サインイン情報は入力しませんでした。\n\n${page}`;
+    case "no_form": return `このページにログインの入力欄が見つからなかったため、サインインできませんでした。\n\n${page}`;
+    case "still_walled": return `サインインを試みましたが、ログイン画面が残りました。保存された情報が合っていない可能性があります。\n\n${page}`;
+    case "no_pair": return `サインイン情報が届かなかったため、入力しませんでした。\n\n${page}`;
+    default: return `サインインできませんでした。\n\n${page}`;
   }
 }
 
