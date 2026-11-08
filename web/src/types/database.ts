@@ -166,6 +166,8 @@ export interface ActivitySpace {
   updated_at: string | null
   /** What the Space shows: everything, or only the Space, People and Audit (ADR 0048). */
   scope?: 'audit' | 'full'
+  /** How Athena's writes are held in this Space: 'ask' every write, 'auto' critical only, 'free' none (policy approvals). */
+  approval_mode?: 'ask' | 'auto' | 'free'
 }
 
 export interface ActivitySpaceInsert {
@@ -1509,6 +1511,10 @@ export interface AgentAction {
   decided_by: string | null
   decided_at: string | null
   decision_note: string | null
+  /** Who decided: null is a person; 'policy' is the Space's free mode deciding by standing policy. */
+  decision_source?: 'policy' | null
+  /** The approval mode in force when the policy decided. */
+  policy_mode?: 'ask' | 'auto' | 'free' | null
   result: Record<string, unknown> | null
   /** When an undecided proposal lapses; only a Copilot session's approvals carry one. */
   expires_at: string | null

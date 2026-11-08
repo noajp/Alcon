@@ -204,12 +204,12 @@ export function useAgentRunEvents(runId: string | null) {
     queryFn: async ({ signal }) => {
       const [steps, actions] = await Promise.all([
         supabase.from('agent_run_steps').select('idx, type, title, detail, created_at').eq('run_id', runId!).order('idx').abortSignal(signal),
-        supabase.from('agent_actions').select('status, summary, created_at').eq('run_id', runId!).order('created_at').abortSignal(signal),
+        supabase.from('agent_actions').select('status, summary, created_at, decision_source, policy_mode').eq('run_id', runId!).order('created_at').abortSignal(signal),
       ]);
       if (steps.error) throw new Error(`Unable to read the run's steps: ${steps.error.message}`);
       if (actions.error) throw new Error(`Unable to read the run's approvals: ${actions.error.message}`);
       const stepRows = (steps.data ?? []) as { idx: number; type: string; title: string; detail: string | null; created_at: string }[];
-      const actionRows = (actions.data ?? []) as { status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'; summary: string; created_at: string }[];
+      const actionRows = (actions.data ?? []) as { status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'; summary: string; created_at: string; decision_source: 'policy' | null; policy_mode: string | null }[];
       return { events: agentRunEvents(stepRows, actionRows), steps: stepRows, actions: actionRows };
     },
     enabled: Boolean(userId && runId),

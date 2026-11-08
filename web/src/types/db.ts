@@ -41,7 +41,8 @@ type AssigneeRole = 'assignee' | 'reviewer' | 'collaborator'
 
 /** Column overrides per table, applied to Row, Insert and Update alike. */
 interface ColumnOverrides {
-  activity_spaces: { scope: 'audit' | 'full' }
+  activity_spaces: { scope: 'audit' | 'full'; approval_mode: 'ask' | 'auto' | 'free' }
+  space_approval_mode_changes: { from_mode: 'ask' | 'auto' | 'free' | null; to_mode: 'ask' | 'auto' | 'free' }
   // The chat transcript; readers check Array.isArray before use.
   ai_sessions: { messages: unknown[] }
   domains: {
@@ -97,12 +98,14 @@ interface ColumnOverrides {
   }
   intent_escalations: { trigger_kind: IntentEscalationTrigger; status: IntentEscalationStatus }
   intent_next_actions: { status: IntentNextActionStatus }
-  agent_runs: { status: AgentRunStatus; mode: AgentRunMode }
+  agent_runs: { status: AgentRunStatus; mode: AgentRunMode; approval_mode: 'ask' | 'auto' | 'free' | null }
   agent_run_steps: { type: AgentRunStepType }
   agent_actions: {
     input: { calls?: { id: string; name: string; input: Record<string, unknown> }[] }
     status: AgentActionStatus
     result: Record<string, unknown> | null
+    decision_source: 'policy' | null
+    policy_mode: 'ask' | 'auto' | 'free' | null
   }
   integrations: {
     kind: 'mcp' | 'http' | 'model'

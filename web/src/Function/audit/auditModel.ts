@@ -608,6 +608,10 @@ export interface AgentActionRow {
   status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
   summary: string;
   created_at: string;
+  /** Who decided: null/absent is a person; 'policy' is the Space's free
+   *  approval mode, with the mode in policy_mode. */
+  decision_source?: 'policy' | null;
+  policy_mode?: string | null;
 }
 
 const ACTION_RESULT: Record<AgentActionRow['status'], StepResult> = {
@@ -631,7 +635,12 @@ export function agentRunEvents(steps: readonly AgentRunStepRow[], actions: reado
   const pushAction = (action: AgentActionRow) => {
     events.push({
       seq: lastIdx, step_key: 'approval', kind: 'approval', connector: null, operation: 'none',
-      result: ACTION_RESULT[action.status], reason: action.summary, outside_grant: false,
+      result: ACTION_RESULT[action.status],
+      // A policy approval is nobody's decision: the event says so, so
+      // what ran unasked under the free mode never reads as approved
+      // by a person who was never asked.
+      reason: action.decision_source === 'policy' ? `ポリシー承認: ${action.summary}` : action.summary,
+      outside_grant: false,
     });
   };
   for (const step of ordered) {

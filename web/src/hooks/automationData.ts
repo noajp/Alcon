@@ -34,8 +34,19 @@ export interface AutomationEvent {
   source: 'schedule' | 'webhook' | 'manual';
   status: 'received' | 'started' | 'skipped' | 'failed';
   element_id: string | null;
+  run_id: string | null;
+  /** The run's current status, when the reader can see the run; a run
+   *  stopped at an approval ('awaiting_approval') is the one state an
+   *  automation's list must not hide — under the Ask-every-time mode
+   *  stopping there is the specified behavior, not a failure. */
+  run_status: string | null;
   error: string | null;
   created_at: string;
+}
+
+/** Pure. A started run that is waiting on a person's approval. */
+export function runWaitingOnApproval(runStatus: string | null | undefined): boolean {
+  return runStatus === 'awaiting_approval';
 }
 
 const COLUMNS = 'id, activity_space_id, name, enabled, definition_id, object_id, kind, cron, timezone, token_hash, owner_id, next_run_at, last_fired_at, last_status, last_error, created_at';
@@ -70,10 +81,20 @@ export function useAutomationEvents(automationId: string | null) {
     enabled: !!automationId,
     queryFn: async () => {
       const { data, error } = await supabase.from('automation_events')
-        .select('id, source, status, element_id, error, created_at')
+        .select('id, source, status, element_id, run_id, error, created_at')
         .eq('automation_id', automationId!).order('created_at', { ascending: false }).limit(10);
       if (error) throw error;
-      return (data ?? []) as AutomationEvent[];
+      const events = (data ?? []) as Omit<AutomationEvent, 'run_status'>[];
+      // Each started event names its run; read the runs' states so a run
+      // stopped at an approval shows as waiting, not as a plain start.
+      // A run the reader cannot see simply carries no status.
+      const runIds = [...new Set(events.map((e) => e.run_id).filter((id): id is string => !!id))];
+      const statuses = new Map<string, string>();
+      if (runIds.length) {
+        const { data: runs } = await supabase.from('agent_runs').select('id, status').in('id', runIds);
+        for (const r of (runs ?? []) as { id: string; status: string }[]) statuses.set(r.id, r.status);
+      }
+      return events.map((e) => ({ ...e, run_status: e.run_id ? statuses.get(e.run_id) ?? null : null }));
     },
   });
   return { data: query.data ?? [], loading: !!automationId && query.isPending, refetch: () => query.refetch() };

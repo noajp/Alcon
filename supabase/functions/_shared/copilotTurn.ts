@@ -12,10 +12,12 @@ import type { BoardActor } from "./boardTools.ts";
 import { catalogIndex, runCatalogTool, toolsFor } from "./catalog.ts";
 import { TOOL_SEARCH, toolParamsFor } from "./toolLoading.ts";
 import type { ToolCall, ToolKind } from "./agentLoop.ts";
-import { needsApprovalFor } from "./approvalPolicy.ts";
+import {
+  applyMode, approvalVerdict, type ApprovalMode, type ApprovalVerdict,
+} from "./approvalPolicy.ts";
 import {
   buildSpaceIntegrationTools, executeIntegrationTool, integrationApprovalFacts, integrationIndexLines,
-  integrationPromptSection, type SpaceIntegrationTools,
+  integrationPromptSection, manifestDenyRefusal, type SpaceIntegrationTools,
 } from "./integrationTools.ts";
 
 export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人と AI が一緒に進める運用基盤）の AI です。ユーザーの依頼を受けて、道具で Alcon のデータを読み書きし、仕事を最後までやり遂げます。
@@ -76,8 +78,17 @@ export interface CopilotTurn {
   toolParams: any[];
   /** The Space's integration toolset, when one was assembled. */
   toolset: SpaceIntegrationTools | null;
+  /** The approval mode this turn's Space runs under ("auto" without one). */
+  approvalMode: ApprovalMode;
   kindOf(name: string): ToolKind;
   needsApproval(call: ToolCall): boolean;
+  /** The policy's answer for one integration call: the verdict the floors
+   *  give (base) and the verdict under the turn's mode (final). Null for
+   *  Alcon's own tools, which the catalog's entry policy governs alone.
+   *  The driver reads this to record a policy approval where the mode
+   *  lifted an ask — the recording is the driver's, the verdict is here,
+   *  computed once and shared with the gate. */
+  verdictOf(call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null;
   execute(call: ToolCall): Promise<{ content: string; is_error?: boolean }>;
 }
 
@@ -124,8 +135,13 @@ export async function buildCopilotTurn(args: {
   supabaseUrl: string | null;
   actor: BoardActor;
   events?: CopilotTurnEvents;
+  /** The context Space's approval mode, resolved by the driver from the
+   *  Space's row (policy is read server-side; no tool can set it).
+   *  Defaults to "auto" — the verdict unchanged — when not given. */
+  approvalMode?: ApprovalMode;
 }): Promise<CopilotTurn> {
   const { userDb, admin, context: ctx, actor, events } = args;
+  const approvalMode: ApprovalMode = args.approvalMode ?? "auto";
   const toolset = ctx.spaceId && admin
     ? await buildSpaceIntegrationTools({ userDb, admin, spaceId: ctx.spaceId, supabaseUrl: args.supabaseUrl }).catch(() => null)
     : null;
@@ -144,21 +160,47 @@ export async function buildCopilotTurn(args: {
     { type: "text" as const, text: `# 現在の文脈\n${copilotContextHint(ctx)}\n（明示されない限りこのスコープを優先してください）` },
   ];
 
+  // The turn's verdicts, computed once per call and shared by the gate,
+  // the executor's deny refusal and the driver's policy-approval record:
+  // one call, one answer, however many places ask.
+  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict }>();
+  const verdictOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null => {
+    const it = toolset?.tools.get(call.name);
+    if (!it) return null;
+    let v = verdicts.get(call.id);
+    if (!v) {
+      const facts = integrationApprovalFacts(it, call, true);
+      const base = approvalVerdict(facts);
+      v = { base, final: applyMode(base, facts, approvalMode) };
+      verdicts.set(call.id, v);
+    }
+    return v;
+  };
+
   return {
     system,
     toolParams,
     toolset,
+    approvalMode,
+    verdictOf,
     // An integration tool is an external write for the loop: the approval
     // policy then decides per call, exactly as in a run. Alcon's own tools
     // stay "board" — the panel's catalog policy decides them, as before.
     kindOf: (name) => (toolset?.tools.has(name) ? "write" : "board"),
-    needsApproval: (call) => {
-      const it = toolset?.tools.get(call.name);
-      return it ? needsApprovalFor(integrationApprovalFacts(it, call, true)) : false;
-    },
+    needsApproval: (call) => verdictOf(call)?.final === "ask",
     execute: async (call) => {
       const it = toolset?.tools.get(call.name);
       if (it) {
+        // A deny verdict is refused here, by the policy itself, before
+        // the executor is reached — no mode lifts a prohibition, and no
+        // dispatch path can grow around the refusal. (The executor
+        // rechecks at the moment it runs regardless: an approval given
+        // before a rule denied these arguments must not carry them.)
+        if (verdictOf(call)?.final === "deny" && it.command) {
+          const text = manifestDenyRefusal(it.command.name);
+          events?.onToolResult?.({ name: call.name, ok: false, error: text.slice(0, 300) });
+          return { content: JSON.stringify({ error: text }).slice(0, 100_000), is_error: true };
+        }
         try {
           const r = await executeIntegrationTool(it, call);
           events?.onToolResult?.({ name: call.name, ok: !r.isError, error: r.isError ? r.text.slice(0, 300) : undefined });

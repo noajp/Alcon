@@ -64,11 +64,11 @@ import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type R
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
 import {
-  adoptPlannedTools, approvalDisplayForCall, bindingOf, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, lazyBinding, operationOf, planManifestTools,
+  adoptPlannedTools, approvalDisplayForCall, bindingOf, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools,
   type ApprovalDisplay, type IntegrationBinding, type IntegrationTool, type PlannedIntegrationTool,
 } from "../_shared/integrationTools.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
-import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
+import { catalogDenyRefusal, catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName, missingConnectorNames } from "../_shared/connectorNeeds.ts";
@@ -79,7 +79,10 @@ import { resolveDefinition, type DefinitionCandidate } from "../_shared/definiti
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { offeredCommands, parseManifest, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
-import { needsApprovalFor } from "../_shared/approvalPolicy.ts";
+import {
+  applyMode, approvalModeOf, approvalVerdict, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
+} from "../_shared/approvalPolicy.ts";
+import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
@@ -156,6 +159,8 @@ type Run = {
   transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
   continuation_count: number; continuation_token: string | null;
+  /** The approval mode this run started under, snapshotted by serve(); null until first driven. */
+  approval_mode: string | null;
 };
 
 // IntegrationTool and ApprovalDisplay live in _shared/integrationTools.ts,
@@ -175,6 +180,14 @@ const PRESET_NAMES: Record<string, string> = {
 
 /** The fold harness connector names are matched by (the same fold as checkHarness). */
 const foldName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+
+/** A Space's approval mode, read with the service role: policy comes from
+ *  the Space's row, never from the request or the model. An unreadable or
+ *  unknown value is "auto" — the mode that changes nothing. */
+async function loadSpaceApprovalMode(admin: SupabaseClient, spaceId: string): Promise<ApprovalMode> {
+  const { data } = await admin.from("activity_spaces").select("approval_mode").eq("id", spaceId).maybeSingle();
+  return approvalModeOf((data as { approval_mode?: unknown } | null)?.approval_mode);
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -295,7 +308,20 @@ Deno.serve(async (req: Request) => {
   const { data: claimed } = await claim.select("id").maybeSingle();
   if (!claimed) return json({ error: `この実行は今その操作を受け付けません（${run.status}）。` }, 409);
 
-  const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl };
+  // The run's approval mode: the snapshot it started under wins — a mode
+  // changed mid-run reaches the next run, not into this one, and never
+  // retroactively approves what already waits. A run first driven now
+  // takes its Space's current mode and keeps it; a personal run (no
+  // Space) is fixed to "auto". Stamped before the driver runs, so the
+  // record says under which policy the work happened.
+  let approvalMode = approvalModeOf(run.approval_mode);
+  if (run.approval_mode == null) {
+    if (run.activity_space_id) approvalMode = await loadSpaceApprovalMode(admin, run.activity_space_id);
+    run.approval_mode = approvalMode;
+    await admin.from("agent_runs").update({ approval_mode: approvalMode }).eq("id", run.id);
+  }
+
+  const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl, approvalMode };
   const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
@@ -379,6 +405,10 @@ async function deleteStep(admin: SupabaseClient, runId: string, idx: number): Pr
 interface ExecArgs {
   req: Request; run: Run; user: { id: string; email: string | null }; jwt: string;
   admin: SupabaseClient; userDb: SupabaseClient; anthropicKey: string | null; supabaseUrl: string;
+  /** The run's approval mode (its snapshot; serve() resolved it). The
+   *  drivers compose it over every verdict — policy read server-side,
+   *  never a model's choice, and no tool exists that could change it. */
+  approvalMode: ApprovalMode;
   body: {
     continue?: boolean; resume?: boolean; token?: string; message?: string;
     decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] };
@@ -759,6 +789,34 @@ async function execute(a: ExecArgs): Promise<void> {
    *  _shared/integrationTools.ts, so the run's card and the panel's agree. */
   const approvalDisplayFor = (c: ToolCall): ApprovalDisplay => approvalDisplayForCall(integrationTools, c);
 
+  // ── The approval mode, composed over the policy's verdicts ───────────
+  // The verdict and the mode composition live in _shared/approvalPolicy.ts;
+  // what is gathered here, once per call and shared by the loop's gate and
+  // its executor, is the facts this run has for the call. A deny the gate
+  // answered is refused by the executor wrapper below; an ask the free
+  // mode lifted is recorded there as a policy approval as it runs.
+  const mode = a.approvalMode;
+  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict }>();
+  const factsForCall = (call: ToolCall): ApprovalFacts => {
+    // Alcon's own operations: the Element entry's policy decides each call.
+    if (isCatalogTool(call.name)) {
+      const tool = catalogTool(call.name);
+      return { catalogDecision: tool ? decideCall("element", tool, call.input) : "allow", isWrite: true, isRead: false };
+    }
+    // The facts are gathered by the shared adapter (_shared/integrationTools.ts).
+    return integrationApprovalFacts(integrationTools.get(call.name), call, kindOf(call.name) === "write");
+  };
+  const verdictForCall = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } => {
+    let v = verdicts.get(call.id);
+    if (!v) {
+      const facts = factsForCall(call);
+      const base = approvalVerdict(facts);
+      v = { base, final: applyMode(base, facts, mode) };
+      verdicts.set(call.id, v);
+    }
+    return v;
+  };
+
   // ── Executors ───────────────────────────────────────────────────────────
   // The Sub-elements of this Element (Elements whose parent it is): the only
   // ones complete_subelement may close.
@@ -1013,7 +1071,7 @@ async function execute(a: ExecArgs): Promise<void> {
   if (pending && !pending.approved && !a.body.decision) {
     await restorePendingApproval({
       admin, runId: run.id, elementId: run.element_id, pending,
-      displays: pending.calls.map((c) => approvalDisplayFor(c)),
+      displays: displaysUnderMode(pending.calls.map((c) => approvalDisplayFor(c)), mode),
       sha256, addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
     });
     return;
@@ -1031,7 +1089,10 @@ async function execute(a: ExecArgs): Promise<void> {
     admin, runId: run.id, userId: user.id,
     addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
     saveTranscript, executeApproved: (call) => executeCall(call, true),
-    rememberApproval, scheduleContinuation, deadline,
+    // Under the ask mode nothing is rememberable: every write asks again,
+    // so a decision's "from now on" is not accepted, as the card never
+    // offered it.
+    rememberApproval: mode === "ask" ? undefined : rememberApproval, scheduleContinuation, deadline,
   });
   if (decisionOutcome.continued) return;
   pending = decisionOutcome.pending;
@@ -1158,18 +1219,57 @@ async function execute(a: ExecArgs): Promise<void> {
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
     },
     kindOf,
-    needsApproval: (call) => {
-      // The decision itself is _shared/approvalPolicy.ts; this adapter only
-      // gathers the facts this call has.
-      // Alcon's own operations: the Element entry's policy decides each call.
-      if (isCatalogTool(call.name)) {
-        const tool = catalogTool(call.name);
-        return needsApprovalFor({ catalogDecision: tool ? decideCall("element", tool, call.input) : "allow", isWrite: true, isRead: false });
+    needsApproval: (call) => verdictForCall(call).final === "ask",
+    execute: async (call) => {
+      const v = verdicts.get(call.id);
+      // A deny verdict is refused here, by the policy itself: the call is
+      // never dispatched, so no executor path can grow around the
+      // refusal. (Each executor still rechecks at the moment it runs —
+      // an approval given before a rule denied these arguments must not
+      // carry them through the decision path, which never passes here.)
+      if (v?.final === "deny") {
+        if (isCatalogTool(call.name)) {
+          const refusal = catalogDenyRefusal(call.name, call.input);
+          await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, call.input)}`, refusal);
+          return { content: refusal, is_error: true };
+        }
+        const deniedTool = integrationTools.get(call.name);
+        if (deniedTool?.command) {
+          const refusal = manifestDenyRefusal(deniedTool.command.name);
+          await addStep(admin, run.id, "action", `${deniedTool.integration.name}: ${operationOf(deniedTool, call.input)}`, refusal.slice(0, 500));
+          return { content: refusal, is_error: true };
+        }
       }
-      // The facts are gathered by the shared adapter (_shared/integrationTools.ts).
-      return needsApprovalFor(integrationApprovalFacts(integrationTools.get(call.name), call, kindOf(call.name) === "write"));
+      // The free mode lifted this call's ask: it runs as a policy
+      // approval — recorded before it runs, settled when it lands, and
+      // announced when the call is critical, so what ran unasked is as
+      // visible as what a person approved.
+      let policyActionId: string | null = null;
+      if (v && v.base === "ask" && mode === "free") {
+        const display = approvalDisplayFor(call);
+        const summary = approvalSummary([display]);
+        policyActionId = await recordPolicyApproval(admin, {
+          runId: run.id, elementId: run.element_id, call, display, mode,
+          integrationId: integrationTools.get(call.name)?.integration.id ?? null,
+        });
+        await addStep(admin, run.id, "approval", `ポリシー承認で実行: ${summary}`, "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
+        if (display.critical) {
+          await admin.from("element_comments").insert({
+            element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+            content: `**ポリシー承認で実行** — ${summary}。重要な操作のため記録しています。Space の承認モード（自由行動）により、承認は求めませんでした。`,
+          });
+          if (run.triggered_by) {
+            await admin.from("notifications").insert({
+              recipient_id: run.triggered_by, actor_name: agentName, kind: "status_change", element_id: run.element_id,
+              agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
+            }).then(() => {}, () => {});
+          }
+        }
+      }
+      const r = await executeCall(call);
+      if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error);
+      return r;
     },
-    execute: (call) => executeCall(call),
     onUsage: recordUsage,
     verify: run.mode === "reply" || external ? undefined : verifyFinish,
     afterTurn: () => saveTranscript(),
@@ -1197,7 +1297,7 @@ async function execute(a: ExecArgs): Promise<void> {
     case "approval": {
       await saveTranscript(outcome.pending);
       const calls = outcome.pending.calls;
-      const display = calls.map((c) => approvalDisplayFor(c));
+      const display = displaysUnderMode(calls.map((c) => approvalDisplayFor(c)), mode);
       const summary = approvalSummary(display);
       const inputHash = await sha256(canonicalCalls(calls));
       const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
@@ -1927,6 +2027,17 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   // its message, else the one the transcript kept, else the run's Space.
   const context = foldCopilotContext(run.transcript?.context, a.body.context, run.activity_space_id);
 
+  // The turn's approval mode follows the turn's context Space: the
+  // snapshot serve() took is the session's own Space, but a turn held
+  // under another Space's view runs under that Space's policy — and the
+  // run's snapshot follows the turn, so the record names the policy the
+  // latest work ran under.
+  let turnMode = a.approvalMode;
+  if (context.spaceId && context.spaceId !== run.activity_space_id) {
+    turnMode = await loadSpaceApprovalMode(admin, context.spaceId);
+    if (turnMode !== a.approvalMode) await admin.from("agent_runs").update({ approval_mode: turnMode }).eq("id", run.id);
+  }
+
   // The turn's tools, rebuilt for this slice by the one assembly
   // (copilotTurn.ts). Each result lands on the run as a step — the
   // turn's audit trace, detail carrying the call's input and outcome
@@ -1940,7 +2051,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     stepChain = stepChain.then(() => bound(type, title, detail));
   };
   const turn: CopilotTurn = await buildCopilotTurn({
-    userDb, admin, context, supabaseUrl: a.supabaseUrl,
+    userDb, admin, context, supabaseUrl: a.supabaseUrl, approvalMode: turnMode,
     actor: { agent: COPILOT_AGENT_NAME, userId: user.id },
     events: {
       onToolResult: (r) => {
@@ -1969,7 +2080,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     callInputs.push({ name: call.name, input: call.input });
     return turn.execute(call);
   };
-  const displaysFor = (calls: ToolCall[]) => calls.map((c) => approvalDisplayForCall(turn.toolset?.tools ?? new Map(), c));
+  const displaysFor = (calls: ToolCall[]) => displaysUnderMode(calls.map((c) => approvalDisplayForCall(turn.toolset?.tools ?? new Map(), c)), turnMode);
 
   const saveTranscript = async (p: SavedPending | undefined = pending) => {
     const transcript: Transcript = {
@@ -2028,7 +2139,9 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   const rememberApproval = makeRememberApproval({ userDb, tools: turn.toolset?.tools ?? new Map(), addStep: bound });
   const decisionOutcome = await applyDecision(state, pending, a.body.decision, {
     admin, runId: run.id, userId: user.id, addStep: bound,
-    saveTranscript, executeApproved: execute, rememberApproval, scheduleContinuation, deadline,
+    saveTranscript, executeApproved: execute,
+    // Under the ask mode nothing is rememberable, as in an Element's run.
+    rememberApproval: turnMode === "ask" ? undefined : rememberApproval, scheduleContinuation, deadline,
   });
   if (decisionOutcome.continued) return;
   pending = decisionOutcome.pending;
@@ -2133,6 +2246,33 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     return "";
   };
 
+  // The loop's executor: a call the free mode let through records its
+  // policy approval as it runs (policyApproval.ts), settled when it
+  // lands — the decision path above runs its approved calls through the
+  // plain executor, a person's approval already being their record.
+  const loopExecute = async (call: ToolCall) => {
+    const v = turn.verdictOf(call);
+    let policyActionId: string | null = null;
+    if (v && v.base === "ask" && turnMode === "free") {
+      const display = approvalDisplayForCall(turn.toolset?.tools ?? new Map(), call);
+      const summary = approvalSummary([display]);
+      policyActionId = await recordPolicyApproval(admin, {
+        runId: run.id, elementId: null, call, display, mode: turnMode,
+        integrationId: turn.toolset?.tools.get(call.name)?.integration.id ?? null,
+      });
+      await bound("approval", `ポリシー承認で実行: ${summary}`, "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
+      if (display.critical && run.triggered_by) {
+        await admin.from("notifications").insert({
+          recipient_id: run.triggered_by, actor_name: COPILOT_AGENT_NAME, kind: "status_change",
+          agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
+        }).then(() => {}, () => {});
+      }
+    }
+    const r = await execute(call);
+    if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error);
+    return r;
+  };
+
   const outcome = await runLoop(state, {
     // One model call, streamed: the answer grows in a draft step (S2) —
     // throttled writes the panel's live display reads — and folds into
@@ -2180,7 +2320,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     },
     kindOf: turn.kindOf,
     needsApproval: turn.needsApproval,
-    execute,
+    execute: loopExecute,
     onUsage: recordUsage,
     afterTurn: () => saveTranscript(),
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,

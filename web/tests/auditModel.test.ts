@@ -308,6 +308,15 @@ describe('agentRunEvents', () => {
       ['approval', 'waiting', '削除の承認待ち'],
     ]);
   });
+
+  it("marks a policy approval as the policy's, never as a person's decision", () => {
+    const events = agentRunEvents(steps, [
+      { status: 'executed', summary: 'Mail: send', created_at: '2026-11-06T01:01:00Z', decision_source: 'policy', policy_mode: 'free' },
+      { status: 'executed', summary: '人が承認した送信', created_at: '2026-11-06T01:01:30Z', decision_source: null, policy_mode: null },
+    ]);
+    const approvals = events.filter(e => e.kind === 'approval');
+    expect(approvals.map(e => e.reason)).toEqual(['ポリシー承認: Mail: send', '人が承認した送信']);
+  });
 });
 
 describe('auditShowsSample', () => {
