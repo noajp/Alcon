@@ -92,6 +92,32 @@ export function useAiConversations(spaceId: string | null) {
     return data.id;
   }, [spaceId]);
 
+  /** Files a conversation — its title and folder, never its messages:
+   *  the engine writes those now. The title fills only while the
+   *  conversation is still untitled (a rename is never overwritten),
+   *  and a folder is set only when one is given, so a conversation
+   *  files into the folder it was started in exactly once. */
+  const fileSession = useCallback(async (
+    id: string, patch: { title?: string; folder_id?: string | null },
+  ): Promise<void> => {
+    const updated_at = new Date().toISOString();
+    const { data: cur } = await supabase.from('ai_sessions').select('title').eq('id', id).maybeSingle();
+    if (!cur) return;
+    const fillTitle = !cur.title && patch.title ? patch.title : null;
+    const { data: row, error: e } = await supabase.from('ai_sessions').update({
+      updated_at,
+      ...(fillTitle ? { title: fillTitle } : {}),
+      ...(patch.folder_id != null ? { folder_id: patch.folder_id } : {}),
+    }).eq('id', id).select('id,folder_id,title,updated_at').maybeSingle();
+    if (e) { setError(e.message); return; }
+    // The row may be new to this list (the hook created it for a first
+    // send), so it goes in whether or not it was listed.
+    if (row) {
+      setSessions((prev) => [row as AiSessionSummary, ...prev.filter((s) => s.id !== id)]
+        .sort((x, y) => y.updated_at.localeCompare(x.updated_at)));
+    }
+  }, []);
+
   const renameSession = useCallback(async (id: string, title: string) => {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title } : s)));
     const { error: e } = await supabase.from('ai_sessions').update({ title }).eq('id', id);
@@ -113,6 +139,6 @@ export function useAiConversations(spaceId: string | null) {
   return {
     folders, sessions, error,
     createFolder, renameFolder, deleteFolder,
-    loadMessages, saveSession, renameSession, moveSession, deleteSession,
+    loadMessages, saveSession, fileSession, renameSession, moveSession, deleteSession,
   };
 }

@@ -3,13 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
-import { decideAgentActionById, fetchAgentActionById, fetchAgentRunStatus } from './agentData';
+import {
+  decideAgentActionById, fetchAgentActionById, fetchAgentRunStatus, fetchAgentRunSteps,
+  fetchOpenCopilotRun, insertCopilotRun, retireCopilotRun, sendCopilotMessage,
+  type CopilotRunRef,
+} from './agentData';
+import { liveTurnFromSteps } from './copilotSteps';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Shape of a Copilot conversation turn.
 //
 // `user` messages are plain text. `assistant` messages collect:
-//   - text — the streamed prose
+//   - text — the answer's prose
 //   - toolEvents — chronological log of tool_use → tool_result pairs the
 //     model invoked while answering. Surfacing these in the UI is what lets
 //     the user see "the Copilot ran listElements and got 12 rows", which is
@@ -47,18 +52,19 @@ export interface CopilotApprovalCall {
  * nothing.
  *
  * A card with a runId/actionId is persisted: it is an agent_actions row on
- * the session's anchor run, decidable here or in the Inbox, by the person
+ * the session's run, decidable here or in the Inbox, by the person
  * who started the conversation, whenever they decide — the decision goes
  * through the engine, the paused turn resumes, and what it goes on to say
  * is appended to the kept conversation. Left undecided it lapses after
- * seven days ('expired'). A card without them predates the anchor: it is
- * decided in this chat only, and approving can no longer run it.
+ * seven days ('expired'). A card without them predates persisted
+ * approvals: it is decided in this chat only, and approving can no longer
+ * run it.
  */
 export interface CopilotApproval {
   calls: CopilotApprovalCall[];
   inputHash: string;
   status: 'pending' | 'executing' | 'executed' | 'denied' | 'failed' | 'expired';
-  /** The anchor run and action this card is decided through, when persisted. */
+  /** The run and action this card is decided through, when persisted. */
   runId?: string;
   actionId?: string;
   /** What each call answered, once approval ran it. */
@@ -66,7 +72,7 @@ export interface CopilotApproval {
 }
 
 /** A finished turn: done, and any step still waiting for its result marked
- *  as not run — the stream has ended, so no result is coming and the step
+ *  as not run — the turn has ended, so no result is coming and the step
  *  should stop reading as in progress. Steps whose calls are waiting on an
  *  approval card say so instead: they are held, not skipped. */
 function settle(message: CopilotMessage): CopilotMessage {
@@ -105,7 +111,7 @@ export interface CopilotMessage {
   toolEvents?: ToolEvent[];
   /** Integration writes held for the person's decision on a card. */
   approvals?: CopilotApproval[];
-  /** True once the stream for this assistant turn has finished. */
+  /** True once the turn for this assistant message has finished. */
   done?: boolean;
   /** When the turn was sent or began (ms). */
   at?: number;
@@ -153,49 +159,100 @@ export function buildCopilotContext(input: {
   return { ...base, viewLabel: input.strategyName ?? 'Strategy', strategyId: input.subject.id };
 }
 
+/** Pure. A kept conversation's title: the start of its first question,
+ *  whitespace folded, capped at 80 characters. A question sent with only
+ *  a file takes the file's name; a conversation with no question yet
+ *  stays untitled (''). */
+export function copilotTitleOf(messages: readonly CopilotMessage[]): string {
+  const first = messages.find((m) => m.role === 'user');
+  return (first?.content || first?.attachments?.[0]?.name || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+}
+
+/** Pure. The kept shape of the shown conversation: a file's contents are
+ *  never kept (only its name), and a turn's bookkeeping (done, at) is the
+ *  panel's own, not the record's. Used when the person cuts a
+ *  conversation back — the one write of messages that stays theirs. */
+export function toKeptMessages(messages: readonly CopilotMessage[]): CopilotMessage[] {
+  return messages.map(({ role, content, toolEvents, attachments, approvals }) => ({
+    role, content,
+    ...(toolEvents?.length ? { toolEvents } : {}),
+    ...(approvals?.length ? { approvals } : {}),
+    ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
+  }));
+}
+
 interface SendOptions {
   context?: CopilotContext;
   attachments?: CopilotAttachment[];
 }
 
-type RequestTurn = { role: 'user' | 'assistant'; content: string; attachments?: CopilotAttachment[] };
-
-const FUNCTIONS_PATH = '/functions/v1/alcon-copilot';
-
-function functionsUrl(): string | null {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  if (!base) return null;
-  return base.replace(/\/$/, '') + FUNCTIONS_PATH;
-}
-
 export interface CopilotHookOptions {
   /** The kept conversation this chat is showing, when it has one: sends
-   *  carry it so the turn anchors on that session. */
+   *  run on that session. */
   getSessionId?: () => string | null;
-  /** The function anchored the turn on a session (the first turn's):
-   *  adopt its id, so the kept conversation and the anchor stay one. */
+  /** Ensures the kept conversation's row for a first send (the library's
+   *  insert, in the provider's Space and starting folder). Without a
+   *  provider the hook makes the row itself — in the send's Space, or
+   *  personal (no Space) when the send has none. */
+  ensureSession?: () => Promise<string | null>;
+  /** The conversation anchored on a session (a first send made its row):
+   *  adopt its id, so the kept conversation and its run stay one. */
   onSessionId?: (id: string) => void;
-  /** Re-reads the kept conversation after a decision's resume settled,
-   *  so the card's outcome and the turn's continuation come from the
-   *  server's record. False when there is nothing to re-read. */
+  /** Re-reads the kept conversation, so what shows is the server's
+   *  record. False when there is nothing to re-read. */
   reloadSession?: () => Promise<boolean>;
+  /** Writes back a conversation the person cut back (an edit, a
+   *  retry), in its kept shape (toKeptMessages): from the cut on, the
+   *  record is theirs to rewrite — the turns themselves are the
+   *  engine's to write. Without a provider the hook writes its own
+   *  session's row. */
+  onTruncate?: (kept: CopilotMessage[]) => Promise<void>;
 }
 
+const FOLLOW_EVERY_MS = 1500;
+/** Following a turn gives up after this long and settles what it has;
+ *  the turn itself goes on server-side either way. */
+const FOLLOW_MAX_POLLS = 600;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Drives the SSE conversation with the alcon-copilot Edge Function. The
+ * Drives a Copilot conversation on its session's run (Athena): a send
+ * ensures the session and its open run, posts the message to the
+ * engine, and follows the run — its steps for the live turn, the kept
+ * conversation (ai_sessions.messages) for the settled one. The
  * conversation lives here while it is open; CopilotProvider keeps it.
  */
 export function useAlconCopilot(options: CopilotHookOptions = {}) {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const optionsRef = useRef(options);
   useEffect(() => { optionsRef.current = options; });
+  /** The session this hook made itself, when no provider keeps it. */
+  const ownSessionRef = useRef<string | null>(null);
+  /** The run the current turn is on, for the stop button. */
+  const runIdRef = useRef<string | null>(null);
+  /** Bumped whenever the shown conversation is replaced or cut back:
+   *  a follow loop from before the change stops following. */
+  const followGenRef = useRef(0);
+  /** A cut-back's retiring of the old run, awaited by the next send so
+   *  it cannot land on the run being retired. */
+  const rewriteRef = useRef<Promise<void>>(Promise.resolve());
+
+  const settleLast = useCallback(() => {
+    setMessages((prev) => {
+      const next = prev.slice();
+      const last = next[next.length - 1];
+      if (last && last.role === 'assistant' && !last.done) next[next.length - 1] = settle(last);
+      return next;
+    });
+  }, []);
 
   const reset = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+    followGenRef.current++;
+    runIdRef.current = null;
+    ownSessionRef.current = null;
     setMessages([]);
     setError(null);
     setStreaming(false);
@@ -203,217 +260,203 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
 
   /** Shows a kept conversation, to go on from where it stopped. */
   const load = useCallback((kept: CopilotMessage[]) => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+    followGenRef.current++;
+    runIdRef.current = null;
     setMessages(kept.map((m) => ({ ...m, done: true })));
     setError(null);
     setStreaming(false);
   }, []);
 
+  /** Stops the turn on the server: its run is cancelled, and the engine
+   *  stops at its next turn boundary. (Closing a view does not call
+   *  this — a turn goes on without its window.) */
   const cancel = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
+    followGenRef.current++;
+    const runId = runIdRef.current;
+    if (runId) void retireCopilotRun(runId).catch(() => undefined);
+    setStreaming(false);
+    settleLast();
+  }, [settleLast]);
+
+  /** Stops following the turn without stopping it — a view going away.
+   *  The turn finishes on the server and lands in the kept conversation. */
+  const detach = useCallback(() => {
+    followGenRef.current++;
     setStreaming(false);
   }, []);
+
+  const sessionIdNow = useCallback(() => optionsRef.current.getSessionId?.() ?? ownSessionRef.current, []);
+
+  /** The conversation's row for a send: the provider's when it keeps
+   *  one, else a row this hook makes — in the send's Space, or personal
+   *  when the send has no Space (a profile chat). */
+  const ensureSessionId = useCallback(async (spaceId: string | null): Promise<string | null> => {
+    const existing = sessionIdNow();
+    if (existing) return existing;
+    let id = await (optionsRef.current.ensureSession?.().catch(() => null) ?? Promise.resolve(null));
+    if (!id) {
+      const { data, error: insertError } = await supabase.from('ai_sessions')
+        .insert({ activity_space_id: spaceId, title: '', messages: [] })
+        .select('id').single();
+      if (!insertError && data) id = (data as { id: string }).id;
+    }
+    if (id) {
+      ownSessionRef.current = id;
+      optionsRef.current.onSessionId?.(id);
+    }
+    return id;
+  }, [sessionIdNow]);
+
+  /** Re-reads the kept conversation into the display: the provider's
+   *  reload when it keeps the library, else this hook's own session row. */
+  const reloadKept = useCallback(async (sessionId: string | null): Promise<boolean> => {
+    if (optionsRef.current.reloadSession) {
+      return optionsRef.current.reloadSession().catch(() => false);
+    }
+    if (!sessionId) return false;
+    const { data } = await supabase.from('ai_sessions').select('messages').eq('id', sessionId).maybeSingle();
+    if (!data || !Array.isArray(data.messages)) return false;
+    load(data.messages as CopilotMessage[]);
+    return true;
+  }, [load]);
+
+  /**
+   * Cuts the conversation back to `kept` — for an edit or a retry. The
+   * display and the kept record are cut together, and the session's
+   * run is retired: the next send starts a fresh run, seeded from the
+   * cut conversation, so the model's context and what the person
+   * sees agree. Returns when the retiring has landed.
+   */
+  const cutBack = useCallback(async (kept: CopilotMessage[]) => {
+    followGenRef.current++;
+    const runId = runIdRef.current;
+    runIdRef.current = null;
+    if (runId) await retireCopilotRun(runId).catch(() => undefined);
+    const sessionId = sessionIdNow();
+    if (!sessionId) return;
+    if (optionsRef.current.onTruncate) {
+      await optionsRef.current.onTruncate(kept).catch(() => undefined);
+    } else {
+      await supabase.from('ai_sessions')
+        .update({ messages: toKeptMessages(kept), updated_at: new Date().toISOString() })
+        .eq('id', sessionId)
+        .then(() => undefined, () => undefined);
+    }
+  }, [sessionIdNow]);
 
   const send = useCallback(async (text: string, opts: SendOptions = {}) => {
     const trimmed = text.trim();
     const files = opts.attachments ?? [];
     if ((!trimmed && files.length === 0) || streaming) return;
 
-    const url = functionsUrl();
-    if (!url) {
-      setError(translate('Supabase URL is not configured.'));
-      return;
-    }
-
     setError(null);
+    // A cut-back still retiring its run settles first: the send must
+    // not land on the run being retired.
+    await rewriteRef.current;
 
-    // Push the user turn + an empty assistant turn we'll stream into.
-    const historyForRequest: RequestTurn[] = [];
-    setMessages((prev) => {
-      const next: CopilotMessage[] = [
-        ...prev,
-        { role: 'user', content: trimmed, at: Date.now(), ...(files.length ? { attachments: files } : {}) },
-        { role: 'assistant', content: '', toolEvents: [], done: false, at: Date.now() },
-      ];
-      for (const m of next) {
-        if (m.role === 'user') {
-          // Files whose contents are still at hand go along with every turn,
-          // so later questions can refer back to them.
-          const sendable = (m.attachments ?? []).filter((a) => a.data);
-          historyForRequest.push({ role: 'user', content: m.content, ...(sendable.length ? { attachments: sendable } : {}) });
-        }
-        else if (m.role === 'assistant' && m.done) {
-          historyForRequest.push({ role: 'assistant', content: m.content });
-        }
-      }
-      return next;
-    });
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      setError(translate('Sign in to continue.'));
-      setStreaming(false);
+    // The session and its open run come first: a conversation waiting
+    // on an approval, or one another window is driving, refuses here —
+    // before anything is shown as sent.
+    let sessionId: string | null = null;
+    let run: CopilotRunRef | null = null;
+    try {
+      sessionId = await ensureSessionId(opts.context?.spaceId ?? null);
+      if (!sessionId) throw new Error(translate('Could not start the conversation.'));
+      run = await fetchOpenCopilotRun(sessionId) ?? await insertCopilotRun(sessionId);
+      if (!run) throw new Error(translate('Could not start the conversation.'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       return;
     }
-    const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+    if (run.status === 'awaiting_approval') {
+      setError(translate('There is an operation waiting for approval. Decide on the approval card to continue.'));
+      return;
+    }
+    if (run.status === 'running') {
+      setError(translate('The previous answer is still being written. Wait a moment and send again.'));
+      return;
+    }
+    // A 'queued' run is one never claimed — this window's fresh run, or
+    // one a failed send left behind: posting the message is what it
+    // waits for, and the engine's claim settles any race for it.
 
+    runIdRef.current = run.id;
+    // Push the user turn + the empty assistant turn the follow fills.
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: trimmed, at: Date.now(), ...(files.length ? { attachments: files } : {}) },
+      { role: 'assistant', content: '', toolEvents: [], done: false, at: Date.now() },
+    ]);
     setStreaming(true);
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const gen = ++followGenRef.current;
 
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': apiKey,
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-        },
-        body: JSON.stringify({
-          messages: historyForRequest, context: opts.context ?? {},
-          sessionId: optionsRef.current.getSessionId?.() ?? undefined,
-        }),
+      await sendCopilotMessage(run.id, {
+        message: trimmed,
+        context: opts.context ?? {},
+        attachments: files.filter((f) => f.data).map((f) => ({ name: f.name, mediaType: f.mediaType, data: f.data })),
       });
-
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(errText || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE: events are separated by a blank line. Each event has `event:`
-        // and `data:` lines; we only emit one-line JSON `data:` payloads.
-        let sep: number;
-        while ((sep = buffer.indexOf('\n\n')) !== -1) {
-          const raw = buffer.slice(0, sep);
-          buffer = buffer.slice(sep + 2);
-          let evt = 'message';
-          let data = '';
-          for (const line of raw.split('\n')) {
-            if (line.startsWith('event:')) evt = line.slice(6).trim();
-            else if (line.startsWith('data:')) data += line.slice(5).trim();
-          }
-          if (!data) continue;
-          let payload: Record<string, unknown> = {};
-          try { payload = JSON.parse(data); } catch { /* skip */ }
-          dispatchEvent(evt, payload);
-        }
-      }
-
-      // Mark the assistant turn done. (If the stream ended without an
-      // explicit `done` event we still want to flip the flag.)
+    } catch (e) {
+      if (followGenRef.current !== gen) return;
+      setError(e instanceof Error ? e.message : String(e));
       setMessages((prev) => {
         const next = prev.slice();
         const last = next[next.length - 1];
-        if (last && last.role === 'assistant') next[next.length - 1] = settle(last);
+        if (last && last.role === 'assistant') {
+          next[next.length - 1] = settle({ ...last, content: last.content + `\n\n_(${translate('Error: {error}', { error: e instanceof Error ? e.message : String(e) })})_` });
+        }
         return next;
       });
-    } catch (e) {
-      if ((e as { name?: string }).name === 'AbortError') {
-        // Stopped by the person: the steps it never reached stop spinning.
-        setMessages((prev) => {
-          const next = prev.slice();
-          const last = next[next.length - 1];
-          if (last && last.role === 'assistant') next[next.length - 1] = settle(last);
-          return next;
-        });
-      } else {
-        setError(e instanceof Error ? e.message : String(e));
-        setMessages((prev) => {
-          const next = prev.slice();
-          const last = next[next.length - 1];
-          if (last && last.role === 'assistant') next[next.length - 1] = settle(last);
-          return next;
-        });
-      }
-    } finally {
       setStreaming(false);
-      abortRef.current = null;
-    }
-  }, [streaming]);
-
-  // Mutate the in-progress assistant turn based on the latest SSE event.
-  function dispatchEvent(evt: string, payload: Record<string, unknown>) {
-    if (evt === 'session') {
-      // The turn anchored on a kept conversation: adopt its id.
-      if (typeof payload.sessionId === 'string') optionsRef.current.onSessionId?.(payload.sessionId);
       return;
     }
-    setMessages((prev) => {
-      const next = prev.slice();
-      const i = next.length - 1;
-      const last = next[i];
-      if (!last || last.role !== 'assistant') return prev;
-      if (evt === 'text') {
-        next[i] = { ...last, content: last.content + (payload.delta as string ?? '') };
-      } else if (evt === 'tool_use') {
-        const events = (last.toolEvents ?? []).slice();
-        events.push({ name: payload.name as string, input: payload.input as Record<string, unknown> });
-        next[i] = { ...last, toolEvents: events };
-      } else if (evt === 'tool_result') {
-        const events = (last.toolEvents ?? []).slice();
-        // Attach the result to the earliest unresolved call of the same name —
-        // a turn's calls run, and report, in the order they were made.
-        for (let k = 0; k < events.length; k++) {
-          if (events[k].name === payload.name && !events[k].result) {
-            events[k] = {
-              ...events[k],
-              result: {
-                ok: payload.ok as boolean,
-                rows: payload.rows as number | undefined,
-                error: payload.error as string | undefined,
-              },
-            };
-            break;
-          }
+
+    // Follow the run: its steps draw the live turn (the draft step is
+    // the answer growing; the tool steps are its work), and when the
+    // run rests, the kept conversation — the server's record — is
+    // what shows.
+    let finalStatus: string | null = null;
+    for (let i = 0; i < FOLLOW_MAX_POLLS; i++) {
+      await sleep(FOLLOW_EVERY_MS);
+      if (followGenRef.current !== gen) return;
+      const status = await fetchAgentRunStatus(run.id).catch(() => null);
+      if (followGenRef.current !== gen) return;
+      if (status && status !== 'running' && status !== 'queued') { finalStatus = status; break; }
+      const steps = await fetchAgentRunSteps(run.id).catch(() => null);
+      if (followGenRef.current !== gen || !steps) continue;
+      const live = liveTurnFromSteps(steps);
+      setMessages((prev) => {
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (last && last.role === 'assistant' && !last.done) {
+          next[next.length - 1] = { ...last, content: live.content, toolEvents: live.toolEvents };
         }
-        next[i] = { ...last, toolEvents: events };
-      } else if (evt === 'approval') {
-        const approval: CopilotApproval = {
-          calls: (payload.calls as CopilotApprovalCall[] | undefined) ?? [],
-          inputHash: String(payload.inputHash ?? ''),
-          status: 'pending',
-          ...(typeof payload.runId === 'string' ? { runId: payload.runId } : {}),
-          ...(typeof payload.actionId === 'string' ? { actionId: payload.actionId } : {}),
-        };
-        next[i] = { ...last, approvals: [...(last.approvals ?? []), approval] };
-      } else if (evt === 'done') {
-        // Cut off by the length limit with no calls left to run: say so,
-        // rather than end mid-sentence as if that were the answer.
-        const cut = payload.stop_reason === 'max_tokens'
-          ? `\n\n_(${translate('The answer was cut off by the length limit. Ask to continue.')})_`
-          : '';
-        next[i] = settle({ ...last, content: last.content + cut });
-      } else if (evt === 'error') {
-        next[i] = settle({ ...last, content: last.content + `\n\n_(${translate('Error: {error}', { error: String(payload.error ?? '') })})_` });
-      }
-      return next;
-    });
-  }
+        return next;
+      });
+    }
+    if (followGenRef.current !== gen) return;
+    if (finalStatus === 'cancelled') {
+      // Stopped by its person: what the turn had written stays on
+      // screen, settled — the kept conversation carries no answer
+      // for a stopped turn.
+      settleLast();
+    } else if (!(await reloadKept(sessionId))) {
+      settleLast();
+    }
+    if (followGenRef.current === gen) setStreaming(false);
+  }, [streaming, ensureSessionId, reloadKept, settleLast]);
 
   /**
    * The person's decision on an approval card.
    *
    * A persisted card (runId + actionId) is decided through the engine:
-   * the decision — approve or deny — goes to the anchor run, the paused
-   * turn resumes there, and the kept conversation the server writes back
-   * is re-read, so the card's outcome and the turn's continuation are the
-   * server's record. Either way the model learns the outcome from the
-   * resumed turn itself.
+   * the decision — approve or deny — goes to the session's run, the
+   * paused turn resumes there, and the kept conversation the server
+   * writes back is re-read, so the card's outcome and the turn's
+   * continuation are the server's record. Either way the model learns
+   * the outcome from the resumed turn itself.
    *
-   * A card without an anchor was kept from before approvals persisted:
+   * A card without a run was kept from before approvals persisted:
    * denying is local (nothing was ever sent anywhere, and nothing runs);
    * approving can no longer run it — the in-chat execute callback it was
    * bound to is gone — so the card says so, and the person asks again in
@@ -442,10 +485,10 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
         patch('pending', `\n\n_(${translate('Could not send the decision. Try again.')})_`);
         return;
       }
-      // The resume runs in the background; follow the anchor to its rest,
+      // The resume runs in the background; follow the run to its rest,
       // then let the kept conversation speak for the outcome.
       for (let i = 0; i < 90; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
+        await sleep(2000);
         const status = await fetchAgentRunStatus(approval.runId).catch(() => null);
         if (status && status !== 'running') break;
       }
@@ -471,8 +514,10 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
   /** Drops the turns from `index` on — editing a question starts over from it. */
   const truncate = useCallback((index: number) => {
     if (streaming) return;
-    setMessages((prev) => prev.slice(0, index));
-  }, [streaming]);
+    const kept = messages.slice(0, index);
+    setMessages(kept);
+    rewriteRef.current = cutBack(kept);
+  }, [messages, streaming, cutBack]);
 
   /** Asks the last question again, in place of its answer. */
   const retry = useCallback((opts: Omit<SendOptions, 'attachments'> = {}) => {
@@ -480,9 +525,11 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
     const at = messages.map((m) => m.role).lastIndexOf('user');
     if (at < 0) return;
     const question = messages[at];
-    setMessages((prev) => prev.slice(0, at));
+    const kept = messages.slice(0, at);
+    setMessages(kept);
+    rewriteRef.current = cutBack(kept);
     void send(question.content, { ...opts, attachments: (question.attachments ?? []).filter((a) => a.data) });
-  }, [messages, streaming, send]);
+  }, [messages, streaming, cutBack, send]);
 
-  return { messages, streaming, error, send, cancel, reset, load, truncate, retry, decideApproval };
+  return { messages, streaming, error, send, cancel, detach, reset, load, truncate, retry, decideApproval };
 }

@@ -1,8 +1,9 @@
 import type { CopilotAttachment } from './useAlconCopilot';
 
 // Files the AI can read: PDF, Markdown and plain text. A PDF goes to the model
-// as itself (base64); Markdown and text go as their text. The limits match the
-// alcon-copilot function's, so a file it would refuse is refused here first.
+// as itself (base64); Markdown and text go as their text. The limits match
+// the engine's (_shared/attachments.ts), so a file it would refuse is
+// refused here first.
 
 export const ATTACH_ACCEPT = '.pdf,.md,.markdown,.txt,application/pdf,text/markdown,text/plain';
 export const MAX_FILES = 5;

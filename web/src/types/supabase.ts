@@ -434,7 +434,7 @@ export type Database = {
       }
       ai_sessions: {
         Row: {
-          activity_space_id: string
+          activity_space_id: string | null
           created_at: string
           folder_id: string | null
           id: string
@@ -444,7 +444,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          activity_space_id: string
+          activity_space_id?: string | null
           created_at?: string
           folder_id?: string | null
           id?: string
@@ -454,7 +454,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
-          activity_space_id?: string
+          activity_space_id?: string | null
           created_at?: string
           folder_id?: string | null
           id?: string

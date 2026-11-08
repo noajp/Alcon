@@ -1,6 +1,6 @@
 // The decision half of a paused turn, shared by every driver that can
-// hold one: an Element's run (execute) and a Copilot session's anchor run
-// (resumeCopilot). A decision answers the paused turn before anything
+// hold one: an Element's run (execute) and a Copilot session's run
+// (Athena's chat driver). A decision answers the paused turn before anything
 // else: the action is marked, the approved batch runs to the end with its
 // progress saved as it goes (a slice that runs out of time hands the rest
 // to a continuation), or the rejection goes back to the model as the

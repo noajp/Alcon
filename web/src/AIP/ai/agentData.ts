@@ -83,7 +83,7 @@ async function fetchLatestAgentRun(elementId: string): Promise<ParsedAgentRun | 
   return parseAgentRun(data);
 }
 
-async function fetchAgentRunSteps(runId: string): Promise<AgentRunStep[]> {
+export async function fetchAgentRunSteps(runId: string): Promise<AgentRunStep[]> {
   const { data, error } = await supabase
     .from('agent_run_steps')
     .select('*')
@@ -313,6 +313,71 @@ export async function decideAgentActionById(opts: {
     decision: {
       actionId: opts.actionId, approve: opts.approve, inputHash: opts.inputHash, note: opts.note?.trim() || undefined,
     },
+  });
+}
+
+// ── Copilot chat runs ─────────────────────────────────────────────────────
+// A Copilot conversation runs on its session's one open run (Athena's
+// chat driver): the panel ensures the run, posts the message to it, and
+// follows it. A chat run rests at 'awaiting_input' between messages —
+// its own open set, wider than an Element run's.
+
+const COPILOT_RUN_OPEN_STATUSES: AgentRunStatus[] = ['queued', 'running', 'awaiting_approval', 'paused', 'awaiting_input'];
+
+export interface CopilotRunRef { id: string; status: AgentRunStatus }
+
+/** The session's open chat run, if it has one. */
+export async function fetchOpenCopilotRun(sessionId: string): Promise<CopilotRunRef | null> {
+  const { data, error } = await supabase
+    .from('agent_runs')
+    .select('id, status')
+    .eq('ai_session_id', sessionId)
+    .in('status', COPILOT_RUN_OPEN_STATUSES)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as CopilotRunRef | null) ?? null;
+}
+
+/** Starts the session's chat run. Two windows racing settle on the
+ *  one-open-run-per-session index: the loser's insert fails, and it
+ *  reads the winner back instead. */
+export async function insertCopilotRun(sessionId: string): Promise<CopilotRunRef | null> {
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from('agent_runs')
+    .insert({ ai_session_id: sessionId, triggered_by: userId, mode: 'copilot', status: 'queued' })
+    .select('id, status')
+    .single();
+  if (!error && data) return data as unknown as CopilotRunRef;
+  return fetchOpenCopilotRun(sessionId);
+}
+
+/** Takes a chat run out of its session's open slot: the person's stop
+ *  (the engine sees the cancellation and halts the turn), or a
+ *  conversation cut back, whose next send starts a fresh run. */
+export async function retireCopilotRun(runId: string): Promise<void> {
+  const { error } = await supabase
+    .from('agent_runs')
+    .update({ status: 'cancelled', finished_at: new Date().toISOString() })
+    .eq('id', runId)
+    .in('status', COPILOT_RUN_OPEN_STATUSES);
+  if (error) throw error;
+}
+
+/** Posts a chat message to the session's run: the person's words, the
+ *  view context they were sent from, and any files (with their data). */
+export async function sendCopilotMessage(runId: string, opts: {
+  message: string;
+  context?: object;
+  attachments?: { name: string; mediaType: string; data?: string }[];
+}): Promise<void> {
+  await invokeEngine({
+    runId, message: opts.message,
+    ...(opts.context ? { context: opts.context } : {}),
+    ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
   });
 }
 

@@ -90,4 +90,4 @@ curl -s -X POST "$ALCON_API/elements/ELE_PLT-006/comments" -H "Authorization: Be
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-api --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない・無効な場合に、関数自身がこの API の形式の 401 を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-mcp` も、`_shared/boardTools.ts` を変更したら `alcon-mcp` と `alcon-copilot` も再デプロイする。PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` が要る（[mcp.md](mcp.md) のデプロイを参照）。
+`--no-verify-jwt` を付けるのは、トークンがない・無効な場合に、関数自身がこの API の形式の 401 を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-mcp` も、`_shared/boardTools.ts` を変更したら `alcon-mcp` も再デプロイする。`alcon-copilot` はツールなし JSON 応答だけの関数で、`_shared/attachments.ts` と `_shared/models.ts` にのみ依存する（チャットは run-agent が担う）。PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` が要る（[mcp.md](mcp.md) のデプロイを参照）。
