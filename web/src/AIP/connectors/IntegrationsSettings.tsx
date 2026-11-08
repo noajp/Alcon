@@ -23,6 +23,7 @@ import { APPROVAL_MODE_DESCRIPTIONS, APPROVAL_MODE_LABELS, APPROVAL_MODE_ORDER, 
 import { createDraft, useIntegrationDrafts } from './draftData';
 import { DRAFT_STATUS_LABELS, reconcileDraftWeb } from './draftModel';
 import { IntegrationDraftDialog } from './IntegrationDraftDialog';
+import { SiteCredentialsSection } from './SiteCredentialsSection';
 import { Textarea } from '@/ui/textarea';
 import type { IntegrationDraft } from '@/types/database';
 import { IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
@@ -187,6 +188,10 @@ function ExternalServicesPanel() {
           </div>
         )}
       </section>}
+
+      {mode === 'yours' && spaceId && (
+        <SiteCredentialsSection spaceId={spaceId} integrations={integrations} isOwner={isOwner} ownerKnown={ownerRole !== null} />
+      )}
 
       {mode === 'yours' && drafts.length > 0 && (
         <section className="space-y-3">

@@ -1432,6 +1432,44 @@ export interface Integration {
 export type IntegrationUpdate = Partial<Pick<Integration,
   'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled' | 'manifest'>>
 
+/** A website username/password login (secure-login PR1): the metadata a
+ *  browser may know. The password itself lives only in Vault under
+ *  `site-credential:<id>` and is never selected back — `secret_id` only
+ *  says whether one is stored. Written only through
+ *  set_site_credential_by_origin / set_site_credential (owner-only). */
+export interface SiteCredential {
+  id: string
+  activity_space_id: string
+  /** Canonical scheme://host[:port] — the credential's identity. */
+  origin: string
+  username: string
+  label: string | null
+  secret_id: string | null
+  /** Same shape as an integration's last_test; written by the runner sign-in path (PR3). */
+  last_test: Json | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** One row of the append-only credential audit (credential_uses):
+ *  which credential was touched, how, by whom or by which run — never
+ *  a value. Owners of the Space read it; PR1 writes the lifecycle
+ *  events (stored / replaced / deleted). */
+export interface CredentialUse {
+  id: string
+  activity_space_id: string
+  credential_kind: 'integration' | 'site' | 'once'
+  integration_id: string | null
+  site_credential_id: string | null
+  event: 'stored' | 'replaced' | 'deleted' | 'declined' | 'used' | 'test_failed' | 'release_refused'
+  run_id: string | null
+  actor_id: string | null
+  origin: string | null
+  detail: string | null
+  created_at: string
+}
+
 export type IntegrationDraftStatus =
   | 'drafting' | 'awaiting_input' | 'testing' | 'awaiting_review'
   | 'active' | 'rejected' | 'failed' | 'expired' | 'superseded' | 'rerouted'

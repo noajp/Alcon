@@ -1474,6 +1474,150 @@ export type Database = {
           },
         ]
       }
+      credential_requests: {
+        Row: {
+          activity_space_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          expires_at: string | null
+          id: string
+          integration_id: string | null
+          kind: string
+          need: Json
+          origin: string | null
+          requested_by: string | null
+          site_credential_id: string | null
+          status: string
+          username_hint: string | null
+        }
+        Insert: {
+          activity_space_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          expires_at?: string | null
+          id?: string
+          integration_id?: string | null
+          kind: string
+          need?: Json
+          origin?: string | null
+          requested_by?: string | null
+          site_credential_id?: string | null
+          status?: string
+          username_hint?: string | null
+        }
+        Update: {
+          activity_space_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          expires_at?: string | null
+          id?: string
+          integration_id?: string | null
+          kind?: string
+          need?: Json
+          origin?: string | null
+          requested_by?: string | null
+          site_credential_id?: string | null
+          status?: string
+          username_hint?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credential_requests_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_requests_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_requests_site_credential_id_fkey"
+            columns: ["site_credential_id"]
+            isOneToOne: false
+            referencedRelation: "site_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credential_uses: {
+        Row: {
+          activity_space_id: string
+          actor_id: string | null
+          created_at: string
+          credential_kind: string
+          detail: string | null
+          event: string
+          id: string
+          integration_id: string | null
+          origin: string | null
+          run_id: string | null
+          site_credential_id: string | null
+        }
+        Insert: {
+          activity_space_id: string
+          actor_id?: string | null
+          created_at?: string
+          credential_kind: string
+          detail?: string | null
+          event: string
+          id?: string
+          integration_id?: string | null
+          origin?: string | null
+          run_id?: string | null
+          site_credential_id?: string | null
+        }
+        Update: {
+          activity_space_id?: string
+          actor_id?: string | null
+          created_at?: string
+          credential_kind?: string
+          detail?: string | null
+          event?: string
+          id?: string
+          integration_id?: string | null
+          origin?: string | null
+          run_id?: string | null
+          site_credential_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credential_uses_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_uses_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_uses_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_uses_site_credential_id_fkey"
+            columns: ["site_credential_id"]
+            isOneToOne: false
+            referencedRelation: "site_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_column_placements: {
         Row: {
           column_id: string
@@ -4604,6 +4748,53 @@ export type Database = {
           },
         ]
       }
+      site_credentials: {
+        Row: {
+          activity_space_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string | null
+          last_test: Json | null
+          origin: string
+          secret_id: string | null
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          activity_space_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string | null
+          last_test?: Json | null
+          origin: string
+          secret_id?: string | null
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          activity_space_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string | null
+          last_test?: Json | null
+          origin?: string
+          secret_id?: string | null
+          updated_at?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_credentials_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       space_approval_mode_changes: {
         Row: {
           activity_space_id: string
@@ -6099,6 +6290,10 @@ export type Database = {
         Args: { p_integration_id: string }
         Returns: string
       }
+      get_site_credential: {
+        Args: { p_site_credential_id: string }
+        Returns: string
+      }
       get_my_elements: { Args: never; Returns: Json }
       get_now_work: { Args: { p_space_id: string }; Returns: Json }
       get_space_guest_domain_members: {
@@ -6223,6 +6418,10 @@ export type Database = {
       merge_widget_params: {
         Args: { p_patch: Json; p_widget_id: string }
         Returns: Json
+      }
+      normalize_site_origin: {
+        Args: { p_origin: string }
+        Returns: string
       }
       note_presence_allowed: { Args: { p_topic: string }; Returns: boolean }
       notify_about_element: {
@@ -6381,6 +6580,21 @@ export type Database = {
       set_oauth_client_access: {
         Args: { p_access: string; p_client_id: string }
         Returns: undefined
+      }
+      set_site_credential: {
+        Args: { p_password: string; p_request_id: string; p_username: string }
+        Returns: string
+      }
+      set_site_credential_by_origin: {
+        Args: {
+          p_activity_space_id: string
+          p_force?: boolean
+          p_label?: string | null
+          p_origin: string
+          p_password: string
+          p_username: string
+        }
+        Returns: string
       }
       set_space_approval_mode: {
         Args: { p_mode: string; p_space_id: string }
