@@ -1874,6 +1874,60 @@ export type Database = {
           },
         ]
       }
+      definition_revision_candidates: {
+        Row: {
+          activity_space_id: string
+          created_at: string
+          definition_id: string
+          id: string
+          pairs: number
+          rate: number
+          reason: string
+          sample_outcome_ids: string[]
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activity_space_id: string
+          created_at?: string
+          definition_id: string
+          id?: string
+          pairs: number
+          rate: number
+          reason: string
+          sample_outcome_ids?: string[]
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activity_space_id?: string
+          created_at?: string
+          definition_id?: string
+          id?: string
+          pairs?: number
+          rate?: number
+          reason?: string
+          sample_outcome_ids?: string[]
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "definition_revision_candidates_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "definition_revision_candidates_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       definitions: {
         Row: {
           activity_space_id: string
@@ -5376,6 +5430,63 @@ export type Database = {
         }
         Relationships: []
       }
+      verifier_calibration: {
+        Row: {
+          activity_space_id: string
+          agree_fail: number
+          agree_pass: number
+          definition_id: string
+          false_fail: number
+          false_pass: number
+          id: string
+          pairs: number
+          updated_at: string
+          window_days: number
+          window_start: string
+        }
+        Insert: {
+          activity_space_id: string
+          agree_fail?: number
+          agree_pass?: number
+          definition_id: string
+          false_fail?: number
+          false_pass?: number
+          id?: string
+          pairs?: number
+          updated_at?: string
+          window_days: number
+          window_start: string
+        }
+        Update: {
+          activity_space_id?: string
+          agree_fail?: number
+          agree_pass?: number
+          definition_id?: string
+          false_fail?: number
+          false_pass?: number
+          id?: string
+          pairs?: number
+          updated_at?: string
+          window_days?: number
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verifier_calibration_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verifier_calibration_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       widget_boards: {
         Row: {
           board_key: string
@@ -6504,6 +6615,10 @@ export type Database = {
           name: string
           user_id: string
         }[]
+      }
+      resolve_revision_candidate: {
+        Args: { p_candidate_id: string; p_status: string }
+        Returns: string
       }
       resolve_work_import: {
         Args: { p_batch_id: string; p_space_id: string }

@@ -24,7 +24,14 @@
 //                                      half from each run's sealed record,
 //                                      the human signal from the acts that
 //                                      already exist, and the rollups —
-//                                      measurement only, no behavior.
+//                                      measurement only, no behavior. The
+//                                      same tick then evaluates verifier
+//                                      calibration over those outcomes (B5):
+//                                      per definition, where the verifier
+//                                      and the human systematically
+//                                      disagree, a revision candidate opens
+//                                      for a person — measurement and a
+//                                      queue, never an edit.
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -51,6 +58,7 @@ import { deleteStagedRow, loadDraft, transitionDraft } from "../_shared/integrat
 import { loadPromotionDraft, transitionPromotionDraft } from "../_shared/promotionDrafts.ts";
 import { settlePromotionRehearsal } from "../_shared/promotionTest.ts";
 import { collectOutcomes } from "../_shared/outcomeCollector.ts";
+import { evaluateCalibration } from "../_shared/verifierCalibration.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -451,6 +459,21 @@ async function tick(env: Env): Promise<Record<string, number>> {
   } catch (e) {
     console.error("automations: outcome collection failed", e instanceof Error ? e.message : e);
   }
+  // Verifier calibration (B5): over the outcomes the collector keeps,
+  // pair each checked verdict with its human signal per definition;
+  // where the disagreement is systematic, open (or refresh) a
+  // definition-revision candidate. Deterministic, derived from the
+  // same sealed rows, and it changes no behavior either — the queue
+  // is worked by people, surfaced by the heartbeat.
+  let calibrationRows = 0, calibrationOpened = 0, calibrationRefreshed = 0;
+  try {
+    const evaluated = await evaluateCalibration(env.admin, now);
+    calibrationRows = evaluated.calibrationRows;
+    calibrationOpened = evaluated.opened;
+    calibrationRefreshed = evaluated.refreshed;
+  } catch (e) {
+    console.error("automations: calibration evaluation failed", e instanceof Error ? e.message : e);
+  }
   // Heartbeats whose wake is due. The tick's arrival is stamped on
   // every enabled Space first: the pg_cron registration is per
   // environment, and this stamp is how the settings screen can say
@@ -490,7 +513,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, credentialRequestsExpired, credentialStashesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, credentialRequestsExpired, credentialStashesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

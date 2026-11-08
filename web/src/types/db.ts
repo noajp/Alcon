@@ -30,6 +30,7 @@ import type {
   Element, ElementComment, IssuedPersonalAccessToken,
   IntegrationDraftStatus, DraftRequestContext, DraftDrop, DraftChangeEvent,
   PromotionDraftStatus, PromotionBinding, PromotionMaterialSource, PromotionDraftEvent,
+  RevisionCandidateReason, RevisionCandidateStatus,
 } from './database'
 import type { ElementImportResult, ElementImportRow } from '@/Function/shared/element/intakeModel'
 import type { DeploymentGrant, GrantOperation } from '@/Function/audit/auditModel'
@@ -131,6 +132,10 @@ interface ColumnOverrides {
     rehearsal_report: Record<string, unknown> | null
     material_sources: PromotionMaterialSource[]
     events: PromotionDraftEvent[]
+  }
+  definition_revision_candidates: {
+    reason: RevisionCandidateReason
+    status: RevisionCandidateStatus
   }
   code_changes: { provider: 'github'; state: CodeChangeState; linked_via: 'manual' | 'agent' }
   code_change_reviews: { verdict: 'comment' | 'matches' | 'needs_changes' }

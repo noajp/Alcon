@@ -16,6 +16,8 @@ import { signsInWithOAuth } from '@/AIP/connectors/catalog';
 import { ConnectDialogHost, openedForPreset, openedForRegistryEntry, type OpenedConnection } from '@/AIP/connectors/ConnectDialogHost';
 import { saveOAuthReturnSettingsTab, useOAuthOutcome } from '@/AIP/connectors/oauthReturn';
 import { applyDefinitionCatalogUpdate, createDefinition, deleteDefinition, markDefinitionCatalogVersion, setDefinitionEnabled, updateDefinition, useDefinitions, useSpaceDefaultHarness, type Definition } from '@/hooks/definitionData';
+import { resolveRevisionCandidate, useDefinitionCalibration } from '@/hooks/calibrationData';
+import { calibrationSummaryOf, candidateErrorCount, ratePercent } from './calibrationModel';
 import { useCatalog, useConnectorDirectory, type CatalogDefinition } from '@/hooks/customizeData';
 import { checkHarness, parseDefinition, type Diagnostic } from './harnessDefinition';
 import { catalogRelation, lineDiffCounts } from './installState';
@@ -415,7 +417,7 @@ export function HarnessesPanel() {
       {trying && <TryDefinition definition={trying} onClose={() => setTrying(null)} />}
 
       {editing && spaceId && (
-        <HarnessEditor spaceId={spaceId} definition={editing === 'new' ? null : editing} connected={connected}
+        <HarnessEditor spaceId={spaceId} definition={editing === 'new' ? null : editing} connected={connected} isOwner={isOwner}
           onClose={() => setEditing(null)} onSaved={() => { void library.refetch(); setEditing(null); }} />
       )}
     </div>
@@ -537,8 +539,8 @@ function Diagnostics({ diagnostics }: { diagnostics: Diagnostic[] }) {
   );
 }
 
-function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
-  spaceId: string; definition: Definition | null; connected: string[]; onClose: () => void; onSaved: () => void;
+function HarnessEditor({ spaceId, definition, connected, isOwner, onClose, onSaved }: {
+  spaceId: string; definition: Definition | null; connected: string[]; isOwner: boolean; onClose: () => void; onSaved: () => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(definition?.name ?? '');
@@ -570,6 +572,7 @@ function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
           <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={14} spellCheck={false} className="font-mono text-[12px]"
             placeholder={'# 目的\n…\n# 進め方\n1. …\n# 止める条件\n- …\n# 使うコネクタ\n- GitHub\n# 成果物の型\n```md\n# …\n```'} />
           {body.trim() && <Diagnostics diagnostics={diagnostics} />}
+          {definition && <CalibrationSection spaceId={spaceId} definitionId={definition.id} isOwner={isOwner} />}
           {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
         <DialogFooter>
@@ -579,5 +582,68 @@ function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The definition's calibration drill-down (B5): how its verifier's
+ *  checked verdicts paired with people's eventual judgements over the
+ *  trailing window — agree / false pass / false fail, the three
+ *  numbers that answer "is my verifier lying to me on this
+ *  definition" — and, when the tick evaluator has queued the
+ *  definition for revision, the claim itself with the owner's two
+ *  answers (the definition was revised, or the claim is dismissed).
+ *  Nothing renders until pairs exist: calibration speaks only where
+ *  a person judged the work, and silence below the data is the
+ *  honest state, not a missing feature. Resolving goes through the
+ *  owner-checked RPC; a member sees the claim but no buttons. */
+function CalibrationSection({ spaceId, definitionId, isOwner }: {
+  spaceId: string; definitionId: string; isOwner: boolean;
+}) {
+  const { t } = useI18n();
+  const { calibration, candidate, loading, refetch } = useDefinitionCalibration(spaceId, definitionId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const summary = calibrationSummaryOf(calibration);
+  if (loading || (!summary && !candidate)) return null;
+  const resolve = async (status: 'dismissed' | 'addressed') => {
+    if (!candidate) return;
+    setBusy(true); setError(null);
+    try { await resolveRevisionCandidate(candidate.id, status); refetch(); }
+    catch (e) { setError(formatError(e)); }
+    setBusy(false);
+  };
+  return (
+    <div className="space-y-2 rounded-md border border-[var(--border-default)] p-3">
+      <div className="text-[11px] text-muted-foreground">{t('Verifier calibration')}</div>
+      {summary && (
+        <p className="text-[12px] tabular-nums text-foreground">
+          {t('Agree {agree} · False pass {fp} · False fail {ff} — {n} paired results in the last {days} days', {
+            agree: summary.agree, fp: summary.falsePass, ff: summary.falseFail, n: summary.pairs, days: summary.windowDays,
+          })}
+        </p>
+      )}
+      {candidate && (
+        <div className="space-y-2">
+          <p className="text-[12px] text-[var(--status-warning)]">
+            {candidate.reason === 'false_pass_heavy'
+              ? t('Queued for revision: this verifier passes work people send back ({errors} of {n} paired results, {rate}%).', {
+                  errors: candidateErrorCount(candidate), n: candidate.pairs, rate: ratePercent(candidate.rate),
+                })
+              : candidate.reason === 'false_fail_heavy'
+                ? t('Queued for revision: this verifier fails work people accept ({errors} of {n} paired results, {rate}%).', {
+                    errors: candidateErrorCount(candidate), n: candidate.pairs, rate: ratePercent(candidate.rate),
+                  })
+                : t('Queued for revision.')}
+          </p>
+          {isOwner && (
+            <div className="flex items-center gap-2">
+              <Button size="xs" variant="secondary" disabled={busy} onClick={() => void resolve('addressed')}>{t('Mark addressed')}</Button>
+              <Button size="xs" variant="ghost" disabled={busy} onClick={() => void resolve('dismissed')}>{t('Dismiss')}</Button>
+            </div>
+          )}
+          {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+        </div>
+      )}
+    </div>
   );
 }
