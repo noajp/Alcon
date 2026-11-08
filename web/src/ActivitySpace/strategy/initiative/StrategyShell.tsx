@@ -83,7 +83,6 @@ import {
   WidgetSurface,
   WidgetZone,
   WidgetActionSlotProvider,
-  WidgetActionSlotTarget,
   INITIATIVE_BOARD,
   type BoardLayout,
   type WidgetHost,
@@ -126,7 +125,9 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
   children: React.ReactNode;
 }) {
   const board = useBoard(surface, defaults, subjectId);
-  return <WidgetSurface board={board} host={host} zones={zones} className="space-y-5">{children}</WidgetSurface>;
+  // No "Add widget": what a Strategy shows is written into its description
+  // with "/". Widgets already placed keep drawing.
+  return <WidgetSurface board={board} host={host} zones={zones} addable={false} className="space-y-5">{children}</WidgetSurface>;
 }
 
 // =============================================================
@@ -946,8 +947,6 @@ function StrategyDetailView({
           </span>
         )}
         <div className="ml-auto flex min-w-0 items-center gap-2">
-          {/* "Add widget" is page chrome: it sits in the header, as on a Domain. */}
-          <WidgetActionSlotTarget className="flex items-center gap-1" />
           {(deleteError || saveError) && (
             <span role="status" className="text-[11px] text-muted-foreground truncate">
               {deleteError ?? t('{error} — change reverted', { error: saveError ?? '' })}
