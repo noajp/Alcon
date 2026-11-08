@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { AlertCircle, Check, CheckCheck, ChevronRight, Copy, FileText, Hand, Loader2, Pencil, RotateCcw } from '@/ui/icons';
+import { AlertCircle, Check, CheckCheck, ChevronRight, Copy, FileText, Loader2, Pencil, RotateCcw } from '@/ui/icons';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
-import type { CopilotApproval, CopilotApprovalCall, CopilotAttachment, CopilotMessage, ToolEvent } from './useAlconCopilot';
-import { CRITICAL_CLASS_LABELS } from '@/AIP/connectors/catalog';
+import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
+import type { AgentAction } from '@/types/database';
+import type { CopilotApproval, CopilotAttachment, CopilotMessage, ToolEvent } from './useAlconCopilot';
 import { toolVerb } from './copilotFiles';
 import { splitAnswer } from './chartSpec';
 
@@ -17,7 +18,7 @@ const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: ()
  *  bare asterisks; its work shows as steps above it. Under each turn, as in
  *  Claude's chat: copy, and on the latest exchange retry (an answer) or edit
  *  (a question); the time shows beside them. */
-export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval }: {
+export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval }: {
   message: CopilotMessage;
   streaming: boolean;
   /** Present on the latest answer once it is in. */
@@ -25,7 +26,9 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   /** Present on the latest question while nothing is streaming. */
   onEdit?: () => void;
   /** Present when an approval card on this answer can be decided now. */
-  onDecideApproval?: (approval: CopilotApproval, approve: boolean) => void;
+  onDecideApproval?: (approval: CopilotApproval, approve: boolean, opts: { note?: string; remember?: string[] }) => void;
+  /** Whether the viewer owns the Space (a standing approval is theirs to give). */
+  canRememberApproval?: boolean;
 }) {
   const { t } = useI18n();
   if (message.role === 'user') {
@@ -56,8 +59,8 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
         ? <Answer content={message.content} />
         : streaming && events.length === 0 && <Working label="Thinking" />}
       {message.approvals?.map((a) => (
-        <ApprovalCard key={a.inputHash} approval={a}
-          onDecide={onDecideApproval ? (approve) => onDecideApproval(a, approve) : undefined} />
+        <ApprovalCard key={a.inputHash} approval={a} canRemember={canRememberApproval}
+          onDecide={onDecideApproval ? (approve, opts) => onDecideApproval(a, approve, opts) : undefined} />
       ))}
       {settled && message.content && (
         <div className={`flex items-center gap-0.5 transition-opacity ${onRetry ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
@@ -70,141 +73,64 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   );
 }
 
+
 /**
  * Integration writes waiting for the person's decision, on a card in the
- * chat: the same contract as a run's approval card — the operations and
- * where they go, a critical warning, the calls bound to exactly this
- * input — at the panel's size. Approving runs exactly these calls with
+ * chat: the shared decision card (Function/shared/ApprovalDecisionCard),
+ * fed by an action-shaped view of the turn payload — the same contract
+ * as a run's approval card. Approving runs exactly these calls with
  * exactly this input; denying runs nothing. A persisted card (one with a
  * run and an action) is a run's approval like any other: it waits in the
  * Inbox too, for the person who started the conversation, and lapses
- * after seven days undecided.
+ * after seven days undecided. The chat's own addition over the shared
+ * anatomy is the per-call results, which land on the card once its
+ * approved calls have run.
  */
-function ApprovalCard({ approval, onDecide }: {
+function ApprovalCard({ approval, onDecide, canRemember }: {
   approval: CopilotApproval;
   /** Absent while a turn is streaming, or on a surface that cannot decide. */
-  onDecide?: (approve: boolean) => void;
+  onDecide?: (approve: boolean, opts: { note?: string; remember?: string[] }) => void;
+  canRemember?: boolean;
 }) {
   const { t } = useI18n();
-  const [showInput, setShowInput] = useState(false);
-  const calls = approval.calls;
-  const critical = calls.find((c) => c.display.critical)?.display.critical ?? null;
-  const destinations = [...new Set(calls.map((c) => c.display.destination).filter(Boolean))];
-  const groups = new Map<string, number>();
-  for (const c of calls) {
-    const key = `${c.display.integration} · ${c.display.operation || t('write')}`;
-    groups.set(key, (groups.get(key) ?? 0) + 1);
-  }
-  const summary = [...groups.entries()].map(([k, n]) => (n > 1 ? `${k} × ${n}` : k)).join('、');
-  const status = approval.status;
+  const action = useMemo<AgentAction>(() => {
+    // The grouped summary the chat card has always headlined a mixed
+    // batch with; a uniform batch's headline comes from the model.
+    const groups = new Map<string, number>();
+    for (const c of approval.calls) {
+      const key = `${c.display.integration} · ${c.display.operation || t('write')}`;
+      groups.set(key, (groups.get(key) ?? 0) + 1);
+    }
+    const summary = [...groups.entries()].map(([k, n]) => (n > 1 ? `${k} × ${n}` : k)).join('、');
+    return {
+      id: approval.actionId ?? approval.inputHash,
+      run_id: approval.runId ?? '',
+      element_id: null,
+      tool: '',
+      input: {
+        calls: approval.calls.map((c) => ({ id: c.id, name: c.name, input: c.input })),
+        display: approval.calls.map((c) => ({ ...c.display, id: c.id })),
+      } as AgentAction['input'],
+      input_hash: approval.inputHash,
+      summary,
+      integration_id: null,
+      status: approval.status === 'pending' ? 'pending'
+        : approval.status === 'executing' ? 'approved'
+        : approval.status === 'executed' ? 'executed'
+        : approval.status === 'denied' ? 'rejected'
+        : approval.status === 'failed' ? 'failed' : 'expired',
+      decided_by: null,
+      decided_at: null,
+      decision_note: null,
+      result: null,
+      expires_at: null,
+      created_at: '',
+    };
+  }, [approval, t]);
   return (
-    <div className="rounded-lg border border-border bg-card p-2.5 animate-fade-in">
-      <div className="flex items-start gap-2">
-        <Hand size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <div className="font-medium text-foreground">{summary}</div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-            {calls.length > 1 ? `${t('Approving runs all {n} operations', { n: calls.length })} · ` : ''}
-            {destinations.length === 1 ? t('Destination: {where}', { where: destinations[0] }) : t('{n} destinations', { n: destinations.length })}
-          </div>
-        </div>
-        {status === 'pending' && (
-          <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10.5px] text-muted-foreground">{t('Awaiting approval')}</span>
-        )}
-      </div>
-
-      {critical && (
-        <div className="mt-2 rounded-md border border-[var(--status-danger)]/40 bg-[var(--status-danger)]/10 px-2 py-1.5 text-[11.5px] text-[var(--status-danger)]">
-          {t('This includes a critical operation ({class}). Critical operations always ask, whatever the delegation.', { class: t(CRITICAL_CLASS_LABELS[critical as keyof typeof CRITICAL_CLASS_LABELS] ?? critical) })}
-        </div>
-      )}
-
-      <ul className="mt-2 space-y-1.5">
-        {calls.map((c) => <ApprovalCallRow key={c.id} call={c} />)}
-      </ul>
-
-      <button type="button" onClick={() => setShowInput((v) => !v)} aria-expanded={showInput}
-        className="mt-2 flex items-center gap-1 rounded text-[11px] text-muted-foreground transition-colors hover:text-foreground">
-        <ChevronRight size={11} className={`transition-transform duration-200 ${showInput ? 'rotate-90' : ''}`} />
-        {t('Exact input')}
-      </button>
-      {showInput && (
-        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted/60 p-2 font-mono text-[10.5px] text-muted-foreground animate-fade-in">
-          {JSON.stringify(calls.map((c) => c.input), null, 2)}
-        </pre>
-      )}
-      <div className="mt-1.5 text-[11px] text-muted-foreground">
-        {t('Allowing runs exactly these calls with exactly this input. If the input changes, this approval no longer matches.')}
-      </div>
-
-      {status === 'pending' && onDecide && (
-        <div className="mt-2.5 flex items-center justify-end gap-1.5">
-          <button type="button" onClick={() => onDecide(false)}
-            className="rounded-md border border-border px-2.5 py-1 text-[12px] text-foreground transition-colors hover:bg-muted">
-            {t('Deny')}
-          </button>
-          <button type="button" onClick={() => onDecide(true)}
-            className="rounded-md bg-primary px-2.5 py-1 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90">
-            {t('Approve and run')}
-          </button>
-        </div>
-      )}
-      {status === 'executing' && <div className="mt-2"><Working label="Working" /></div>}
-      {status === 'denied' && (
-        <div className="mt-2 text-[11.5px] text-muted-foreground">{t('You denied this operation. It was not run.')}</div>
-      )}
-      {status === 'expired' && (
-        <div className="mt-2 text-[11.5px] text-muted-foreground">{t('This approval expired undecided. It was not run.')}</div>
-      )}
-      {(status === 'executed' || status === 'failed') && approval.results && (
-        <ul className="mt-2 space-y-0.5">
-          {approval.results.map((r, i) => {
-            const call = calls.find((c) => c.name === r.name);
-            const Icon = r.ok ? Check : AlertCircle;
-            return (
-              <li key={i} className={`flex min-w-0 items-start gap-1.5 text-[11.5px] ${r.ok ? 'text-muted-foreground' : 'text-[var(--status-danger)]'}`}>
-                <Icon size={11} className="mt-0.5 shrink-0" />
-                <span className="min-w-0">
-                  {call && <span className="font-medium">{call.display.integration} · {call.display.operation} — </span>}
-                  <span className="break-words">{r.content.slice(0, 160)}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function ApprovalCallRow({ call }: { call: CopilotApprovalCall }) {
-  const { t } = useI18n();
-  const d = call.display;
-  const fields = Object.entries(call.input).filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v)).slice(0, 6);
-  return (
-    <li className="rounded-md bg-muted/50 px-2 py-1.5">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-        <span className="font-medium text-foreground">{d.integration}</span>
-        <span className="rounded bg-background px-1 py-px font-mono text-[10.5px] text-muted-foreground">{d.operation}</span>
-        <span className="text-[10.5px] text-muted-foreground">{d.effect === 'read' ? t('read') : t('write')}</span>
-        {d.critical && (
-          <span className="rounded border border-[var(--status-danger)]/40 px-1 py-px text-[10.5px] text-[var(--status-danger)]">
-            {t('Critical · {class} — always asks', { class: t(CRITICAL_CLASS_LABELS[d.critical as keyof typeof CRITICAL_CLASS_LABELS] ?? d.critical) })}
-          </span>
-        )}
-      </div>
-      {d.detail && <div className="mt-0.5 break-all font-mono text-[10.5px] text-muted-foreground">{d.detail}</div>}
-      {fields.length > 0 && (
-        <div className="mt-0.5 space-y-px">
-          {fields.map(([k, v]) => (
-            <div key={k} className="flex min-w-0 gap-1.5 text-[11px]">
-              <span className="shrink-0 text-muted-foreground">{k}</span>
-              <span className="truncate text-foreground/90">{String(v)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </li>
+    <ApprovalDecisionCard action={action} surface="chat"
+      canDecide={!!onDecide} canRemember={canRemember} results={approval.results}
+      onDecide={async (approve, opts) => { onDecide?.(approve, opts); }} />
   );
 }
 

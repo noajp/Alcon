@@ -32,9 +32,10 @@ import { draftPermissionHashWeb, draftStructureHashWeb } from './draftModel';
 // deleting the row. Until the server has that provider's OAuth client,
 // Connect stays disabled with a note saying so.
 //
-// Agents act in a connected service without asking each time; whether they
-// may use it at all is the on/off. For an existing connection, on/off applies at once
-// (optimistically, rolled back on failure); custom name / endpoint / auth are
+// Whether agents may use a connection at all is the on/off; whether its
+// writes ask first is the delegation, chosen here — a new connection
+// starts at approve_each. For an existing connection, on/off and
+// delegation apply at once (optimistically, rolled back on failure); custom name / endpoint / auth are
 // saved with 「保存」. Members see the same dialog read-only.
 
 /** What a sign-in connection says, per provider (English source strings for t()). */
@@ -67,6 +68,17 @@ const CUSTOM_AUTH_LABELS: Record<'none' | 'bearer' | 'header', string> = {
   none: 'None',
   bearer: 'Bearer token',
   header: 'Custom header',
+};
+
+/** The delegation choice's words (English source strings for t()). */
+const DELEGATION_LABELS: Record<IntegrationDelegation, string> = {
+  approve_each: 'Approve each write',
+  full_delegation: 'Full delegation',
+};
+
+const DELEGATION_DESCRIPTIONS: Record<IntegrationDelegation, string> = {
+  approve_each: 'Agents ask before each write on this connection, as each command is set.',
+  full_delegation: 'Agents write without asking on this connection. Critical operations still ask every time, and “Not allowed” and conditions still hold.',
 };
 
 /** A service's logo on a tile, or the name's first letter when it has none. */
@@ -131,8 +143,21 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const [newEnabled, setNewEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Agents act in a connected service without asking each time.
-  const delegation: IntegrationDelegation = 'full_delegation';
+  // Delegation is the person's choice, not a constant: a new connection
+  // starts at approve_each — agents ask before writes, as each command
+  // is set — with full delegation one tap away; an existing connection's
+  // switch applies at once, like its on/off. (A model connection is not
+  // a tool agents call: its delegation is inert, keeps the historical
+  // default, and is not shown.)
+  const [newDelegation, setNewDelegation] = useState<IntegrationDelegation>(
+    integration?.delegation ?? (preset.kind === 'model' ? 'full_delegation' : 'approve_each'),
+  );
+  const delegation: IntegrationDelegation = integration?.delegation ?? newDelegation;
+  const setDelegation = (v: IntegrationDelegation) => {
+    if (!integration) { setNewDelegation(v); return; }
+    setError(null);
+    actions.update.mutate({ id: integration.id, patch: { delegation: v } }, { onError: (e) => setError(t(errorText(e))) });
+  };
   const enabled = integration?.enabled ?? newEnabled;
   const needsSecret = auth === 'bearer' || auth === 'header';
   const hasSecret = !!integration?.secret_id;
@@ -411,6 +436,30 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             <ToggleRow label={t('Enabled')} desc={isModel ? t('When off, AI agents on this connection do not run.') : t('When off, agents do not see this connection.')} value={enabled}
               disabled={readOnly} onChange={(v) => setLive({ enabled: v })} />
           </div>
+
+          {!isModel && (
+            <Field label={t('Delegation')}>
+              <div className="space-y-1.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" align="start" disabled={readOnly || busy}>
+                      <span>{t(DELEGATION_LABELS[delegation])}</span>
+                      <ChevronDown size={12} aria-hidden="true" className="opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[200px]">
+                    {(['approve_each', 'full_delegation'] as const).map((v) => (
+                      <DropdownMenuItem key={v} onSelect={() => setDelegation(v)} className="gap-2 text-[12px]">
+                        <span className="flex-1">{t(DELEGATION_LABELS[v])}</span>
+                        {delegation === v && <Check size={12} />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <p className="text-[12px] text-muted-foreground">{t(DELEGATION_DESCRIPTIONS[delegation])}</p>
+              </div>
+            </Field>
+          )}
 
           {integration && integration.kind === 'mcp' && (
             <Field label={t('Commands')}>

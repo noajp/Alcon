@@ -125,3 +125,56 @@ export function verdictUnderMode(facts: ApprovalFacts, mode: ApprovalMode): Appr
 export function needsApprovalFor(facts: ApprovalFacts): boolean {
   return approvalVerdict(facts) === "ask";
 }
+
+/**
+ * Why one call is being asked about — the vocabulary the approval card
+ * and the settings screen share, so a person deciding and a person
+ * configuring read one policy in one set of words. "mode" is the one
+ * reason this function never returns: it belongs to the mode
+ * composition, not the floors, and the caller that applies an "ask"
+ * mode to a display whose own reason is null names it there
+ * (displaysUnderMode in policyApproval.ts).
+ */
+export type AskReason = "critical" | "command" | "rule" | "mode" | "http" | "catalog";
+
+/**
+ * Pure. The reason a call's own facts hold it, or null when they let it
+ * through (or refuse it — a denial is not asked about). Keyed off
+ * approvalVerdict itself, so the reason can never name a hold the
+ * verdict did not make: a critical class outranks a command's ask, a
+ * rule-bound ask is the rule's, and a typed write that merely follows
+ * its connection's delegation has no named reason.
+ */
+export function askReasonOf(facts: ApprovalFacts): AskReason | null {
+  if (approvalVerdict(facts) !== "ask") return null;
+  if (facts.catalogDecision !== undefined) return "catalog";
+  if (facts.manifest) {
+    if (facts.manifest.critical) return "critical";
+    return facts.manifest.rule !== null ? "rule" : "command";
+  }
+  if (facts.critical) return "critical";
+  if (facts.rawHttp) return "http";
+  return null;
+}
+
+/**
+ * Pure. The lift a call's facts contain: "delegation" when the call ran
+ * unasked because full delegation lifted its command's ask — true
+ * exactly when approvalVerdict's delegation branch produced the allow
+ * for an ask-permission, rule-free, non-critical manifest command. The
+ * check re-runs the verdict, so the two cannot drift: a rule-bound ask
+ * (which asks under any delegation), a critical command, an allowed
+ * command, and a call the floors refuse or hold for any other reason
+ * are never a lift. The mode is not read here — a caller discloses a
+ * lift when the call actually ran (its final verdict was allow); under
+ * the free mode a delegation-lifted call is still this lift, not a
+ * policy approval, because its own verdict never asked.
+ */
+export function liftOf(facts: ApprovalFacts): "delegation" | null {
+  const m = facts.manifest;
+  if (!m || facts.catalogDecision !== undefined || !facts.isWrite) return null;
+  if (m.permission !== "ask" || m.rule !== null || m.critical) return null;
+  return facts.delegation === "full_delegation" && approvalVerdict(facts) === "allow"
+    ? "delegation"
+    : null;
+}

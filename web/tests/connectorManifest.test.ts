@@ -86,6 +86,60 @@ describe('manifestFromTools', () => {
   });
 });
 
+describe('presentation blocks', () => {
+  const withPresent = (present: unknown) => cm.parseManifest({
+    version: 1,
+    commands: [{ name: 'open_pr', action: 'pulls.create', effect: 'write', mcp: 'create_pull_request', present }],
+  }).manifest.commands[0];
+
+  it('reads a well-shaped block onto the command', () => {
+    const c = withPresent({
+      title: 'Open a pull request',
+      fields: [{ arg: 'title', label: 'Title' }, { arg: 'base', label: 'Base' }],
+      preview: 'body',
+    });
+    expect(c.present).toEqual({
+      title: 'Open a pull request',
+      fields: [{ arg: 'title', label: 'Title' }, { arg: 'base', label: 'Base' }],
+      preview: 'body',
+    });
+  });
+
+  it('drops a malformed block whole, and keeps the command', () => {
+    for (const bad of [
+      { title: 'x'.repeat(121) },
+      { title: 42 },
+      { fields: Array.from({ length: 9 }, (_, i) => ({ arg: `a${i}`, label: 'L' })) },
+      { fields: [{ arg: 'not a field!', label: 'L' }] },
+      { fields: [{ arg: 'ok', label: 'y'.repeat(41) }] },
+      { fields: 'title' },
+      { preview: 'not a field!' },
+      { preview: 7 },
+    ]) {
+      const c = withPresent(bad);
+      expect(c.present, JSON.stringify(bad)).toBeNull();
+      expect(c.name).toBe('open_pr');
+    }
+    expect(withPresent(undefined).present).toBeNull();
+    expect(withPresent({}).present).toBeNull();
+  });
+
+  it('survives a connection test rewrite, keyed by the tool, and drops with its tool', () => {
+    const before = {
+      version: 1,
+      commands: [{
+        name: 'open_pr', action: 'pulls.create', effect: 'write', mcp: 'create_pull_request',
+        present: { title: 'Open a pull request', preview: 'body' },
+      }],
+    };
+    const next = cm.manifestFromTools([{ name: 'create_pull_request', readOnly: false }], before);
+    const kept = (next.commands as { mcp: string; present?: unknown }[]).find((x) => x.mcp === 'create_pull_request');
+    expect(kept?.present).toEqual({ title: 'Open a pull request', preview: 'body' });
+    const gone = cm.manifestFromTools([{ name: 'search_repositories', readOnly: true }], before);
+    expect((gone.commands as { present?: unknown }[]).every((x) => x.present === undefined)).toBe(true);
+  });
+});
+
 describe('argument rules', () => {
   const RULED = {
     version: 1,

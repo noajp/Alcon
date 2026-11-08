@@ -142,6 +142,20 @@ describe('drafting rules', () => {
     expect(cd.validateDraftCandidate(candidate({ manifest: defaulted })).errors.join(' ')).toContain('defaults.write');
   });
 
+  it('tolerates a presentation block on a drafted command (v1: accepted, never required)', () => {
+    const presented = JSON.parse(JSON.stringify(MANIFEST));
+    presented.commands[2].present = { title: 'Create an item', fields: [{ arg: 'title', label: 'Title' }] };
+    const { errors, manifest } = cd.validateDraftCandidate(candidate({ manifest: presented }));
+    expect(errors).toEqual([]);
+    expect(manifest?.commands.find((c: { name: string }) => c.name === 'create_item')?.present?.title).toBe('Create an item');
+    // A malformed block is dropped by the manifest reader, not an error.
+    const malformed = JSON.parse(JSON.stringify(MANIFEST));
+    malformed.commands[2].present = { fields: [{ arg: 'not a field!', label: 'Title' }] };
+    const again = cd.validateDraftCandidate(candidate({ manifest: malformed }));
+    expect(again.errors).toEqual([]);
+    expect(again.manifest?.commands.find((c: { name: string }) => c.name === 'create_item')?.present).toBeNull();
+  });
+
   it('refuses a read whose name says it writes, an OAuth service, and a reserved header', () => {
     const verb = JSON.parse(JSON.stringify(MANIFEST));
     verb.commands.push({ name: 'delete_old_items', effect: 'read', http: { method: 'GET', path: '/items/old' } });

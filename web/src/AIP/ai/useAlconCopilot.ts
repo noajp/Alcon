@@ -42,6 +42,13 @@ export interface CopilotApprovalCall {
     effect: 'read' | 'write';
     critical: string | null;
     rememberable: boolean;
+    /** Display v2: the action sentence, its labeled fields, its content
+     *  preview, and why the call is asked about — absent on cards the
+     *  engine persisted before presentation data. */
+    title?: string;
+    fields?: { label: string; value: string }[];
+    preview?: string | null;
+    askReason?: string | null;
   };
 }
 
@@ -484,7 +491,7 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
    * bound to is gone — so the card says so, and the person asks again in
    * the chat, where the new card is persisted like any other.
    */
-  const decideApproval = useCallback(async (approval: CopilotApproval, approve: boolean) => {
+  const decideApproval = useCallback(async (approval: CopilotApproval, approve: boolean, opts?: { note?: string; remember?: string[] }) => {
     const isCard = (a: CopilotApproval) => (approval.actionId ? a.actionId === approval.actionId : a.inputHash === approval.inputHash);
     const patch = (status: CopilotApproval['status'], note?: string, results?: CopilotApproval['results']) => {
       setMessages((prev) => prev.map((m) => {
@@ -501,6 +508,7 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
       try {
         await decideAgentActionById({
           runId: approval.runId, actionId: approval.actionId, inputHash: approval.inputHash, approve,
+          note: opts?.note, remember: opts?.remember,
         });
       } catch {
         // The decision never landed: the card stays decidable.

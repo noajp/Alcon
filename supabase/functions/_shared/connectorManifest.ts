@@ -46,6 +46,23 @@ export interface CommandRule {
   permission: Permission;
 }
 
+/**
+ * How one call reads on an approval card: the action as a person reads
+ * it, the labeled fields worth deciding on (by argument name), and the
+ * argument whose value is the content preview. Presentation only —
+ * enforcement never reads it — so a malformed block is dropped whole
+ * rather than repaired, and a connection test must not wipe one a person
+ * (or an earlier draft) wrote.
+ */
+export interface CommandPresent {
+  /** The action as a person reads it: "Create a pull request". */
+  title?: string;
+  /** Ordered labeled fields, by argument name. */
+  fields?: { arg: string; label: string }[];
+  /** The argument whose value is the content preview (a body, a file's content, a message). */
+  preview?: string;
+}
+
 export interface ManifestCommand {
   name: string;
   action: string;
@@ -59,6 +76,8 @@ export interface ManifestCommand {
   mcp: string | null;
   /** Argument-bound permissions, first match wins. */
   rules: CommandRule[];
+  /** How a call reads on an approval card, when the manifest says. */
+  present: CommandPresent | null;
 }
 
 export interface Manifest {
@@ -71,6 +90,41 @@ const PERMISSIONS = new Set(["allow", "ask", "deny"]);
 const NAME = /^[a-z][a-z0-9_]{0,47}$/;
 const FIELD = /^[A-Za-z0-9_.-]{1,64}$/;
 export const MAX_RULES = 50;
+export const MAX_PRESENT_FIELDS = 8;
+
+/**
+ * Pure. A command's presentation block, or null when it carries none —
+ * or when what it carries is not in the one accepted shape (a title of
+ * at most 120 chars, at most 8 labeled fields with labels of at most 40
+ * chars, a preview naming an argument). A bad block is dropped whole,
+ * never fatal: a manifest is data a connection test rewrites, and a
+ * presentation mistake must not break enforcement.
+ */
+export function parsePresent(raw: unknown): CommandPresent | null {
+  const x = obj(raw);
+  if (!x) return null;
+  const present: CommandPresent = {};
+  if (x.title !== undefined) {
+    if (typeof x.title !== "string" || !x.title.trim() || x.title.length > 120) return null;
+    present.title = x.title;
+  }
+  if (x.fields !== undefined) {
+    if (!Array.isArray(x.fields) || x.fields.length > MAX_PRESENT_FIELDS) return null;
+    const fields: { arg: string; label: string }[] = [];
+    for (const f of x.fields) {
+      const y = obj(f);
+      if (!y || typeof y.arg !== "string" || !FIELD.test(y.arg)
+        || typeof y.label !== "string" || !y.label.trim() || y.label.length > 40) return null;
+      fields.push({ arg: y.arg, label: y.label });
+    }
+    if (fields.length) present.fields = fields;
+  }
+  if (x.preview !== undefined) {
+    if (typeof x.preview !== "string" || !FIELD.test(x.preview)) return null;
+    present.preview = x.preview;
+  }
+  return present.title || present.fields || present.preview ? present : null;
+}
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null);
@@ -208,6 +262,7 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       input: obj(x.input) ?? {},
       required: strings(x.required),
       rules: parseRules(x.rules),
+      present: parsePresent(x.present),
     });
   }
   const aliases: Record<string, string> = {};
@@ -346,6 +401,7 @@ export function manifestFromTools(tools: { name: string; description?: string; r
       name, action: typeof before?.action === "string" ? before.action : name, effect,
       ...(typeof before?.permission === "string" && PERMISSIONS.has(before.permission) ? { permission: before.permission } : {}),
       ...(Array.isArray(before?.rules) && before!.rules.length ? { rules: before!.rules } : {}),
+      ...(obj(before?.present) ? { present: before!.present } : {}),
       description: (t.description ?? "").slice(0, 1000),
       mcp: t.name,
     });

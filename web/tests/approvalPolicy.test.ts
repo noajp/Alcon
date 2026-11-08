@@ -167,6 +167,26 @@ describe('applyMode', () => {
   });
 });
 
+const reasonOf = ap.askReasonOf as (facts: Record<string, unknown>) => string | null;
+
+describe('askReasonOf', () => {
+  it('names the hold each facts shape makes, and nothing the verdict lets through', () => {
+    expect(reasonOf({ catalogDecision: 'approve', isWrite: true, isRead: false })).toBe('catalog');
+    expect(reasonOf({ catalogDecision: 'allow', isWrite: true, isRead: false })).toBeNull();
+    expect(reasonOf({ isWrite: true, isRead: false, manifest: { permission: 'allow', rule: null, critical: 'send' }, delegation: 'full_delegation' })).toBe('critical');
+    expect(reasonOf({ isWrite: true, isRead: false, manifest: { permission: 'ask', rule: 2, critical: null }, delegation: 'full_delegation' })).toBe('rule');
+    expect(reasonOf({ isWrite: true, isRead: false, manifest: { permission: 'ask', rule: null, critical: null }, delegation: 'approve_each' })).toBe('command');
+    expect(reasonOf({ isWrite: true, isRead: false, manifest: { permission: 'ask', rule: null, critical: null }, delegation: 'full_delegation' })).toBeNull();
+    expect(reasonOf({ isWrite: true, isRead: false, critical: 'delete', delegation: 'approve_each' })).toBe('critical');
+    expect(reasonOf({ isWrite: true, isRead: false, rawHttp: true, delegation: 'approve_each' })).toBe('http');
+    // A denial is not asked about, and a typed write held only by its
+    // connection's delegation has no named reason.
+    expect(reasonOf({ isWrite: true, isRead: false, manifest: { permission: 'deny', rule: null, critical: 'send' }, delegation: 'approve_each' })).toBeNull();
+    expect(reasonOf({ isWrite: true, isRead: false, delegation: 'approve_each' })).toBeNull();
+    expect(reasonOf({ isWrite: false, isRead: true, delegation: 'approve_each' })).toBeNull();
+  });
+});
+
 describe('approvalModeOf', () => {
   it('reads the three modes and falls back to auto for anything else', () => {
     expect(modeOf('ask')).toBe('ask');
@@ -176,5 +196,36 @@ describe('approvalModeOf', () => {
     expect(modeOf(undefined)).toBe('auto');
     expect(modeOf('yolo')).toBe('auto');
     expect(ap.APPROVAL_MODES).toEqual(['ask', 'auto', 'free']);
+  });
+});
+
+describe('liftOf', () => {
+  const lift = ap.liftOf as (facts: Record<string, unknown>) => 'delegation' | null;
+  const underMode = ap.verdictUnderMode as (facts: Record<string, unknown>, mode: string) => string;
+  const lifted = { isWrite: true, isRead: false, manifest: { permission: 'ask', rule: null, critical: null }, delegation: 'full_delegation' };
+
+  it('names exactly the delegation branch of the verdict', () => {
+    expect(lift(lifted)).toBe('delegation');
+    // A rule-bound ask is held, not lifted; a critical command asks.
+    expect(lift({ ...lifted, manifest: { permission: 'ask', rule: 0, critical: null } })).toBeNull();
+    expect(lift({ ...lifted, manifest: { permission: 'ask', rule: null, critical: 'send' } })).toBeNull();
+    // No delegation, no lift; an allowed or denied command was never lifted.
+    expect(lift({ ...lifted, delegation: 'approve_each' })).toBeNull();
+    expect(lift({ ...lifted, delegation: null })).toBeNull();
+    expect(lift({ ...lifted, manifest: { permission: 'allow', rule: null, critical: null } })).toBeNull();
+    expect(lift({ ...lifted, manifest: { permission: 'deny', rule: null, critical: null } })).toBeNull();
+    // Not a manifest command at all: catalog, raw HTTP, the typed-write
+    // fall-through (its verdict allows under full delegation, but no
+    // command's "Asks first" was lifted), and reads.
+    expect(lift({ catalogDecision: 'allow', isWrite: true, isRead: false })).toBeNull();
+    expect(lift({ isWrite: true, isRead: false, rawHttp: true, delegation: 'full_delegation' })).toBeNull();
+    expect(lift({ isWrite: true, isRead: false, delegation: 'full_delegation' })).toBeNull();
+    expect(lift({ isWrite: false, isRead: true, manifest: { permission: 'ask', rule: null, critical: null }, delegation: 'full_delegation' })).toBeNull();
+  });
+
+  it('the mode is not part of the lift: under ask-every-time the same call is held, so no driver discloses a run that did not happen unasked', () => {
+    expect(underMode(lifted, 'ask')).toBe('ask');
+    expect(underMode(lifted, 'auto')).toBe('allow');
+    expect(underMode(lifted, 'free')).toBe('allow');
   });
 });

@@ -307,11 +307,14 @@ export async function decideAgentActionById(opts: {
   inputHash: string;
   approve: boolean;
   note?: string;
+  /** Input fields whose values let this operation run without asking from now on. */
+  remember?: string[];
 }): Promise<void> {
   await invokeEngine({
     runId: opts.runId,
     decision: {
       actionId: opts.actionId, approve: opts.approve, inputHash: opts.inputHash, note: opts.note?.trim() || undefined,
+      ...(opts.approve && opts.remember?.length ? { remember: opts.remember } : {}),
     },
   });
 }
@@ -412,6 +415,46 @@ export function useAgentAction(actionId: string | null) {
   }, [actionId]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the server when the card's action changes
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  return {
+    action, run, loading, error, refresh,
+    canDecide: !!action && action.status === 'pending' && !!run && !!me && run.triggered_by === me,
+  };
+}
+
+/** A run's pending action, for a surface that arrives by run rather than
+ *  by action (an Automation's waiting row expanding in place). The same
+ *  rule as useAgentAction: only the run's starter may decide, and the
+ *  engine refuses anyone else. */
+export function usePendingAgentAction(runId: string | null) {
+  const [action, setAction] = useState<AgentAction | null>(null);
+  const [run, setRun] = useState<{ id: string; status: AgentRunStatus; triggered_by: string | null } | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!runId) { setAction(null); setRun(null); return; }
+    setLoading(true);
+    try {
+      const [a, uid] = await Promise.all([fetchPendingAgentAction(runId), getCurrentUserId()]);
+      setMe(uid ?? null);
+      setAction(a);
+      if (a) {
+        const { data } = await supabase.from('agent_runs')
+          .select('id, status, triggered_by').eq('id', runId).maybeSingle();
+        setRun((data as typeof run) ?? null);
+      } else setRun(null);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [runId]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the server when the row opens on a run
   useEffect(() => { void refresh(); }, [refresh]);
 
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseInline, parseMarkdown } from '@/Function/shared/markdownParse';
-import { approvalRows, readableFields, rememberChoices, sharedColumns } from '@/ActivitySpace/execution/element/agent/approvalView';
+import { approvalHeadline, approvalRows, humanizedTitle, readableFields, rememberChoices, sharedColumns } from '@/Function/shared/approvalCardModel';
 import { agentMention, foldAgentRuns, plainFirstLine } from '@/ActivitySpace/execution/element/agent/commentAgent';
 
 describe('markdown for agent reports', () => {
@@ -116,6 +116,71 @@ describe('approval card rows', () => {
     expect(rememberChoices(batch([false, false], 'send') as never)).toEqual([]);
     expect(rememberChoices(batch([false, false]) as never)).toEqual([]);
     expect(rememberChoices(batch([true, false]) as never)).toEqual([]);
+  });
+});
+
+describe('approval card model — display v2', () => {
+  const v2 = {
+    input: {
+      calls: [{ id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.', draft: false } }],
+      display: [{
+        id: 'a', integration: 'GitHub', operation: 'create_pull_request', destination: 'https://api.github.com',
+        detail: null, effect: 'write', critical: null, rememberable: true,
+        title: 'Create a pull request',
+        fields: [
+          { label: 'Repository owner', value: 'noajp' }, { label: 'Repository', value: 'Alcon' },
+          { label: 'Title', value: 'Add the card' }, { label: 'Base', value: 'main' }, { label: 'Head', value: 'claude/card' },
+        ],
+        preview: 'The body.', askReason: 'command',
+      }],
+    },
+    summary: 'GitHub · create_pull_request',
+  };
+
+  it('reads the v2 title, labeled fields, preview and ask reason as stored', () => {
+    const row = approvalRows(v2 as never)[0];
+    expect(row.title).toBe('Create a pull request');
+    expect(row.fields).toEqual([
+      ['Repository owner', 'noajp'], ['Repository', 'Alcon'], ['Title', 'Add the card'], ['Base', 'main'], ['Head', 'claude/card'],
+    ]);
+    expect(row.preview).toBe('The body.');
+    expect(row.askReason).toBe('command');
+    // Seven input fields, five labeled: the two left out are counted.
+    expect(row.more).toBe(2);
+  });
+
+  it('headlines a single call and a uniform batch as a sentence; a mixed batch falls back to the summary', () => {
+    expect(approvalHeadline(approvalRows(v2 as never), v2.summary)).toBe('GitHub · Create a pull request');
+    const batch = {
+      input: {
+        calls: [v2.input.calls[0], { ...v2.input.calls[0], id: 'b' }],
+        display: [v2.input.display[0], { ...v2.input.display[0], id: 'b' }],
+      },
+      summary: 'the grouped summary',
+    };
+    expect(approvalHeadline(approvalRows(batch as never), batch.summary)).toBe('GitHub · Create a pull request × 2');
+    const mixed = {
+      input: {
+        calls: [v2.input.calls[0], { id: 'b', name: 'slack__post', input: { channel: 'C1' } }],
+        display: [v2.input.display[0], { id: 'b', integration: 'Slack', operation: 'chat.postMessage', title: 'Post a message' }],
+      },
+      summary: 'the grouped summary',
+    };
+    expect(approvalHeadline(approvalRows(mixed as never), mixed.summary)).toBe('the grouped summary');
+  });
+
+  it('a v1 row derives its title from the operation, humanized, and carries no preview or reason', () => {
+    const rows = approvalRows({ input: { calls: [{ id: 'x', name: 'slack_1__chat_postMessage', input: { channel: 'C1', text: 'hi' } }], display: [{ id: 'x', integration: 'Slack', operation: 'chat.postMessage' }] } } as never);
+    expect(rows[0].title).toBe('Post message');
+    expect(rows[0].preview).toBeNull();
+    expect(rows[0].askReason).toBeNull();
+    expect(humanizedTitle('create_pull_request')).toBe('Create pull request');
+    expect(humanizedTitle('issues.create')).toBe('Create');
+  });
+
+  it('an unknown ask reason on a stored display reads as none', () => {
+    const rows = approvalRows({ input: { calls: [{ id: 'x', name: 'a__b', input: {} }], display: [{ id: 'x', integration: 'A', operation: 'b', askReason: 'bogus' }] } } as never);
+    expect(rows[0].askReason).toBeNull();
   });
 });
 

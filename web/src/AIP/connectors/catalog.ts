@@ -11,6 +11,8 @@
 // tests/integrationsCatalog.test.ts. Display strings here are English source
 // strings; the screen passes them through t().
 
+import type { ApprovalMode } from './approvalModeModel';
+
 export type IntegrationKind = 'mcp' | 'http' | 'model';
 export type IntegrationAuthType = 'none' | 'bearer' | 'header' | 'oauth';
 export type IntegrationDelegation = 'approve_each' | 'full_delegation';
@@ -234,6 +236,78 @@ export function criticalClassOfManifestCommand(command: { name?: unknown; action
 
 /** The class words the Settings copy uses, as t() source strings. */
 export const CRITICAL_CLASS_LABELS: Record<CriticalClass, string> = { send: 'Send', money: 'Money', delete: 'Delete', contract: 'Contract' };
+
+// ── Effective outcomes ─────────────────────────────────────────────────
+//
+// What will actually happen for one command, composed the way the
+// engine composes it: the stored permission, the command's critical
+// class and conditions, the connection's delegation, and the Space's
+// approval mode over all of it (approvalVerdict + applyMode in
+// supabase/functions/_shared/approvalPolicy.ts). The stored permission
+// alone is what a person edits; this is what they should expect — the
+// two differ exactly where a surface must say so. Web code cannot
+// import the engine module, so the composition is copied here and a
+// contract test holds the two to the same answers over the whole
+// matrix (tests/effectiveOutcome.test.ts).
+//
+// The composition, for the static part (no call arguments at hand):
+// a denial denies; a critical command asks under every delegation and
+// setting — only the Free action mode lifts it, recorded as a policy
+// approval and announced, like every ask that mode lifts; a command
+// carrying conditions is by-rule — its conditions decide per call, so
+// no static outcome exists; otherwise the stored permission composed
+// with the delegation (an ask under full delegation runs), and then
+// the mode (Ask-every-time collapses a write's runs to asks — a read's
+// never; Free action collapses an ask to a run recorded as a policy
+// approval).
+
+export type StoredPermission = 'allow' | 'ask' | 'deny';
+
+export type EffectiveOutcome =
+  | { kind: 'asks'; why: 'critical' | 'command' | 'mode' }
+  | { kind: 'runs'; how: 'allowed' | 'rule' | 'delegation' | 'mode-free' }
+  | { kind: 'denied' }
+  /** Argument conditions decide per call; no static outcome. */
+  | { kind: 'by-rule' };
+
+/** Pure. The outcome a person should expect for one command. */
+export function effectiveOutcome(
+  command: { permission: StoredPermission; effect: 'read' | 'write'; hasRules: boolean; critical: CriticalClass | null },
+  ctx: { delegation: IntegrationDelegation | string | null | undefined; mode: ApprovalMode },
+): EffectiveOutcome {
+  if (command.permission === 'deny') return { kind: 'denied' };
+  if (command.critical) {
+    // The critical floor: asks under every delegation and setting.
+    // The Free action mode's composition lifts any ask (applyMode has
+    // no critical exception) — recorded as a policy approval, and the
+    // run announces it, so the lift is disclosed, never silent.
+    return ctx.mode === 'free' ? { kind: 'runs', how: 'mode-free' } : { kind: 'asks', why: 'critical' };
+  }
+  if (command.hasRules) return { kind: 'by-rule' };
+  const base: EffectiveOutcome = command.permission === 'allow'
+    ? { kind: 'runs', how: 'allowed' }
+    : ctx.delegation === 'full_delegation'
+      ? { kind: 'runs', how: 'delegation' }
+      : { kind: 'asks', why: 'command' };
+  if (ctx.mode === 'free' && base.kind === 'asks') return { kind: 'runs', how: 'mode-free' };
+  if (ctx.mode === 'ask' && base.kind === 'runs' && command.effect === 'write') return { kind: 'asks', why: 'mode' };
+  return base;
+}
+
+/**
+ * Pure. The one policy line for a connection's command panel: what
+ * writes do under this connection's delegation and this Space's mode,
+ * in one sentence (an English source string for t()). Computed from
+ * the same inputs as the rows beneath it, so the line and the rows
+ * cannot tell different stories.
+ */
+export function policyLineFor(delegation: IntegrationDelegation | string | null | undefined, mode: ApprovalMode): string {
+  if (mode === 'ask') return 'This Space asks every time: every write needs a person’s approval first, whatever the settings below say. Conditions and “Not allowed” still hold.';
+  if (mode === 'free') return 'This Space’s Free action mode is on: writes run without asking, and what would have asked is recorded as a policy approval. Critical operations are recorded and announced.';
+  if (delegation === 'full_delegation') return 'Full delegation is on, so commands set to “Asks first” run without asking. Conditions and “Not allowed” still hold.';
+  return 'Writes follow each command’s setting below: a command set to “Asks first” asks a person before it runs.';
+}
+
 
 // ── Building a row ─────────────────────────────────────────────────────────
 
