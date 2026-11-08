@@ -162,6 +162,55 @@ describe('verdict verify accounting (B2)', () => {
   });
 });
 
+describe('verdict corrections and inputs hash (B3)', () => {
+  const ENVELOPE = {
+    v: 1, unit: { kind: 'element', id: 'e1', title: '競合を調べる' }, verdict: 'fail', source: 'verifier',
+    reason: ['件数が足りない'], evidence: { verifyStepIdx: 12, artifactIds: ['a1'] },
+    scope: '直すのはこの Element の成果だけです。', attempt: 1, maxAttempts: 3,
+  };
+
+  it('seals the corrections and the inputs hash on a checked record and an unchecked one alike', () => {
+    const checked = buildRunVerdict({ ...BASE, lastCheck: FAIL_CHECK, checkAttempted: true, revisions: 1, corrections: [ENVELOPE], inputsHash: 'h-sealed' });
+    expect(checked.corrections).toEqual([ENVELOPE]);
+    expect(checked.inputsHash).toBe('h-sealed');
+    const unchecked = buildRunVerdict({ ...BASE, checkAttempted: true, corrections: [ENVELOPE], inputsHash: 'h-sealed' });
+    expect(unchecked.corrections).toEqual([ENVELOPE]);
+    expect(unchecked.inputsHash).toBe('h-sealed');
+  });
+
+  it('carries neither when the driver supplied none', () => {
+    const v = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, corrections: [], inputsHash: null });
+    expect(v.corrections).toBeUndefined();
+    expect(v.inputsHash).toBeUndefined();
+  });
+
+  it('round-trips through both parsers, and rejects malformed fields on both', () => {
+    const built = buildRunVerdict({ ...BASE, lastCheck: FAIL_CHECK, checkAttempted: true, revisions: 1, corrections: [ENVELOPE], inputsHash: 'h-sealed' });
+    expect(parseRunVerdict(JSON.parse(JSON.stringify(built)))).toEqual(built);
+    expect(webParseRunVerdict(JSON.parse(JSON.stringify(built)))).toEqual(built);
+    for (const bad of [
+      { ...built, inputsHash: 42 },
+      { ...built, inputsHash: '' },
+      { ...built, inputsHash: null },
+      { ...built, corrections: 'two' },
+      { ...built, corrections: null },
+      { ...built, corrections: [{ ...ENVELOPE, attempt: 0 }] },
+      { ...built, corrections: [{ ...ENVELOPE, source: 'agent' }] },
+      { ...built, corrections: [{ ...ENVELOPE, evidence: { verifyStepIdx: -1, artifactIds: [] } }] },
+      { ...built, corrections: [ENVELOPE, { nope: true }] },
+    ]) {
+      expect(parseRunVerdict(bad)).toBeNull();
+      expect(webParseRunVerdict(bad)).toBeNull();
+    }
+  });
+
+  it('a record written before B3 reads back with neither field invented', () => {
+    const built = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true });
+    expect(parseRunVerdict(built)?.corrections).toBeUndefined();
+    expect(webParseRunVerdict(built)?.inputsHash).toBeUndefined();
+  });
+});
+
 describe('parseProposedReadings', () => {
   const good = [{ measureId: 'm1', value: 42, applied: true, appliedAt: '2026-11-07T02:00:00Z', appliedBy: 'u1', heldReason: null }];
 

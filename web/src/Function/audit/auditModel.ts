@@ -411,6 +411,27 @@ export type RunVerdictReason =
   | 'outcome-not-completed'  // partial / blocked finishes are not checked
   | 'external-model';        // runs on an external model have no verifier
 
+/** One correction a finish was sent back with (B3; server:
+ *  _shared/correctionEnvelope.ts) — the return as the agent received
+ *  it: the unit, the verdict, the reasons, the evidence the check
+ *  read, and the scope the correction was bounded to. */
+export interface CorrectionEnvelope {
+  v: 1;
+  unit: { kind: 'element'; id: string; title: string };
+  verdict: 'fail';
+  /** Which check returned it: the mechanical claim gate, or the verifier. */
+  source: 'mechanical' | 'verifier';
+  /** The return's findings, as issued (≤5). */
+  reason: string[];
+  evidence: { verifyStepIdx: number | null; artifactIds: string[] };
+  /** The line the correction was bounded by. */
+  scope: string;
+  /** The finish attempt that was returned (1 = the first finish). */
+  attempt: number;
+  /** Finish attempts a run is allowed in all. */
+  maxAttempts: number;
+}
+
 export interface RunVerdict {
   v: 1 | 2;
   result: RunVerdictResult;
@@ -445,12 +466,55 @@ export interface RunVerdict {
    *  writes read back (checked) and how each ended. Absent when no
    *  verify-declared write ran. */
   verify?: { checked: number; ok: number; mismatched: number; unverified: number };
+  /** v2 only, optional within it (B3): the corrections this run's
+   *  finishes were sent back with, in order. Absent when no finish
+   *  was sent back, and on records written before envelopes existed. */
+  corrections?: CorrectionEnvelope[];
+  /** v2 only, optional within it (B3): the hash of the Element's
+   *  inputs when this record was sealed — the standing-pass
+   *  comparison the unit-return rule makes at dispatch. */
+  inputsHash?: string;
 }
 
 const VERDICT_RESULTS: readonly string[] = ['pass', 'fail', 'unchecked'];
 const VERDICT_SOURCES: readonly string[] = ['verifier', 'none'];
 const VERDICT_OUTCOMES: readonly string[] = ['completed', 'partial', 'blocked'];
 const VERDICT_REASONS: readonly string[] = ['revisions-exhausted', 'verify-unavailable', 'outcome-not-completed', 'external-model'];
+
+const CORRECTION_SOURCES: readonly string[] = ['mechanical', 'verifier'];
+
+/** Strict narrowing of one correction envelope, mirroring the server's
+ *  parseCorrectionEnvelope field for field. */
+function parseCorrectionEnvelope(raw: unknown): CorrectionEnvelope | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  if (r.v !== 1 || r.verdict !== 'fail') return null;
+  if (typeof r.source !== 'string' || !CORRECTION_SOURCES.includes(r.source)) return null;
+  const unit = r.unit;
+  if (!unit || typeof unit !== 'object' || Array.isArray(unit)) return null;
+  const u = unit as Record<string, unknown>;
+  if (u.kind !== 'element' || typeof u.id !== 'string' || !u.id || typeof u.title !== 'string') return null;
+  if (!Array.isArray(r.reason) || r.reason.length > 5 || !r.reason.every((g) => typeof g === 'string')) return null;
+  const evidence = r.evidence;
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return null;
+  const ev = evidence as Record<string, unknown>;
+  if (!(ev.verifyStepIdx === null || (typeof ev.verifyStepIdx === 'number' && Number.isInteger(ev.verifyStepIdx) && ev.verifyStepIdx >= 0))) return null;
+  if (!Array.isArray(ev.artifactIds) || !ev.artifactIds.every((id) => typeof id === 'string')) return null;
+  if (typeof r.scope !== 'string' || !r.scope) return null;
+  if (typeof r.attempt !== 'number' || !Number.isInteger(r.attempt) || r.attempt < 1) return null;
+  if (typeof r.maxAttempts !== 'number' || !Number.isInteger(r.maxAttempts) || r.maxAttempts < 2 || r.attempt > r.maxAttempts) return null;
+  return {
+    v: 1,
+    unit: { kind: 'element', id: u.id as string, title: u.title as string },
+    verdict: 'fail',
+    source: r.source as CorrectionEnvelope['source'],
+    reason: [...(r.reason as string[])],
+    evidence: { verifyStepIdx: ev.verifyStepIdx as number | null, artifactIds: [...(ev.artifactIds as string[])] },
+    scope: r.scope as string,
+    attempt: r.attempt as number,
+    maxAttempts: r.maxAttempts as number,
+  };
+}
 
 /** Strict narrowing of the jsonb: a record that is not exactly this shape
  *  is not a verdict (null), never a partially-read one. Mirrors the
@@ -499,16 +563,35 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     claimGaps: [...(r.claimGaps as string[])],
   };
   // Optional within v2, exact when present — as the server reads it.
-  if (r.verify === undefined) return withClaims;
-  const verify = r.verify;
-  if (!verify || typeof verify !== 'object' || Array.isArray(verify)) return null;
-  const vt = verify as Record<string, unknown>;
-  if (!count(vt.checked) || !count(vt.ok) || !count(vt.mismatched) || !count(vt.unverified)) return null;
-  if ((vt.ok as number) + (vt.mismatched as number) + (vt.unverified as number) !== (vt.checked as number)) return null;
-  return {
-    ...withClaims,
-    verify: { checked: vt.checked as number, ok: vt.ok as number, mismatched: vt.mismatched as number, unverified: vt.unverified as number },
-  };
+  let out: RunVerdict = withClaims;
+  if (r.verify !== undefined) {
+    const verify = r.verify;
+    if (!verify || typeof verify !== 'object' || Array.isArray(verify)) return null;
+    const vt = verify as Record<string, unknown>;
+    if (!count(vt.checked) || !count(vt.ok) || !count(vt.mismatched) || !count(vt.unverified)) return null;
+    if ((vt.ok as number) + (vt.mismatched as number) + (vt.unverified as number) !== (vt.checked as number)) return null;
+    out = {
+      ...out,
+      verify: { checked: vt.checked as number, ok: vt.ok as number, mismatched: vt.mismatched as number, unverified: vt.unverified as number },
+    };
+  }
+  // B3's fields, the same: optional within v2, exact when present —
+  // one malformed correction refuses the record.
+  if (r.inputsHash !== undefined) {
+    if (typeof r.inputsHash !== 'string' || !r.inputsHash) return null;
+    out = { ...out, inputsHash: r.inputsHash };
+  }
+  if (r.corrections !== undefined) {
+    if (!Array.isArray(r.corrections)) return null;
+    const corrections: CorrectionEnvelope[] = [];
+    for (const entry of r.corrections) {
+      const parsed = parseCorrectionEnvelope(entry);
+      if (!parsed) return null;
+      corrections.push(parsed);
+    }
+    out = { ...out, corrections };
+  }
+  return out;
 }
 
 /** One fact a finish stated, typed at the source (server: finishClaims.ts). */
