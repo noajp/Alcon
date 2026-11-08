@@ -39,7 +39,6 @@ export function ElementActionsMenu({
   onAddDependency,
   onOpenApproval,
   onDelegateToAi,
-  agentBusy,
 }: {
   element: ElementWithDetails;
   onRefresh?: () => void | Promise<void>;
@@ -49,10 +48,10 @@ export function ElementActionsMenu({
   onAddDependency?: () => void;
   /** Opens the page's approval panel. */
   onOpenApproval?: () => void;
-  /** Opens the page's form for handing the Element to an AI Worker. */
+  /** Opens the page's form for handing the Element to an AI Worker. The
+   *  item is never disabled: while a run is open the form it opens says
+   *  so and explains — a silently dead item told the person nothing. */
   onDelegateToAi?: () => void;
-  /** An AI Worker is already working on it: the item says so and is off. */
-  agentBusy?: boolean;
 }) {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -147,8 +146,8 @@ export function ElementActionsMenu({
         </DropdownMenuItem>
       )}
       {onDelegateToAi && (
-        <DropdownMenuItem disabled={agentBusy} onSelect={() => setTimeout(onDelegateToAi, 0)} className="gap-2.5 py-1.5 text-[13px]">
-          <Bot size={15} className="text-muted-foreground" /> {t(agentBusy ? 'AI is working on it' : 'Delegate to AI…')}
+        <DropdownMenuItem onSelect={onDelegateToAi} className="gap-2.5 py-1.5 text-[13px]">
+          <Bot size={15} className="text-muted-foreground" /> {t('Delegate to AI…')}
         </DropdownMenuItem>
       )}
     </EntityActionsMenu>

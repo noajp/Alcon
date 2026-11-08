@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -116,7 +117,7 @@ export function readStoredFile(file: StoredFile, source: FileSource, kind: Previ
     return deck?.slides.length ? { deck } : { office: await readOffice('pptx', bytes) };
   })().catch((e: unknown) => {
     // A zip that will not open is a damaged file, whatever JSZip calls it.
-    const message = e instanceof Error ? e.message : String(e);
+    const message = formatError(e);
     throw new Error(/zip|central directory|end of data/i.test(message) ? translate('This file could not be read. It may be damaged.') : message);
   });
   read.catch(() => READ_CACHE.delete(file.id));
@@ -197,7 +198,7 @@ export function FilePreview({ file, source, height = 480, actions, presence, edi
       ].filter(Boolean);
       if (notes.length) await appDialog.alert(notes.join('\n'));
     } catch (e) {
-      await appDialog.alert(e instanceof Error ? e.message : String(e));
+      await appDialog.alert(formatError(e));
     } finally {
       setSaving(false);
     }
@@ -205,7 +206,7 @@ export function FilePreview({ file, source, height = 480, actions, presence, edi
 
   useEffect(() => {
     let live = true;
-    const fail = (e: unknown) => { if (live) setError(e instanceof Error ? e.message : String(e)); };
+    const fail = (e: unknown) => { if (live) setError(formatError(e)); };
     if (kind === 'text' || kind === 'html' || kind === 'office') {
       readStoredFile(file, source, kind).then((l) => { if (live) setLoaded(l); }).catch(fail);
     } else {
@@ -272,7 +273,7 @@ export function FilePreview({ file, source, height = 480, actions, presence, edi
           <span className="mx-0.5 h-4 w-px bg-border/60" />
         </>}
         <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Download')} title={t('Download')}
-          onClick={() => { void source.download(file).catch((e) => setError(e instanceof Error ? e.message : String(e))); }}>
+          onClick={() => { void source.download(file).catch((e) => setError(formatError(e))); }}>
           <Download size={13} />
         </Button>
         <Button type="button" variant="ghost" size="icon-xs" onClick={toggleFullscreen}

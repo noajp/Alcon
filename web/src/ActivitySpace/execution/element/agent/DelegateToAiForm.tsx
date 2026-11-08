@@ -23,6 +23,7 @@ export function DelegateToAiForm({
   error,
   onStart,
   onStarted,
+  onViewRun,
 }: {
   aiWorkers: Worker[];
   defaultWorkerId: string | null;
@@ -37,6 +38,10 @@ export function DelegateToAiForm({
   onStart: (opts: { workerId: string | null; prompt: string }) => Promise<AgentStartOutcome>;
   /** The run started; the caller closes the form. */
   onStarted: () => void;
+  /** Go to the run already going (the caller closes the form onto the
+   *  page's run panel). Offered in the busy state, so "already working"
+   *  comes with a way to the work, not just a stopped form. */
+  onViewRun?: () => void;
 }) {
   const { t } = useI18n();
   const [prompt, setPrompt] = useState(defaultPrompt ?? '');
@@ -58,6 +63,16 @@ export function DelegateToAiForm({
       <div className="mb-2 text-[12px] text-muted-foreground">
         {t('The agent works with your permissions. External writes wait for your approval.')}
       </div>
+      {/* Busy is explained where the person lands, not discovered from a
+          dead button: a run is already going, and here is the way to it. */}
+      {busy && (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1 text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
+          {onViewRun && (
+            <Button variant="secondary" size="sm" onClick={onViewRun}>{t('View the run')}</Button>
+          )}
+        </div>
+      )}
       <TextComposer
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -84,7 +99,7 @@ export function DelegateToAiForm({
           </Button>
         }
       />
-      {(busy || outcome === 'busy') && (
+      {outcome === 'busy' && (
         <p className="mt-2 text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
       )}
       {outcome === 'failed' && error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}

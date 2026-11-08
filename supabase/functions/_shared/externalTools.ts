@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOARD_TOOLS, runBoardTool, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
 import { STRATEGY_TOOLS, runStrategyTool } from "./strategyTools.ts";
-import { AGENT_REPORT_TOOLS, isAgentReportTool, runAgentReportTool, type CallerNotifier } from "./agentReportTools.ts";
+import { AGENT_REPORT_TOOLS, isAgentReportTool, runAgentReportTool, type CallerNotifier, type ReportBinding } from "./agentReportTools.ts";
 import type { CallerAccess } from "./callerAuth.ts";
 
 // What a caller outside the app may do — through MCP (alcon-mcp) or REST
@@ -66,6 +66,9 @@ export function externalToolDefs(access: CallerAccess = "read_write"): ToolDef[]
  * Runs one tool for an outside caller. A tool not offered at `access` is
  * refused here, whatever the entry in front of it checked. `notify` tells
  * the connecting person when their agent closes work (agentReportTools.ts).
+ * `binding`, when the dispatching driver runs work on a known Element (a
+ * run's agent_runs.element_id), makes the report tools act on that id
+ * directly instead of re-resolving the caller's string.
  */
 export async function runExternalTool(
   supabase: SupabaseClient,
@@ -74,10 +77,11 @@ export async function runExternalTool(
   actor: BoardActor,
   access: CallerAccess = "read_write",
   notify?: CallerNotifier,
+  binding?: ReportBinding,
 ): Promise<ToolResult> {
   const offered = externalToolDefs(access).some((t) => t.name === name);
   if (!offered) return { ok: false, error: `Tool ${name} is not available to this connection` };
   if (STRATEGY_NAMES.has(name)) return await runStrategyTool(supabase, name, args);
-  if (isAgentReportTool(name)) return await runAgentReportTool(supabase, name, args, actor, notify);
+  if (isAgentReportTool(name)) return await runAgentReportTool(supabase, name, args, actor, notify, binding);
   return await runBoardTool(supabase, name, args, actor);
 }

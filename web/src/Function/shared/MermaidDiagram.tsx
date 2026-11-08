@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from './formatError';
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -94,7 +95,7 @@ export async function renderMermaid(code: string): Promise<{ svg: string } | { e
     cache.set(key, svg);
     return { svg };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return { error: formatError(e) };
   }
 }
 

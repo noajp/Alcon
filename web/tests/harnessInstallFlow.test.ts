@@ -9,6 +9,14 @@ describe('missingConnectors', () => {
     expect(missing.map((m) => m.name)).toEqual(['GitHub']);
   });
 
+  it('a connection whose latest test failed is a reauth need, not a have', () => {
+    const expired = row({ last_test: { ok: false, code: 'auth_failed', message: 'Bad credentials' } });
+    expect(missingConnectors(['GitHub'], [expired])).toEqual([{ name: 'GitHub', preset: expect.objectContaining({ id: 'github' }), kind: 'reauth' }]);
+    expect(missingConnectors(['GitHub'], [row({ enabled: false, last_test: { ok: false, code: 'auth_failed' } })]).map((m) => m.kind)).toEqual(['missing']);
+    expect(missingConnectors(['GitHub'], [row({ last_test: { ok: true, tools: 30 } })])).toEqual([]);
+    expect(missingConnectors(['GitHub'], [row({ last_test: null })])).toEqual([]);
+  });
+
   it('an enabled connection satisfies by its name, its preset id, or its preset name, folded', () => {
     expect(missingConnectors(['My GitHub'], [row({ name: 'My GitHub' })])).toEqual([]);
     expect(missingConnectors(['github'], [row({ name: 'Renamed' })])).toEqual([]);

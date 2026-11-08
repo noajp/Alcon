@@ -16,7 +16,8 @@ export type HeartbeatSignalKind =
   | "run_paused" | "run_failed"
   | "draft_review" | "draft_input"
   | "promotion_review" | "promotion_input"
-  | "automation_failed";
+  | "automation_failed"
+  | "capability_landed";
 
 /** One thing waiting for a person, as the driver's reads found it. */
 export interface HeartbeatSignal {
@@ -83,6 +84,7 @@ export const HEARTBEAT_KIND_LABEL: Record<HeartbeatSignalKind, string> = {
   promotion_review: "昇格ドラフトの審査待ち",
   promotion_input: "昇格の起草の回答待ち",
   automation_failed: "自動化の失敗",
+  capability_landed: "使えるようになった能力",
 };
 
 const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
@@ -99,6 +101,7 @@ const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
   promotion_review: "promotion_review",
   promotion_input: "promotion_input",
   automation_failed: "automation_failed",
+  capability_landed: "capability",
 };
 
 /** Pure. A wait's identity across wakes: its kind, its thing, and its

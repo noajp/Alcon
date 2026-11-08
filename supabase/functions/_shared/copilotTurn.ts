@@ -19,6 +19,7 @@ import {
   buildSpaceIntegrationTools, executeIntegrationTool, integrationApprovalFacts, integrationIndexLines,
   integrationPromptSection, manifestDenyRefusal, type SpaceIntegrationTools,
 } from "./integrationTools.ts";
+import { CONNECTION_PROPOSED_REPLY, PROPOSE_CONNECTION_TOOL, resolveConnectionProposal } from "./connectProposal.ts";
 
 export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人と AI が一緒に進める運用基盤）の AI です。ユーザーの依頼を受けて、道具で Alcon のデータを読み書きし、仕事を最後までやり遂げます。
 
@@ -26,7 +27,7 @@ export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人
 - Strategy（意図）: 目的・前提・意思決定・成功条件を持ち、際限なく入れ子にできる。最上位の Strategy が Space の目指す姿を表す。道具では Initiative と呼ぶ（listInitiatives / getInitiative / createInitiative / updateInitiative / addIntent など）。
 - Execution（行動）: Domain（活動の場）→ Object（Element をまとめる持ち場。プロジェクトに近い）→ Element（行動の最小単位）。
 - Strategy と Object は別物。Strategy には貢献する Object が紐づくだけで、Strategy を消しても Object・Element は消えない（逆も同じ）。
-- ユーザーが名指しした概念だけを操作する。別の概念で代用しない。どの道具でも扱えないときは「今はできません」と答え、近い別のものを操作しない。
+- ユーザーが名指しした概念だけを操作する。別の概念で代用しない。どの道具でも扱えないときは「今はできません」と答え、近い別のものを操作しない。ただし、連携の定義に操作が無いことが理由なら、それは「できません」ではなく定義の不足として扱う（エラーリカバリ参照）。
 
 # できること
 - Strategy: 一覧・詳細、作成（最上位は spaceId、Sub Strategy は parentId を渡して createInitiative）、目的の書き換え、成功条件・前提・意思決定の追加と修正、仕事の進め方（定義）の記入、削除。
@@ -34,7 +35,7 @@ export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人
 - ファイル: Element・Object・Strategy・Artifacts のフォルダに付いたファイルの一覧（listFiles）、読み取り（readFile）、書き込み（writeFile。同じ名前は新しい版になる）。
 - ハーネス: Space の仕事のやり方（listHarnesses / readHarness）。依頼に合うものがあれば読んで従う。
 - Table（tableData）、ボードのウィジェット（widgetBoard）、成功条件の実績（campaignMeasure）。
-- 連携（外部サービス）: この Space に接続された連携の、宣言された操作が道具として使えることがある（下の「この Space の連携」に、使える連携と使えない理由が書かれている）。
+- 連携（外部サービス）: この Space に接続された連携の、宣言された操作が道具として使えることがある（下の「この Space の連携」に、使える連携と使えない理由が書かれている）。未接続、または接続テストが失敗した連携は、propose_connection で接続（再接続）を提案できる。
 - 最初から読み込まれていない道具は、末尾の一覧にある名前で道具の検索をすると使えるようになる。
 
 # 進め方
@@ -51,6 +52,8 @@ export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人
    道具で得た数値やユーザーが示した数値だけを使い、値を作らない。
 
 # エラーリカバリ
+- 連携が必要な依頼で、その連携が未接続または認証切れ（接続テストが失敗している）のときは、propose_connection で接続を提案する。「今はできません」で終わらせない。
+- 連携の操作が定義に無い（道具が無い）ことが理由で頼まれたことができないときは、「できません」で終わらせない。それは定義の不足だと名指しし（例: 「GitHub 連携の定義に delete_branch がありません」）、拡張の道筋を提案する — 組み込みの連携は定義の変更として（コード/マニフェストの変更で、人の承認を通る道筋）、カスタム連携は接続の起草を提案する。人が望むなら note_pending_capability で「能力待ちのルール」として記録し（Space の中での話なら spaceId を渡す）、記録したことと、能力が来たら知らされて効かせ始められることを伝える。今すぐできる代替策（サービス側の設定で済むことなど）があれば、それも人の承認を得る提案として添える — 人の宿題にしない。
 - "Element not found" → すぐに聞き直さず、listElements か findByText で範囲を広げて探す。それでも 0 件なら確認する。
 - 操作が失敗したら、エラーを読んで原因（権限不足 / 必須項目の欠け / 存在しない id など）をユーザーに伝える。
 
@@ -68,7 +71,13 @@ export interface CopilotContextLike {
 /** What a caller hears about the turn's work, as it happens: the panel
  *  streams these as events; a background driver records them as steps. */
 export interface CopilotTurnEvents {
-  onToolResult?(r: { name: string; ok: boolean; rows?: number; error?: string }): void;
+  onToolResult?(r: {
+    name: string; ok: boolean; rows?: number; error?: string;
+    /** A connection proposal the call made (propose_connection): the driver
+     *  records it as a connection_request step and keeps it with the turn's
+     *  message, so the panel renders the Connect card. */
+    connectionProposal?: { names: string[]; waitingFor: string };
+  }): void;
 }
 
 export interface CopilotTurn {
@@ -157,8 +166,11 @@ export async function buildCopilotTurn(args: {
     ? await buildSpaceIntegrationTools({ userDb, admin, spaceId: ctx.spaceId, supabaseUrl: args.supabaseUrl }).catch(() => null)
     : null;
 
+  // propose_connection rides beside the catalog: internal, always loaded
+  // (a connection ask must never wait behind a tool search), and gated by
+  // nothing — it writes nothing; connecting stays the person's act.
   const catalogTools = toolsFor("panel");
-  const tools = [...catalogTools, ...(toolset?.defs ?? [])];
+  const tools = [...catalogTools, PROPOSE_CONNECTION_TOOL, ...(toolset?.defs ?? [])];
   const cache = { cache_control: { type: "ephemeral" as const } };
   const toolParams = [TOOL_SEARCH, ...toolParamsFor(tools, cache, false)];
   const index = [catalogIndex(catalogTools), toolset ? integrationIndexLines(toolset) : ""].filter(Boolean).join("\n");
@@ -228,6 +240,23 @@ export async function buildCopilotTurn(args: {
           events?.onToolResult?.({ name: call.name, ok: false, error: msg });
           return { content: JSON.stringify({ error: msg }), is_error: true };
         }
+      }
+      // The connection proposal is judged by the shared core (the same
+      // one the Strategy conversation's handler calls): the outcome
+      // reaches the driver on the events channel as a proposal, and the
+      // driver turns it into a card — the tool itself records nothing.
+      if (call.name === PROPOSE_CONNECTION_TOOL.name) {
+        const r = await resolveConnectionProposal(userDb, ctx.spaceId ?? null, call.input);
+        if (r.kind === "invalid") {
+          events?.onToolResult?.({ name: call.name, ok: false, error: r.error });
+          return { content: JSON.stringify({ error: r.error }), is_error: true };
+        }
+        if (r.kind === "already") {
+          events?.onToolResult?.({ name: call.name, ok: true });
+          return { content: `${r.asked.join("、")} はすでに接続されています。接続の提案は要りません。` };
+        }
+        events?.onToolResult?.({ name: call.name, ok: true, connectionProposal: { names: r.names, waitingFor: r.waitingFor } });
+        return { content: CONNECTION_PROPOSED_REPLY };
       }
       const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "panel" });
       events?.onToolResult?.({ name: call.name, ok: r.ok, rows: r.ok ? r.meta?.rows : undefined, error: r.ok ? undefined : r.error });

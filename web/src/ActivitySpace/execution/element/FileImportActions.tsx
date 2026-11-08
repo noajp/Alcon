@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
 import { Loader2, NotebookText, Presentation, Table2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
@@ -49,7 +50,7 @@ function ImportDocToNote({ file }: { file: Attachment }) {
       const note = await createNoteFile(baseName(file), html);
       openInApp('note', { noteId: note.id });
     } catch (e) {
-      await appDialog.alert(e instanceof Error ? e.message : String(e));
+      await appDialog.alert(formatError(e));
     } finally {
       setBusy(false);
     }
@@ -104,7 +105,7 @@ function ImportDeckToSlides({ file }: { file: Attachment }) {
       requestNewDeck(baseName(file), deck);
       openInApp('slides');
     } catch (e) {
-      await appDialog.alert(e instanceof Error ? e.message : String(e));
+      await appDialog.alert(formatError(e));
     } finally {
       setBusy(false);
     }
@@ -132,7 +133,7 @@ function ImportSheetToTable({ file }: { file: Attachment }) {
       const id = await importDataTable(sheets && sheets.length > 1 ? `${base} - ${name}` : base, table.columns, table.rows);
       openInApp('tables', { tableId: id });
     } catch (e) {
-      await appDialog.alert(e instanceof Error ? e.message : String(e));
+      await appDialog.alert(formatError(e));
     } finally {
       setBusy(false);
     }

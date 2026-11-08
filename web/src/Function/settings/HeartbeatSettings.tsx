@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -43,7 +44,7 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
       await setSpaceHeartbeat(spaceId, next);
       await refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      setSaveError(formatError(e));
     } finally {
       setSaving(false);
     }
@@ -76,7 +77,7 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
       await wakeHeartbeatNow(spaceId);
       await refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      setSaveError(formatError(e));
     } finally {
       setWaking(false);
     }

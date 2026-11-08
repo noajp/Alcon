@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -71,7 +72,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
       await fn();
       await state.refetch();
     } catch (e) {
-      setError(t(failKey, { error: e instanceof Error ? e.message : String(e) }));
+      setError(t(failKey, { error: formatError(e) }));
     } finally {
       setBusy(false);
     }

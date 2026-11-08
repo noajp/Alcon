@@ -15,6 +15,10 @@ export interface ConnectorNeed {
   name: string;
   /** The fixed preset the name resolves to (MCP/API only), or null: find it in the MCP Registry. */
   preset: IntegrationPreset | null;
+  /** missing: no enabled connection answers to the name. reauth: an enabled
+   *  connection answers, but its latest connection test failed — it reads as
+   *  connected nowhere now; the remedy is the same dialog, re-opened. */
+  kind: 'missing' | 'reauth';
 }
 
 const fold = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '');
@@ -22,6 +26,19 @@ const fold = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '');
 /** The names a connection answers to: what the Space named it, and its preset's id and name. */
 function aliasesOf(i: Pick<Integration, 'name' | 'preset'>): string[] {
   return [i.name, i.preset ?? '', presetById(i.preset)?.name ?? ''].filter(Boolean);
+}
+
+/**
+ * A connection's latest test, read as a state — the web twin of the engine's
+ * lastTestNeedsReauth (_shared/connectorNeeds.ts): the sign-in was refused,
+ * or the latest test failed at all. A connection whose test failed is a
+ * need, not a "have": counting it as connected is what made an expired
+ * GitHub read as connected everywhere while every call through it failed.
+ */
+function lastTestNeedsReauth(lastTest: unknown): boolean {
+  if (!lastTest || typeof lastTest !== 'object') return false;
+  const t = lastTest as { ok?: unknown; code?: unknown };
+  return t.ok === false || t.code === 'auth_failed' || t.code === 'oauth_expired' || t.code === 'oauth_required';
 }
 
 /** Every name the Space's enabled connections answer to — the `connected` list a harness is checked against. */
@@ -36,19 +53,28 @@ function presetForName(name: string): IntegrationPreset | null {
   return INTEGRATION_PRESETS.find((p) => (p.kind === 'mcp' || p.kind === 'http') && (fold(p.id) === key || fold(p.name) === key)) ?? null;
 }
 
-/** The named connectors with no enabled connection, in body order, de-duplicated by folded name. */
+/** The named connectors with no usable connection, in body order, de-duplicated by folded name. */
 export function missingConnectors(
   names: string[],
-  integrations: readonly Pick<Integration, 'name' | 'preset' | 'enabled'>[],
+  integrations: readonly (Pick<Integration, 'name' | 'preset' | 'enabled'> & { last_test?: unknown })[],
 ): ConnectorNeed[] {
-  const have = new Set(enabledConnectedNames(integrations).map(fold));
+  const byKey = new Map<string, (Pick<Integration, 'name' | 'preset' | 'enabled'> & { last_test?: unknown })[]>();
+  for (const i of integrations) {
+    if (!i.enabled) continue;
+    for (const alias of aliasesOf(i)) {
+      const key = fold(alias);
+      byKey.set(key, [...(byKey.get(key) ?? []), i]);
+    }
+  }
   const seen = new Set<string>();
   const out: ConnectorNeed[] = [];
   for (const name of names) {
     const key = fold(name);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    if (!have.has(key)) out.push({ name, preset: presetForName(name) });
+    const matching = byKey.get(key) ?? [];
+    if (!matching.length) out.push({ name, preset: presetForName(name), kind: 'missing' });
+    else if (matching.every((i) => lastTestNeedsReauth(i.last_test))) out.push({ name, preset: presetForName(name), kind: 'reauth' });
   }
   return out;
 }

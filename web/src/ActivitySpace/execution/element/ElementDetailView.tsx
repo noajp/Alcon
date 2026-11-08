@@ -20,7 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
@@ -393,14 +394,12 @@ function ElementDetailBody({
   // starts from the previous run's AI and instructions; while a run is open
   // it says so and starts nothing.
   const [delegateOpen, setDelegateOpen] = useState(false);
-  const delegateRef = useRef<HTMLDivElement>(null);
-  const delegateAnchorRef = useRef<HTMLSpanElement>(null);
   const agentBusy = isAgentRunOpen(agent.run);
   const previousPrompt = agent.run && agent.run.mode !== 'reply' ? agent.run.prompt : null;
   useRegisterPageCommand({
     id: 'element-delegate-to-ai', label: 'Delegate to AI…', icon: Bot,
     keywords: ['agent', 'ai', 'claude', 'run', 'delegate', 'エージェント', '委ねる', '実行'],
-    run: () => setTimeout(() => setDelegateOpen(true), 0),
+    run: () => setDelegateOpen(true),
   });
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
@@ -712,36 +711,31 @@ function ElementDetailBody({
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
           {/* ⋯ actions for the lowest breadcrumb item (this Element):
               duplicate / move / multi-home / delete. */}
-          <Popover open={delegateOpen} onOpenChange={setDelegateOpen}>
-            <PopoverAnchor asChild>
-              <span ref={delegateAnchorRef} className="inline-flex">
-                <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
-                  onAddDependency={() => setDependencySignal((n) => n + 1)}
-                  onOpenApproval={() => setApprovalSignal((n) => n + 1)}
-                  onDelegateToAi={() => setDelegateOpen(true)} agentBusy={agentBusy} />
-              </span>
-            </PopoverAnchor>
-            {/* It opens just as the "…" menu (or ⌘K's dialog) closes and hands
-                focus back to what opened it — the "…" button, or nowhere. That
-                focus move alone does not close it; the focus comes back to the
-                note. Focus going anywhere else (a click on another field) still
-                closes it and stays where the person put it. */}
-            <PopoverContent ref={delegateRef} align="start" className="w-[380px] p-3"
-              onFocusOutside={(e) => {
-                const to = e.target instanceof Node ? e.target : null;
-                const handBack = !to || to === document.body || !!delegateAnchorRef.current?.contains(to);
-                if (!handBack) return;
-                e.preventDefault();
-                requestAnimationFrame(() => delegateRef.current?.querySelector<HTMLElement>('textarea')?.focus());
-              }}>
+          <span className="inline-flex">
+            <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack}
+              onAddDependency={() => setDependencySignal((n) => n + 1)}
+              onOpenApproval={() => setApprovalSignal((n) => n + 1)}
+              onDelegateToAi={() => setDelegateOpen(true)} />
+          </span>
+          {/* Handing the Element to an AI is a modal dialog, opened
+              directly from the menu item (or ⌘K): focus is trapped by
+              the dialog, so the menu's focus hand-back cannot close it
+              in the frame it opens — the anchored-Popover handoff it
+              replaces could, which read as the item doing nothing. */}
+          <Dialog open={delegateOpen} onOpenChange={setDelegateOpen}>
+            <DialogContent className="max-w-[420px]">
+              <DialogHeader>
+                <DialogTitle>{t('Delegate to AI…')}</DialogTitle>
+              </DialogHeader>
               <DelegateToAiForm aiWorkers={aiWorkers}
                 defaultWorkerId={rerunWorkerId(agent.run?.worker_id)}
                 defaultPrompt={previousPrompt}
                 busy={agentBusy} starting={agent.starting} error={agent.error ?? null}
                 onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
+                onViewRun={() => setDelegateOpen(false)}
                 onStarted={() => setDelegateOpen(false)} />
-            </PopoverContent>
-          </Popover>
+            </DialogContent>
+          </Dialog>
           <FollowButton kind="element" id={element.id} />
         </div>
         <div className="flex-1" />

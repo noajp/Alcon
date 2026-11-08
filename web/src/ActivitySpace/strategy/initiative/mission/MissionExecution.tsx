@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
@@ -191,7 +192,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
       if (next.tasks.length === 0) setError(t('The Planner returned no tasks. Add guidance and try again.'));
       else setDraft(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setPlanning(false);
     }
@@ -256,7 +257,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         : created);
       ctx.refetch();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setApplying(false);
     }

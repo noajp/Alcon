@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
@@ -109,6 +110,14 @@ export interface CopilotAttachment {
   data?: string;
 }
 
+/** A connection the assistant proposed (propose_connection), kept with
+ *  the message — the card the person connects from (ConnectRequestCard),
+ *  rendered under the turn that proposed it. */
+export interface CopilotConnectionProposal {
+  names: string[];
+  waitingFor: string;
+}
+
 export interface CopilotMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -118,6 +127,8 @@ export interface CopilotMessage {
   toolEvents?: ToolEvent[];
   /** Integration writes held for the person's decision on a card. */
   approvals?: CopilotApproval[];
+  /** Connection proposals made on this turn — cards the person acts on. */
+  connections?: CopilotConnectionProposal[];
   /** True once the turn for this assistant message has finished. */
   done?: boolean;
   /** When the turn was sent or began (ms). */
@@ -202,10 +213,11 @@ export function copilotTitleOf(messages: readonly CopilotMessage[]): string {
  *  panel's own, not the record's. Used when the person cuts a
  *  conversation back — the one write of messages that stays theirs. */
 export function toKeptMessages(messages: readonly CopilotMessage[]): CopilotMessage[] {
-  return messages.map(({ role, content, toolEvents, attachments, approvals }) => ({
+  return messages.map(({ role, content, toolEvents, attachments, approvals, connections }) => ({
     role, content,
     ...(toolEvents?.length ? { toolEvents } : {}),
     ...(approvals?.length ? { approvals } : {}),
+    ...(connections?.length ? { connections } : {}),
     ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
   }));
 }
@@ -394,7 +406,7 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
       run = await fetchOpenCopilotRun(sessionId) ?? await insertCopilotRun(sessionId);
       if (!run) throw new Error(translate('Could not start the conversation.'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
       return;
     }
     if (run.status === 'awaiting_approval') {
@@ -427,12 +439,12 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
       });
     } catch (e) {
       if (followGenRef.current !== gen) return;
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
       setMessages((prev) => {
         const next = prev.slice();
         const last = next[next.length - 1];
         if (last && last.role === 'assistant') {
-          next[next.length - 1] = settle({ ...last, content: last.content + `\n\n_(${translate('Error: {error}', { error: e instanceof Error ? e.message : String(e) })})_` });
+          next[next.length - 1] = settle({ ...last, content: last.content + `\n\n_(${translate('Error: {error}', { error: formatError(e) })})_` });
         }
         return next;
       });
@@ -458,7 +470,7 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
         const next = prev.slice();
         const last = next[next.length - 1];
         if (last && last.role === 'assistant' && !last.done) {
-          next[next.length - 1] = { ...last, content: live.content, toolEvents: live.toolEvents };
+          next[next.length - 1] = { ...last, content: live.content, toolEvents: live.toolEvents, ...(live.connections.length ? { connections: live.connections } : {}) };
         }
         return next;
       });

@@ -1,5 +1,7 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
+
 import { useState } from 'react';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
@@ -36,13 +38,13 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
   const change = async (id: string, delegation: StrategyDelegation) => {
     setSaving(id); setError(null);
     try { await updateStrategy(id, { delegation }); refetch(); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    catch (e) { setError(formatError(e)); }
     finally { setSaving(null); }
   };
   const changeHarness = async (id: string, definitionId: string | null) => {
     setSaving(id); setError(null);
     try { await setStrategyDefinition(id, definitionId); refetch(); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    catch (e) { setError(formatError(e)); }
     finally { setSaving(null); }
   };
 

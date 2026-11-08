@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useMemo, useState } from 'react';
 import { Loader2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
@@ -41,7 +42,7 @@ export function AlconFilePicker({ disabled, onPick }: { disabled?: boolean; onPi
       setOpen(false);
       setQuery('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setReading(null);
     }

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
@@ -77,7 +78,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
       await sendDraftMessage(run.id, message);
       setWords('');
     } catch (e) {
-      setSendError(e instanceof Error ? e.message : String(e));
+      setSendError(formatError(e));
     } finally {
       setSending(false);
     }
@@ -91,7 +92,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
       setSecretInput('');
       onChanged?.();
     } catch (e) {
-      setTestError(e instanceof Error ? e.message : String(e));
+      setTestError(formatError(e));
     }
   };
 
@@ -102,7 +103,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
       else await runDraftTest(draft.id);
       onChanged?.();
     } catch (e) {
-      setTestError(e instanceof Error ? e.message : String(e));
+      setTestError(formatError(e));
     } finally {
       setTestBusy(false);
     }
@@ -122,7 +123,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
       onChanged?.();
       if (activate) onClose();
     } catch (e) {
-      setDecideError(e instanceof Error ? e.message : String(e));
+      setDecideError(formatError(e));
     } finally {
       setDeciding(false);
     }

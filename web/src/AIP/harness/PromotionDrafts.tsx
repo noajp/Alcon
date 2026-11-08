@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/ui/button';
@@ -166,7 +167,7 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
       await sendPromotionMessage(draft.draft_run_id, words.trim());
       setWords('');
     } catch (e) {
-      setSendError(e instanceof Error ? e.message : String(e));
+      setSendError(formatError(e));
     } finally {
       setSending(false);
     }
@@ -189,7 +190,7 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
       onChanged?.();
       if (action === 'activate') onClose();
     } catch (e) {
-      setDecideError(e instanceof Error ? e.message : String(e));
+      setDecideError(formatError(e));
     } finally {
       setDeciding(false);
     }

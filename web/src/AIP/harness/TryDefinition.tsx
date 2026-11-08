@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useMemo, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Textarea } from '@/ui/textarea';
@@ -50,7 +51,7 @@ export function TryDefinition({ definition, onClose }: { definition: Definition;
       onClose();
       openInApp('domain-elements', { elementId: element.id, objectId, ...(domainId ? { objectDomainId: domainId } : {}) });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
       setBusy(false);
     }
   };

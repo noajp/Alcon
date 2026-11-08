@@ -44,21 +44,11 @@ export const START_TOOL: ToolDef = {
   },
 };
 
-export const CONNECT_TOOL: ToolDef = {
-  name: "propose_connection",
-  description:
-    "仕事に必要なコネクタがこの Space で未接続のとき、その接続を人に提案するカードを出す。接続そのものはしない — 人がカードのボタンから接続ダイアログを開いて行う。" +
-    "names は未接続のコネクタ名（文脈の「未接続のコネクタ」にある名前、または定義の「# 使うコネクタ」の名前）。waitingFor には、その接続を待っている仕事を人の言葉で書く（例：「問い合わせ集計の Element」）。",
-  input_schema: {
-    type: "object",
-    properties: {
-      names: { type: "array", items: { type: "string" }, description: "未接続のコネクタ名" },
-      waitingFor: { type: "string", description: "その接続を待っている仕事" },
-    },
-    required: ["names", "waitingFor"],
-    additionalProperties: false,
-  },
-};
+// The connection proposal's tool definition lives with its core in
+// _shared/connectProposal.ts — the Copilot panel driver offers the same
+// tool, and the two drivers' surfaces must not drift apart.
+import { PROPOSE_CONNECTION_TOOL as CONNECT_TOOL } from "../_shared/connectProposal.ts";
+export { CONNECT_TOOL };
 
 export const ANSWER_TOOL: ToolDef = {
   name: "propose_answer",
@@ -148,6 +138,7 @@ export function conversationSystemPrompt(agentName: string): string {
 - 詰まりは barriers と blockers から、どの Element が・何に・なぜ止まっているかを短く説明する。検証で落ちた実行は verdict の gaps を引く。保留中の指標報告（heldReadings）は「レビューで承認されると記録される」と伝える。
 - 着手できる仕事があり、人が進めたいと言ったら、propose_run_start で開始のカードを出す。開始したとは言わない。決めるのは人で、開始はカードが押されてから。
 - 仕事に必要なコネクタが未接続なら、道具が無いふりをして迂回したり、黙って進めたりしない。未接続であることと、それがどの仕事を止めているかを短く伝え、propose_connection で接続のカードを出す。接続したとは言わない。接続はカードから人が行う。文脈に起草の状態（起草中・テスト中・審査待ち・要対応）が付いた名前は、その進み具合も併せて伝える。
+- 仕事に必要な操作が連携の定義に無いときも、道具が無いふりをして迂回しない。それは定義の不足だと名指しし（例: 「GitHub 連携の定義に delete_branch がありません」）、拡張の道筋を伝える — 組み込みの連携は定義の変更として提案し、カスタム連携は接続の起草を提案する。人が望むなら note_pending_capability で「能力待ちのルール」として記録する（spaceId にはこの Strategy の Space を渡す）。
 - 実行が人の答えを待っていて（state が waiting、latestRun が awaiting_input）、人が答えを言ったら、propose_answer でその言葉をそのまま届けるカードを出す。自分で答えを作らない。
 - 状態の説明と提案までが会話の仕事。Element の状態変更や承認そのものはしない。
 

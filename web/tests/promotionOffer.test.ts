@@ -66,7 +66,7 @@ describe('the conversational promotion offer (decision 9)', () => {
 describe('start_promotion', () => {
   it('is a memory-area tool beside recall and remember', () => {
     expect(memoryTools.MEMORY_TOOLS.map((t: { name: string }) => t.name))
-      .toEqual(['recall_memory', 'remember', 'start_promotion']);
+      .toEqual(['recall_memory', 'remember', 'start_promotion', 'note_pending_capability']);
     const tool = memoryTools.MEMORY_TOOLS.find((t: { name: string }) => t.name === 'start_promotion');
     expect(tool.input_schema.required).toEqual(['memoryId']);
   });
