@@ -131,6 +131,13 @@ import {
   questionShortForm, restingSummaryFor, settleRunBlockedByQuestions, ticketContextOf,
   validateAskInput, validateTicketAnswer, type QuestionTicketRow,
 } from "../_shared/questionTickets.ts";
+import {
+  COMPENSATION_REASONS, compensationReportHasContent, compensationReportText,
+  compensationSummaryOf, loadCompensationReport, mergeCompensationBatchOutcome,
+  recordCompensationExecution, recordWriteCompensation,
+  runCompensationPass, settleWriteCompensation, type CompensationPassOutcome,
+  type CompensationReportData,
+} from "../_shared/compensation.ts";
 import { applyDecision, makeRememberApproval, restorePendingApproval, type SavedPending } from "./decision.ts";
 import { buildCopilotTurn, foldCopilotContext, type CopilotContextLike, type CopilotTurn } from "../_shared/copilotTurn.ts";
 import { COPILOT_AGENT_NAME, persistCopilotApproval, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
@@ -1119,6 +1126,14 @@ async function execute(a: ExecArgs): Promise<void> {
   // seals at the finish, beside the claim accounting.
   let verifyTally: VerifyTally = emptyVerifyTally();
 
+  // The compensation context (B9): call id → the write_compensations
+  // row this call compensates. Set for the calls a compensation pass
+  // or a person's batch decision drives (the pass's executeUndo wraps
+  // its call; a standing compensation pending seeds it at entry), so
+  // the record stage below writes those executions as the rollback's
+  // own rows — a compensation never earns a compensation.
+  const compensationOfCall = new Map<string, string>();
+
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; verify?: VerifyCheck }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
@@ -1140,6 +1155,37 @@ async function execute(a: ExecArgs): Promise<void> {
         commandName: it.command.name, isWrite: it.command.effect === "write", ok: !r.isError,
         targetKey: it.command.effect === "write" ? targetKeyOf(it.command, call.input) : null,
       });
+    }
+    // The compensation record (B9): a write that landed and whose
+    // command declares an undo leaves its payload here, resolved
+    // from this call's actual arguments and result — bound at the
+    // moment of the act, so a later failure rolls back from the
+    // record, never from a re-derivation. A call driven BY a
+    // compensation (its id is in compensationOfCall) leaves the
+    // rollback's own record instead. A payload that could not be
+    // recorded is said on the run, not silenced: a write its run
+    // believes rollback-able must not quietly be otherwise.
+    if (it.command && it.command.effect === "write") {
+      const compOf = compensationOfCall.get(call.id);
+      if (compOf) {
+        await recordCompensationExecution(admin, {
+          runId: run.id, spaceId: run.activity_space_id, elementId: run.element_id,
+          integrationId: it.integration.id, commandName: it.command.name, toolUseId: call.id,
+          input: call.input, targetKey: targetKeyOf(it.command, call.input), compensatesId: compOf,
+          ok: !r.isError, verify: r.verify,
+          reason: r.isError ? `実行エラー: ${r.text.slice(0, 200)}` : null,
+        });
+      } else if (!r.isError && it.command.undo) {
+        const recorded = await recordWriteCompensation(admin, {
+          runId: run.id, spaceId: run.activity_space_id, elementId: run.element_id,
+          integrationId: it.integration.id, command: it.command, manifest: it.manifest ?? null,
+          toolUseId: call.id, writeInput: call.input, resultText: r.text, verify: r.verify,
+        });
+        if (!recorded) {
+          await addStep(admin, run.id, "error", "補償の記録を残せませんでした",
+            `${it.integration.name}: ${operationOf(it, call.input)} — この書き込みは、実行が失敗しても巻き戻しできません。`);
+        }
+      }
     }
     if (r.isError && isAuthFailure(r.text)) {
       // A credential refused at call time is the connection's state,
@@ -1651,6 +1697,159 @@ async function execute(a: ExecArgs): Promise<void> {
     return { content: "Unknown tool.", is_error: true };
   };
 
+  // ── Compensation (B9) ─────────────────────────────────────────────
+  // The driver's half of the compensation pass: an undo command
+  // resolves to its tool in this run's assembly (deterministic names,
+  // so a decision invocation resolves the same ones), the verdict is
+  // this driver's own composition for the call, and execution rides
+  // executeCall — with the call marked as compensating its payload
+  // row, so the record stage writes the rollback's own row, never a
+  // fresh payload.
+  const compensationDeps = {
+    resolveUndoTool: (integrationId: string, commandName: string): { toolName: string } | null => {
+      for (const [toolName, it] of integrationTools) {
+        if (it.integration.id === integrationId && it.command?.name === commandName) return { toolName };
+      }
+      return null;
+    },
+    verdictOf: (call: ToolCall) => verdictForCall(call),
+    executeUndo: async (call: ToolCall): Promise<{ ok: boolean; errorText?: string }> => {
+      const rowId = call.id.startsWith("undo-") ? call.id.slice("undo-".length) : null;
+      if (rowId) compensationOfCall.set(call.id, rowId);
+      try {
+        const r = await executeCall(call, true);
+        return { ok: !r.is_error, ...(r.is_error ? { errorText: r.content } : {}) };
+      } finally {
+        if (rowId) compensationOfCall.delete(call.id);
+      }
+    },
+    displayFor: (call: ToolCall) => approvalDisplayFor(call),
+  };
+
+  const runFailureCompensation = async (): Promise<CompensationPassOutcome> => {
+    try {
+      return await runCompensationPass(admin, {
+        runId: run.id, elementId: run.element_id, definitionId: definition?.id ?? null,
+        deps: compensationDeps,
+      });
+    } catch {
+      // The pass failing must never take the failure settle down with
+      // it: the report then reads from whatever the records hold (a
+      // row left mid-claim reads as interrupted — state unknown —
+      // which is the truth of it).
+      const report = await loadCompensationReport(admin, run.id).catch((): CompensationReportData => ({
+        compensated: [], failed: [], declined: [], offered: [], uncompensated: [], failedWrites: [],
+      }));
+      return { kind: "settled", report };
+    }
+  };
+
+  /** Posts the compensation report where the failure's own report
+   *  goes — the Element's thread — and onto the run's steps with its
+   *  structured form. Silent when there is nothing to say. */
+  const postCompensationReport = async (report: CompensationReportData): Promise<void> => {
+    if (!compensationReportHasContent(report)) return;
+    const text = compensationReportText(report);
+    if (run.element_id) {
+      await admin.from("element_comments").insert({
+        element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+        content: text,
+      });
+    }
+    await addStep(admin, run.id, "compensation", "補償（巻き戻し）の結果", `${text}\n\n${JSON.stringify(report)}`);
+  };
+
+  /**
+   * A terminal finish's settle, shared by the finish that just
+   * landed, the failure path that ran its compensation pass first,
+   * and the decision that finalized a held rollback: the finishRun
+   * itself (with the compensation outcome sealed into its record
+   * when a pass ran), the report on the thread, and the memory
+   * capture a sealed finish earns.
+   */
+  const settleFinish = async (
+    finish: FinishPayload, verdict: RunVerdict | null, comp?: CompensationReportData,
+  ): Promise<void> => {
+    const sealed = await finishRun(a, run, agentName,
+      comp ? { ...finish, compensation: compensationSummaryOf(comp) } : finish,
+      undefined, verdict, boundMeasures);
+    if (comp) await postCompensationReport(comp);
+    // Memory: a sealed finish is distilled into episodes — the curated
+    // layer above this run's sealed record. Best-effort by construction
+    // (capture never throws); a run stopped meanwhile (not sealed)
+    // teaches nothing, and an external-provider run is skipped (the
+    // distillation calls are Anthropic-shaped). A rehearsal run is
+    // skipped too: a trial's finish is evidence about a definition,
+    // not work the person did, and its report is the record it leaves.
+    // A plan run is skipped for the same reason: its finish is a plan
+    // awaiting a decision, not completed work.
+    if (sealed && !run.rehearsal && !planRun) {
+      const { data: el } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
+      await captureMemories({
+        admin, userId: user.id,
+        scope: captureScopeOf(run.activity_space_id), spaceId: run.activity_space_id,
+        material: {
+          finishSummary: finish.summary, finishMessage: finish.message,
+          stepTitles: await loadStepTitles(admin, run.id),
+          verdictGaps: verdict?.gaps ?? [],
+          integrationNames: integrationSummary.filter((i) => !i.down).map((i) => i.name),
+          subjectTitle: el?.title ?? null, subjectDescription: el?.description ?? null,
+        },
+        call: external ? null : { client: modelClient, model, recordUsage },
+        budgetOk: spentBefore + usage.cost < budget && usage.cost < runCap,
+        sourceRunId: run.id, sourceSessionId: null,
+        links: { elementId: run.element_id, domainId: run.domain_id, strategyId: recordScope?.strategyId ?? null },
+        noteKept: async (titles) => { await addStep(admin, run.id, "memory", `記憶に残しました: ${titles.join("、")}`); },
+      });
+    }
+  };
+
+  /**
+   * Parks a compensation batch as the run's one pending approval:
+   * the batch rides the transcript with the failure it interrupted,
+   * the action carries the compensation marker (the card's label),
+   * and the person is told a rollback — not new work — waits. The
+   * decision entry's hash check covers these calls exactly as it
+   * covers a turn's.
+   */
+  const restCompensationBatch = async (
+    outcome: Extract<CompensationPassOutcome, { kind: "rest" }>,
+    failure: NonNullable<SavedPending["compensation"]>["failure"],
+    failureSummary: string,
+  ): Promise<void> => {
+    const compPending: SavedPending = {
+      calls: outcome.calls, partial: [],
+      compensation: { failure, entries: outcome.entries, report: outcome.report },
+    };
+    await saveTranscript(compPending);
+    const display = displaysUnderMode(outcome.displays, mode);
+    const summary = `補償（巻き戻し）の承認待ち: ${approvalSummary(display)}`;
+    const inputHash = await sha256(canonicalCalls(outcome.calls));
+    const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval", summary })
+      .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+    if (!waiting) return; // cancelled meanwhile
+    const { data: action } = await admin.from("agent_actions").insert({
+      run_id: run.id, element_id: run.element_id, tool_use_id: outcome.calls[0].id, tool: "batch",
+      input: { calls: outcome.calls, display, compensation: { setSize: outcome.entries.length, failureSummary } },
+      input_hash: inputHash, summary,
+      integration_id: integrationTools.get(outcome.calls[0].name)?.integration.id ?? null,
+    }).select("id").single();
+    await addStep(admin, run.id, "compensation", summary, compensationReportText(outcome.report));
+    if (run.element_id) {
+      await admin.from("element_comments").insert({
+        element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+        content: `**補償（巻き戻し）の承認待ち** — 失敗した実行の書き込みを巻き戻します。\n\n${compensationReportText(outcome.report)}`,
+      });
+    }
+    if (run.triggered_by) {
+      await admin.from("notifications").insert({
+        recipient_id: run.triggered_by, actor_name: agentName, kind: "approval_requested", element_id: run.element_id,
+        agent_action_id: (action as { id: string } | null)?.id ?? null,
+        title: `${agentName} が補償（巻き戻し）の承認を求めています`, body: summary,
+      }).then(() => {}, () => {});
+    }
+  };
+
   // ── The rehearsal gate ──────────────────────────────────────────────
   // A rehearsal run's choke point: the loop's executor wrapper sends
   // every call here first. Reads run live and are recorded; writes are
@@ -1875,6 +2074,16 @@ async function execute(a: ExecArgs): Promise<void> {
   // saveTranscript below reads this variable, so every save keeps it
   // until the answer application clears it.
   let question: SavedQuestion | undefined = run.transcript?.question;
+  // The compensation rest this run stands in, if any (B9): a failed
+  // run's rollback, offered as one pending batch. Captured before
+  // applyDecision consumes the pending: the person's decision on it
+  // finalizes the failure settle instead of resuming the loop. Its
+  // calls are seeded into the compensation context now, so the
+  // record stage writes their executions as the rollback's own rows.
+  const standingCompensation = pending?.compensation;
+  if (standingCompensation) {
+    for (const e of standingCompensation.entries) compensationOfCall.set(e.callId, e.rowId);
+  }
   if (run.transcript?.messages?.length) {
     state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0, revisions: run.transcript.revisions ?? 0 };
     turnBudget = run.transcript.turnBudget ?? maxTotalTurns;
@@ -2060,6 +2269,10 @@ async function execute(a: ExecArgs): Promise<void> {
     // commands' earned grants in the same flow that records it, so
     // the next call to the command asks again.
     onRejected: async (_action, calls) => {
+      // A compensation batch's rejection is not an incident against
+      // the undo command (B9 §7.2): the person declined a rollback,
+      // they did not judge the command — its earned grant stands.
+      if (standingCompensation) return;
       if (!run.activity_space_id) return;
       const seen = new Set<string>();
       for (const c of calls) {
@@ -2091,6 +2304,38 @@ async function execute(a: ExecArgs): Promise<void> {
   }
   if (decisionOutcome.continued) return;
   pending = decisionOutcome.pending;
+
+  // A decision on a compensation batch finalizes the failure settle
+  // the batch interrupted (B9): the batch's outcomes seal its payload
+  // rows, the merged report posts, and the original failure — the
+  // finish with its verdict, or the refusal — settles exactly as it
+  // would have, with the compensation outcome in its record. The
+  // loop never resumes: the model is done, there is no live turn.
+  if (standingCompensation && decisionOutcome.decided && !decisionOutcome.continued) {
+    const decided = decisionOutcome.decided;
+    const outcomes = new Map<string, { ok: boolean; reason?: string }>();
+    for (const e of standingCompensation.entries) {
+      const res = decided.results.find((r) => r.tool_use_id === e.callId);
+      outcomes.set(e.rowId, {
+        ok: !!res && !res.is_error,
+        ...(res?.is_error ? { reason: COMPENSATION_REASONS.executionError(res.content) } : {}),
+      });
+    }
+    for (const e of standingCompensation.entries) {
+      const o = outcomes.get(e.rowId)!;
+      await settleWriteCompensation(admin, e.rowId,
+        decided.approved ? (o.ok ? "compensated" : "compensation_failed") : "declined",
+        decided.approved ? (o.ok ? null : (o.reason ?? COMPENSATION_REASONS.resultMissing)) : null);
+    }
+    const report = mergeCompensationBatchOutcome(standingCompensation.report, { approved: decided.approved, outcomes });
+    if (standingCompensation.failure.kind === "finish") {
+      await settleFinish(standingCompensation.failure.finish, standingCompensation.failure.verdict, report);
+    } else {
+      await postCompensationReport(report);
+      await failRun(admin, run, standingCompensation.failure.message);
+    }
+    return;
+  }
 
   // ── Model ───────────────────────────────────────────────────────────────
   // Another provider gets the plain Messages API: no betas, no cache marks.
@@ -2538,35 +2783,26 @@ async function execute(a: ExecArgs): Promise<void> {
         corrections,
         inputsHash,
       });
-      const sealed = await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
-      // Memory: a sealed finish is distilled into episodes — the curated
-      // layer above this run's sealed record. Best-effort by construction
-      // (capture never throws); a run stopped meanwhile (not sealed)
-      // teaches nothing, and an external-provider run is skipped (the
-      // distillation calls are Anthropic-shaped). A rehearsal run is
-      // skipped too: a trial's finish is evidence about a definition,
-      // not work the person did, and its report is the record it leaves.
-      // A plan run is skipped for the same reason: its finish is a plan
-      // awaiting a decision, not completed work.
-      if (sealed && !run.rehearsal && !planRun) {
-        const { data: el } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
-        await captureMemories({
-          admin, userId: user.id,
-          scope: captureScopeOf(run.activity_space_id), spaceId: run.activity_space_id,
-          material: {
-            finishSummary: outcome.finish.summary, finishMessage: outcome.finish.message,
-            stepTitles: await loadStepTitles(admin, run.id),
-            verdictGaps: verdict?.gaps ?? [],
-            integrationNames: integrationSummary.filter((i) => !i.down).map((i) => i.name),
-            subjectTitle: el?.title ?? null, subjectDescription: el?.description ?? null,
-          },
-          call: external ? null : { client: modelClient, model, recordUsage },
-          budgetOk: spentBefore + usage.cost < budget && usage.cost < runCap,
-          sourceRunId: run.id, sourceSessionId: null,
-          links: { elementId: run.element_id, domainId: run.domain_id, strategyId: recordScope?.strategyId ?? null },
-          noteKept: async (titles) => { await addStep(admin, run.id, "memory", `記憶に残しました: ${titles.join("、")}`); },
-        });
+      // The compensation pass (B9): a finish that failed — a partial
+      // or blocked outcome, or a completed one the verifier marked
+      // fail — settles its landed writes before the finish seals.
+      // The pass runs the rollback now (auto), holds it as one batch
+      // (ask: the run rests here, and the person's decision finalizes
+      // this settle), or only reports it (never); the finish then
+      // seals with the outcome in its record. A rehearsal landed no
+      // real writes, and a plan run's finish is a plan, not a failure
+      // (its apply run compensates its own failures) — neither fires.
+      if ((outcome.finish.outcome !== "completed" || verdict?.result === "fail") && !run.rehearsal && !planRun) {
+        const compOutcome = await runFailureCompensation();
+        if (compOutcome.kind === "rest") {
+          await restCompensationBatch(compOutcome,
+            { kind: "finish", finish: outcome.finish, verdict }, outcome.finish.summary);
+          return;
+        }
+        await settleFinish(outcome.finish, verdict, compOutcome.report);
+        return;
       }
+      await settleFinish(outcome.finish, verdict);
       return;
     }
 
@@ -2695,15 +2931,42 @@ async function execute(a: ExecArgs): Promise<void> {
       return;
     }
 
-    case "cancelled":
+    case "cancelled": {
       await saveTranscript();
+      // Compensation on a stop (B9, D4): a person stopped this run —
+      // the rollback is never executed and never offered (the stop
+      // may itself be the judgment that the writes stand), but the
+      // landed writes are named on the record as not rolled back,
+      // never silently dropped.
+      if (!run.rehearsal) {
+        const report = await loadCompensationReport(admin, run.id).catch(() => null);
+        if (report && compensationReportHasContent(report)) {
+          await addStep(admin, run.id, "compensation", "補償は実行されませんでした",
+            `${compensationReportText(report)}\n\n${JSON.stringify(report)}`);
+        }
+      }
       await addStep(admin, run.id, "status", "停止しました");
       return;
+    }
 
-    case "refusal":
+    case "refusal": {
       await saveTranscript();
-      await failRun(admin, run, `モデルがこの依頼を断りました: ${outcome.detail.slice(0, 300)}`);
+      const refusalMessage = `モデルがこの依頼を断りました: ${outcome.detail.slice(0, 300)}`;
+      // A refusal after writes landed is a terminal failure like any
+      // other (B9): the pass fires before the run seals failed — or
+      // rests the run on the rollback batch, and the refusal settles
+      // when the person decides. A rehearsal landed nothing real.
+      if (!run.rehearsal) {
+        const compOutcome = await runFailureCompensation();
+        if (compOutcome.kind === "rest") {
+          await restCompensationBatch(compOutcome, { kind: "fail", message: refusalMessage }, refusalMessage);
+          return;
+        }
+        await postCompensationReport(compOutcome.report);
+      }
+      await failRun(admin, run, refusalMessage);
       return;
+    }
   }
 }
 

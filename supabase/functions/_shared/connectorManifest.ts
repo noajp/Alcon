@@ -51,6 +51,19 @@
 //     number (_shared/breakers.ts), so like verify it is enforcement:
 //     a malformed quota is a parse error and the command is left out,
 //     never read as "no limit".
+//   undo (B9): on a write command — { "command": <a write command of
+//     the same manifest>, "input": { <arg>: <field name or literal> } },
+//     the compensation that rolls the write back when a run fails
+//     after it landed. The input mapping reads exactly like verify's
+//     expect: a string value naming a field of the write's input ⊕
+//     result state takes that field's value; anything else is a
+//     literal. An undo is a promise about recovery, so like verify
+//     and quota it is enforcement: a malformed declaration, or one
+//     naming a command that is missing, not a write, or the command
+//     itself, is a parse error and the command is left out — never
+//     read as a compensation that merely never fires. The payload a
+//     landed write leaves is resolved and recorded at execution time
+//     (_shared/compensation.ts), bound, never re-derived later.
 
 export type Effect = "read" | "write";
 export type Permission = "allow" | "ask" | "deny";
@@ -84,6 +97,24 @@ export interface VerifyDeclaration {
  */
 export interface CommandQuota {
   writesPerHour: number;
+}
+
+/**
+ * A write command's compensation declaration (manifest v2, back-half
+ * B9): the write that rolls this write back. `command` names another
+ * write command of the same manifest; `input` maps that command's
+ * arguments to scalars read the way verify's expect reads them — a
+ * string naming a field of the write's input ⊕ result state takes
+ * the field's value (the input wins over the result state), any
+ * other value is a literal. Arguments the mapping does not name are
+ * not passed; a required argument of the undo command the mapping
+ * leaves unfilled makes the recorded payload incomplete, and an
+ * incomplete payload is reported, never partially executed
+ * (_shared/compensation.ts).
+ */
+export interface UndoDeclaration {
+  command: string;
+  input: Record<string, unknown>;
 }
 
 export interface HttpMapping {
@@ -140,6 +171,11 @@ export interface ManifestCommand {
   /** The declared write quota (B11), when the manifest says; null
    *  leaves the breaker's standing same-target default in force. */
   quota: CommandQuota | null;
+  /** The declared compensation (B9), when the manifest says; null
+   *  leaves the write with nothing that rolls it back — a failure
+   *  report then names it as uncompensatable. Writes only: a read's
+   *  undo declaration is read and discarded by the parser. */
+  undo: UndoDeclaration | null;
 }
 
 export interface Manifest {
@@ -250,6 +286,38 @@ export function parseQuota(raw: unknown): CommandQuota | null | undefined {
   const n = x.writes_per_hour;
   if (typeof n !== "number" || !Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > MAX_QUOTA_WRITES_PER_HOUR) return null;
   return { writesPerHour: n };
+}
+
+export const MAX_UNDO_FIELDS = 16;
+
+/**
+ * Pure. A command's undo declaration: undefined when it carries none,
+ * null when what it carries is malformed, the declaration otherwise.
+ * Malformed is distinct from absent for the same reason as verify and
+ * quota: an undo is enforcement — a promise about recovery — so a
+ * declaration that cannot be read (not an object, no usable command
+ * name, an input that is not a map of at most 16 scalar values of at
+ * most 500 chars serialized) is a parse error at the caller, never a
+ * compensation that silently reads as none. Whether the named
+ * command can serve as an undo at all (it exists in the manifest, is
+ * a write, is not the command itself) is the caller's second pass,
+ * mirroring verify's.
+ */
+export function parseUndo(raw: unknown): UndoDeclaration | null | undefined {
+  if (raw === undefined) return undefined;
+  const x = obj(raw);
+  if (!x) return null;
+  if (typeof x.command !== "string" || !NAME.test(x.command)) return null;
+  const inputRaw = obj(x.input);
+  if (!inputRaw) return null;
+  const entries = Object.entries(inputRaw);
+  if (entries.length > MAX_UNDO_FIELDS) return null;
+  for (const [k, v] of entries) {
+    if (!FIELD.test(k)) return null;
+    if (v !== null && typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") return null;
+    try { if (JSON.stringify(v)?.length > 500) return null; } catch { return null; }
+  }
+  return { command: x.command, input: { ...inputRaw } };
 }
 
 /** Pure. The rules stored on a command; one that cannot be read is left out. */
@@ -381,6 +449,12 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
     if (verify === null) { errors.push(`${name}: verify の形が読めません（command と expect が必要です）`); continue; }
     const quota = parseQuota(x.quota);
     if (quota === null) { errors.push(`${name}: quota の形が読めません（writes_per_hour は 1 以上の整数にしてください）`); continue; }
+    // An undo on a read is read and discarded: nothing a read does
+    // needs rolling back, and a stray declaration must not cost the
+    // read its place. On a write it is parsed in full — malformed is
+    // a parse error, as with verify and quota.
+    const undo = effect === "write" ? parseUndo(x.undo) : undefined;
+    if (undo === null) { errors.push(`${name}: undo の形が読めません（command と input が必要です）`); continue; }
     seen.add(name);
     commands.push({
       name, effect, permission, http, mcp,
@@ -393,6 +467,7 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       verify: verify ?? null,
       reversibility: parseReversibility(x.reversibility),
       quota: quota ?? null,
+      undo: undo ?? null,
     });
   }
   // A verify is only as real as its target: it must sit on a write and
@@ -401,9 +476,18 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
   // must never survive as one that merely never fires.
   const effectByName = new Map(commands.map((c) => [c.name, c.effect]));
   const kept = commands.filter((c) => {
-    if (!c.verify) return true;
-    if (c.effect !== "write") { errors.push(`${c.name}: verify は write のコマンドにだけ宣言できます`); return false; }
-    if (effectByName.get(c.verify.command) !== "read") { errors.push(`${c.name}: verify の ${c.verify.command} は read のコマンドではありません`); return false; }
+    if (c.verify) {
+      if (c.effect !== "write") { errors.push(`${c.name}: verify は write のコマンドにだけ宣言できます`); return false; }
+      if (effectByName.get(c.verify.command) !== "read") { errors.push(`${c.name}: verify の ${c.verify.command} は read のコマンドではありません`); return false; }
+    }
+    // An undo is only as real as its target, the same discipline from
+    // the other side: it must name a write command of this same
+    // manifest, and never the command itself — a write whose rollback
+    // is itself would re-run the very thing that failed.
+    if (c.undo) {
+      if (c.undo.command === c.name) { errors.push(`${c.name}: undo は自分自身を指せません`); return false; }
+      if (effectByName.get(c.undo.command) !== "write") { errors.push(`${c.name}: undo の ${c.undo.command} は write のコマンドではありません`); return false; }
+    }
     return true;
   });
   const aliases: Record<string, string> = {};
@@ -577,6 +661,7 @@ export function manifestFromTools(tools: { name: string; description?: string; r
       ...(obj(before?.verify) ? { verify: before!.verify } : {}),
       ...(parseReversibility(before?.reversibility) ? { reversibility: before!.reversibility } : {}),
       ...(obj(before?.quota) ? { quota: before!.quota } : {}),
+      ...(obj(before?.undo) ? { undo: before!.undo } : {}),
       description: (t.description ?? "").slice(0, 1000),
       mcp: t.name,
     });

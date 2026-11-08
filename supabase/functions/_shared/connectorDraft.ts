@@ -371,7 +371,10 @@ export async function draftContentHash(c: DraftContent): Promise<string> {
  *  far it reaches, and how fast it may write — not permission, so a
  *  draft cannot gain or lose one without the structure hash moving,
  *  exactly like an http mapping. (The content hash already binds the
- *  raw manifest whole.) */
+ *  raw manifest whole.) The undo declaration rides here as well (B9):
+ *  how a write is cleaned up after is part of what the command is,
+ *  not of who may run it, so it moves the structure hash and never
+ *  the permission hash. */
 export function draftStructureOf(c: DraftContent): unknown {
   const { manifest } = parseManifest(c.manifest);
   return {
@@ -380,7 +383,7 @@ export function draftStructureOf(c: DraftContent): unknown {
       .map((cmd) => ({
         name: cmd.name, action: cmd.action, effect: cmd.effect,
         http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required,
-        verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota,
+        verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota, undo: cmd.undo,
       }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases: manifest.aliases,

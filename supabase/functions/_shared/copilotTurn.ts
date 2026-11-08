@@ -22,6 +22,7 @@ import {
 } from "./integrationTools.ts";
 import { CONNECTION_PROPOSED_REPLY, PROPOSE_CONNECTION_TOOL, resolveConnectionProposal } from "./connectProposal.ts";
 import { createCredentialRequestsForNames, notifyCredentialRequestOwners } from "./credentialRequests.ts";
+import { recordWriteCompensation } from "./compensation.ts";
 import type { VerifyCheck } from "./verifyReads.ts";
 
 export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人と AI が一緒に進める運用基盤）の AI です。ユーザーの依頼を受けて、道具で Alcon のデータを読み書きし、仕事を最後までやり遂げます。
@@ -262,6 +263,20 @@ export async function buildCopilotTurn(args: {
         }
         try {
           const r = await executeIntegrationTool(it, call);
+          // The compensation record (B9): a landed write whose command
+          // declares an undo leaves its payload here, at the same seam
+          // a work run's executor records — the record attaches to the
+          // act, not the driver. A chat turn has no failure settle of
+          // its own, so no pass ever fires for these rows; the record
+          // is the audit, and it reads from the same table. Best
+          // effort, like every record here.
+          if (!r.isError && it.command?.effect === "write" && it.command.undo && admin && ctx.spaceId && args.runId) {
+            await recordWriteCompensation(admin, {
+              runId: args.runId, spaceId: ctx.spaceId, elementId: null,
+              integrationId: it.integration.id, command: it.command, manifest: it.manifest ?? null,
+              toolUseId: call.id, writeInput: call.input, resultText: r.text, verify: r.verify,
+            }).catch(() => false);
+          }
           // Graduated autonomy (B7): a verify read-back that lands on a
           // mismatch is the command's first incident — its grant is
           // revoked here, in the same flow that records the result, so

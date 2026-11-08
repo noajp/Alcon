@@ -9,7 +9,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
 import type { AgentAction } from '@/types/database';
 import { CRITICAL_CLASS_LABELS } from '@/AIP/connectors/catalog';
-import { approvalHeadline, approvalRows, rememberChoices, type ApprovalAskReason, type ApprovalRow } from './approvalCardModel';
+import { approvalHeadline, approvalRows, compensationMarkerOf, rememberChoices, type ApprovalAskReason, type ApprovalRow } from './approvalCardModel';
 
 // The one decision card for Athena's writes, on every surface that
 // decides: the chat, the Element run panel, the Inbox, an Automation's
@@ -64,6 +64,12 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
   // ends the plan rather than sending the agent back to propose again.
   const isPlan = action.tool === 'plan';
 
+  // A compensation batch (B9): this approval is a failed run's
+  // rollback, not new work — the note under the header says so, and
+  // the deny wording is the rollback's own (denying does not send
+  // the agent back to propose again; it leaves the writes standing).
+  const compensation = compensationMarkerOf(action);
+
   // The note and the remember selection belong to one request: a new
   // request starts empty; a decision that fails and comes back keeps
   // what was typed.
@@ -98,6 +104,11 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
           {isPlan && (
             <div className="text-[12px] text-muted-foreground">
               {t('This is a plan: the agent worked through the task without writing anything. Approving applies exactly the calls listed here.')}
+            </div>
+          )}
+          {compensation && (
+            <div className="text-[12px] text-muted-foreground">
+              {t('Compensation for a failed run: approving runs these undo operations to roll back what the failed run wrote.')}
             </div>
           )}
           {pending && action.expires_at && (
@@ -159,7 +170,7 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
           )}
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={2000}
             placeholder={t('Note to the agent (optional)')} aria-label={t('Note to the agent (optional)')} className="text-[13px]" />
-          <div className="mt-1 text-[12px] text-muted-foreground">{isPlan ? t('Denying ends this plan. The plan stays in the record; nothing in it runs.') : t('Denying with a note tells the agent what to change; it will propose again.')}</div>
+          <div className="mt-1 text-[12px] text-muted-foreground">{compensation ? t('Denying leaves the failed run\'s writes as they are; nothing is rolled back.') : isPlan ? t('Denying ends this plan. The plan stays in the record; nothing in it runs.') : t('Denying with a note tells the agent what to change; it will propose again.')}</div>
           <div className="mt-2 flex items-center justify-end gap-1.5">
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => decide(false)}>{t('Deny')}</Button>
             <Button variant="primary" size="sm" disabled={busy} onClick={() => decide(true)}>
@@ -187,7 +198,7 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
         </div>
       )}
       {surface !== 'inbox' && status === 'rejected' && (
-        <div className="mt-2 px-1 text-[12px] text-muted-foreground">{isPlan ? t('You denied this plan. Nothing in it was run.') : t('You denied this operation. It was not run.')}</div>
+        <div className="mt-2 px-1 text-[12px] text-muted-foreground">{compensation ? t('You denied this compensation. The failed run\'s writes were not rolled back.') : isPlan ? t('You denied this plan. Nothing in it was run.') : t('You denied this operation. It was not run.')}</div>
       )}
       {surface !== 'inbox' && status === 'expired' && (
         <div className="mt-2 px-1 text-[12px] text-muted-foreground">{t('This approval expired undecided. It was not run.')}</div>

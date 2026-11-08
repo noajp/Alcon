@@ -34,6 +34,26 @@ export interface FinishDetail {
   /** What the agent could not confirm. Non-empty marks the finish; it
    *  never fails it — the Reviews filter is how a person finds these. */
   unconfirmed: string[];
+  /** The compensation outcome of this finish's failure settle (B9),
+   *  present only when the settle ran a compensation pass: what the
+   *  rollback did, counted, and the names of the writes that stand
+   *  uncompensated. Sealed beside the claims so the outcome record
+   *  (B4) reads a failure's aftermath as data. */
+  compensation?: CompensationSummary;
+}
+
+/**
+ * A failed run's compensation outcome, as finish_detail keeps it
+ * (back-half B9): counts of what the rollback did, and the NAMES of
+ * the writes that stand uncompensated — a failure's aftermath as
+ * data, not prose in a comment. Built by _shared/compensation.ts
+ * from the run's records, never by the model.
+ */
+export interface CompensationSummary {
+  compensated: number;
+  compensationFailed: number;
+  declined: number;
+  uncompensated: string[];
 }
 
 const MAX_CLAIMS = 50;
@@ -69,11 +89,23 @@ export function normalizeUnconfirmed(raw: unknown): string[] {
 }
 
 /** Pure. The sealed record for a finish: its claims and unconfirmed list,
- *  exactly as submitted (the executor already normalized them). */
-export function finishDetailOf(finish: { claims?: FinishClaim[]; unconfirmed?: string[] }): FinishDetail {
+ *  exactly as submitted (the executor already normalized them), plus the
+ *  compensation outcome the driver computed for a failure settle (B9) —
+ *  the finish itself never carries one; the driver attaches it. */
+export function finishDetailOf(finish: { claims?: FinishClaim[]; unconfirmed?: string[]; compensation?: CompensationSummary }): FinishDetail {
   return {
     claims: (finish.claims ?? []).map((c) => ({ ...c })),
     unconfirmed: [...(finish.unconfirmed ?? [])],
+    ...(finish.compensation
+      ? {
+        compensation: {
+          compensated: finish.compensation.compensated,
+          compensationFailed: finish.compensation.compensationFailed,
+          declined: finish.compensation.declined,
+          uncompensated: [...finish.compensation.uncompensated],
+        },
+      }
+      : {}),
   };
 }
 
@@ -167,5 +199,20 @@ export function parseFinishDetail(raw: unknown): FinishDetail | null {
     if (!nullable(c.source) || !nullable(c.retrievedAt) || !nullable(c.type)) return null;
     claims.push({ text: c.text, source: c.source as string | null, retrievedAt: c.retrievedAt as string | null, type: c.type as string | null });
   }
-  return { claims, unconfirmed: [...(r.unconfirmed as string[])] };
+  // The compensation outcome (B9), when the settle sealed one: counts
+  // and names, exactly the shape compensationSummaryOf writes. A
+  // malformed one is not a finish detail at all (the strict rule).
+  let compensation: CompensationSummary | undefined;
+  if (r.compensation !== undefined) {
+    const c = r.compensation as Record<string, unknown> | null;
+    const count = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 0;
+    if (!c || typeof c !== "object" || Array.isArray(c)
+      || !count(c.compensated) || !count(c.compensationFailed) || !count(c.declined)
+      || !Array.isArray(c.uncompensated) || !c.uncompensated.every((x) => typeof x === "string")) return null;
+    compensation = {
+      compensated: c.compensated as number, compensationFailed: c.compensationFailed as number,
+      declined: c.declined as number, uncompensated: [...(c.uncompensated as string[])],
+    };
+  }
+  return { claims, unconfirmed: [...(r.unconfirmed as string[])], ...(compensation ? { compensation } : {}) };
 }
