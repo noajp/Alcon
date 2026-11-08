@@ -99,7 +99,7 @@ import {
 import { claimFor, driverForRun, entryForBody, messageAllowed } from "./dispatch.ts";
 import { ASK_TOOL, FINISH_TOOL, PROPOSE_TOOL, draftKindOf, draftOpening, draftSystemPrompt, draftTools } from "./drafter.ts";
 import {
-  AI_DRAFTED_PRESET, reconcileDraft, unaccountedDrops, validateDraftCandidate,
+  AI_DRAFTED_PRESET, DRAFT_OPEN_STATUSES, openDraftsForNames, reconcileDraft, unaccountedDrops, validateDraftCandidate,
   type DraftCandidate, type DraftDrop,
 } from "../_shared/connectorDraft.ts";
 import { applyCandidate, askDraft, loadDraft, transitionDraft, type DraftRow } from "../_shared/integrationDrafts.ts";
@@ -2297,6 +2297,20 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
   }
   const { data: def } = definitionId ? await userDb.from("definitions").select("name, body").eq("id", definitionId).maybeSingle() : { data: null };
   const defRow = (def as { name: string; body: string } | null) ?? null;
+  const missingConnectors = defRow
+    ? missingConnectorNames(parseDefinition(defRow.body).connectors, (allIntegrations ?? []) as { name: string; preset: string | null; enabled: boolean }[])
+    : [];
+  // The drafts already in flight for those names (G4): the conversation
+  // says where a connection stands instead of proposing it cold. Members
+  // read every draft of their Space, so the caller's client sees them.
+  let connectorDrafts: { name: string; status: string }[] = [];
+  if (missingConnectors.length && run.activity_space_id) {
+    const { data: draftRows } = await userDb.from("integration_drafts")
+      .select("id, name_key, status")
+      .eq("activity_space_id", run.activity_space_id)
+      .in("status", [...DRAFT_OPEN_STATUSES]);
+    connectorDrafts = openDraftsForNames(missingConnectors, (draftRows ?? []) as { id: string; name_key: string; status: string }[]);
+  }
   return {
     strategy: {
       id: d.id, name: d.name, description: d.description, intents: d.intents, objects: d.objects,
@@ -2306,9 +2320,8 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
     canEdit: (row as { created_by?: string } | null)?.created_by === userId,
     definition: defRow,
     integrations: (integrations ?? []) as { name: string; kind: string; delegation: string }[],
-    missingConnectors: defRow
-      ? missingConnectorNames(parseDefinition(defRow.body).connectors, (allIntegrations ?? []) as { name: string; preset: string | null; enabled: boolean }[])
-      : [],
+    missingConnectors,
+    connectorDrafts,
     today: new Date().toISOString().slice(0, 10),
   };
 }

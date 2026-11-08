@@ -17,9 +17,11 @@ import { useLatestRunStatuses } from '@/hooks/elementRunData';
 import { useDefinitions } from '@/hooks/definitionData';
 import { useIntegrations } from '@/AIP/connectors/data';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
+import { useIntegrationDrafts } from '@/AIP/connectors/draftData';
+import { openDraftForName } from '@/AIP/connectors/draftModel';
 import { missingConnectors, missingForWork, type ConnectorNeed } from '@/AIP/harness/installFlow';
 import { answerAgentRun, startElementRun } from '@/AIP/ai/agentData';
-import type { AgentRunStatus, ElementWithDetails } from '@/types/database';
+import type { AgentRunStatus, ElementWithDetails, IntegrationDraft, IntegrationDraftStatus } from '@/types/database';
 import { conversationItems, traceStepFromWorkItem, workTally, type AgentSegment, type WorkItem } from './conversationModel';
 
 // =============================================================
@@ -63,6 +65,9 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
   // the Space has not connected. Read live, so a start card and a
   // connection card agree with the moment they are pressed, not proposed.
   const integrations = useIntegrations(spaceId);
+  // The Space's AI drafts (G4), read live like the connections: a start
+  // card waiting on a name with a draft in flight says where it stands.
+  const drafts = useIntegrationDrafts(spaceId);
   const definitions = useDefinitions(spaceId);
   const missingByElement = useMemo(() => {
     const out = new Map<string, ConnectorNeed[]>();
@@ -113,7 +118,7 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
         )}
         {items.map((item, i) => item.kind === 'person'
           ? <PersonTurn key={i} text={item.text} />
-          : <AgentTurn key={i} segments={item.segments} onPlan={onPlan} onAnswered={onAnswered} elementStatus={elementStatus} runStatuses={runStatuses} spaceId={spaceId} missingByElement={missingByElement} integrations={integrations.data} />)}
+          : <AgentTurn key={i} segments={item.segments} onPlan={onPlan} onAnswered={onAnswered} elementStatus={elementStatus} runStatuses={runStatuses} spaceId={spaceId} missingByElement={missingByElement} integrations={integrations.data} drafts={drafts.data} />)}
         {talk.pendingText && !items.some((it, i) => i === items.length - 1 && it.kind === 'person' && it.text === talk.pendingText) && (
           <PersonTurn text={talk.pendingText} />
         )}
@@ -167,7 +172,7 @@ function PersonTurn({ text }: { text: string }) {
   );
 }
 
-function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, spaceId, missingByElement, integrations }: {
+function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, spaceId, missingByElement, integrations, drafts }: {
   segments: AgentSegment[];
   onPlan: (guidance: string) => void;
   onAnswered: () => void;
@@ -176,6 +181,7 @@ function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, s
   spaceId: string | null;
   missingByElement: Map<string, ConnectorNeed[]>;
   integrations: Parameters<typeof missingConnectors>[1];
+  drafts: readonly IntegrationDraft[];
 }) {
   return (
     <div className="space-y-2">
@@ -186,7 +192,7 @@ function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, s
             <WorkLine items={s.items} />
             {s.items.filter((w) => w.kind === 'plan').map((w) => <PlanHandOff key={w.id} guidance={w.detail} onPlan={onPlan} />)}
             {s.items.filter((w) => w.proposal?.kind === 'start').map((w) => (
-              <StartRunsCard key={w.id} item={w} elementStatus={elementStatus} runStatuses={runStatuses} spaceId={spaceId} missingByElement={missingByElement} />
+              <StartRunsCard key={w.id} item={w} elementStatus={elementStatus} runStatuses={runStatuses} spaceId={spaceId} missingByElement={missingByElement} drafts={drafts} />
             ))}
             {s.items.filter((w) => w.proposal?.kind === 'answer').map((w) => (
               <AnswerCard key={w.id} item={w} onAnswered={onAnswered} />
@@ -249,6 +255,20 @@ function PlanHandOff({ guidance, onPlan }: { guidance: string; onPlan: (guidance
 /** Runs that mean an Element is already spoken for: it cannot be started. */
 const OPEN_RUN: readonly AgentRunStatus[] = ['queued', 'running', 'awaiting_input', 'awaiting_approval', 'paused', 'awaiting_review'];
 
+/** One waiting name's open AI draft (G4), in the connection card's
+ *  voice: what the AI is doing with that name, or what the draft is
+ *  waiting for. A status outside the open four says nothing. */
+function DraftStateNote({ name, status }: { name: string; status: IntegrationDraftStatus }) {
+  const { t } = useI18n();
+  const line = status === 'drafting' ? t('The AI is drafting the {name} connection.', { name })
+    : status === 'testing' ? t('The AI is testing the drafted {name} connection.', { name })
+    : status === 'awaiting_review' ? t('The drafted {name} connection is waiting for review.', { name })
+    : status === 'awaiting_input' ? t('The {name} draft is waiting for an answer.', { name })
+    : null;
+  if (!line) return null;
+  return <p className="mt-0.5 text-[12px] text-muted-foreground">{line}</p>;
+}
+
 /** The agent proposed starting ready work: the person presses, and the web
  *  starts — revalidating at the press, since a proposal is only as fresh
  *  as when it was made. An Element starts only while it is still open and
@@ -259,12 +279,13 @@ const OPEN_RUN: readonly AgentRunStatus[] = ['queued', 'running', 'awaiting_inpu
  *  was promised, quietly. It waits on the connection instead — the card
  *  says which connector, and the connection card under it opens the
  *  dialog. Once connected, the same Start press starts what waited. */
-function StartRunsCard({ item, elementStatus, runStatuses, spaceId, missingByElement }: {
+function StartRunsCard({ item, elementStatus, runStatuses, spaceId, missingByElement, drafts }: {
   item: WorkItem;
   elementStatus: Map<string, string | null>;
   runStatuses: Record<string, AgentRunStatus>;
   spaceId: string | null;
   missingByElement: Map<string, ConnectorNeed[]>;
+  drafts: readonly IntegrationDraft[];
 }) {
   const { t } = useI18n();
   const [outcome, setOutcome] = useState<string | null>(null);
@@ -274,6 +295,13 @@ function StartRunsCard({ item, elementStatus, runStatuses, spaceId, missingByEle
   if (!proposal || proposal.kind !== 'start') return null;
   const blocked = proposal.elementIds.filter((id) => !startedIds.has(id) && (missingByElement.get(id)?.length ?? 0) > 0);
   const blockedNeeds = [...new Map(blocked.flatMap((id) => missingByElement.get(id) ?? []).map((n) => [n.name, n] as const)).values()];
+  // A waiting name with a connection already being drafted for it: the
+  // card says where that stands, not just that it waits. The draft is
+  // read live, so the line moves as the draft does.
+  const blockedDrafts = blockedNeeds.flatMap((n) => {
+    const draft = openDraftForName(drafts, n.name);
+    return draft ? [{ name: n.name, status: draft.status }] : [];
+  });
   const blockedTitles = proposal.elementIds
     .map((id, i) => (blocked.includes(id) ? proposal.titles[i] : null))
     .filter((x): x is string => !!x);
@@ -314,6 +342,9 @@ function StartRunsCard({ item, elementStatus, runStatuses, spaceId, missingByEle
               {t('Waiting on a connection: {names}', { names: blockedNeeds.map((n) => n.name).join('、') })}
             </p>
           )}
+          {blockedDrafts.map((d) => (
+            <DraftStateNote key={d.name} name={d.name} status={d.status} />
+          ))}
           {outcome && <p className="mt-0.5 text-[12px] text-muted-foreground">{outcome}</p>}
         </div>
         {startable.length > 0 && (

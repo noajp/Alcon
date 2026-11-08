@@ -138,6 +138,23 @@ export function reconcileDraft(args: {
   return { kind: "create" };
 }
 
+/** Pure. The open drafts answering these names, in the order named —
+ *  what a surface that names a missing connector (a conversation's
+ *  context, a start card) says about the connection already in flight
+ *  for it: being drafted or tested, or waiting for its review or for a
+ *  person's answer. Closed drafts answer nothing. */
+export function openDraftsForNames(
+  names: readonly string[],
+  drafts: readonly ReconcileDraft[],
+): { name: string; status: DraftStatus }[] {
+  const byKey = new Map<string, DraftStatus>();
+  for (const d of drafts) if (isDraftOpen(d.status) && !byKey.has(d.name_key)) byKey.set(d.name_key, d.status);
+  return names.flatMap((name) => {
+    const status = byKey.get(draftNameKey(name));
+    return status ? [{ name, status }] : [];
+  });
+}
+
 // ── Hosts: what "the official host" means ────────────────────────────────
 
 // Two-level public suffixes this product's services commonly sit under.

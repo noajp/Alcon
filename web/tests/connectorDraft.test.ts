@@ -98,6 +98,32 @@ describe('draft state machine', () => {
   });
 });
 
+describe('open drafts for names', () => {
+  const draft = (id: string, name_key: string, status: string) => ({ id, name_key, status });
+
+  it('answers the names with an open draft, in the order named, folded the connector way', () => {
+    const drafts = [
+      draft('d1', 'foo', 'awaiting_review'),
+      draft('d2', 'bar', 'testing'),
+    ];
+    expect(cd.openDraftsForNames(['Bar', 'Foo', 'Baz'], drafts)).toEqual([
+      { name: 'Bar', status: 'testing' },
+      { name: 'Foo', status: 'awaiting_review' },
+    ]);
+    // Whitespace and case do not matter, the way connector names fold.
+    expect(cd.openDraftsForNames(['F o o'], drafts)).toEqual([{ name: 'F o o', status: 'awaiting_review' }]);
+  });
+
+  it('closed drafts answer nothing', () => {
+    const drafts = [
+      draft('d1', 'foo', 'active'),
+      draft('d2', 'bar', 'rejected'),
+      draft('d3', 'baz', 'expired'),
+    ];
+    expect(cd.openDraftsForNames(['Foo', 'Bar', 'Baz'], drafts)).toEqual([]);
+  });
+});
+
 describe('drafting rules', () => {
   it('accepts a candidate inside the rules', () => {
     const { errors } = cd.validateDraftCandidate(candidate());
