@@ -37,16 +37,20 @@ export function driverForRun(run: RunSubject): DriverKind {
 }
 
 /** The shape a request to drive a run takes. */
-export type EntryKind = "message" | "decision" | "continue" | "resume" | "start";
+export type EntryKind = "message" | "decision" | "answer" | "continue" | "resume" | "start";
 
 /** Pure. A request's entry shape, in the order serve() has always
  *  preferred them: a message first (it is the only entry that carries
- *  new words), then a decision, a continuation, a resume, a plain start. */
+ *  new words), then a decision, then an answer to a question ticket
+ *  (B12 — a person's response to a specific ask, like a decision, but
+ *  bound to a ticket rather than to an approval's calls), a
+ *  continuation, a resume, a plain start. */
 export function entryForBody(body: {
-  message?: unknown; decision?: unknown; continue?: unknown; resume?: unknown;
+  message?: unknown; decision?: unknown; answer?: unknown; continue?: unknown; resume?: unknown;
 }): EntryKind {
   if (body.message !== undefined) return "message";
   if (body.decision) return "decision";
+  if (body.answer) return "answer";
   if (body.continue) return "continue";
   if (body.resume) return "resume";
   return "start";
@@ -61,6 +65,20 @@ export function messageAllowed(driver: DriverKind): boolean {
   return driver === "converse" || driver === "chat" || driver === "draft" || driver === "promote";
 }
 
+/**
+ * Pure. A question ticket's answer may drive only a work run (B12):
+ * the ticket is an execute run's ask, filed by its ask_question tool
+ * and rested in awaiting_input. Conversations take their person's
+ * words as messages, and the draft flows answer through theirs —
+ * the answer entry exists because a work run takes no message, and
+ * an answer is not a decision: it carries no approval, binds to a
+ * ticket instead of a batch's hash, and its words are delivered to
+ * the model as the question call's tool result, verbatim.
+ */
+export function answerAllowed(driver: DriverKind): boolean {
+  return driver === "execute";
+}
+
 export interface ClaimRule {
   /** The statuses the claim may take the run from. */
   from: readonly string[];
@@ -70,15 +88,21 @@ export interface ClaimRule {
 
 /**
  * Pure. From which statuses each entry may claim its run. A decision
- * answers a run that waits for one; a continuation is bound to its
- * token rather than to a person's patience; a message reaches a
- * conversation at rest in any of its waiting words ('paused' included,
- * so runs rested under the panel's old host still answer).
+ * answers a run that waits for one; an answer claims a work run
+ * resting on its question ticket(s) — awaiting_input is a work run's
+ * only rest an answer may take it from (a conversation's
+ * awaiting_input is reached by message, and message is preferred
+ * over answer in entryForBody, so the two never collide); a
+ * continuation is bound to its token rather than to a person's
+ * patience; a message reaches a conversation at rest in any of its
+ * waiting words ('paused' included, so runs rested under the
+ * panel's old host still answer).
  */
 export function claimFor(entry: EntryKind): ClaimRule {
   switch (entry) {
     case "message": return { from: ["queued", "awaiting_input", "paused"] };
     case "decision": return { from: ["awaiting_approval"] };
+    case "answer": return { from: ["awaiting_input"] };
     case "continue": return { from: ["running"], token: true };
     case "resume": return { from: ["paused"] };
     case "start": return { from: ["queued"] };

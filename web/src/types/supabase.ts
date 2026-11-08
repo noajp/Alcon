@@ -4454,6 +4454,7 @@ export type Database = {
           kind: string
           object_id: string | null
           promotion_draft_id: string | null
+          question_ticket_id: string | null
           recipient_id: string
           strategy_comment_id: string | null
           strategy_id: string | null
@@ -4478,6 +4479,7 @@ export type Database = {
           kind: string
           object_id?: string | null
           promotion_draft_id?: string | null
+          question_ticket_id?: string | null
           recipient_id: string
           strategy_comment_id?: string | null
           strategy_id?: string | null
@@ -4502,6 +4504,7 @@ export type Database = {
           kind?: string
           object_id?: string | null
           promotion_draft_id?: string | null
+          question_ticket_id?: string | null
           recipient_id?: string
           strategy_comment_id?: string | null
           strategy_id?: string | null
@@ -5159,6 +5162,98 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      question_tickets: {
+        Row: {
+          activity_space_id: string | null
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          context: Json
+          created_at: string
+          element_id: string | null
+          expires_at: string
+          id: string
+          options: Json
+          question: string
+          question_key: string
+          run_id: string
+          status: string
+          strategy_id: string | null
+          tool_use_id: string
+          tried: string
+          updated_at: string
+        }
+        Insert: {
+          activity_space_id?: string | null
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          context?: Json
+          created_at?: string
+          element_id?: string | null
+          expires_at: string
+          id?: string
+          options?: Json
+          question: string
+          question_key: string
+          run_id: string
+          status?: string
+          strategy_id?: string | null
+          tool_use_id: string
+          tried: string
+          updated_at?: string
+        }
+        Update: {
+          activity_space_id?: string | null
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          context?: Json
+          created_at?: string
+          element_id?: string | null
+          expires_at?: string
+          id?: string
+          options?: Json
+          question?: string
+          question_key?: string
+          run_id?: string
+          status?: string
+          strategy_id?: string | null
+          tool_use_id?: string
+          tried?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_tickets_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_tickets_element_id_fkey"
+            columns: ["element_id"]
+            isOneToOne: false
+            referencedRelation: "elements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_tickets_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_tickets_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       run_iterations: {
         Row: {

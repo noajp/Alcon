@@ -1162,6 +1162,7 @@ export type NotificationKind =
   | 'measure_missed'
   | 'heartbeat'
   | 'promotion'
+  | 'question'
 
 export interface Notification {
   id: string
@@ -1191,10 +1192,38 @@ export interface Notification {
   integration_draft_id?: string | null
   /** The promotion draft a 'promotion' notification is about. */
   promotion_draft_id?: string | null
+  /** The question ticket a 'question' notification is about (B12). */
+  question_ticket_id?: string | null
   title: string
   body: string | null
   is_read: boolean
   is_archived: boolean
+  created_at: string
+}
+
+export type QuestionTicketStatus = 'open' | 'answered' | 'expired'
+
+/** A question ticket (B12): a run's question for a person, filed by
+ *  its ask_question tool. The run rests until the person answers —
+ *  the answer is stored here verbatim — or the ticket expires and
+ *  the run ends blocked. `options` / `context` are the jsonb shapes
+ *  the engine wrote; readers parse them defensively
+ *  (Function/shared/questionTicketModel.ts). */
+export interface QuestionTicket {
+  id: string
+  activity_space_id: string | null
+  run_id: string
+  element_id: string | null
+  strategy_id: string | null
+  question: string
+  options: unknown
+  context: unknown
+  tried: string
+  status: QuestionTicketStatus
+  answer: string | null
+  answered_by: string | null
+  answered_at: string | null
+  expires_at: string
   created_at: string
 }
 

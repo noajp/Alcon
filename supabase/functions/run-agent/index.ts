@@ -122,10 +122,15 @@ import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateP
 import { checkHarness, checkOutput, checksDue, definitionPrompt, freshnessTableOf, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, passwordFieldOf, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, signInResultText, type RunnerRow } from "./runnerTools.ts";
 import {
-  runLoop, canonicalCalls,
-  type Block, type LoopState, type ToolCall, type ToolKind, type FinishPayload, type Msg,
+  runLoop, canonicalCalls, appendDecisionResults,
+  type Block, type LoopState, type ToolCall, type ToolKind, type ToolResult, type FinishPayload, type Msg,
   type PendingApproval, type Verdict,
 } from "../_shared/agentLoop.ts";
+import {
+  ensureQuestionTicket, loadQuestionTicket, loadQuestionTickets, markQuestionAnswered,
+  questionShortForm, restingSummaryFor, settleRunBlockedByQuestions, ticketContextOf,
+  validateAskInput, validateTicketAnswer, type QuestionTicketRow,
+} from "../_shared/questionTickets.ts";
 import { applyDecision, makeRememberApproval, restorePendingApproval, type SavedPending } from "./decision.ts";
 import { buildCopilotTurn, foldCopilotContext, type CopilotContextLike, type CopilotTurn } from "../_shared/copilotTurn.ts";
 import { COPILOT_AGENT_NAME, persistCopilotApproval, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
@@ -133,7 +138,7 @@ import {
   copilotApprovalExpiresAt, resumedAssistantMessage, seedMessagesFromPanel, withApprovalDecision,
   type PanelMessage, type PanelToolEvent,
 } from "../_shared/copilotSession.ts";
-import { claimFor, driverForRun, entryForBody, heartbeatEntryAllowed, messageAllowed } from "./dispatch.ts";
+import { answerAllowed, claimFor, driverForRun, entryForBody, heartbeatEntryAllowed, messageAllowed } from "./dispatch.ts";
 import { ASK_TOOL, FINISH_TOOL, PROPOSE_TOOL, draftKindOf, draftOpening, draftSystemPrompt, draftTools } from "./drafter.ts";
 import {
   AI_DRAFTED_PRESET, DRAFT_OPEN_STATUSES, openDraftsForNames, reconcileDraft, unaccountedDrops, validateDraftCandidate,
@@ -201,6 +206,12 @@ async function sha256(text: string): Promise<string> {
 }
 
 
+/** A paused turn resting on question tickets (B12): the approval
+ *  pending's shape — the unanswered calls, the turn's other results —
+ *  plus the ticket each call filed. The answers themselves live on
+ *  the ticket rows; the transcript carries only the turn's shape. */
+type SavedQuestion = PendingApproval & { tickets: { callId: string; ticketId: string }[] };
+
 type Transcript = {
   messages: Msg[]; turns: number; nudges: number;
   /** Times the verifier sent a finish back. */
@@ -210,6 +221,9 @@ type Transcript = {
   /** The tool definitions frozen at the first slice, so later slices send the same prefix. */
   tools?: RunToolDef[];
   pending?: SavedPending;
+  /** A question rest (B12): the ask_question calls awaiting a person's
+   *  answer, rested in awaiting_input until the last of them lands. */
+  question?: SavedQuestion;
   /** A chat run's kept view context: where its person was, last told. */
   context?: CopilotContextLike;
   /** A heartbeat run's digest memory: what its wake told, so the next
@@ -290,6 +304,7 @@ Deno.serve(async (req: Request) => {
   let body: {
     runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; message?: string;
     decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] };
+    answer?: { ticketId?: string; option?: string; text?: string };
     context?: CopilotContextLike; attachments?: Attachment[];
   };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
@@ -376,6 +391,28 @@ Deno.serve(async (req: Request) => {
   // A heartbeat takes no words and no decisions: it is driven by its
   // schedule's start, and by the tick's revival of a cut-off wake.
   if (driver === "heartbeat" && !heartbeatEntryAllowed(entry)) return json({ error: "ハートビートはスケジュールからのみ駆動されます。" }, 400);
+  // An answer is checked before the run is touched, like a decision
+  // (B12): it must name a ticket of THIS run that the run is actually
+  // resting on, still standing open inside its window, and the answer
+  // must be one the ticket can take — a choice it offered, or the
+  // person's own words. What the driver delivers is the validated
+  // answer, never the raw request.
+  let validatedAnswer: { ticketId: string; answer: string } | null = null;
+  if (entry === "answer") {
+    if (!answerAllowed(driver)) return json({ error: "この実行は質問への回答を受け付けません。" }, 400);
+    const ticketId = typeof body.answer?.ticketId === "string" ? body.answer.ticketId : "";
+    const ticket = ticketId ? await loadQuestionTicket(admin, ticketId) : null;
+    if (!ticket || ticket.run_id !== runId) return json({ error: "その質問は見つかりませんでした。" }, 404);
+    if (ticket.status === "answered") return json({ error: "その質問にはすでに回答があります。" }, 409);
+    if (ticket.status !== "open" || new Date(ticket.expires_at).getTime() <= Date.now()) {
+      return json({ error: "その質問は期限を過ぎたため、回答は受け付けられません。" }, 409);
+    }
+    const resting = (run.transcript?.question?.tickets ?? []).some((t) => t.ticketId === ticket.id);
+    if (!resting) return json({ error: "その質問は、この実行の現在の待ちには含まれていません。" }, 409);
+    const v = validateTicketAnswer(ticket, { option: body.answer?.option, text: body.answer?.text });
+    if ("error" in v) return json({ error: v.error }, 400);
+    validatedAnswer = { ticketId: ticket.id, answer: v.answer };
+  }
   if (entry === "message") {
     if (!messageAllowed(driver)) return json({ error: "この実行は会話ではありません。" }, 400);
     // A message of files alone is still a message: its words are the
@@ -392,6 +429,7 @@ Deno.serve(async (req: Request) => {
     claim = admin.from("agent_runs").update({ status: "running", error: null, continuation_token: null, started_at: run.status === "queued" ? new Date().toISOString() : undefined })
       .eq("id", runId).in("status", [...claimFor("message").from]);
   } else if (entry === "decision") claim = claim.eq("status", claimFor("decision").from[0]);
+  else if (entry === "answer") claim = claim.eq("status", claimFor("answer").from[0]);
   else if (entry === "continue") claim = claim.eq("status", claimFor("continue").from[0]).eq("continuation_token", body.token ?? "\u0000");
   else if (entry === "resume") {
     if (run.status === "running") {
@@ -418,7 +456,7 @@ Deno.serve(async (req: Request) => {
     await admin.from("agent_runs").update({ approval_mode: approvalMode }).eq("id", run.id);
   }
 
-  const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl, approvalMode };
+  const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl, approvalMode, answer: validatedAnswer };
   const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : driver === "promote" ? promote(args, said) : driver === "heartbeat" ? heartbeat(args) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
@@ -555,6 +593,11 @@ interface ExecArgs {
     /** A chat message's view context and files (the panel's send). */
     context?: CopilotContextLike; attachments?: Attachment[];
   };
+  /** A question ticket's answer, validated by serve() before the run
+   *  was claimed (the ticket is this run's, still open, and the answer
+   *  is one the ticket can take): the exact words the driver delivers
+   *  as the ask_question call's tool result. Null for every other entry. */
+  answer: { ticketId: string; answer: string } | null;
 }
 
 async function execute(a: ExecArgs): Promise<void> {
@@ -973,6 +1016,10 @@ async function execute(a: ExecArgs): Promise<void> {
     // gate may hold (D6 — the ask mode's first-ever card; the gate
     // below decides, this only lets it be asked).
     if (name === SIGN_IN_TOOL) return "write";
+    // A question files a ticket and rests the run (B12): its own
+    // kind, so the loop can hold the turn for the person's answer
+    // rather than for an approval.
+    if (name === "ask_question") return "question";
     const base = baseKindOf(name);
     // A catalog tool whose calls may wait for approval (a Strategy write) goes
     // through the approval path; needsApproval decides each call.
@@ -1445,7 +1492,7 @@ async function execute(a: ExecArgs): Promise<void> {
     return { content: signInResultText(settled.result), ...(outcome.ok ? {} : { is_error: true }) };
   };
 
-  const executeCall = async (call: ToolCall, approved = false): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload; verify?: VerifyCheck }> => {
+  const executeCall = async (call: ToolCall, approved = false): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload; verify?: VerifyCheck; question?: { ticketId: string } }> => {
     const input = call.input;
     switch (call.name) {
       case "record_plan": {
@@ -1528,6 +1575,33 @@ async function execute(a: ExecArgs): Promise<void> {
           ...(unconfirmed.length ? { unconfirmed } : {}),
         };
         return { content: "完了報告を受け取りました。", finish };
+      }
+      case "ask_question": {
+        // Filing a question is a real act on the person's queue, so a
+        // rehearsal never files one — what it cannot decide surfaces
+        // in its own report as unconfirmed — and a plan run's
+        // questions belong to the run that applies the plan, not to
+        // the plan itself.
+        if (run.rehearsal) return { content: "試走では質問は出せません。判断が要る点は、試走の報告に未確認として残してください。", is_error: true };
+        if (planRun) return { content: "計画モードでは質問は出せません。判断が要る点は計画への注記として残し、実行時に質問してください。", is_error: true };
+        const v = validateAskInput(input);
+        if ("error" in v) return { content: v.error, is_error: true };
+        if (!run.activity_space_id) return { content: "この実行には Space がないため、質問を出すことができません。", is_error: true };
+        const { ticket, created } = await ensureQuestionTicket(admin, {
+          spaceId: run.activity_space_id, runId: run.id, elementId: run.element_id,
+          strategyId: recordScope?.strategyId ?? run.strategy_id ?? null,
+          toolUseId: call.id, ask: v.value, now: new Date(),
+        });
+        // A slice retried after the filing (its outcome was never
+        // saved) can meet a ticket that already ended: an answered
+        // one hands its answer over as this call's result directly,
+        // an expired one answers honestly — the run never rests on a
+        // ticket that is not standing.
+        if (ticket.status === "answered" && ticket.answer) return { content: ticket.answer };
+        if (ticket.status === "expired") return { content: "その質問は、回答がないまま期限を過ぎました。状況を確認し、必要なら新しい質問として出し直してください。", is_error: true };
+        await addStep(admin, run.id, "question", `質問: ${questionShortForm(ticket.question)}`,
+          created ? "人の回答があるまで、この実行は休止します。" : "同じ質問がすでに出ているため、そのチケットで回答を待ちます。");
+        return { content: "質問を登録しました。回答があるまで、この実行は休止します。", question: { ticketId: ticket.id } };
       }
     }
     if (call.name === "save_records" || call.name === "read_records") {
@@ -1795,6 +1869,12 @@ async function execute(a: ExecArgs): Promise<void> {
   let state: LoopState;
   let turnBudget: number;
   let pending: SavedPending | undefined = run.transcript?.pending;
+  // The question rest this run stands in, if any (B12): the paused
+  // turn's unanswered ask_question calls and their tickets. It rides
+  // the transcript across slices like the approval pending does, and
+  // saveTranscript below reads this variable, so every save keeps it
+  // until the answer application clears it.
+  let question: SavedQuestion | undefined = run.transcript?.question;
   if (run.transcript?.messages?.length) {
     state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0, revisions: run.transcript.revisions ?? 0 };
     turnBudget = run.transcript.turnBudget ?? maxTotalTurns;
@@ -1848,6 +1928,7 @@ async function execute(a: ExecArgs): Promise<void> {
     const transcript: Transcript = {
       messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: state.revisions ?? 0, turnBudget, tools,
       ...(p ? { pending: p } : {}),
+      ...(question ? { question } : {}),
       ...(corrections.length ? { corrections } : {}),
       ...(run.rehearsal ? {
         rehearsal: rehearsalReport,
@@ -1899,6 +1980,68 @@ async function execute(a: ExecArgs): Promise<void> {
       sha256, addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
     });
     return;
+  }
+
+  // A run resting on question tickets takes only an answer (B12): any
+  // other entry that reached here — a stale continuation, a resume —
+  // must not run the loop over a turn whose tool calls still have no
+  // results, so the run goes back to its rest, summary and all.
+  if (question && !a.answer) {
+    const standing = await loadQuestionTickets(admin, question.tickets.map((t) => t.ticketId));
+    await admin.from("agent_runs").update({ status: "awaiting_input", summary: restingSummaryFor(standing) })
+      .eq("id", run.id).eq("status", "running");
+    return;
+  }
+
+  // ── An answer answers the paused turn first (B12) ─────────────────
+  // serve() validated the answer against its ticket before claiming;
+  // here the ticket is marked (the guarded transition races the
+  // expiry sweep — the loser stops), and the resting set is re-read
+  // from its rows, never from the transcript's memory of it.
+  if (question && a.answer) {
+    const q = question;
+    const answer = a.answer;
+    const marked = await markQuestionAnswered(admin, {
+      ticketId: answer.ticketId, answer: answer.answer, answeredBy: user.id, now: new Date(),
+    });
+    const tickets = await loadQuestionTickets(admin, q.tickets.map((t) => t.ticketId));
+    const byId = new Map(tickets.map((t) => [t.id, t]));
+    const expired = tickets.filter((t) => t.status === "expired");
+    if (!marked || expired.length) {
+      // The expiry took this ticket (or a sibling) between serve's
+      // check and the marking: the run ends blocked on the questions
+      // that went unanswered, exactly as the tick settles it.
+      await settleRunBlockedByQuestions(admin, {
+        run, tickets: expired.length ? expired : tickets, expectStatus: "running",
+        agentName, actorUserId: user.id, now: new Date(),
+      });
+      return;
+    }
+    const stillOpen = tickets.filter((t) => t.status === "open");
+    if (stillOpen.length) {
+      // One rest, several questions: the run goes back to waiting on
+      // the ones still unanswered. Nothing is appended to the
+      // transcript yet — the paused turn is answered in ONE message
+      // when the last answer lands, so every tool_use still gets
+      // exactly one tool_result in the message that follows it.
+      await saveTranscript(pending);
+      await admin.from("agent_runs").update({ status: "awaiting_input", summary: restingSummaryFor(stillOpen) })
+        .eq("id", run.id).eq("status", "running");
+      await addStep(admin, run.id, "question", "回答を受け取りました", `残りの質問（${stillOpen.length} 件）の回答を待っています。`);
+      return;
+    }
+    // Every question answered: the answers are the calls' results —
+    // the person's words verbatim, read from the ticket rows — in the
+    // one message that answers the paused turn, the decision path's
+    // own discipline (appendDecisionResults).
+    const answerResults: ToolResult[] = q.calls.map((c) => {
+      const ticketId = q.tickets.find((x) => x.callId === c.id)?.ticketId ?? "";
+      return { type: "tool_result", tool_use_id: c.id, content: byId.get(ticketId)?.answer ?? "" };
+    });
+    appendDecisionResults(state, q, answerResults);
+    question = undefined;
+    await addStep(admin, run.id, "question", "回答を受け取りました", "質問への回答を受けて、作業を再開します。");
+    await saveTranscript(pending);
   }
 
   // A standing approval, written when a decision asks to remember it
@@ -2492,6 +2635,42 @@ async function execute(a: ExecArgs): Promise<void> {
           recipient_id: run.triggered_by, actor_name: agentName, kind: "approval_requested", element_id: run.element_id,
           title: `${agentName} が承認を求めています`, body: summary,
         }).then(() => {}, () => {});
+      }
+      return;
+    }
+
+    case "question": {
+      await flushLifted();
+      // The run rests on its question ticket(s) (B12): the paused
+      // turn rides the transcript with the ticket each call filed,
+      // the run's one line is the question's short form (what the
+      // Chain's waiting display reads), and each ticket raises its
+      // own Inbox item — the question, its options as tappable
+      // answers, its context — because two questions are two asks,
+      // and neither may be lost in the other's shadow. Dependents
+      // wait by the graph's own rule: this run has not completed.
+      const q: SavedQuestion = { calls: outcome.pending.calls, partial: outcome.pending.partial, tickets: outcome.tickets };
+      question = q;
+      await saveTranscript(pending);
+      const tickets = await loadQuestionTickets(admin, q.tickets.map((t) => t.ticketId));
+      const summary = restingSummaryFor(tickets);
+      const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_input", summary })
+        .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+      if (!waiting) return; // cancelled meanwhile
+      await addStep(admin, run.id, "question", `回答待ち: ${summary}`,
+        tickets.map((t, i) => `${i + 1}. ${t.question}`).join("\n"));
+      await admin.from("element_comments").insert({
+        element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+        content: `**回答待ち** — ${tickets.map((t) => t.question).join(" / ")}\n\nInbox で回答すると、この実行は続きから再開します。`,
+      });
+      if (run.triggered_by) {
+        for (const t of tickets) {
+          await admin.from("notifications").insert({
+            recipient_id: run.triggered_by, actor_name: agentName, kind: "question",
+            agent_run_id: run.id, question_ticket_id: t.id,
+            title: questionShortForm(t.question), body: ticketContextOf(t.context).decision ?? t.question,
+          }).then(() => {}, () => {});
+        }
       }
       return;
     }

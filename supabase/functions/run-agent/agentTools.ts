@@ -38,6 +38,52 @@ export const INTERNAL_TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "ask_question",
+    description: "自分では決められない・分からないことを、人に質問として出す。質問はチケットとして人の Inbox に届き、この実行は回答があるまで休止する（依存する作業は止まるが、関係ない作業は止まらない）。回答はこの呼び出しの結果として、その人の言葉のまま返る。7日以内に回答がなければ、この実行はブロックで終了し、質問は記録に残る。使う前に、自分で調べられる手段（道具・記録・Web）を尽くすこと：tried に、先に試したことを必ず書く（無い質問は受け付けられない）。推測で進めたいときや、些細な確認には使わない。",
+    input_schema: {
+      type: "object",
+      properties: {
+        question: { type: "string", description: "人に決めてほしい・教えてほしいこと（1 つの質問として具体的に）" },
+        options: {
+          type: "array", minItems: 2, maxItems: 5,
+          description: "選択肢で答えられる質問なら 2〜5 件。人はタップ 1 つで答えられる。自分のおすすめがある場合は 1 件だけ recommended: true を付ける。選択肢にできない質問では付けない",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string", description: "選択肢の文言" },
+              recommended: { type: "boolean", description: "これが自分のおすすめなら true（最大 1 件）" },
+            },
+            required: ["label"],
+            additionalProperties: false,
+          },
+        },
+        context: {
+          type: "object",
+          description: "人が判断するために必要な材料。要点だけを渡す（文章の塊ではなく、判断材料へのリンクとして）",
+          properties: {
+            decision: { type: "string", description: "この回答で何が決まるか（1 行）" },
+            links: {
+              type: "array", maxItems: 5,
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string", description: "資料の名前（成果物・記録など）" },
+                  url: { type: "string", description: "資料の URL（あれば）" },
+                },
+                required: ["label"],
+                additionalProperties: false,
+              },
+            },
+          },
+          additionalProperties: false,
+        },
+        tried: { type: "string", description: "人に聞く前に自分で試したこと（調べた記録・使った道具・試した手段）。必須" },
+      },
+      required: ["question", "tried"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "complete_subelement",
     description: "この Element の Sub-element（この Element を親に持つ Element）のうち、終えたものを完了（status done）にする。新しい Sub-element は作らない。",
     input_schema: {

@@ -34,6 +34,7 @@ import type {
   AutonomyLevel, AutonomyIncidentKind, AutonomyBasis,
   ConstraintScope, ConstraintDerivedFrom, ConstraintDraftStatus, ConstraintClusterRecord, ConstraintDraftEvent,
   PlanningConstraintStatus, ConstraintEffectStatus, ConstraintEffectRecord,
+  QuestionTicketStatus,
 } from './database'
 import type { ElementImportResult, ElementImportRow } from '@/Function/shared/element/intakeModel'
 import type { DeploymentGrant, GrantOperation } from '@/Function/audit/auditModel'
@@ -125,6 +126,7 @@ interface ColumnOverrides {
     to_level: AutonomyLevel
     detail: Record<string, unknown>
   }
+  question_tickets: { status: QuestionTicketStatus }
   integrations: {
     kind: 'mcp' | 'http' | 'model'
     auth_type: 'none' | 'bearer' | 'header' | 'oauth'
