@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
+import { decideAgentActionById, fetchAgentActionById, fetchAgentRunStatus } from './agentData';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Shape of a Copilot conversation turn.
@@ -43,14 +44,23 @@ export interface CopilotApprovalCall {
  * Integration writes the approval policy held, waiting for the person's
  * decision on a card in this chat. Nothing has run. Approving runs exactly
  * these calls with exactly this input (inputHash binds them); denying runs
- * nothing. The decision is taken here, by the person at the keyboard — this
- * is not the runs' approval queue (an agent_actions row belongs to an
- * Element's run), and a batch left undecided simply never runs.
+ * nothing.
+ *
+ * A card with a runId/actionId is persisted: it is an agent_actions row on
+ * the session's anchor run, decidable here or in the Inbox, by the person
+ * who started the conversation, whenever they decide — the decision goes
+ * through the engine, the paused turn resumes, and what it goes on to say
+ * is appended to the kept conversation. Left undecided it lapses after
+ * seven days ('expired'). A card without them predates the anchor: it is
+ * decided in this chat only, and approving can no longer run it.
  */
 export interface CopilotApproval {
   calls: CopilotApprovalCall[];
   inputHash: string;
-  status: 'pending' | 'executing' | 'executed' | 'denied' | 'failed';
+  status: 'pending' | 'executing' | 'executed' | 'denied' | 'failed' | 'expired';
+  /** The anchor run and action this card is decided through, when persisted. */
+  runId?: string;
+  actionId?: string;
   /** What each call answered, once approval ran it. */
   results?: { name: string; ok: boolean; content: string }[];
 }
@@ -158,15 +168,30 @@ function functionsUrl(): string | null {
   return base.replace(/\/$/, '') + FUNCTIONS_PATH;
 }
 
+export interface CopilotHookOptions {
+  /** The kept conversation this chat is showing, when it has one: sends
+   *  carry it so the turn anchors on that session. */
+  getSessionId?: () => string | null;
+  /** The function anchored the turn on a session (the first turn's):
+   *  adopt its id, so the kept conversation and the anchor stay one. */
+  onSessionId?: (id: string) => void;
+  /** Re-reads the kept conversation after a decision's resume settled,
+   *  so the card's outcome and the turn's continuation come from the
+   *  server's record. False when there is nothing to re-read. */
+  reloadSession?: () => Promise<boolean>;
+}
+
 /**
  * Drives the SSE conversation with the alcon-copilot Edge Function. The
  * conversation lives here while it is open; CopilotProvider keeps it.
  */
-export function useAlconCopilot() {
+export function useAlconCopilot(options: CopilotHookOptions = {}) {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const optionsRef = useRef(options);
+  useEffect(() => { optionsRef.current = options; });
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
@@ -248,7 +273,10 @@ export function useAlconCopilot() {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
-        body: JSON.stringify({ messages: historyForRequest, context: opts.context ?? {} }),
+        body: JSON.stringify({
+          messages: historyForRequest, context: opts.context ?? {},
+          sessionId: optionsRef.current.getSessionId?.() ?? undefined,
+        }),
       });
 
       if (!res.ok || !res.body) {
@@ -318,6 +346,11 @@ export function useAlconCopilot() {
 
   // Mutate the in-progress assistant turn based on the latest SSE event.
   function dispatchEvent(evt: string, payload: Record<string, unknown>) {
+    if (evt === 'session') {
+      // The turn anchored on a kept conversation: adopt its id.
+      if (typeof payload.sessionId === 'string') optionsRef.current.onSessionId?.(payload.sessionId);
+      return;
+    }
     setMessages((prev) => {
       const next = prev.slice();
       const i = next.length - 1;
@@ -352,6 +385,8 @@ export function useAlconCopilot() {
           calls: (payload.calls as CopilotApprovalCall[] | undefined) ?? [],
           inputHash: String(payload.inputHash ?? ''),
           status: 'pending',
+          ...(typeof payload.runId === 'string' ? { runId: payload.runId } : {}),
+          ...(typeof payload.actionId === 'string' ? { actionId: payload.actionId } : {}),
         };
         next[i] = { ...last, approvals: [...(last.approvals ?? []), approval] };
       } else if (evt === 'done') {
@@ -369,69 +404,68 @@ export function useAlconCopilot() {
   }
 
   /**
-   * The person's decision on an approval card. Denying is local — nothing
-   * was ever sent anywhere, and nothing runs. Approving posts the batch
-   * back to the function in "execute" mode, which re-derives the Space's
-   * tools and runs exactly these calls with exactly this input. Either
-   * way, the outcome is noted on the message, so a later turn (which only
-   * sees the conversation's text) knows what happened.
+   * The person's decision on an approval card.
+   *
+   * A persisted card (runId + actionId) is decided through the engine:
+   * the decision — approve or deny — goes to the anchor run, the paused
+   * turn resumes there, and the kept conversation the server writes back
+   * is re-read, so the card's outcome and the turn's continuation are the
+   * server's record. Either way the model learns the outcome from the
+   * resumed turn itself.
+   *
+   * A card without an anchor was kept from before approvals persisted:
+   * denying is local (nothing was ever sent anywhere, and nothing runs);
+   * approving can no longer run it — the in-chat execute callback it was
+   * bound to is gone — so the card says so, and the person asks again in
+   * the chat, where the new card is persisted like any other.
    */
-  const decideApproval = useCallback(async (approval: CopilotApproval, approve: boolean, spaceId?: string) => {
+  const decideApproval = useCallback(async (approval: CopilotApproval, approve: boolean) => {
+    const isCard = (a: CopilotApproval) => (approval.actionId ? a.actionId === approval.actionId : a.inputHash === approval.inputHash);
     const patch = (status: CopilotApproval['status'], note?: string, results?: CopilotApproval['results']) => {
       setMessages((prev) => prev.map((m) => {
-        if (m.role !== 'assistant' || !m.approvals?.some((a) => a.inputHash === approval.inputHash)) return m;
+        if (m.role !== 'assistant' || !m.approvals?.some(isCard)) return m;
         return {
           ...m,
-          approvals: m.approvals.map((a) => (a.inputHash === approval.inputHash ? { ...a, status, ...(results ? { results } : {}) } : a)),
+          approvals: m.approvals.map((a) => (isCard(a) ? { ...a, status, ...(results ? { results } : {}) } : a)),
           ...(note ? { content: m.content + note } : {}),
         };
       }));
     };
-    const ops = [...new Set(approval.calls.map((c) => `${c.display.integration} · ${c.display.operation}`))].join('、');
+    if (approval.runId && approval.actionId) {
+      patch('executing');
+      try {
+        await decideAgentActionById({
+          runId: approval.runId, actionId: approval.actionId, inputHash: approval.inputHash, approve,
+        });
+      } catch {
+        // The decision never landed: the card stays decidable.
+        patch('pending', `\n\n_(${translate('Could not send the decision. Try again.')})_`);
+        return;
+      }
+      // The resume runs in the background; follow the anchor to its rest,
+      // then let the kept conversation speak for the outcome.
+      for (let i = 0; i < 90; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const status = await fetchAgentRunStatus(approval.runId).catch(() => null);
+        if (status && status !== 'running') break;
+      }
+      const reloaded = await (optionsRef.current.reloadSession?.().catch(() => false) ?? Promise.resolve(false));
+      if (!reloaded) {
+        const action = await fetchAgentActionById(approval.actionId).catch(() => null);
+        if (action?.status === 'executed') patch('executed');
+        else if (action?.status === 'failed') patch('failed');
+        else if (action?.status === 'rejected') patch('denied');
+        else if (action?.status === 'expired') patch('expired');
+      }
+      return;
+    }
+
     if (!approve) {
       patch('denied', `\n\n_(${translate('You denied this operation. It was not run.')})_`);
       return;
     }
-    patch('executing');
-    try {
-      const url = functionsUrl();
-      if (!url) throw new Error(translate('Supabase URL is not configured.'));
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error(translate('Sign in to continue.'));
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mode: 'execute',
-          calls: approval.calls.map(({ id, name, input }) => ({ id, name, input })),
-          inputHash: approval.inputHash,
-          context: { spaceId },
-        }),
-      });
-      const data = (await res.json().catch(() => null)) as { results?: { name: string; ok: boolean; content: string }[]; error?: string } | null;
-      if (!res.ok || !data?.results) {
-        // The function refused (the content no longer matches what was
-        // approved, the connection changed): the batch did not run.
-        patch('failed', `\n\n_(${translate('Could not run the approved operations. Try again.')})_`,
-          [{ name: '', ok: false, content: data?.error ?? `HTTP ${res.status}` }]);
-        return;
-      }
-      const results = data.results.map((r) => ({ name: r.name, ok: r.ok, content: r.content.slice(0, 300) }));
-      const failed = results.some((r) => !r.ok);
-      patch(
-        failed ? 'failed' : 'executed',
-        `\n\n_(${translate(failed ? 'The approved operations ran with failures: {ops}' : 'Ran the approved operations: {ops}', { ops })})_`,
-        results,
-      );
-    } catch {
-      // The request never landed (offline, the tab tore down): the card
-      // stays decidable, and the note says nothing ran.
-      patch('pending', `\n\n_(${translate('Could not run the approved operations. Try again.')})_`);
-    }
+    patch('failed', `\n\n_(${translate('This approval can no longer be run. Ask again in the chat.')})_`,
+      [{ name: '', ok: false, content: translate('This approval can no longer be run. Ask again in the chat.') }]);
   }, []);
 
   /** Drops the turns from `index` on — editing a question starts over from it. */
