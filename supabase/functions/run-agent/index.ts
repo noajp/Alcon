@@ -80,6 +80,10 @@ import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName, missingConnectorNames } from "../_shared/connectorNeeds.ts";
 import { CONNECTION_PROPOSED_REPLY, resolveConnectionProposal } from "../_shared/connectProposal.ts";
+import {
+  CREDENTIAL_REQUEST_STEP, createCredentialRequestsForNames, credentialRequestTitle, credentialStepDetail,
+  ensureIntegrationCredentialRequest, notifyCredentialRequestOwners, type CaptureIntegrationRow,
+} from "../_shared/credentialRequests.ts";
 import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
@@ -653,9 +657,31 @@ async function execute(a: ExecArgs): Promise<void> {
   const integrationTools = new Map<string, IntegrationTool>();
   const integrationDefs: ToolDef[] = [];
   const integrationSummary: TaskContext["integrations"] = [];
+  // Credential capture (secure-login PR2): when this run learns a
+  // token connection's credential is missing or was refused — a
+  // server-side fact the driver itself just observed — the need
+  // becomes a capture request: a step on this run (its card), and a
+  // notice to the Space's owners, who are the only people who can
+  // answer it (D1). The run goes on without the tool, as it does
+  // today; the ask stands where a person can act on it, and the
+  // starter's Resume is the continuation (§3.6's person-pressed
+  // discipline). Dedup lives in the creator: one live ask per need.
+  const noteCredentialNeed = async (row: CaptureIntegrationRow, failedTest?: { ok: false; code: string }) => {
+    if (!run.activity_space_id) return;
+    const fact = failedTest ? { ...row, last_test: failedTest } : row;
+    const got = await ensureIntegrationCredentialRequest(admin, {
+      spaceId: run.activity_space_id, userId: user.id, row: fact,
+      waitingFor: "実行中の作業", runId: run.id,
+    }).catch(() => null);
+    if (!got?.created) return;
+    await addStep(admin, run.id, CREDENTIAL_REQUEST_STEP, credentialRequestTitle(row.name), credentialStepDetail(got.request, row.name));
+    await notifyCredentialRequestOwners(admin, {
+      spaceId: run.activity_space_id, requesterId: user.id, label: row.name, waitingFor: "実行中の作業", always: true,
+    }).catch(() => 0);
+  };
   if (run.activity_space_id) {
     const { data: rows } = await userDb.from("integrations")
-      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide, updated_at")
+      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide, updated_at, secret_id, external_account, last_test")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
     // The integrations' cached tool plans, read once for the whole Space:
     // this slice plans fresh only what the cache cannot vouch for, and a
@@ -751,7 +777,7 @@ async function execute(a: ExecArgs): Promise<void> {
             integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
           };
           if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
-            offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row));
+            offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row, { consumeStash: true }));
           } else {
             let refreshed: { planned: PlannedIntegrationTool[]; bound: Promise<IntegrationBinding> } | null = null;
             try {
@@ -779,6 +805,7 @@ async function execute(a: ExecArgs): Promise<void> {
               await addStep(admin, run.id, "error", `連携「${row.name}」の道具一覧を更新できませんでした`, `前回取得した一覧で続けます: ${message}`);
               if (isAuthFailure(message)) {
                 await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: message.slice(0, 300) } }).eq("id", row.id);
+                await noteCredentialNeed(row as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
               }
             }
             if (refreshed) {
@@ -786,14 +813,14 @@ async function execute(a: ExecArgs): Promise<void> {
               const bound = refreshed.bound;
               offerPlanned(refreshed.planned, () => bound);
             } else if (cached) {
-              offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row));
+              offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row, { consumeStash: true }));
             }
           }
         } else if (manifest) {
           // An API with a manifest: its declared commands, never a raw
           // request. The plan is pure, so the cache only saves the
           // planning; the secret binds when a call runs.
-          const bind = lazyBinding(admin, row);
+          const bind = lazyBinding(admin, row, { consumeStash: true });
           let planned: PlannedIntegrationTool[];
           if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
             planned = adoptPlannedTools(cached.plan, integrationTools);
@@ -809,7 +836,7 @@ async function execute(a: ExecArgs): Promise<void> {
           integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: planned.length, declared: true, guide: row.guide });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
-          integrationTools.set(name, { integration: row, remote: null, bind: lazyBinding(admin, row) });
+          integrationTools.set(name, { integration: row, remote: null, bind: lazyBinding(admin, row, { consumeStash: true }) });
           integrationDefs.push({
             name,
             description: `[${row.name}] ${row.description ?? ""} の API（base: ${row.endpoint}）に HTTP リクエストを送る。GET / HEAD は読み取り、それ以外は書き込み。`.slice(0, 1024),
@@ -824,6 +851,7 @@ async function execute(a: ExecArgs): Promise<void> {
         // the connector shows it, so a person knows to sign in again.
         if (isAuthFailure(message)) {
           await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: message.slice(0, 300) } }).eq("id", row.id);
+          await noteCredentialNeed(row as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
         }
         integrationSummary.push(downIntegration(row.name, isAuthFailure(message)
           ? (row.auth_type === "oauth" ? "認証が切れている（Settings › Customize でサインインし直す必要がある）" : "認証に失敗した（Settings › Customize で認証情報を直す必要がある）")
@@ -957,6 +985,16 @@ async function execute(a: ExecArgs): Promise<void> {
     // the GitHub pulls it opened to this run's Element stays the run's own
     // post-step.
     const r = await executeIntegrationTool(it, call);
+    if (r.isError && isAuthFailure(r.text)) {
+      // A credential refused at call time is the connection's state,
+      // not just this call's: record it on the row (assembly does the
+      // same for its own refusals) and raise the capture need from
+      // that fact — later calls to this connection fail the same way
+      // until a person answers the card. The creator dedups, so a
+      // run full of failing calls raises one ask.
+      await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: r.text.slice(0, 300) } }).eq("id", it.integration.id);
+      await noteCredentialNeed(it.integration as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
+    }
     if (r.verify) {
       // The read-back's outcome is a first-class entry in the run's
       // trace, whatever it found — match, mismatch, or unverifiable.
@@ -1765,7 +1803,37 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     if (call.name === CONNECT_TOOL.name) {
       const r = await resolveConnectionProposal(userDb, run.activity_space_id, call.input);
       if (r.kind === "invalid") return { content: r.error, is_error: true };
-      if (r.kind === "already") return { content: `${r.asked.join("、")} はすでに接続されています。接続の提案は要りません。` };
+      // Credential capture (secure-login PR2) rides the same event:
+      // the creators judge the Space's rows from server-side facts —
+      // a named token connection with an empty or refused slot gets a
+      // capture request and its card, in this conversation too. The
+      // model named connectors; it cannot name a destination or a
+      // credential. Creation never fails the proposal.
+      const credWaitingFor = r.kind === "proposed"
+        ? r.waitingFor
+        : (typeof call.input?.waitingFor === "string" ? call.input.waitingFor.trim().slice(0, 300) : "");
+      let credMade: Awaited<ReturnType<typeof createCredentialRequestsForNames>> = [];
+      if (run.activity_space_id && credWaitingFor) {
+        credMade = await createCredentialRequestsForNames(admin, {
+          spaceId: run.activity_space_id, userId: user.id,
+          names: r.kind === "proposed" ? r.names : r.asked, waitingFor: credWaitingFor,
+        }).catch(() => []);
+        for (const m of credMade) {
+          await addStep(admin, run.id, CREDENTIAL_REQUEST_STEP, credentialRequestTitle(m.row.name), credentialStepDetail(m.request, m.row.name));
+          if (m.created) {
+            await notifyCredentialRequestOwners(admin, {
+              spaceId: run.activity_space_id, requesterId: user.id, label: m.row.name, waitingFor: credWaitingFor,
+            }).catch(() => 0);
+          }
+        }
+      }
+      if (r.kind === "already") {
+        return {
+          content: credMade.length
+            ? `${r.asked.join("、")} は接続されていますが、認証情報が入っていない（または拒否された）ため、会話に入力のカードを出しました。入力されたとは言わないでください。`
+            : `${r.asked.join("、")} はすでに接続されています。接続の提案は要りません。`,
+        };
+      }
       const detail = JSON.stringify({ names: r.names, waitingFor: r.waitingFor });
       await addStep(admin, run.id, "connection_request", "接続を提案しました", detail);
       return { content: CONNECTION_PROPOSED_REPLY };
@@ -3340,6 +3408,10 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   // as connection_request steps for the live panel, and kept with the
   // turn's message so the card renders after the panel re-opens.
   const connectProposals: { names: string[]; waitingFor: string }[] = [];
+  // Credential capture requests this turn's proposals created: recorded
+  // as credential_request steps and kept with the turn's message, the
+  // same two-medium discipline as the proposals themselves.
+  const credentialAsks: { requestId: string; label: string; waitingFor: string }[] = [];
   const callInputs: { name: string; input: Record<string, unknown> }[] = [];
   let stepChain: Promise<unknown> = Promise.resolve();
   const stepLater = (type: string, title: string, detail?: string | null) => {
@@ -3368,6 +3440,16 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
             ? { ok: true, ...(r.rows !== undefined ? { rows: r.rows } : {}) }
             : { ok: false, ...(r.error ? { error: r.error } : {}) },
         });
+        if (r.credentialRequests?.length) {
+          // A capture ask is recorded the same way: its own step kind,
+          // carrying the request id the card re-reads — never a value,
+          // which exists in no step, event or message by construction.
+          for (const c of r.credentialRequests) {
+            credentialAsks.push(c);
+            stepLater(CREDENTIAL_REQUEST_STEP, credentialRequestTitle(c.label),
+              credentialStepDetail({ id: c.requestId }, c.label));
+          }
+        }
         if (r.connectionProposal) {
           // A proposal is recorded in the conversation's own medium — a
           // connection_request step, the shape the Strategy conversation
@@ -3683,7 +3765,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       await saveTranscript();
       const text = outcome.finish.message || outcome.finish.summary;
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
-        resumedAssistantMessage({ text, toolEvents, connections: connectProposals })]);
+        resumedAssistantMessage({ text, toolEvents, connections: connectProposals, credentials: credentialAsks })]);
       // The answer's words are already a step: the streaming call folded
       // its draft into the reply.
       await rest("awaiting_input", outcome.finish.summary);
@@ -3722,7 +3804,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       });
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
         resumedAssistantMessage({
-          text: lastWords(), toolEvents, connections: connectProposals,
+          text: lastWords(), toolEvents, connections: connectProposals, credentials: credentialAsks,
           approval: { calls: p.calls, inputHash: persisted.inputHash, status: "pending", runId: run.id, actionId: persisted.actionId },
         })]);
       await bound("approval", "承認待ち", persisted.summary);
@@ -3746,7 +3828,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
         : outcome.kind === "refusal" ? "モデルがこの依頼を断ったため、続きは止まりました。"
         : "作業の上限に達したため、続きは止まりました。チャットで話しかけると続けられます。";
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
-        resumedAssistantMessage({ text: note, toolEvents, connections: connectProposals })]);
+        resumedAssistantMessage({ text: note, toolEvents, connections: connectProposals, credentials: credentialAsks })]);
       if (outcome.kind === "budget") {
         await bound("error", "予算の上限に達しました", note);
         await pause(note);

@@ -6235,6 +6235,10 @@ export type Database = {
         Args: { p_element_id: string; p_space_id: string }
         Returns: boolean
       }
+      complete_credential_request: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       copy_integration_secret: {
         Args: { p_from_id: string; p_to_id: string }
         Returns: boolean
@@ -6247,6 +6251,10 @@ export type Database = {
       decide_workflow_approval: {
         Args: { _approval_id: string; _approve: boolean; _note?: string }
         Returns: Json
+      }
+      decline_credential_request: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       describe_function: { Args: { fn_name: string }; Returns: string }
       edit_approach_plan_item: {
@@ -6638,6 +6646,10 @@ export type Database = {
           uploaded_by: string
           versions: number
         }[]
+      }
+      stash_credential_once: {
+        Args: { p_request_id: string; p_username: string; p_value: string }
+        Returns: string
       }
       stash_integration_oauth_pending: {
         Args: {

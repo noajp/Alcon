@@ -118,6 +118,17 @@ export interface CopilotConnectionProposal {
   waitingFor: string;
 }
 
+/** A credential capture the turn's proposal created (secure-login
+ *  PR2), kept with the message — the card the person enters the
+ *  credential from (CredentialRequestCard). Only the request id and
+ *  display data: the card re-reads the request row live, and a value
+ *  exists in no message by construction. */
+export interface CopilotCredentialAsk {
+  requestId: string;
+  label: string;
+  waitingFor: string;
+}
+
 export interface CopilotMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -129,6 +140,8 @@ export interface CopilotMessage {
   approvals?: CopilotApproval[];
   /** Connection proposals made on this turn — cards the person acts on. */
   connections?: CopilotConnectionProposal[];
+  /** Credential capture asks created on this turn — cards the person answers. */
+  credentials?: CopilotCredentialAsk[];
   /** True once the turn for this assistant message has finished. */
   done?: boolean;
   /** When the turn was sent or began (ms). */
@@ -213,11 +226,12 @@ export function copilotTitleOf(messages: readonly CopilotMessage[]): string {
  *  panel's own, not the record's. Used when the person cuts a
  *  conversation back — the one write of messages that stays theirs. */
 export function toKeptMessages(messages: readonly CopilotMessage[]): CopilotMessage[] {
-  return messages.map(({ role, content, toolEvents, attachments, approvals, connections }) => ({
+  return messages.map(({ role, content, toolEvents, attachments, approvals, connections, credentials }) => ({
     role, content,
     ...(toolEvents?.length ? { toolEvents } : {}),
     ...(approvals?.length ? { approvals } : {}),
     ...(connections?.length ? { connections } : {}),
+    ...(credentials?.length ? { credentials } : {}),
     ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
   }));
 }
@@ -470,7 +484,11 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
         const next = prev.slice();
         const last = next[next.length - 1];
         if (last && last.role === 'assistant' && !last.done) {
-          next[next.length - 1] = { ...last, content: live.content, toolEvents: live.toolEvents, ...(live.connections.length ? { connections: live.connections } : {}) };
+          next[next.length - 1] = {
+            ...last, content: live.content, toolEvents: live.toolEvents,
+            ...(live.connections.length ? { connections: live.connections } : {}),
+            ...(live.credentials.length ? { credentials: live.credentials } : {}),
+          };
         }
         return next;
       });

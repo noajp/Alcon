@@ -66,6 +66,10 @@ export interface PanelMessage {
    *  the message so their cards render after the panel re-opens — the
    *  Strategy conversation's connection_request step, in panel form. */
   connections?: { names: string[]; waitingFor: string }[];
+  /** Credential capture requests the turn's proposals created, kept
+   *  the same way: the card re-reads its request row live, so the
+   *  kept form needs only the id and display data. */
+  credentials?: { requestId: string; label: string; waitingFor: string }[];
   [k: string]: unknown;
 }
 
@@ -95,6 +99,7 @@ export function resumedAssistantMessage(args: {
   toolEvents?: PanelToolEvent[];
   approval?: PanelApproval | null;
   connections?: { names: string[]; waitingFor: string }[];
+  credentials?: { requestId: string; label: string; waitingFor: string }[];
 }): PanelMessage {
   return {
     role: "assistant",
@@ -103,6 +108,7 @@ export function resumedAssistantMessage(args: {
     ...(args.toolEvents?.length ? { toolEvents: args.toolEvents } : {}),
     ...(args.approval ? { approvals: [args.approval] } : {}),
     ...(args.connections?.length ? { connections: args.connections } : {}),
+    ...(args.credentials?.length ? { credentials: args.credentials } : {}),
   };
 }
 

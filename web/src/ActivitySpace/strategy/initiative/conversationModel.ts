@@ -6,7 +6,7 @@
 
 import type { TraceStep } from '@/Function/shared/workTrace';
 
-export type WorkKind = 'write' | 'read' | 'web' | 'plan' | 'start' | 'answer' | 'connect';
+export type WorkKind = 'write' | 'read' | 'web' | 'plan' | 'start' | 'answer' | 'connect' | 'credential';
 
 /** A proposal the conversation made and the person decides on: the step's
  *  detail, parsed. Titles are the engine's snapshots, so the card reads
@@ -14,7 +14,8 @@ export type WorkKind = 'write' | 'read' | 'web' | 'plan' | 'start' | 'answer' | 
 export type WorkProposal =
   | { kind: 'start'; elementIds: string[]; titles: string[] }
   | { kind: 'answer'; runId: string; elementId: string; elementTitle: string; text: string; question: string | null }
-  | { kind: 'connect'; names: string[]; waitingFor: string };
+  | { kind: 'connect'; names: string[]; waitingFor: string }
+  | { kind: 'credential'; requestId: string; label: string };
 
 /** What a work item is called in the conversation (i18n source strings). */
 const WORK_LABEL: Record<string, string> = {
@@ -33,6 +34,7 @@ const WORK_LABEL: Record<string, string> = {
   propose_run_start: 'Proposed starting runs',
   propose_answer: 'Proposed an answer',
   propose_connection: 'Proposed a connection',
+  request_credential: 'Asked for a credential',
 };
 
 export interface WorkItem {
@@ -63,9 +65,16 @@ const ALCON = 'Alcon: ';
 /** Pure. A proposal step's detail, read defensively: anything unreadable
  *  or incomplete reads as no proposal, never as an exception. */
 function proposalOf(step: ConversationStep): WorkProposal | null {
-  if (step.type !== 'start_request' && step.type !== 'answer_request' && step.type !== 'connection_request') return null;
+  if (step.type !== 'start_request' && step.type !== 'answer_request' && step.type !== 'connection_request' && step.type !== 'credential_request') return null;
   try {
     const raw = JSON.parse(step.detail ?? '') as Record<string, unknown>;
+    if (step.type === 'credential_request') {
+      // The capture ask's address only: the card re-reads its request
+      // row for the state, the need and the destination.
+      return typeof raw.requestId === 'string' && raw.requestId
+        ? { kind: 'credential', requestId: raw.requestId, label: typeof raw.label === 'string' ? raw.label : '' }
+        : null;
+    }
     if (step.type === 'connection_request') {
       const names = Array.isArray(raw.names) ? raw.names.filter((v): v is string => typeof v === 'string' && !!v) : [];
       return names.length ? { kind: 'connect', names, waitingFor: typeof raw.waitingFor === 'string' ? raw.waitingFor : '' } : null;
@@ -88,10 +97,10 @@ function proposalOf(step: ConversationStep): WorkProposal | null {
 
 function work(step: ConversationStep): WorkItem | null {
   if (step.type === 'plan_request') return { id: step.id, name: 'hand_to_planner', kind: 'plan', detail: step.detail ?? '', ok: true };
-  if (step.type === 'start_request' || step.type === 'answer_request' || step.type === 'connection_request') {
-    const kind = step.type === 'start_request' ? 'start' : step.type === 'answer_request' ? 'answer' : 'connect';
+  if (step.type === 'start_request' || step.type === 'answer_request' || step.type === 'connection_request' || step.type === 'credential_request') {
+    const kind = step.type === 'start_request' ? 'start' : step.type === 'answer_request' ? 'answer' : step.type === 'connection_request' ? 'connect' : 'credential';
     return {
-      id: step.id, name: kind === 'start' ? 'propose_run_start' : kind === 'answer' ? 'propose_answer' : 'propose_connection', kind,
+      id: step.id, name: kind === 'start' ? 'propose_run_start' : kind === 'answer' ? 'propose_answer' : kind === 'connect' ? 'propose_connection' : 'request_credential', kind,
       detail: '', ok: true, proposal: proposalOf(step),
     };
   }
@@ -141,7 +150,7 @@ export function conversationItems(steps: ConversationStep[]): ConversationItem[]
 
 /** Pure. How many of each kind a folded work line stands for. */
 export function workTally(items: WorkItem[]): Record<WorkKind, number> & { failed: number } {
-  const tally = { write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 0, failed: 0 };
+  const tally = { write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 0, credential: 0, failed: 0 };
   for (const w of items) {
     tally[w.kind] += 1;
     if (!w.ok) tally.failed += 1;
@@ -159,6 +168,6 @@ export function traceStepFromWorkItem(item: WorkItem): TraceStep {
     label: WORK_LABEL[item.name] ?? item.name,
     chip: null,
     detail: item.ok ? (item.detail || null) : (item.error ?? item.detail ?? null),
-    tone: !item.ok ? 'error' : item.kind === 'plan' || item.kind === 'start' || item.kind === 'answer' || item.kind === 'connect' ? 'note' : 'work',
+    tone: !item.ok ? 'error' : item.kind === 'plan' || item.kind === 'start' || item.kind === 'answer' || item.kind === 'connect' || item.kind === 'credential' ? 'note' : 'work',
   };
 }

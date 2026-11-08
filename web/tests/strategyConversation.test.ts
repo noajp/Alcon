@@ -150,7 +150,7 @@ describe('conversationItems', () => {
     ]);
     expect(work[2].error).toBe('持ち主だけです');
     expect(work.find((w) => w.kind === 'plan')?.detail).toBe('広告は使わない');
-    expect(workTally(work)).toEqual({ write: 2, read: 1, web: 1, plan: 1, start: 0, answer: 0, connect: 0, failed: 1 });
+    expect(workTally(work)).toEqual({ write: 2, read: 1, web: 1, plan: 1, start: 0, answer: 0, connect: 0, credential: 0, failed: 1 });
     expect(agent.segments[3]).toEqual({ kind: 'text', text: '記録しました。\n次は前提です。' });
   });
 
@@ -175,7 +175,7 @@ describe('conversationItems', () => {
     ]);
     expect(work[1].proposal).toEqual({ kind: 'start', elementIds: ['e1', 'e2'], titles: ['下調べ', '集計'] });
     expect(work[2].proposal).toEqual({ kind: 'answer', runId: 'r1', elementId: 'e3', elementTitle: '確認', text: 'A で進めて', question: 'A と B どちらにしますか' });
-    expect(workTally(work)).toEqual({ write: 0, read: 1, web: 0, plan: 0, start: 1, answer: 1, connect: 0, failed: 0 });
+    expect(workTally(work)).toEqual({ write: 0, read: 1, web: 0, plan: 0, start: 1, answer: 1, connect: 0, credential: 0, failed: 0 });
   });
 
   it('maps a connection proposal step to an item that carries the ask', () => {
@@ -190,7 +190,22 @@ describe('conversationItems', () => {
     const work = agent.segments.flatMap((s) => (s.kind === 'work' ? s.items : []));
     expect(work.map((w) => [w.name, w.kind])).toEqual([['propose_connection', 'connect']]);
     expect(work[0].proposal).toEqual({ kind: 'connect', names: ['GitHub'], waitingFor: '問い合わせ集計の Element' });
-    expect(workTally(work)).toEqual({ write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 1, failed: 0 });
+    expect(workTally(work)).toEqual({ write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 1, credential: 0, failed: 0 });
+  });
+
+  it('maps a credential request step to an item that carries the ask', () => {
+    const credentialSteps = [
+      step('message', 'GitHub で PR を作って', 'GitHub で PR を作って'),
+      step('credential_request', 'GitHub の認証情報が必要です', JSON.stringify({ requestId: 'req-1', label: 'GitHub' })),
+      step('reply', 'カードを出しました。', 'カードを出しました。'),
+    ];
+    const items = conversationItems(credentialSteps);
+    const agent = items[1];
+    if (agent.kind !== 'agent') throw new Error('expected the agent');
+    const work = agent.segments.flatMap((s) => (s.kind === 'work' ? s.items : []));
+    expect(work.map((w) => [w.name, w.kind])).toEqual([['request_credential', 'credential']]);
+    expect(work[0].proposal).toEqual({ kind: 'credential', requestId: 'req-1', label: 'GitHub' });
+    expect(workTally(work)).toEqual({ write: 0, read: 0, web: 0, plan: 0, start: 0, answer: 0, connect: 0, credential: 1, failed: 0 });
   });
 
   it('a proposal step with an unreadable detail degrades to a plain work item', () => {

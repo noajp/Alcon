@@ -1264,6 +1264,11 @@ export type AgentRunStepType =
   // conversation itself starts and answers nothing.
   | 'start_request'
   | 'answer_request'
+  // A connection a conversation proposed, and a credential capture a
+  // conversation or a run raised (secure login): both carry only the
+  // proposal's or the request's address in their detail.
+  | 'connection_request'
+  | 'credential_request'
   // Memory: a run kept what it learned (capture), or read what earlier
   // work kept (retrieval, including an auto-promotion it completed).
   | 'memory'
@@ -1467,6 +1472,41 @@ export interface CredentialUse {
   actor_id: string | null
   origin: string | null
   detail: string | null
+  created_at: string
+}
+
+export type CredentialRequestStatus = 'pending' | 'saved' | 'used_once' | 'declined' | 'expired' | 'superseded'
+
+/** What raised a credential request (the need jsonb's source): a
+ *  connection slot found empty, a refused credential, a run that hit
+ *  the wall, the runner standing on a login page. Server-written from
+ *  server-side facts only — a model cannot author one. */
+export interface CredentialRequestNeed {
+  source?: 'connection' | 'reauth' | 'run' | 'runner'
+  run_id?: string
+  waiting_for?: string
+}
+
+/** A credential capture ask (secure-login PR2): a server-written row
+ *  the client renders as the capture card/dialog. It carries display
+ *  data only — the destination, the work waiting, a username hint.
+ *  The value a person types goes from the dialog straight to the
+ *  storage RPC and exists in no row, step or message. */
+export interface CredentialRequest {
+  id: string
+  activity_space_id: string
+  kind: 'integration_secret' | 'site_login'
+  integration_id: string | null
+  site_credential_id: string | null
+  /** For a site login: the canonical origin, server-derived, locked in the dialog. */
+  origin: string | null
+  username_hint: string | null
+  need: CredentialRequestNeed
+  status: CredentialRequestStatus
+  requested_by: string | null
+  decided_by: string | null
+  decided_at: string | null
+  expires_at: string | null
   created_at: string
 }
 

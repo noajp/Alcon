@@ -10,6 +10,7 @@ import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { traceFromRunSteps } from '@/Function/shared/workTrace';
 import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared/workTraceView';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
+import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
 import type { AgentOutput } from '@/types/database';
 import type { ProposedReading } from '@/Function/audit/auditModel';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
@@ -100,8 +101,25 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
   const { t } = useI18n();
   const now = useNow();
   // A standing approval changes the Space's connection rules: owners only.
-  const isOwner = useIsSpaceOwner(useActiveSpaceId()) === true;
+  const spaceId = useActiveSpaceId();
+  const isOwner = useIsSpaceOwner(spaceId) === true;
   const run = agent.run;
+  // Credential capture asks this run raised (secure-login PR2): their
+  // steps carry only the request id — the card re-reads its row live.
+  // One card per request, however many slices repeated the step.
+  const credentialAsks = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const s of agent.steps) {
+      if (s.type !== 'credential_request' || !s.detail) continue;
+      try {
+        const parsed = JSON.parse(s.detail) as { requestId?: unknown; label?: unknown };
+        if (typeof parsed.requestId === 'string' && parsed.requestId) {
+          seen.set(parsed.requestId, typeof parsed.label === 'string' ? parsed.label : '');
+        }
+      } catch { /* a step whose detail is not the ask's JSON is just a row */ }
+    }
+    return [...seen.entries()].map(([requestId, label]) => ({ requestId, label }));
+  }, [agent.steps]);
   // The run told the shared way (workTrace): headline, steps, completion.
   const trace = useMemo(
     () => traceFromRunSteps(
@@ -157,6 +175,14 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
                 onDecide={async (approve, opts) => { await agent.decide(approve, opts.note, opts.remember); }} />
             </div>
           )}
+          {/* A capture this run is waiting on: the shared card, under
+              the trace it interrupted. Answering it is an owner's act
+              in the dialog; the run's own Resume stays the starter's. */}
+          {credentialAsks.map((c) => (
+            <div key={c.requestId} className="mt-2">
+              <CredentialRequestCard spaceId={spaceId} requestId={c.requestId} label={c.label} />
+            </div>
+          ))}
         </div>
       )}
 

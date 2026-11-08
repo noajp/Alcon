@@ -1,4 +1,4 @@
-import type { CopilotConnectionProposal, ToolEvent } from './useAlconCopilot';
+import type { CopilotConnectionProposal, CopilotCredentialAsk, ToolEvent } from './useAlconCopilot';
 
 // A Copilot turn in progress, read from its run's steps — the live
 // display while Athena works, before the kept conversation carries the
@@ -6,8 +6,9 @@ import type { CopilotConnectionProposal, ToolEvent } from './useAlconCopilot';
 // person's 'message', a step per tool result (its title the tool, its
 // detail a JSON of the call's input and the result's rows or error),
 // 'draft' steps holding the answer as it grows, 'reply' steps for
-// each stretch of finished words, and a 'connection_request' step per
-// connection proposal. Pure.
+// each stretch of finished words, a 'connection_request' step per
+// connection proposal, and a 'credential_request' step per credential
+// capture the proposal created. Pure.
 
 export interface CopilotStepRow { type: string; title: string; detail: string | null }
 
@@ -28,21 +29,39 @@ function proposalOf(step: CopilotStepRow): CopilotConnectionProposal | null {
   }
 }
 
+/** Pure. A credential_request step's ask, defensively parsed — the
+ *  request id and its display label; the card re-reads the request
+ *  row for everything else (its waiting work lives on the row). */
+function credentialOf(step: CopilotStepRow): CopilotCredentialAsk | null {
+  try {
+    const parsed = JSON.parse(step.detail ?? '') as { requestId?: unknown; label?: unknown };
+    const requestId = typeof parsed?.requestId === 'string' ? parsed.requestId : '';
+    if (!requestId) return null;
+    return { requestId, label: typeof parsed?.label === 'string' ? parsed.label : '', waitingFor: '' };
+  } catch {
+    return null;
+  }
+}
+
 /** Pure. The in-progress assistant turn a run's steps describe: the
  *  words so far (finished stretches, then the growing draft), the
  *  tool steps as the panel's tool events, and the connection proposals
  *  made so far (rendered as Connect cards). Steps before the latest
  *  'message' belong to earlier turns and are not this turn's. */
-export function liveTurnFromSteps(steps: readonly CopilotStepRow[]): { content: string; toolEvents: ToolEvent[]; connections: CopilotConnectionProposal[] } {
+export function liveTurnFromSteps(steps: readonly CopilotStepRow[]): { content: string; toolEvents: ToolEvent[]; connections: CopilotConnectionProposal[]; credentials: CopilotCredentialAsk[] } {
   const start = steps.map((s) => s.type).lastIndexOf('message');
   const toolEvents: ToolEvent[] = [];
   const connections: CopilotConnectionProposal[] = [];
+  const credentials: CopilotCredentialAsk[] = [];
   const segments: string[] = [];
   let draft = '';
   for (const step of steps.slice(start + 1)) {
     if (step.type === 'connection_request') {
       const proposal = proposalOf(step);
       if (proposal) connections.push(proposal);
+    } else if (step.type === 'credential_request') {
+      const ask = credentialOf(step);
+      if (ask) credentials.push(ask);
     } else if (step.type === 'reply') {
       const text = (step.detail ?? step.title).trim();
       if (text) segments.push(text);
@@ -74,5 +93,5 @@ export function liveTurnFromSteps(steps: readonly CopilotStepRow[]): { content: 
     }
   }
   const content = [...segments, ...(draft.trim() ? [draft] : [])].join('\n\n');
-  return { content, toolEvents, connections };
+  return { content, toolEvents, connections, credentials };
 }
