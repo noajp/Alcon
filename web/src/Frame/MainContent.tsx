@@ -1,6 +1,7 @@
 'use client';
 
 import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
+import type { CopilotSubject } from '@/AIP/ai/useAlconCopilot';
 import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
@@ -53,9 +54,12 @@ interface MainContentProps {
   activeSpaceId?: string | null;
   /** The AI screen's shrink button: back to the pop-up. */
   onMinimizeAi?: () => void;
+  /** The AI screen's subject — the same one the pop-up carries (the
+   *  open, or last open, Strategy): context for a send, never powers. */
+  aiSubject?: CopilotSubject;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
   const scope = useActiveSpaceScope();
   const notebookVisible = activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder');
   // The notebook stays mounted once opened (it keeps its editor state while
@@ -264,7 +268,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {/* The AI on a screen of its own — the same conversation as the pop-up. */}
-          {activeActivity === 'ai' && <AlconCopilotPanel variant="page" open onOpenChange={() => {}} onMinimize={onMinimizeAi} />}
+          {activeActivity === 'ai' && <AlconCopilotPanel variant="page" open onOpenChange={() => {}} subject={aiSubject} onMinimize={onMinimizeAi} />}
 
           {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
 

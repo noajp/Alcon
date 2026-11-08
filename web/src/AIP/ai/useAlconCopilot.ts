@@ -159,6 +159,28 @@ export function buildCopilotContext(input: {
   return { ...base, viewLabel: input.strategyName ?? 'Strategy', strategyId: input.subject.id };
 }
 
+/** Pure. The subject the Copilot speaks to, from where the person is:
+ *  the open deck on Slides, the open Strategy on its view. On the AI
+ *  screen it is the last Strategy they had open — the screen and the
+ *  pop-up are two windows onto one conversation, and the pop-up they
+ *  came from would have carried that Strategy. Anywhere else, and on
+ *  the Strategy view with none open, there is no subject. A subject
+ *  scopes a send's context; it grants nothing. */
+export function copilotSubjectFor(input: {
+  activeView: string;
+  strategyId?: string | null;
+  lastStrategyId?: string | null;
+}): CopilotSubject {
+  if (input.activeView === 'slides') return { kind: 'slides' };
+  if (input.activeView === 'strategy') {
+    return input.strategyId ? { kind: 'strategy', id: input.strategyId } : null;
+  }
+  if (input.activeView === 'ai') {
+    return input.lastStrategyId ? { kind: 'strategy', id: input.lastStrategyId } : null;
+  }
+  return null;
+}
+
 /** Pure. A kept conversation's title: the start of its first question,
  *  whitespace folded, capped at 80 characters. A question sent with only
  *  a file takes the file's name; a conversation with no question yet
