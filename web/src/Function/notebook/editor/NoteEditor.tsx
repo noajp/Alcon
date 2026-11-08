@@ -16,6 +16,8 @@ import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Functio
 import { patchBlocks } from '@/Function/notebook/noteMerge';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MermaidLayer } from './MermaidLayer';
+import { EmbedLayer } from './EmbedLayer';
+import { EMBED_LANG, embedSource, useEmbedHost } from './embedBlocks';
 
 export interface NoteEditorProps {
   initialHtml?: string;
@@ -216,6 +218,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     replaceBody(value ?? initialHtml);
   }, [initialHtml, value, replaceBody]);
 
+  // "/" on an empty line, where the page offers live blocks: a menu of them;
+  // the one picked replaces the line as an ```alcon block.
+  const embedHost = useEmbedHost();
+  const [slash, setSlash] = useState<{ x: number; y: number; index: number; block: Element | null } | null>(null);
   const emit = useCallback(() => {
     const el = ref.current;
     if (!el) return;
@@ -230,6 +236,27 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     lastEmittedRef.current = html;
     onChange?.(html);
   }, [onChange]);
+
+  const insertEmbed = useCallback((view: string) => {
+    const el = ref.current;
+    const at = slash?.block ?? null;
+    setSlash(null);
+    if (!el) return;
+    const pre = document.createElement('pre');
+    pre.setAttribute('data-lang', EMBED_LANG);
+    pre.textContent = embedSource({ view });
+    const after = document.createElement('p');
+    after.appendChild(document.createElement('br'));
+    if (at && at.parentElement === el) { at.replaceWith(pre); pre.after(after); }
+    else { el.appendChild(pre); el.appendChild(after); }
+    const range = document.createRange();
+    range.selectNodeContents(after);
+    range.collapse(true);
+    const sel = document.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    emit();
+  }, [slash, emit]);
 
   // Mirror each linked bullet's ○ to its Element's live status.
   // `data-element-status` is derived — applied here and re-applied
@@ -447,6 +474,28 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, [emit]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (slash && embedHost) {
+      const n = embedHost.views.length;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlash({ ...slash, index: (slash.index + 1) % n }); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlash({ ...slash, index: (slash.index + n - 1) % n }); return; }
+      if (e.key === 'Enter') { e.preventDefault(); const v = embedHost.views[slash.index]; if (v) insertEmbed(v.id); return; }
+      setSlash(null);
+      if (e.key === 'Escape') { e.preventDefault(); return; }
+    }
+    if (e.key === '/' && embedHost && embedHost.views.length && editable && !e.nativeEvent.isComposing && ref.current) {
+      const sel = document.getSelection();
+      let node: Node | null = sel?.anchorNode ?? null;
+      while (node && node.parentNode !== ref.current) node = node.parentNode;
+      const block = node instanceof Element ? node : null;
+      const empty = block ? !(block.textContent ?? '').trim() && block.tagName !== 'PRE' : !(ref.current.textContent ?? '').trim();
+      if (empty) {
+        e.preventDefault();
+        const r = sel && sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
+        const box = (block ?? ref.current).getBoundingClientRect();
+        setSlash({ x: r && r.left ? r.left : box.left, y: (r && r.bottom ? r.bottom : box.bottom) + 4, index: 0, block });
+        return;
+      }
+    }
     if (e.key === 'Tab' && !e.nativeEvent.isComposing) {
       if (handleTableTab(!e.shiftKey)) { e.preventDefault(); return; }
     }
@@ -460,7 +509,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     if (key === 'b') { e.preventDefault(); exec('bold'); }
     else if (key === 'i') { e.preventDefault(); exec('italic'); }
     else if (key === 'u') { e.preventDefault(); if (!compact) exec('underline'); }
-  }, [exec, breakOutOfStickyBlock, handleTableTab, compact]);
+  }, [exec, breakOutOfStickyBlock, handleTableTab, compact, slash, embedHost, insertEmbed, editable]);
 
   // Restore caret into the editor when triggering commands from the
   // header toolbar — execCommand only runs against the focused
@@ -926,6 +975,28 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         />
         {/* ```mermaid blocks drawn over their source. */}
         <MermaidLayer root={ref} frame={frameRef} />
+        {/* ```alcon blocks drawn live over their source. */}
+        <EmbedLayer root={ref} frame={frameRef} editable={editable} />
+        {slash && embedHost && createPortal(
+          <div role="listbox" aria-label={t('Insert a block')}
+            className="fixed z-50 w-64 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-xl"
+            style={{ left: slash.x, top: slash.y }}
+            onMouseDown={(e) => e.preventDefault()}>
+            {embedHost.views.map((v, i) => (
+              <button key={v.id} type="button" role="option" aria-selected={i === slash.index}
+                onMouseEnter={() => setSlash({ ...slash, index: i })}
+                onClick={() => insertEmbed(v.id)}
+                className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left ${i === slash.index ? 'bg-muted' : ''}`}>
+                <span className="flex shrink-0 text-muted-foreground">{v.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] text-foreground">{v.label}</span>
+                  {v.hint && <span className="block truncate text-[11px] text-muted-foreground">{v.hint}</span>}
+                </span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
         {editable && tableHandles && (
           <TableInsertHandles
             geom={tableHandles}

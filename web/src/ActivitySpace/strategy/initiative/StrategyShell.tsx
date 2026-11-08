@@ -6,9 +6,11 @@ import { ViewTabs } from '@/Function/shared/ViewTabs';
 import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
+import { EmbedHostContext } from '@/Function/notebook/editor/embedBlocks';
+import { useStrategyEmbeds } from './StrategyEmbeds';
 import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
@@ -586,6 +588,15 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
+  // What "/" can place in the description: live blocks over this
+  // Strategy's own Objects and Elements.
+  const strategyObjects = useMemo(() => {
+    const scope = new Set(strategy.objectIds);
+    return allObjects.filter((o) => scope.has(o.id));
+  }, [allObjects, strategy.objectIds]);
+  const embedChanged = useCallback(() => { void refetchObjects(); onSaved(); }, [refetchObjects, onSaved]);
+  const embeds = useStrategyEmbeds({ elements: initiativeElements, objects: strategyObjects, onOpenObject, onChanged: embedChanged });
+
   // The conversation opens on request; another Strategy opens without it,
   // on its Overview.
   const [talking, setTalking] = useState(false);
@@ -1022,8 +1033,10 @@ function StrategyDetailView({
             {/* Band — how it is going, right under the name. */}
             <WidgetZone zone="band" className="mt-3" />
           </div>
-          <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
-            placeholder={t('Add description…')} onSave={saveDescription} />
+          <EmbedHostContext.Provider value={embeds}>
+            <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
+              placeholder={t('Add description… Type / for a live block')} onSave={saveDescription} />
+          </EmbedHostContext.Provider>
 
           {/* Under the description, as on an Element: one quiet row —
               reactions, attaching a file, and the "…" of other things to do
