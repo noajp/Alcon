@@ -186,7 +186,7 @@ begin
       with check (
         (scope = 'space' and (public.is_activity_space_owner(activity_space_id)
           or (origin = 'person' and created_by = (select auth.uid()))))
-        or (scope = 'personal' and user_id = (select auth.uid())))
+        or (scope = 'personal' and user_id = (select auth.uid()))
       )
   $p$;
   drop policy if exists memories_delete on public.memories;
