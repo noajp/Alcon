@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enabledConnectedNames, installReadiness, missingConnectors } from '@/AIP/harness/installFlow';
+import { enabledConnectedNames, installReadiness, missingConnectors, missingForWork, workDefinition } from '@/AIP/harness/installFlow';
 
 const row = (over: Record<string, unknown> = {}) => ({ name: 'GitHub', preset: 'github', enabled: true, ...over });
 
@@ -32,6 +32,37 @@ describe('missingConnectors', () => {
     expect(notion.preset).toBeNull();
     const [deepseek] = missingConnectors(['DeepSeek'], []);
     expect(deepseek.preset).toBeNull();
+  });
+});
+
+describe('workDefinition / missingForWork', () => {
+  const harnessBody = (connectors: string[]) =>
+    `# 目的\n仕事を進める\n# 使うコネクタ\n${connectors.map((c) => `- ${c}`).join('\n')}`;
+  const def = (id: string, connectors: string[], enabled = true) => ({ id, body: harnessBody(connectors), enabled });
+
+  it('resolves the Element’s own definition first, then the Strategy’s — the engine’s order', () => {
+    const defs = [def('own', ['GitHub']), def('strategy', ['Slack'])];
+    expect(workDefinition(['own', 'strategy'], defs)).toBe('own');
+    expect(workDefinition([null, 'strategy'], defs)).toBe('strategy');
+    expect(workDefinition([null, null], defs)).toBeNull();
+    expect(workDefinition(['gone', 'strategy'], defs)).toBe('strategy');
+  });
+
+  it('a disabled definition is skipped, as if its slot were empty', () => {
+    const defs = [def('own', ['GitHub'], false), def('strategy', ['Slack'])];
+    expect(workDefinition(['own', 'strategy'], defs)).toBe('strategy');
+    expect(missingForWork(['own', 'strategy'], defs, []).map((m) => m.name)).toEqual(['Slack']);
+  });
+
+  it('reports what the resolved definition names that the Space has not connected', () => {
+    const defs = [def('own', ['GitHub', 'Notion'])];
+    expect(missingForWork(['own', null], defs, [row()]).map((m) => m.name)).toEqual(['Notion']);
+    expect(missingForWork(['own', null], defs, [row(), row({ name: 'Notion', preset: null })])).toEqual([]);
+  });
+
+  it('no usable definition promises nothing, so nothing is missing', () => {
+    expect(missingForWork([null, null], [def('own', ['GitHub'])], [])).toEqual([]);
+    expect(missingForWork(['own'], [def('own', ['GitHub'], false)], [])).toEqual([]);
   });
 });
 

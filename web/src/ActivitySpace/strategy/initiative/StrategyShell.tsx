@@ -970,7 +970,7 @@ function StrategyDetailView({
                     <X size={13} />
                   </Button>
                 }>
-                  <StrategyConversation strategyId={strategy.id}
+                  <StrategyConversation strategyId={strategy.id} spaceId={strategy.activity_space_id ?? null} strategyDefinitionId={strategy.definition_id ?? null}
                     objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
                 </PageSection>
               </div>
@@ -1071,7 +1071,7 @@ function StrategyDetailView({
                 <X size={13} />
               </Button>
             }>
-              <StrategyConversation strategyId={strategy.id}
+              <StrategyConversation strategyId={strategy.id} spaceId={strategy.activity_space_id ?? null} strategyDefinitionId={strategy.definition_id ?? null}
                 objects={missionProps.objects} onPlan={planFromConversation} onAnswered={rereadAfterConversation} />
             </PageSection>
             </div>

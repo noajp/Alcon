@@ -14,6 +14,10 @@ import { ElementProgressMark, getElementProgress } from '@/Function/shared/Eleme
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { useStrategyConversation } from '@/hooks/strategyConversationData';
 import { useLatestRunStatuses } from '@/hooks/elementRunData';
+import { useDefinitions } from '@/hooks/definitionData';
+import { useIntegrations } from '@/AIP/connectors/data';
+import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
+import { missingConnectors, missingForWork, type ConnectorNeed } from '@/AIP/harness/installFlow';
 import { answerAgentRun, startElementRun } from '@/AIP/ai/agentData';
 import type { AgentRunStatus, ElementWithDetails } from '@/types/database';
 import { conversationItems, traceStepFromWorkItem, workTally, type AgentSegment, type WorkItem } from './conversationModel';
@@ -28,8 +32,12 @@ import { conversationItems, traceStepFromWorkItem, workTally, type AgentSegment,
 // clear goes straight to the Planner from that card or the Execution tab.
 // =============================================================
 
-export function StrategyConversation({ strategyId, objects, onPlan, onAnswered }: {
+export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId, objects, onPlan, onAnswered }: {
   strategyId: string;
+  /** The Strategy's Space: its connections and harnesses are read from it. */
+  spaceId: string | null;
+  /** The Strategy's own harness, for resolving what an Element's work follows. */
+  strategyDefinitionId: string | null;
   /** The Strategy's Objects with their Elements: the plan card's checklist. */
   objects: { id: string; name: string; elements?: ElementWithDetails[] }[];
   /** Draft the plan in the Execution tab, with this guidance. */
@@ -50,6 +58,22 @@ export function StrategyConversation({ strategyId, objects, onPlan, onAnswered }
     [objects],
   );
   const { data: runStatuses } = useLatestRunStatuses(elementIds);
+  // What each Element's work would go without: the connectors its harness
+  // (its own, else this Strategy's — the engine's resolution) names that
+  // the Space has not connected. Read live, so a start card and a
+  // connection card agree with the moment they are pressed, not proposed.
+  const integrations = useIntegrations(spaceId);
+  const definitions = useDefinitions(spaceId);
+  const missingByElement = useMemo(() => {
+    const out = new Map<string, ConnectorNeed[]>();
+    for (const o of objects) {
+      for (const e of o.elements ?? []) {
+        const missing = missingForWork([e.definition_id, strategyDefinitionId], definitions.data, integrations.data);
+        if (missing.length) out.set(e.id, missing);
+      }
+    }
+    return out;
+  }, [objects, strategyDefinitionId, definitions.data, integrations.data]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -89,7 +113,7 @@ export function StrategyConversation({ strategyId, objects, onPlan, onAnswered }
         )}
         {items.map((item, i) => item.kind === 'person'
           ? <PersonTurn key={i} text={item.text} />
-          : <AgentTurn key={i} segments={item.segments} onPlan={onPlan} onAnswered={onAnswered} elementStatus={elementStatus} runStatuses={runStatuses} />)}
+          : <AgentTurn key={i} segments={item.segments} onPlan={onPlan} onAnswered={onAnswered} elementStatus={elementStatus} runStatuses={runStatuses} spaceId={spaceId} missingByElement={missingByElement} integrations={integrations.data} />)}
         {talk.pendingText && !items.some((it, i) => i === items.length - 1 && it.kind === 'person' && it.text === talk.pendingText) && (
           <PersonTurn text={talk.pendingText} />
         )}
@@ -143,12 +167,15 @@ function PersonTurn({ text }: { text: string }) {
   );
 }
 
-function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses }: {
+function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, spaceId, missingByElement, integrations }: {
   segments: AgentSegment[];
   onPlan: (guidance: string) => void;
   onAnswered: () => void;
   elementStatus: Map<string, string | null>;
   runStatuses: Record<string, AgentRunStatus>;
+  spaceId: string | null;
+  missingByElement: Map<string, ConnectorNeed[]>;
+  integrations: Parameters<typeof missingConnectors>[1];
 }) {
   return (
     <div className="space-y-2">
@@ -159,10 +186,13 @@ function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses }:
             <WorkLine items={s.items} />
             {s.items.filter((w) => w.kind === 'plan').map((w) => <PlanHandOff key={w.id} guidance={w.detail} onPlan={onPlan} />)}
             {s.items.filter((w) => w.proposal?.kind === 'start').map((w) => (
-              <StartRunsCard key={w.id} item={w} elementStatus={elementStatus} runStatuses={runStatuses} />
+              <StartRunsCard key={w.id} item={w} elementStatus={elementStatus} runStatuses={runStatuses} spaceId={spaceId} missingByElement={missingByElement} />
             ))}
             {s.items.filter((w) => w.proposal?.kind === 'answer').map((w) => (
               <AnswerCard key={w.id} item={w} onAnswered={onAnswered} />
+            ))}
+            {s.items.filter((w) => w.proposal?.kind === 'connect').map((w) => (
+              <ConnectCard key={w.id} item={w} spaceId={spaceId} integrations={integrations} />
             ))}
           </div>
         ))}
@@ -181,7 +211,7 @@ function WorkLine({ items }: { items: WorkItem[] }) {
     tally.write ? t('Wrote {n} to the Strategy', { n: tally.write }) : '',
     tally.read ? t('Read {n}', { n: tally.read }) : '',
     tally.web ? t('Searched the web {n}', { n: tally.web }) : '',
-    tally.start + tally.answer ? t('Proposed {n} actions', { n: tally.start + tally.answer }) : '',
+    tally.start + tally.answer + tally.connect ? t('Proposed {n} actions', { n: tally.start + tally.answer + tally.connect }) : '',
     tally.failed ? t('{n} failed', { n: tally.failed }) : '',
   ].filter(Boolean);
   if (parts.length === 0) return null;
@@ -222,22 +252,39 @@ const OPEN_RUN: readonly AgentRunStatus[] = ['queued', 'running', 'awaiting_inpu
 /** The agent proposed starting ready work: the person presses, and the web
  *  starts — revalidating at the press, since a proposal is only as fresh
  *  as when it was made. An Element starts only while it is still open and
- *  has no open run; each start is the Execution tab's own function. */
-function StartRunsCard({ item, elementStatus, runStatuses }: {
+ *  has no open run; each start is the Execution tab's own function.
+ *
+ *  An Element whose harness names a connector the Space has not connected
+ *  does not start: starting it would run the work without the tools it
+ *  was promised, quietly. It waits on the connection instead — the card
+ *  says which connector, and the connection card under it opens the
+ *  dialog. Once connected, the same Start press starts what waited. */
+function StartRunsCard({ item, elementStatus, runStatuses, spaceId, missingByElement }: {
   item: WorkItem;
   elementStatus: Map<string, string | null>;
   runStatuses: Record<string, AgentRunStatus>;
+  spaceId: string | null;
+  missingByElement: Map<string, ConnectorNeed[]>;
 }) {
   const { t } = useI18n();
   const [outcome, setOutcome] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [startedIds, setStartedIds] = useState<ReadonlySet<string>>(new Set());
   const proposal = item.proposal;
   if (!proposal || proposal.kind !== 'start') return null;
+  const blocked = proposal.elementIds.filter((id) => !startedIds.has(id) && (missingByElement.get(id)?.length ?? 0) > 0);
+  const blockedNeeds = [...new Map(blocked.flatMap((id) => missingByElement.get(id) ?? []).map((n) => [n.name, n] as const)).values()];
+  const blockedTitles = proposal.elementIds
+    .map((id, i) => (blocked.includes(id) ? proposal.titles[i] : null))
+    .filter((x): x is string => !!x);
+  const startable = proposal.elementIds.filter((id) => !startedIds.has(id) && !blocked.includes(id));
   const press = async () => {
     setStarting(true);
     let started = 0;
     let failed = 0;
+    const nowStarted = new Set(startedIds);
     for (const id of proposal.elementIds) {
+      if (nowStarted.has(id) || blocked.includes(id)) continue;
       const status = elementStatus.get(id);
       const runStatus = runStatuses[id];
       if (status === undefined || status === 'done' || status === 'cancelled' || (runStatus && OPEN_RUN.includes(runStatus))) {
@@ -245,27 +292,57 @@ function StartRunsCard({ item, elementStatus, runStatuses }: {
         continue;
       }
       if (await startElementRun(id) === 'failed') failed += 1;
-      else started += 1;
+      else { started += 1; nowStarted.add(id); }
     }
+    setStartedIds(nowStarted);
     setOutcome([
       started ? t('Started {n} AI runs.', { n: started }) : '',
       failed ? t('{n} could not start', { n: failed }) : '',
+      blocked.length ? t('{n} waiting on a connection', { n: blocked.length }) : '',
     ].filter(Boolean).join(' '));
     setStarting(false);
   };
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5">
-      <Play size={15} className="shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-foreground">{t('Start {n} ready actions with AI', { n: proposal.elementIds.length })}</p>
-        {proposal.titles.length > 0 && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{proposal.titles.join('、')}</p>}
-        {outcome && <p className="mt-0.5 text-[12px] text-muted-foreground">{outcome}</p>}
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+        <Play size={15} className="shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] text-foreground">{t('Start {n} ready actions with AI', { n: proposal.elementIds.length })}</p>
+          {proposal.titles.length > 0 && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{proposal.titles.join('、')}</p>}
+          {blocked.length > 0 && (
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              {t('Waiting on a connection: {names}', { names: blockedNeeds.map((n) => n.name).join('、') })}
+            </p>
+          )}
+          {outcome && <p className="mt-0.5 text-[12px] text-muted-foreground">{outcome}</p>}
+        </div>
+        {startable.length > 0 && (
+          <Button size="sm" variant="primary" disabled={starting} onClick={() => void press()}>{t('Start')}</Button>
+        )}
       </div>
-      {!outcome && (
-        <Button size="sm" variant="primary" disabled={starting} onClick={() => void press()}>{t('Start')}</Button>
+      {blocked.length > 0 && (
+        <ConnectRequestCard spaceId={spaceId} needs={blockedNeeds}
+          waitingFor={blockedTitles.length ? blockedTitles.join('、') : null} />
       )}
     </div>
   );
+}
+
+/** The agent proposed connecting what the work needs: the shared
+ *  connection card, fed the ask's names. Which of them are still missing
+ *  is read live — here each name becomes a need (its preset, when it is
+ *  still missing), and the card itself re-reads the Space's connections
+ *  before offering anything. */
+function ConnectCard({ item, spaceId, integrations }: {
+  item: WorkItem;
+  spaceId: string | null;
+  integrations: Parameters<typeof missingConnectors>[1];
+}) {
+  const proposal = item.proposal;
+  if (!proposal || proposal.kind !== 'connect') return null;
+  const stillMissing = missingConnectors(proposal.names, integrations);
+  const needs = proposal.names.map((name) => stillMissing.find((n) => n.name === name) ?? { name, preset: null });
+  return <ConnectRequestCard spaceId={spaceId} needs={needs} waitingFor={proposal.waitingFor || null} />;
 }
 
 /** The agent proposed delivering the person's words to a waiting run: the
