@@ -139,6 +139,10 @@ export async function buildCopilotTurn(args: {
    *  Space's row (policy is read server-side; no tool can set it).
    *  Defaults to "auto" — the verdict unchanged — when not given. */
   approvalMode?: ApprovalMode;
+  /** Memory (PR3): the rendered memory section for this turn, appended
+   *  to the context block — the uncached part of the system, never the
+   *  cached prompt. Absent when nothing is remembered. */
+  memories?: string;
 }): Promise<CopilotTurn> {
   const { userDb, admin, context: ctx, actor, events } = args;
   const approvalMode: ApprovalMode = args.approvalMode ?? "auto";
@@ -157,7 +161,7 @@ export async function buildCopilotTurn(args: {
       text: [COPILOT_SYSTEM_PROMPT, toolset ? integrationPromptSection(toolset) : "", index].filter(Boolean).join("\n\n"),
       ...cache,
     },
-    { type: "text" as const, text: `# 現在の文脈\n${copilotContextHint(ctx)}\n（明示されない限りこのスコープを優先してください）` },
+    { type: "text" as const, text: `# 現在の文脈\n${copilotContextHint(ctx)}\n（明示されない限りこのスコープを優先してください）${args.memories ? `\n\n${args.memories}` : ""}` },
   ];
 
   // The turn's verdicts, computed once per call and shared by the gate,

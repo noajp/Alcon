@@ -5,6 +5,7 @@ import { LogOut } from '@/ui/icons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { PersonalMemorySettings } from './MemorySettings';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -73,6 +74,8 @@ export function AccountSettings() {
           </Button>
         </SettingsRow>
       </SettingsSection>
+
+      {user?.id && <PersonalMemorySettings userId={user.id} />}
 
       <SettingsSection title={t('Session')}>
         <SettingsRow label={t('Sign out')} hint={t('End your session on this device.')}>

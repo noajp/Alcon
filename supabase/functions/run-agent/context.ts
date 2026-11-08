@@ -46,6 +46,13 @@ export interface TaskContext {
     down?: string }[];
   /** The Strategy's Tables, one line each; null when the Element serves no Strategy. */
   tables: string[] | null;
+  /** Memory (PR3): the rendered memory section — the durable index and
+   *  the bodies past work left for this Element — injected at the end
+   *  of the task message, never into the cached system prompt. Absent
+   *  when nothing is remembered. memoryUsedIds names the rows whose
+   *  bodies entered, for the driver's use recording; never rendered. */
+  memories?: string;
+  memoryUsedIds?: string[];
   today: string;
 }
 
@@ -155,6 +162,6 @@ ${down.join("\n")}
 - 既定のブランチに直接コミットしない。ブランチ \`alcon/${(el.display_id ?? el.id).toLowerCase()}\` を作り、そこにコミットして Pull Request を開く
 - PR のタイトルの先頭に「${el.display_id ?? ""}」を付ける。本文には、この Element の任務と、関連する Initiative のどの成功条件・意思決定に応える変更かを書く
 - 開いた PR は自動でこの Element の「コード変更」に紐付き、チームが差分を意図と照らして確かめる。マージはしない
-` : ""}
+` : ""}${ctx.memories ? `\n${ctx.memories}\n` : ""}
 今日の日付: ${ctx.today}`;
 }
