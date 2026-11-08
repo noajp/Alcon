@@ -13,7 +13,7 @@ import { catalogIndex, runCatalogTool, toolsFor } from "./catalog.ts";
 import { TOOL_SEARCH, toolParamsFor } from "./toolLoading.ts";
 import type { ToolCall, ToolKind } from "./agentLoop.ts";
 import {
-  applyMode, approvalVerdict, type ApprovalMode, type ApprovalVerdict,
+  applyMode, approvalVerdict, liftOf, type ApprovalMode, type ApprovalVerdict,
 } from "./approvalPolicy.ts";
 import {
   buildSpaceIntegrationTools, executeIntegrationTool, integrationApprovalFacts, integrationIndexLines,
@@ -89,6 +89,13 @@ export interface CopilotTurn {
    *  lifted an ask — the recording is the driver's, the verdict is here,
    *  computed once and shared with the gate. */
   verdictOf(call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null;
+  /** The lift one call's facts contain (approvalPolicy's liftOf):
+   *  "delegation" when full delegation let an ask-permission command's
+   *  call run unasked. The driver reads this to disclose the lift as
+   *  the call runs — a write that would have asked, but didn't, must
+   *  announce itself. Null for Alcon's own tools and for every call
+   *  nothing lifted. */
+  liftOf(call: ToolCall): "delegation" | null;
   execute(call: ToolCall): Promise<{ content: string; is_error?: boolean }>;
 }
 
@@ -167,18 +174,22 @@ export async function buildCopilotTurn(args: {
   // The turn's verdicts, computed once per call and shared by the gate,
   // the executor's deny refusal and the driver's policy-approval record:
   // one call, one answer, however many places ask.
-  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict }>();
-  const verdictOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null => {
+  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict; lift: "delegation" | null }>();
+  const entryOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "delegation" | null } | null => {
     const it = toolset?.tools.get(call.name);
     if (!it) return null;
     let v = verdicts.get(call.id);
     if (!v) {
       const facts = integrationApprovalFacts(it, call, true);
       const base = approvalVerdict(facts);
-      v = { base, final: applyMode(base, facts, approvalMode) };
+      v = { base, final: applyMode(base, facts, approvalMode), lift: liftOf(facts) };
       verdicts.set(call.id, v);
     }
     return v;
+  };
+  const verdictOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null => {
+    const v = entryOf(call);
+    return v ? { base: v.base, final: v.final } : null;
   };
 
   return {
@@ -187,6 +198,7 @@ export async function buildCopilotTurn(args: {
     toolset,
     approvalMode,
     verdictOf,
+    liftOf: (call) => entryOf(call)?.lift ?? null,
     // An integration tool is an external write for the loop: the approval
     // policy then decides per call, exactly as in a run. Alcon's own tools
     // stay "board" — the panel's catalog policy decides them, as before.

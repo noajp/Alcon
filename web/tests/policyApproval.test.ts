@@ -103,4 +103,28 @@ describe('displaysUnderMode', () => {
     expect(pa.displaysUnderMode(built, 'auto')).toBe(built);
     expect(pa.displaysUnderMode(built, 'free')).toBe(built);
   });
+
+  it('the ask mode names its own reason on a display that had none, and keeps a reason the facts gave', () => {
+    const plain = { ...display, askReason: null };
+    const critical = { ...display, id: 'c2', askReason: 'critical' };
+    const shown = pa.displaysUnderMode([plain, critical], 'ask');
+    expect(shown[0].askReason).toBe('mode');
+    expect(shown[1].askReason).toBe('critical');
+    expect(plain.askReason).toBeNull();
+  });
+
+  it('a v2 display persists into a policy approval row exactly as built', () => {
+    const v2 = {
+      ...display,
+      title: 'Send the invoice',
+      fields: [{ label: 'To', value: 'a@example.com' }],
+      preview: 'Please pay.',
+      askReason: 'command',
+    };
+    const row = pa.policyApprovalInsert({
+      runId: 'r1', elementId: null, call, display: v2, inputHash: 'h1', mode: 'free',
+      integrationId: 'i1', decidedAt: '2026-11-08T00:00:00.000Z',
+    }) as { input: { display: unknown[] } };
+    expect(row.input.display).toEqual([v2]);
+  });
 });

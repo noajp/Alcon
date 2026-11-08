@@ -12,7 +12,8 @@ type IntegrationToolLike = Record<string, unknown>;
 const it8n = await import(new URL('../../supabase/functions/_shared/integrationTools.ts', import.meta.url).pathname) as unknown as {
   planManifestTools: (row: { name: string; id: string }, manifest: Manifest | null, remoteTools: { name: string; description: string; inputSchema: Record<string, unknown>; readOnly: boolean }[] | null, taken: Map<string, unknown>) => { name: string; description: string; input_schema: Record<string, unknown>; command: { name: string }; remote: { name: string } | null }[];
   integrationApprovalFacts: (it: IntegrationToolLike | undefined, call: ToolCall, isWrite: boolean) => Record<string, unknown>;
-  approvalDisplayForCall: (tools: Map<string, IntegrationToolLike>, call: ToolCall) => { id: string; integration: string; operation: string; destination: string; detail: string | null; effect: string; critical: string | null; rememberable: boolean };
+  approvalDisplayForCall: (tools: Map<string, IntegrationToolLike>, call: ToolCall) => { id: string; integration: string; operation: string; destination: string; detail: string | null; effect: string; critical: string | null; rememberable: boolean; title: string; fields: { label: string; value: string }[]; preview: string | null; askReason: string | null };
+  humanizedTitle: (operation: string) => string;
   integrationPromptSection: (t: { usable: { name: string; kind: string; delegation: string; tools: number }[]; down: { name: string; reason: string }[] }) => string;
   integrationPrefix: (name: string, id: string) => string;
   uniqueToolName: (raw: string, taken: Map<string, unknown>) => string;
@@ -138,6 +139,119 @@ describe('approvalDisplayForCall', () => {
   it('falls back to the name\'s parts for a tool the map no longer holds', () => {
     const d = it8n.approvalDisplayForCall(new Map(), { id: 'c9', name: 'linear__create_issue', input: {} });
     expect(d).toMatchObject({ integration: 'linear', operation: 'create_issue', effect: 'write', rememberable: false });
+  });
+});
+
+describe('approvalDisplayForCall — display v2 (title, fields, preview, askReason)', () => {
+  const GH = { name: 'GitHub', endpoint: 'https://api.github.com' };
+  const mcpTool = (manifest: Manifest, commandName: string, remoteName: string, delegation = 'approve_each') => {
+    const command = (manifest.commands as unknown as Record<string, unknown>[]).find((c) => c.name === commandName);
+    return { command, manifest, integration: { ...GH, delegation }, remote: { name: remoteName, description: '', inputSchema: {}, readOnly: false } } as IntegrationToolLike;
+  };
+
+  const PR_MANIFEST = cm.parseManifest({
+    version: 1,
+    commands: [
+      { name: 'create_pull_request', action: 'pulls.create', effect: 'write', mcp: 'create_pull_request' },
+      { name: 'create_or_update_file', action: 'contents.update', effect: 'write', mcp: 'create_or_update_file' },
+      { name: 'titled', action: 'pulls.titled', effect: 'write', mcp: 'create_pull_request', present: { title: 'Open a PR, please', fields: [{ arg: 'title', label: 'Subject' }] } },
+    ],
+  }).manifest;
+
+  it('an overlay hit yields the sentence, the fields in overlay order, and the body as preview', () => {
+    const tools = new Map<string, IntegrationToolLike>([['gh__create_pull_request', mcpTool(PR_MANIFEST, 'create_pull_request', 'create_pull_request')]]);
+    const d = it8n.approvalDisplayForCall(tools, {
+      id: 'c1', name: 'gh__create_pull_request',
+      input: { owner: 'noajp', repo: 'Alcon', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.' },
+    });
+    expect(d.title).toBe('Create a pull request');
+    expect(d.fields).toEqual([
+      { label: 'Repository owner', value: 'noajp' },
+      { label: 'Repository', value: 'Alcon' },
+      { label: 'Title', value: 'Add the card' },
+      { label: 'Base', value: 'main' },
+      { label: 'Head', value: 'claude/card' },
+    ]);
+    expect(d.preview).toBe('The body.');
+    expect(d.askReason).toBe('command');
+  });
+
+  it("a command's own present outranks the overlay", () => {
+    const tools = new Map<string, IntegrationToolLike>([['gh__titled', mcpTool(PR_MANIFEST, 'titled', 'create_pull_request')]]);
+    const d = it8n.approvalDisplayForCall(tools, { id: 'c1', name: 'gh__titled', input: { title: 'Hi', body: 'B' } });
+    expect(d.title).toBe('Open a PR, please');
+    expect(d.fields).toEqual([{ label: 'Subject', value: 'Hi' }]);
+    // The command's block names no preview, so none is taken from the overlay.
+    expect(d.preview).toBeNull();
+  });
+
+  it('a file content preview is capped hard', () => {
+    const tools = new Map<string, IntegrationToolLike>([['gh__create_or_update_file', mcpTool(PR_MANIFEST, 'create_or_update_file', 'create_or_update_file')]]);
+    const d = it8n.approvalDisplayForCall(tools, {
+      id: 'c1', name: 'gh__create_or_update_file',
+      input: { owner: 'noajp', repo: 'Alcon', path: 'README.md', branch: 'main', content: 'x'.repeat(2000), message: 'docs' },
+    });
+    expect(d.title).toBe('Create or update a file');
+    expect(d.preview).toHaveLength(601);
+    expect(d.preview?.endsWith('…')).toBe(true);
+  });
+
+  it('no presentation anywhere: a humanized title and the plain field flattening', () => {
+    const d = it8n.approvalDisplayForCall(new Map(), { id: 'c9', name: 'linear__create_issue', input: { title: 'Bug', teamId: 't1' } });
+    expect(d.title).toBe('Create issue');
+    expect(d.fields).toEqual([{ label: 'title', value: 'Bug' }, { label: 'teamId', value: 't1' }]);
+    expect(d.preview).toBeNull();
+    expect(d.askReason).toBeNull();
+    expect(it8n.humanizedTitle('create_pull_request')).toBe('Create pull request');
+    expect(it8n.humanizedTitle('issues.comment')).toBe('Comment');
+    expect(it8n.humanizedTitle('mergePullRequest')).toBe('Merge pull request');
+  });
+
+  it('the generic shape reads a mail-shaped call by its argument names', () => {
+    const mail = cm.parseManifest({
+      version: 1,
+      commands: [{ name: 'deliver', action: 'mail.deliver', effect: 'write', permission: 'ask', http: { method: 'POST', path: '/deliver', body: ['to', 'subject', 'body'] } }],
+    }).manifest;
+    const command = (mail.commands as unknown as Record<string, unknown>[])[0];
+    const tools = new Map<string, IntegrationToolLike>([
+      ['mail__deliver', { command, manifest: mail, integration: { name: 'Mail', endpoint: 'https://mail.example', delegation: 'approve_each' }, remote: null }],
+    ]);
+    const d = it8n.approvalDisplayForCall(tools, { id: 'c1', name: 'mail__deliver', input: { to: 'a@example.com', subject: 'Hi', body: 'The message.' } });
+    expect(d.fields).toEqual([{ label: 'To', value: 'a@example.com' }, { label: 'Subject', value: 'Hi' }]);
+    expect(d.preview).toBe('The message.');
+  });
+
+  it('askReason names each facts shape', () => {
+    // critical
+    const wipe = (API_MANIFEST.commands as unknown as Record<string, unknown>[]).find((c) => c.name === 'wipe');
+    const tools = new Map<string, IntegrationToolLike>([
+      ['gh__wipe', { command: wipe, manifest: API_MANIFEST, integration: { ...GH, delegation: 'approve_each' }, remote: null }],
+    ]);
+    expect(it8n.approvalDisplayForCall(tools, { id: 'c1', name: 'gh__wipe', input: {} }).askReason).toBe('critical');
+    // command (the ask default, approve-each)
+    const create = (API_MANIFEST.commands as unknown as Record<string, unknown>[]).find((c) => c.name === 'create_item');
+    tools.set('gh__create_item', { command: create, manifest: API_MANIFEST, integration: { ...GH, delegation: 'approve_each' }, remote: null });
+    expect(it8n.approvalDisplayForCall(tools, { id: 'c2', name: 'gh__create_item', input: { title: 't' } }).askReason).toBe('command');
+    // under full delegation the same call is not held at all
+    tools.set('gh__create_item', { command: create, manifest: API_MANIFEST, integration: { ...GH, delegation: 'full_delegation' }, remote: null });
+    expect(it8n.approvalDisplayForCall(tools, { id: 'c2', name: 'gh__create_item', input: { title: 't' } }).askReason).toBeNull();
+    // rule
+    const ruled = cm.parseManifest({
+      version: 1,
+      commands: [{ name: 'deliver_it', action: 'x.deliver', effect: 'write', permission: 'allow', mcp: 'deliver_it', rules: [{ when: { repo: 'secret-*' }, permission: 'ask' }] }],
+    }).manifest;
+    const rc = (ruled.commands as unknown as Record<string, unknown>[])[0];
+    const rtools = new Map<string, IntegrationToolLike>([
+      ['x__deliver_it', { command: rc, manifest: ruled, integration: { ...GH, delegation: 'full_delegation' }, remote: { name: 'deliver_it', description: '', inputSchema: {}, readOnly: false } }],
+    ]);
+    expect(it8n.approvalDisplayForCall(rtools, { id: 'c3', name: 'x__deliver_it', input: { repo: 'secret-plans' } }).askReason).toBe('rule');
+    // raw HTTP
+    const raw = new Map<string, IntegrationToolLike>([
+      ['x__http_request', { integration: { ...GH, delegation: 'full_delegation' }, remote: null }],
+    ]);
+    expect(it8n.approvalDisplayForCall(raw, { id: 'c4', name: 'x__http_request', input: { method: 'POST', path: '/a' } }).askReason).toBe('http');
+    // catalog (a Strategy write at the Element entry waits for the person)
+    expect(it8n.approvalDisplayForCall(new Map(), { id: 'c5', name: 'updateInitiative', input: { id: 'i1', title: 'T' } }).askReason).toBe('catalog');
   });
 });
 

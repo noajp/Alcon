@@ -87,7 +87,7 @@ import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
 import {
-  applyMode, approvalModeOf, approvalVerdict, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
+  applyMode, approvalModeOf, approvalVerdict, liftOf, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
 } from "../_shared/approvalPolicy.ts";
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
@@ -913,6 +913,24 @@ async function execute(a: ExecArgs): Promise<void> {
     return v;
   };
 
+  // ── Disclosure: a lifted write announces itself ──────────────────────
+  // A call full delegation let run unasked (liftOf) leaves no approval
+  // row — by design, every write on such a connection is lifted, and
+  // per-call rows would flood the audit with the connection's normal
+  // operation. What it leaves instead is one trace step per turn-batch,
+  // written when the batch lands, so the run's surface and the audit
+  // answer "what ran without asking, and why was that allowed". The
+  // free mode's lifts are a different record (its policy approvals,
+  // below); a call whose own verdict never asked is never one of those.
+  const liftedDisplays: ApprovalDisplay[] = [];
+  const flushLifted = async () => {
+    if (!liftedDisplays.length) return;
+    const batch = liftedDisplays.splice(0, liftedDisplays.length);
+    const names = [...new Set(batch.map((d) => d.integration))];
+    await addStep(admin, run.id, "approval", `確認なしで実行（全委任）: ${approvalSummary(batch)}`,
+      `${names.map((n) => `連携「${n}」`).join("、")}は全委任のため、承認を求めずに実行しました。`);
+  };
+
   // ── Executors ───────────────────────────────────────────────────────────
   // The Sub-elements of this Element (Elements whose parent it is): the only
   // ones complete_subelement may close.
@@ -1460,13 +1478,21 @@ async function execute(a: ExecArgs): Promise<void> {
           }
         }
       }
+      // A write full delegation lifted runs unasked: it is collected
+      // here and announced once, when the turn's batch lands
+      // (flushLifted, at the turn's end). Mutually exclusive with the
+      // policy approval above — that one is a call whose verdict asked
+      // and the mode lifted; this one's verdict never asked.
+      if (!policyActionId && v?.final === "allow" && liftOf(factsForCall(call)) === "delegation") {
+        liftedDisplays.push(approvalDisplayFor(call));
+      }
       const r = await executeCall(call);
       if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error);
       return r;
     },
     onUsage: recordUsage,
     verify: run.mode === "reply" || external ? undefined : verifyFinish,
-    afterTurn: () => saveTranscript(),
+    afterTurn: async () => { await flushLifted(); await saveTranscript(); },
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= runCap,
     cancelled: async () => {
       const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
@@ -1477,6 +1503,7 @@ async function execute(a: ExecArgs): Promise<void> {
   // ── Outcome ─────────────────────────────────────────────────────────────
   switch (outcome.kind) {
     case "finished": {
+      await flushLifted();
       await saveTranscript();
       // A reply run's finish is a reply, not checked work: its verdict stays
       // null. Any other run's record is built from the verifier's holder —
@@ -1515,6 +1542,7 @@ async function execute(a: ExecArgs): Promise<void> {
     }
 
     case "approval": {
+      await flushLifted();
       await saveTranscript(outcome.pending);
       const calls = outcome.pending.calls;
       const display = displaysUnderMode(calls.map((c) => approvalDisplayFor(c)), mode);
@@ -3434,6 +3462,20 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     return "";
   };
 
+  // Writes full delegation lifted in this turn, collected as they run
+  // and announced once when the turn's batch lands: a write that would
+  // have asked, but didn't, leaves a step saying so (the free mode's
+  // lifts leave policy approvals instead — a different record for a
+  // different lift, in loopExecute below).
+  const liftedDisplays: ApprovalDisplay[] = [];
+  const flushLifted = async () => {
+    if (!liftedDisplays.length) return;
+    const batch = liftedDisplays.splice(0, liftedDisplays.length);
+    const names = [...new Set(batch.map((d) => d.integration))];
+    await bound("approval", `確認なしで実行（全委任）: ${approvalSummary(batch)}`,
+      `${names.map((n) => `連携「${n}」`).join("、")}は全委任のため、承認を求めずに実行しました。`);
+  };
+
   // The loop's executor: a call the free mode let through records its
   // policy approval as it runs (policyApproval.ts), settled when it
   // lands — the decision path above runs its approved calls through the
@@ -3455,6 +3497,9 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
           agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
         }).then(() => {}, () => {});
       }
+    }
+    if (!policyActionId && v?.final === "allow" && turn.liftOf(call) === "delegation") {
+      liftedDisplays.push(approvalDisplayForCall(turn.toolset?.tools ?? new Map(), call));
     }
     const r = await execute(call);
     if (policyActionId) await settlePolicyApproval(admin, policyActionId, !r.is_error);
@@ -3510,7 +3555,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     needsApproval: turn.needsApproval,
     execute: loopExecute,
     onUsage: recordUsage,
-    afterTurn: () => saveTranscript(),
+    afterTurn: async () => { await flushLifted(); await saveTranscript(); },
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
     cancelled: async () => {
       const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
@@ -3522,6 +3567,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   await stepChain;
   switch (outcome.kind) {
     case "finished": {
+      await flushLifted();
       await saveTranscript();
       const text = outcome.finish.message || outcome.finish.summary;
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
@@ -3555,6 +3601,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
     case "approval": {
       // The turn stops for approval: the same persistence as any run's
       // stop, and a fresh card in the kept conversation.
+      await flushLifted();
       const p = outcome.pending;
       const persisted = await persistCopilotApproval({
         admin, run, pending: p, messages: state.messages, turns: state.turns, nudges: state.nudges,
@@ -3581,6 +3628,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       // limit / budget / refusal: the turn stops here; the kept
       // conversation says so, and the run rests for the next message —
       // 'paused' on a budget stop, as a conversation rests.
+      await flushLifted();
       await saveTranscript();
       const note = outcome.kind === "budget" ? "予算の上限に達したため、続きは止まりました。"
         : outcome.kind === "refusal" ? "モデルがこの依頼を断ったため、続きは止まりました。"

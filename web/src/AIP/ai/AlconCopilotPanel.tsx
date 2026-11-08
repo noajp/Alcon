@@ -11,7 +11,8 @@ import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
 import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
 import { AlconFilePicker } from './AlconFilePicker';
 import { useCopilotConversation } from './CopilotProvider';
-import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -88,6 +89,8 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
   const { messages, streaming, error, send, cancel, newConversation, retry, truncate, decideApproval } = useCopilotConversation();
+  // A standing approval on an approval card is the Space owner's to give.
+  const canRememberApproval = useIsSpaceOwner(useActiveSpaceId()) === true;
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLElement>(null);
@@ -308,7 +311,8 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
             <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done}
               onRetry={!streaming && m.role === 'assistant' && i === messages.length - 1 ? () => retry({ context: contextNow() }) : undefined}
               onEdit={!streaming && i === lastUser ? editLast : undefined}
-              onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve) => void decideApproval(a, approve) : undefined} />
+              canRememberApproval={canRememberApproval}
+              onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve, opts) => void decideApproval(a, approve, opts) : undefined} />
           ))}
           {error && (
             <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">

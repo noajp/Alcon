@@ -28,9 +28,10 @@ import type { ToolCall } from "./agentLoop.ts";
 import type { RunToolDef } from "./toolLoading.ts";
 import {
   commandSchema, criticalClassForTokens, criticalClassOf, decide, offeredCommands, parseManifest, requestFor,
-  type CriticalClass, type Manifest, type ManifestCommand,
+  type CommandPresent, type CriticalClass, type Manifest, type ManifestCommand,
 } from "./connectorManifest.ts";
-import type { ApprovalFacts } from "./approvalPolicy.ts";
+import { askReasonOf, type ApprovalFacts, type AskReason } from "./approvalPolicy.ts";
+import { overlayPresentation } from "./approvalPresentations.ts";
 import {
   McpSession, callHttp, httpIsRead, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential,
   type IntegrationRow, type RemoteTool,
@@ -39,7 +40,7 @@ import { isGoogleDriveRow } from "./googleOAuth.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
 import { driveOperationLabel, runDriveTool } from "./googleDrive.ts";
-import { catalogOperation, isCatalogTool, summaryOf } from "./catalog.ts";
+import { catalogOperation, catalogTool, decideCall, isCatalogTool, summaryOf } from "./catalog.ts";
 
 // ── Names ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,80 @@ export interface ApprovalDisplay {
   critical: CriticalClass | null;
   /** Only a manifest command that is not critical can become a standing rule. */
   rememberable: boolean;
+  /** The action as a person reads it: "Create a pull request" (display v2). */
+  title: string;
+  /** The labeled fields the decision turns on, values resolved from the call's input. */
+  fields: { label: string; value: string }[];
+  /** The content the decision turns on (a PR body, a file's content, a message), capped; null when the command declares none. */
+  preview: string | null;
+  /** Why this call is being asked about, when its own facts hold it; the ask mode's reason is named by displaysUnderMode. */
+  askReason: AskReason | null;
+}
+
+const MAX_VALUE = 160;
+const MAX_FIELDS = 6;
+const MAX_PREVIEW = 600;
+
+/** Pure. A call value as one line of card text — the same caps the web's
+ *  readableFields applies, so a v1 rendering and a v2 one agree. */
+function showValue(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "string") return v.length > MAX_VALUE ? `${v.slice(0, MAX_VALUE)}…` : v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v) && v.length <= 3 && v.every((x) => typeof x !== "object")) return v.join(", ");
+  const s = JSON.stringify(v) ?? String(v);
+  return s.length > MAX_VALUE ? `${s.slice(0, MAX_VALUE)}…` : s;
+}
+
+/** Pure. A preview argument's value as card text: the string itself, or
+ *  its JSON, capped at the preview's own (larger) limit. */
+function previewText(v: unknown): string {
+  const s = typeof v === "string" ? v : (JSON.stringify(v) ?? String(v));
+  return s.length > MAX_PREVIEW ? `${s.slice(0, MAX_PREVIEW)}…` : s;
+}
+
+/**
+ * Pure. A sentence-shaped title from an operation or tool name, for a
+ * command with no presentation of its own: the last dotted segment,
+ * snake_case and camelCase opened into words, the first letter raised.
+ * `create_pull_request` → "Create pull request".
+ */
+export function humanizedTitle(operation: string): string {
+  const last = operation.split(".").pop() ?? operation;
+  const words = last.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[_\-\s]+/).filter(Boolean).join(" ").toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : operation;
+}
+
+/**
+ * Pure. The fields a call shows when no presentation names them: for an
+ * HTTP call its query and body, otherwise its arguments — the generic
+ * flattening the card's first generation rendered from the raw input,
+ * so a fallback row and a v1 row read alike.
+ */
+function fallbackFields(input: Record<string, unknown>): { label: string; value: string }[] {
+  const isHttp = typeof input.method === "string";
+  const all: { label: string; value: string }[] = [];
+  if (isHttp) {
+    if (input.query && typeof input.query === "object") {
+      for (const [k, v] of Object.entries(input.query as Record<string, unknown>)) all.push({ label: `?${k}`, value: showValue(v) });
+    }
+    if (input.body && typeof input.body === "object" && !Array.isArray(input.body)) {
+      for (const [k, v] of Object.entries(input.body as Record<string, unknown>)) all.push({ label: k, value: showValue(v) });
+    } else if (input.body !== undefined && input.body !== null) {
+      all.push({ label: "body", value: showValue(input.body) });
+    }
+  } else {
+    for (const [k, v] of Object.entries(input)) all.push({ label: k, value: showValue(v) });
+  }
+  return all.slice(0, MAX_FIELDS);
+}
+
+/** Pure. The presentation a call renders with: its command's own block
+ *  first, then the overlay for its tool's names, then nothing (the
+ *  fallback anatomy still applies — only the labels are plainer). */
+function presentationFor(it: IntegrationTool, input: Record<string, unknown>): CommandPresent | null {
+  if (it.command?.present) return it.command.present;
+  return overlayPresentation([it.remote?.name, it.command?.mcp, it.command?.name], input);
 }
 
 /** The operation an integration call shows on the approval card and in the log. */
@@ -166,15 +241,35 @@ export function criticalOfTool(it: IntegrationTool | undefined): CriticalClass |
 }
 
 /** What the approval card is told about one call: where it goes, what it
- *  is, whether it is critical, and whether approving may be remembered. */
+ *  is, whether it is critical, and whether approving may be remembered —
+ *  plus, as display v2, how it reads to the person deciding: the action
+ *  as a sentence, the labeled fields and the content preview its
+ *  command's presentation (or the overlay, or the fallback) gives it,
+ *  and the reason it is being asked about. Persisted with the pending
+ *  action, so every surface — and the audit's drill-down — reads exactly
+ *  what was decided about. */
 export function approvalDisplayForCall(tools: Map<string, IntegrationTool>, c: ToolCall): ApprovalDisplay {
   const it = tools.get(c.name);
   if (!it) {
     if (isCatalogTool(c.name)) {
-      return { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input), destination: "Alcon", detail: null, effect: "write", critical: null, rememberable: false };
+      const tool = catalogTool(c.name);
+      // The Element entry's decision, as the run's own facts gather it:
+      // the one entry whose calls can wait on a card built here.
+      const askReason = askReasonOf({
+        catalogDecision: tool ? decideCall("element", tool, c.input) : "allow", isWrite: true, isRead: false,
+      });
+      const operation = catalogOperation(c.name, c.input);
+      return {
+        id: c.id, integration: "Alcon", operation, destination: "Alcon", detail: null, effect: "write", critical: null, rememberable: false,
+        title: humanizedTitle(c.name), fields: fallbackFields(c.input), preview: null, askReason,
+      };
     }
     const parts = c.name.split(INTEGRATION_SEPARATOR);
-    return { id: c.id, integration: parts[0], operation: parts.slice(1).join(INTEGRATION_SEPARATOR) || c.name, destination: parts[0], detail: null, effect: "write", critical: null, rememberable: false };
+    const operation = parts.slice(1).join(INTEGRATION_SEPARATOR) || c.name;
+    return {
+      id: c.id, integration: parts[0], operation, destination: parts[0], detail: null, effect: "write", critical: null, rememberable: false,
+      title: humanizedTitle(operation), fields: fallbackFields(c.input), preview: null, askReason: null,
+    };
   }
   const critical = criticalOfTool(it);
   let detail: string | null = null;
@@ -182,11 +277,22 @@ export function approvalDisplayForCall(tools: Map<string, IntegrationTool>, c: T
     const req = requestFor(it.command, c.input);
     if (!("error" in req)) detail = `${req.method} ${req.path}`;
   }
+  const operation = operationOf(it, c.input);
+  const effect = it.command ? it.command.effect : integrationCallIsRead(it, c) ? "read" : "write";
+  const present = presentationFor(it, c.input);
+  const fields = present?.fields?.length
+    ? present.fields.flatMap((f) => (c.input[f.arg] === undefined ? [] : [{ label: f.label, value: showValue(c.input[f.arg]) }]))
+    : fallbackFields(c.input);
+  const previewArg = present?.preview;
   return {
-    id: c.id, integration: it.integration.name, operation: operationOf(it, c.input),
+    id: c.id, integration: it.integration.name, operation,
     destination: it.integration.endpoint, detail,
-    effect: it.command ? it.command.effect : integrationCallIsRead(it, c) ? "read" : "write",
-    critical, rememberable: !!it.command && !critical,
+    effect, critical, rememberable: !!it.command && !critical,
+    title: present?.title ?? humanizedTitle(operation),
+    fields,
+    preview: previewArg && c.input[previewArg] !== undefined && c.input[previewArg] !== null
+      ? previewText(c.input[previewArg]) : null,
+    askReason: askReasonOf(integrationApprovalFacts(it, c, effect === "write")),
   };
 }
 

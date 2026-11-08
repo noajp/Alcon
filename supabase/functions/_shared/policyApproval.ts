@@ -76,8 +76,14 @@ export async function settlePolicyApproval(admin: SupabaseClient, actionId: stri
  * The ask mode offers nothing as rememberable — every write asks again
  * next time, so a card that offered "from now on, don't ask" would be
  * promising what the mode forbids. Other modes keep the displays as
- * built.
+ * built. The ask mode is also where a display earns the reason "mode":
+ * a call its own facts let through is being asked about only because
+ * this Space asks every time, and the composition that collapses its
+ * verdict is the honest place to name that — a reason the facts
+ * themselves gave (critical, a condition…) is carried through as built.
  */
 export function displaysUnderMode(displays: ApprovalDisplay[], mode: ApprovalMode): ApprovalDisplay[] {
-  return mode === "ask" ? displays.map((d) => ({ ...d, rememberable: false })) : displays;
+  return mode === "ask"
+    ? displays.map((d) => ({ ...d, rememberable: false, askReason: d.askReason ?? "mode" }))
+    : displays;
 }

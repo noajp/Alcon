@@ -16,6 +16,9 @@ import {
   createAutomation, deleteAutomation, issueWebhookToken, runAutomationNow, runWaitingOnApproval, setAutomationEnabled,
   useAutomationEvents, useAutomations, webhookUrl, type Automation, type AutomationKind,
 } from '@/hooks/automationData';
+import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
+import { decideAgentActionById, usePendingAgentAction } from '@/AIP/ai/agentData';
+import { useIsSpaceOwner } from '@/AIP/connectors/data';
 
 // Automations: which harness starts by itself, when, and where its work goes.
 // A schedule starts at the times its cron names; a webhook starts when an
@@ -135,7 +138,7 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
                         )}
                       </div>
                     )}
-                    <RecentStarts automationId={a.id} onOpenElement={onOpenElement} />
+                    <RecentStarts automationId={a.id} spaceId={spaceId} onOpenElement={onOpenElement} />
                     <Button size="xs" variant="ghost" className="text-[var(--status-danger)]" disabled={busy === a.id}
                       onClick={() => void act(a.id, () => deleteAutomation(a.id))}>{t('Delete')}</Button>
                   </div>
@@ -149,9 +152,10 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
   );
 }
 
-function RecentStarts({ automationId, onOpenElement }: { automationId: string; onOpenElement?: (id: string) => void }) {
+function RecentStarts({ automationId, spaceId, onOpenElement }: { automationId: string; spaceId: string | null; onOpenElement?: (id: string) => void }) {
   const { t } = useI18n();
   const events = useAutomationEvents(automationId);
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
   if (events.loading) return <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>;
   if (events.data.length === 0) return <p className="text-[12px] text-muted-foreground">{t('It has not started yet.')}</p>;
   const label: Record<string, string> = { schedule: 'On schedule', webhook: 'From outside', manual: 'Run now' };
@@ -161,18 +165,30 @@ function RecentStarts({ automationId, onOpenElement }: { automationId: string; o
       <p className="mb-1 text-[12px] font-medium text-foreground">{t('Recent starts')}</p>
       <ul className="space-y-1">
         {events.data.map((e) => (
-          <li key={e.id} className="flex items-center gap-2 text-[12px]">
-            <span className="w-24 shrink-0 tabular-nums text-muted-foreground">{formatRelative(e.created_at)}</span>
-            <span className="w-24 shrink-0 text-muted-foreground">{t(label[e.source])}</span>
-            {e.status === 'failed'
-              ? <span className="min-w-0 flex-1 truncate text-[var(--status-danger)]" title={e.error ?? ''}>{e.error ?? t('Failed')}</span>
-              : e.element_id && onOpenElement
-                ? <button type="button" onClick={() => onOpenElement(e.element_id!)} className="min-w-0 flex-1 truncate text-left text-foreground hover:underline">{t('Open the Element')}</button>
-                : <span className="min-w-0 flex-1 text-muted-foreground">{t(e.status === 'started' ? 'Started' : 'Received')}</span>}
-            {runWaitingOnApproval(e.run_status) && (
-              <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)]">
-                {t('Waiting for approval')}
-              </span>
+          <li key={e.id} className="text-[12px]">
+            <div className="flex items-center gap-2">
+              <span className="w-24 shrink-0 tabular-nums text-muted-foreground">{formatRelative(e.created_at)}</span>
+              <span className="w-24 shrink-0 text-muted-foreground">{t(label[e.source])}</span>
+              {e.status === 'failed'
+                ? <span className="min-w-0 flex-1 truncate text-[var(--status-danger)]" title={e.error ?? ''}>{e.error ?? t('Failed')}</span>
+                : e.element_id && onOpenElement
+                  ? <button type="button" onClick={() => onOpenElement(e.element_id!)} className="min-w-0 flex-1 truncate text-left text-foreground hover:underline">{t('Open the Element')}</button>
+                  : <span className="min-w-0 flex-1 text-muted-foreground">{t(e.status === 'started' ? 'Started' : 'Received')}</span>}
+              {runWaitingOnApproval(e.run_status) && (e.run_id ? (
+                <button type="button" aria-expanded={openRunId === e.run_id}
+                  onClick={() => setOpenRunId((o) => (o === e.run_id ? null : e.run_id))}
+                  className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)] hover:bg-muted/40">
+                  {t('Waiting for approval')}
+                </button>
+              ) : (
+                <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)]">
+                  {t('Waiting for approval')}
+                </span>
+              ))}
+            </div>
+            {openRunId === e.run_id && e.run_id && (
+              <WaitingApproval runId={e.run_id} spaceId={spaceId}
+                onSettled={() => { setOpenRunId(null); void events.refetch(); }} />
             )}
           </li>
         ))}
@@ -182,6 +198,50 @@ function RecentStarts({ automationId, onOpenElement }: { automationId: string; o
           {t('The latest run stopped at an approval on its Element, as the approval mode specifies. It continues as soon as someone approves — under Free action, unattended runs go to the end.')}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * A waiting run's approval, expanded in place in its start row: the
+ * shared decision card for the run's pending action, decidable by the
+ * run's starter exactly as in the run panel — no new decision path.
+ * Settling collapses the row and re-reads the starts, whose run status
+ * then says what happened next.
+ */
+function WaitingApproval({ runId, spaceId, onSettled }: { runId: string; spaceId: string | null; onSettled: () => void }) {
+  const { t } = useI18n();
+  const { action, canDecide, loading, error } = usePendingAgentAction(runId);
+  const canRemember = useIsSpaceOwner(spaceId) === true;
+  const [working, setWorking] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  if (error) return <p role="alert" className="mt-1 text-[12px] text-[var(--status-danger)]">{t('Could not read the approval.')}</p>;
+  if (loading && !action) return <p className="mt-1 text-[12px] text-muted-foreground">{t('Opening…')}</p>;
+  if (!action) return <p className="mt-1 text-[12px] text-muted-foreground">{t('This approval is no longer available.')}</p>;
+
+  const decide = async (approve: boolean, opts: { note?: string; remember?: string[] }) => {
+    setFailed(false);
+    setWorking(true);
+    try {
+      await decideAgentActionById({
+        runId, actionId: action.id, inputHash: action.input_hash, approve,
+        note: opts.note, remember: opts.remember,
+      });
+      onSettled();
+    } catch {
+      setFailed(true);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="mt-1 rounded-md border border-border/60 bg-card p-2">
+      <ApprovalDecisionCard action={action} surface="automation"
+        canDecide={canDecide} deciding={working} canRemember={canRemember}
+        onDecide={decide} />
+      {failed && <p role="alert" className="px-1 pt-1 text-[12px] text-[var(--status-danger)]">{t('Could not record the decision.')}</p>}
     </div>
   );
 }
