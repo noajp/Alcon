@@ -9,6 +9,12 @@
 // from the same table it answers "what did a person approve" — and a
 // mode can never become an invisible path around the record, because
 // the only code that lifts an ask writes this row first.
+//
+// The same record carries graduated autonomy's lifts (B7): a call an
+// earned track-record grant let run unasked is written with
+// decision_source "track-record" instead — the audit distinction
+// between "the Space said always" and "this action earned it" lives
+// on the row, in the one writer both lifts share.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { canonicalCalls, type ToolCall } from "./agentLoop.ts";
@@ -16,6 +22,10 @@ import { approvalSummary, type ApprovalDisplay } from "./integrationTools.ts";
 import { sha256Hex } from "./googleOAuth.ts";
 import type { ApprovalMode } from "./approvalPolicy.ts";
 import type { VerifyCheck } from "./verifyReads.ts";
+
+/** Who lifted the ask this record stands for: the Space's mode
+ *  ("policy") or the action's earned track record ("track-record"). */
+export type PolicyApprovalSource = "policy" | "track-record";
 
 /** Pure. The row a policy approval is written as. Single-call, always:
  *  a batch a person would have approved together is still one execution
@@ -29,33 +39,36 @@ export function policyApprovalInsert(args: {
   mode: ApprovalMode;
   integrationId: string | null;
   decidedAt: string;
+  source?: PolicyApprovalSource;
 }): Record<string, unknown> {
   return {
     run_id: args.runId, element_id: args.elementId, tool_use_id: args.call.id, tool: args.call.name,
     input: { calls: [args.call], display: [args.display] }, input_hash: args.inputHash,
     summary: approvalSummary([args.display]), integration_id: args.integrationId,
     status: "approved", decided_at: args.decidedAt,
-    decision_source: "policy", policy_mode: args.mode,
+    decision_source: args.source ?? "policy", policy_mode: args.mode,
   };
 }
 
 /**
- * Writes the policy approval for one call about to run under the free
- * mode, and returns its row id (null when the write failed — the caller
- * says so on the run's trace; the execution itself is the person's
- * standing instruction and is not hostage to its bookkeeping).
+ * Writes the policy approval for one call about to run unasked —
+ * under the free mode, or on its earned track record — and returns
+ * its row id (null when the write failed — the caller says so on the
+ * run's trace; the execution itself is the person's standing
+ * instruction and is not hostage to its bookkeeping).
  */
 export async function recordPolicyApproval(
   admin: SupabaseClient,
   args: {
     runId: string; elementId: string | null; call: ToolCall; display: ApprovalDisplay;
-    mode: ApprovalMode; integrationId: string | null;
+    mode: ApprovalMode; integrationId: string | null; source?: PolicyApprovalSource;
   },
 ): Promise<string | null> {
   const inputHash = await sha256Hex(canonicalCalls([args.call]));
   const { data, error } = await admin.from("agent_actions").insert(policyApprovalInsert({
     runId: args.runId, elementId: args.elementId, call: args.call, display: args.display,
     inputHash, mode: args.mode, integrationId: args.integrationId, decidedAt: new Date().toISOString(),
+    ...(args.source ? { source: args.source } : {}),
   })).select("id").single();
   if (error || !data) {
     console.error("policy approval record failed", error?.message ?? "unknown");

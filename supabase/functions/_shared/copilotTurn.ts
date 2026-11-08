@@ -13,8 +13,9 @@ import { catalogIndex, runCatalogTool, toolsFor } from "./catalog.ts";
 import { TOOL_SEARCH, toolParamsFor } from "./toolLoading.ts";
 import type { ToolCall, ToolKind } from "./agentLoop.ts";
 import {
-  applyMode, approvalVerdict, liftOf, type ApprovalMode, type ApprovalVerdict,
+  liftOf, verdictWithAutonomy, type ApprovalMode, type ApprovalVerdict,
 } from "./approvalPolicy.ts";
+import { grantFactFor, loadAutonomyGrantFacts, revokeAutonomyForIncident } from "./autonomy.ts";
 import {
   buildSpaceIntegrationTools, executeIntegrationTool, integrationApprovalFacts, integrationIndexLines,
   integrationPromptSection, manifestDenyRefusal, type SpaceIntegrationTools,
@@ -104,15 +105,22 @@ export interface CopilotTurn {
    *  Alcon's own tools, which the catalog's entry policy governs alone.
    *  The driver reads this to record a policy approval where the mode
    *  lifted an ask — the recording is the driver's, the verdict is here,
-   *  computed once and shared with the gate. */
-  verdictOf(call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null;
+   *  computed once and shared with the gate. `lift` names the
+   *  track-record lift (B7) when the call's earned grant is what lets
+   *  it run unasked, so the driver records it under that source. */
+  verdictOf(call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null } | null;
   /** The lift one call's facts contain (approvalPolicy's liftOf):
    *  "delegation" when full delegation let an ask-permission command's
    *  call run unasked. The driver reads this to disclose the lift as
    *  the call runs — a write that would have asked, but didn't, must
    *  announce itself. Null for Alcon's own tools and for every call
    *  nothing lifted. */
-  liftOf(call: ToolCall): "delegation" | null;
+  liftOf(call: ToolCall): "delegation" | "track-record" | null;
+  /** The standing autonomy grant for one call's command (B7), when
+   *  one stands: its lane and the clean-completion count its basis
+   *  carries, so the driver can say on the record why the call ran
+   *  unasked. Null for Alcon's own tools and ungranted commands. */
+  grantOf(call: ToolCall): { lane: 1 | 2; clean: number } | null;
   execute(call: ToolCall): Promise<{ content: string; is_error?: boolean }>;
 }
 
@@ -176,6 +184,13 @@ export async function buildCopilotTurn(args: {
   const toolset = ctx.spaceId && admin
     ? await buildSpaceIntegrationTools({ userDb, admin, spaceId: ctx.spaceId, supabaseUrl: args.supabaseUrl, auditRunId: args.runId ?? null }).catch(() => null)
     : null;
+  // Graduated autonomy (B7): the Space's standing auto grants, loaded
+  // once for the turn and composed into each call's facts — a grant
+  // can only lift the one ask approvalPolicy's grantLiftable names,
+  // and an unread grant table answers empty (no grant, the safe side).
+  const autonomyGrants = ctx.spaceId && admin
+    ? await loadAutonomyGrantFacts(admin, ctx.spaceId)
+    : new Map<string, { lane: 1 | 2; clean: number }>();
 
   // propose_connection rides beside the catalog: internal, always loaded
   // (a connection ask must never wait behind a tool search), and gated by
@@ -197,22 +212,23 @@ export async function buildCopilotTurn(args: {
   // The turn's verdicts, computed once per call and shared by the gate,
   // the executor's deny refusal and the driver's policy-approval record:
   // one call, one answer, however many places ask.
-  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict; lift: "delegation" | null }>();
-  const entryOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "delegation" | null } | null => {
+  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict; lift: "delegation" | "track-record" | null }>();
+  const entryOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "delegation" | "track-record" | null } | null => {
     const it = toolset?.tools.get(call.name);
     if (!it) return null;
     let v = verdicts.get(call.id);
     if (!v) {
       const facts = integrationApprovalFacts(it, call, true);
-      const base = approvalVerdict(facts);
-      v = { base, final: applyMode(base, facts, approvalMode), lift: liftOf(facts) };
+      facts.autonomyGrant = grantFactFor(autonomyGrants, it.integration.id, it.command?.name);
+      const composed = verdictWithAutonomy(facts, approvalMode);
+      v = { base: composed.base, final: composed.final, lift: composed.lift ?? liftOf(facts) };
       verdicts.set(call.id, v);
     }
     return v;
   };
-  const verdictOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } | null => {
+  const verdictOf = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null } | null => {
     const v = entryOf(call);
-    return v ? { base: v.base, final: v.final } : null;
+    return v ? { base: v.base, final: v.final, lift: v.lift === "track-record" ? "track-record" : null } : null;
   };
 
   return {
@@ -222,6 +238,10 @@ export async function buildCopilotTurn(args: {
     approvalMode,
     verdictOf,
     liftOf: (call) => entryOf(call)?.lift ?? null,
+    grantOf: (call) => {
+      const it = toolset?.tools.get(call.name);
+      return it ? grantFactFor(autonomyGrants, it.integration.id, it.command?.name) : null;
+    },
     // An integration tool is an external write for the loop: the approval
     // policy then decides per call, exactly as in a run. Alcon's own tools
     // stay "board" — the panel's catalog policy decides them, as before.
@@ -242,6 +262,16 @@ export async function buildCopilotTurn(args: {
         }
         try {
           const r = await executeIntegrationTool(it, call);
+          // Graduated autonomy (B7): a verify read-back that lands on a
+          // mismatch is the command's first incident — its grant is
+          // revoked here, in the same flow that records the result, so
+          // the very next call asks again. (The write itself stands;
+          // B2's rule — demotion is about asking again, not undoing.)
+          if (r.verify && !r.verify.ok && !r.verify.unverified && it.command && admin && ctx.spaceId) {
+            await revokeAutonomyForIncident(admin, {
+              spaceId: ctx.spaceId, integrationId: it.integration.id, action: it.command.name, kind: "verify_mismatch",
+            });
+          }
           events?.onToolResult?.({ name: call.name, ok: !r.isError, error: r.isError ? r.text.slice(0, 300) : undefined });
           // A verify read-back the call carried (B2) rides back with the
           // result, so a caller keeping per-call records (a run's policy

@@ -923,6 +923,21 @@ const APP_MESSAGES: Record<string, Row> = {
   'Helping — the failure is going down ({with} of {under} runs under it; it was {rate}% before)': ['効いています — 対象の失敗は減っています（有効化後の {under} 件中 {with} 件、以前は {rate}%）', '효과가 있습니다 — 대상 실패가 줄고 있습니다(활성화 후 {under}건 중 {with}건, 이전 {rate}%)', 'Efficace — l’échec visé baisse ({with} exécutions sur {under} depuis l’activation ; {rate} % avant)', 'Funciona: el fallo objetivo está bajando ({with} de {under} ejecuciones desde la activación; antes {rate} %)'],
   'Holding — the failure rate has stayed below where it started': ['定着しています — 失敗率は下がったままです', '정착했습니다 — 실패율이 낮아진 상태를 유지합니다', 'Établi — le taux d’échec est resté en dessous de son niveau de départ', 'Establecida: la tasa de fallos se ha mantenido por debajo del inicio'],
   'Still measuring — {under} runs under it so far': ['測定中 — 有効化後の実行はまだ {under} 件です', '측정 중 — 활성화 후 실행이 아직 {under}건입니다', 'Mesure en cours — {under} exécutions depuis l’activation', 'Midiendo: {under} ejecuciones desde la activación'],
+  'Runs without asking — earned by {n} clean completions': ['承認なしで実行 — 問題ない完了が {n} 回続いた実績によるものです', '묻지 않고 실행 — 문제 없는 완료 {n}회의 실적으로 얻은 것입니다', 'Exécution sans demande — acquis par {n} exécutions sans problème', 'Se ejecuta sin preguntar: ganado con {n} finalizaciones sin problemas'],
+  'Asks first — stopped by {cause}': ['まず確認します — {cause}のため自動実行を停止しました', '먼저 확인합니다 — {cause}(으)로 자동 실행이 중지되었습니다', 'Demande d’abord — arrêté par {cause}', 'Pregunta primero: detenido por {cause}'],
+  'Asks first — {n} clean completions so far': ['まず確認します — これまでの問題ない完了は {n} 回です', '먼저 확인합니다 — 지금까지 문제 없는 완료가 {n}회입니다', 'Demande d’abord — {n} exécutions sans problème jusqu’ici', 'Pregunta primero: {n} finalizaciones sin problemas hasta ahora'],
+  'Pinned by the owner: runs without asking': ['オーナーが固定: 承認なしで実行します', '소유자가 고정함: 묻지 않고 실행합니다', 'Épinglé par le propriétaire : exécution sans demande', 'Fijado por el propietario: se ejecuta sin preguntar'],
+  'Pinned by the owner: asks first': ['オーナーが固定: まず確認します', '소유자가 고정함: 먼저 확인합니다', 'Épinglé par le propriétaire : demande d’abord', 'Fijado por el propietario: pregunta primero'],
+  'Pin: asks first': ['固定: まず確認', '고정: 먼저 확인', 'Épingler : demander d’abord', 'Fijar: preguntar primero'],
+  'Pin: runs without asking': ['固定: 承認なしで実行', '고정: 묻지 않고 실행', 'Épingler : exécuter sans demande', 'Fijar: ejecutar sin preguntar'],
+  'Unpin': ['固定を解除', '고정 해제', 'Désépingler', 'Desfijar'],
+  'a rejection': ['却下', '거부', 'un refus', 'un rechazo'],
+  'a read-back mismatch': ['読み戻し確認の不一致', '읽어 되돌리기 불일치', 'une incohérence à la relecture', 'una discrepancia en la verificación'],
+  'work being sent back': ['作業の差し戻し', '작업 반려', 'un renvoi du travail', 'una devolución del trabajo'],
+  'a rollback': ['ロールバック', '롤백', 'un retour arrière', 'una reversión'],
+  'a failed check': ['検証の失敗', '검사 실패', 'un contrôle en échec', 'una comprobación fallida'],
+  'its record going stale': ['実績の失効', '실적 만료', 'l’expiration de son historique', 'la caducidad de su historial'],
+  'the command changing': ['操作の変更', '명령 변경', 'le changement de la commande', 'el cambio del comando'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

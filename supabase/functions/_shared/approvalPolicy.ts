@@ -55,6 +55,11 @@ export interface ApprovalFacts {
   rawHttp?: boolean;                                     // the manifest-less http_request tool
   critical?: CriticalClass | null;                       // non-manifest write (Drive tool names)
   delegation?: "approve_each" | "full_delegation" | null;
+  /** Graduated autonomy (B7): the live auto grant standing for this
+   *  call's command, when one does — a pre-composed fact the caller
+   *  loaded from autonomy_grants, judged by verdictWithAutonomy
+   *  below. It is data, not a branch: the floors never read it. */
+  autonomyGrant?: { lane: 1 | 2; clean: number } | null;
 }
 
 /** What the floors below the mode say about one call. */
@@ -177,4 +182,64 @@ export function liftOf(facts: ApprovalFacts): "delegation" | null {
   return facts.delegation === "full_delegation" && approvalVerdict(facts) === "allow"
     ? "delegation"
     : null;
+}
+
+// ── Graduated autonomy (B7): the grant as one composed fact ───────────
+//
+// The track-record grant enters the composition here, as a
+// pre-composed input — NOT as a branch inside the floors above.
+// approvalVerdict and applyMode evaluate exactly as they did before
+// grants existed; what a grant may do is defined entirely by
+// grantLiftable + verdictWithAutonomy:
+//
+//   - It can only turn an ask that full delegation would already
+//     have lifted: a manifest command whose own permission is "ask",
+//     held by nothing else — no critical class (the floor is
+//     evaluated on its own derivation, so lane 3 stays closed even
+//     if a grant row names the command), no argument rule (a
+//     rule-bound ask is the person's condition, not the connection's
+//     default), no catalog or raw-HTTP hold.
+//   - It never applies in the ask-every-time mode: earned autonomy
+//     is a refinement of Auto, and a Space that asks every time is
+//     told every time.
+//   - In the free mode the ask is already lifted by the mode; the
+//     grant changes only the record's attribution (the caller writes
+//     the policy approval with decision_source "track-record"), so
+//     the audit keeps distinguishing "the Space said always" from
+//     "this action earned it".
+//   - Deny is unreachable: grantLiftable requires the base verdict
+//     to be "ask", and a denial's verdict is "deny".
+
+/**
+ * Pure. Whether this call's ask is the one kind a track-record grant
+ * may lift: the command's own ask, under a delegation that does not
+ * already lift it, held by no floor. Recomputed from the verdict so
+ * the two cannot drift.
+ */
+export function grantLiftable(facts: ApprovalFacts): boolean {
+  const m = facts.manifest;
+  if (!m || facts.catalogDecision !== undefined || !facts.isWrite || facts.isRead) return false;
+  if (m.permission !== "ask" || m.rule !== null || m.critical) return false;
+  return approvalVerdict(facts) === "ask";
+}
+
+/**
+ * Pure. The mode-aware verdict for one call, with the call's
+ * standing autonomy grant composed over it. `lift` names the
+ * track-record lift when the grant is what lets the call run
+ * unasked (Auto) or the truer attribution for its record (Free) —
+ * the caller then writes the call's policy approval with
+ * decision_source "track-record" (policyApproval.ts). Without a
+ * grant, or in the ask mode, this is verdictUnderMode exactly.
+ */
+export function verdictWithAutonomy(
+  facts: ApprovalFacts,
+  mode: ApprovalMode,
+): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null } {
+  const base = approvalVerdict(facts);
+  const final = applyMode(base, facts, mode);
+  if (!facts.autonomyGrant || mode === "ask" || !grantLiftable(facts)) {
+    return { base, final, lift: null };
+  }
+  return { base, final: "allow", lift: "track-record" };
 }

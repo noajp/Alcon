@@ -59,6 +59,7 @@ import { loadPromotionDraft, transitionPromotionDraft } from "../_shared/promoti
 import { settlePromotionRehearsal } from "../_shared/promotionTest.ts";
 import { collectOutcomes } from "../_shared/outcomeCollector.ts";
 import { evaluateCalibration } from "../_shared/verifierCalibration.ts";
+import { evaluateAutonomy } from "../_shared/autonomy.ts";
 import { deriveConstraintDrafts, evaluateConstraintEffects, type ConstraintCluster } from "../_shared/constraintDrafts.ts";
 
 const corsHeaders = {
@@ -585,6 +586,24 @@ async function tick(env: Env): Promise<Record<string, number>> {
   } catch (e) {
     console.error("automations: constraint effect evaluation failed", e instanceof Error ? e.message : e);
   }
+  // Graduated autonomy (B7): over the same sealed records, each
+  // command's track record is recomputed; grants whose standing the
+  // record no longer supports are revoked here (the record-only
+  // incidents — reopens, rollbacks — are swept at this same seam,
+  // the first place they exist as records; rejections and verify
+  // mismatches demote synchronously where they happen), and commands
+  // whose record has earned their lane's threshold are promoted.
+  // Grants are standing facts the approval gate reads; this evaluator
+  // is their only system writer besides the owner's pin.
+  let autonomyRecords = 0, autonomyPromoted = 0, autonomyDemoted = 0;
+  try {
+    const evaluated = await evaluateAutonomy(env.admin, now);
+    autonomyRecords = evaluated.records;
+    autonomyPromoted = evaluated.promoted;
+    autonomyDemoted = evaluated.demoted;
+  } catch (e) {
+    console.error("automations: autonomy evaluation failed", e instanceof Error ? e.message : e);
+  }
   // Heartbeats whose wake is due. The tick's arrival is stamped on
   // every enabled Space first: the pg_cron registration is per
   // environment, and this stamp is how the settings screen can say
@@ -624,7 +643,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, credentialRequestsExpired, credentialStashesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

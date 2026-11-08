@@ -99,8 +99,9 @@ import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
 import {
-  applyMode, approvalModeOf, approvalVerdict, liftOf, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
+  approvalModeOf, liftOf, verdictWithAutonomy, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
 } from "../_shared/approvalPolicy.ts";
+import { grantFactFor, loadAutonomyGrantFacts, revokeAutonomyForIncident } from "../_shared/autonomy.ts";
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
 import {
@@ -976,7 +977,15 @@ async function execute(a: ExecArgs): Promise<void> {
   // answered is refused by the executor wrapper below; an ask the free
   // mode lifted is recorded there as a policy approval as it runs.
   const mode = a.approvalMode;
-  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict }>();
+  // Graduated autonomy (B7): the Space's standing auto grants, loaded
+  // once for the run and composed into each manifest call's facts —
+  // a grant can only lift the one ask approvalPolicy's grantLiftable
+  // names, and an unread grant table answers empty (no grant: the
+  // safe side).
+  const autonomyGrants = run.activity_space_id
+    ? await loadAutonomyGrantFacts(admin, run.activity_space_id)
+    : new Map<string, { lane: 1 | 2; clean: number }>();
+  const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null }>();
   const factsForCall = (call: ToolCall): ApprovalFacts => {
     // Alcon's own operations: the Element entry's policy decides each call.
     if (isCatalogTool(call.name)) {
@@ -984,14 +993,15 @@ async function execute(a: ExecArgs): Promise<void> {
       return { catalogDecision: tool ? decideCall("element", tool, call.input) : "allow", isWrite: true, isRead: false };
     }
     // The facts are gathered by the shared adapter (_shared/integrationTools.ts).
-    return integrationApprovalFacts(integrationTools.get(call.name), call, kindOf(call.name) === "write");
+    const it = integrationTools.get(call.name);
+    const facts = integrationApprovalFacts(it, call, kindOf(call.name) === "write");
+    facts.autonomyGrant = grantFactFor(autonomyGrants, it?.integration.id, it?.command?.name);
+    return facts;
   };
-  const verdictForCall = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict } => {
+  const verdictForCall = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null } => {
     let v = verdicts.get(call.id);
     if (!v) {
-      const facts = factsForCall(call);
-      const base = approvalVerdict(facts);
-      v = { base, final: applyMode(base, facts, mode) };
+      v = verdictWithAutonomy(factsForCall(call), mode);
       verdicts.set(call.id, v);
     }
     return v;
@@ -1061,6 +1071,17 @@ async function execute(a: ExecArgs): Promise<void> {
         await addStep(admin, run.id, "action", `読み戻し確認ができませんでした: ${op}`, r.verify.unverified);
       } else {
         await addStep(admin, run.id, "action", `読み戻し確認で不一致: ${op}`, verifyDiffText(r.verify.diff ?? []));
+        // Graduated autonomy (B7): the mismatch is this command's
+        // first incident — its earned grant is revoked here, in the
+        // same flow that records the result, so the very next call
+        // asks again. (The write itself stands; B2's rule — demotion
+        // is about asking again, not undoing.)
+        if (it.command && run.activity_space_id) {
+          await revokeAutonomyForIncident(admin, {
+            spaceId: run.activity_space_id, integrationId: it.integration.id, action: it.command.name,
+            kind: "verify_mismatch", runId: run.id,
+          });
+        }
       }
     }
     if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
@@ -1713,6 +1734,24 @@ async function execute(a: ExecArgs): Promise<void> {
     admin, runId: run.id, userId: user.id,
     addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
     saveTranscript, executeApproved: (call) => executeCall(call, true),
+    // Graduated autonomy (B7): a rejection revokes the rejected
+    // commands' earned grants in the same flow that records it, so
+    // the next call to the command asks again.
+    onRejected: async (_action, calls) => {
+      if (!run.activity_space_id) return;
+      const seen = new Set<string>();
+      for (const c of calls) {
+        const it = integrationTools.get(c.name);
+        if (!it?.command) continue;
+        const key = `${it.integration.id}:${it.command.name}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        await revokeAutonomyForIncident(admin, {
+          spaceId: run.activity_space_id, integrationId: it.integration.id, action: it.command.name,
+          kind: "rejection", runId: run.id,
+        });
+      }
+    },
     // Under the ask mode nothing is rememberable: every write asks again,
     // so a decision's "from now on" is not accepted, as the card never
     // offered it.
@@ -1945,29 +1984,40 @@ async function execute(a: ExecArgs): Promise<void> {
           return { content: refusal, is_error: true };
         }
       }
-      // The free mode lifted this call's ask: it runs as a policy
-      // approval — recorded before it runs, settled when it lands, and
-      // announced when the call is critical, so what ran unasked is as
-      // visible as what a person approved.
+      // The free mode lifted this call's ask — or its earned track
+      // record did (B7): either way it runs as a policy approval —
+      // recorded before it runs, settled when it lands, and announced
+      // when the call is critical, so what ran unasked is as visible
+      // as what a person approved. The record's decision_source names
+      // which lift it was: the mode's, or the action's own record.
       let policyActionId: string | null = null;
-      if (v && v.base === "ask" && mode === "free") {
+      if (v && v.base === "ask" && (mode === "free" || v.lift === "track-record")) {
         const display = approvalDisplayFor(call);
         const summary = approvalSummary([display]);
+        const byTrackRecord = v.lift === "track-record";
         policyActionId = await recordPolicyApproval(admin, {
           runId: run.id, elementId: run.element_id, call, display, mode,
           integrationId: integrationTools.get(call.name)?.integration.id ?? null,
+          ...(byTrackRecord ? { source: "track-record" as const } : {}),
         });
-        await addStep(admin, run.id, "approval", `ポリシー承認で実行: ${summary}`, "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
-        if (display.critical) {
-          await admin.from("element_comments").insert({
-            element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
-            content: `**ポリシー承認で実行** — ${summary}。重要な操作のため記録しています。Space の承認モード（自由行動）により、承認は求めませんでした。`,
-          });
-          if (run.triggered_by) {
-            await admin.from("notifications").insert({
-              recipient_id: run.triggered_by, actor_name: agentName, kind: "status_change", element_id: run.element_id,
-              agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
-            }).then(() => {}, () => {});
+        if (byTrackRecord) {
+          const it = integrationTools.get(call.name);
+          const clean = grantFactFor(autonomyGrants, it?.integration.id, it?.command?.name)?.clean ?? 0;
+          await addStep(admin, run.id, "approval", `実績により自動実行: ${summary}`,
+            `この操作は、これまで問題なく完了した実績（${clean} 回）により、承認を求めずに実行しました。記録はポリシー承認（実績）として残ります。`);
+        } else {
+          await addStep(admin, run.id, "approval", `ポリシー承認で実行: ${summary}`, "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
+          if (display.critical) {
+            await admin.from("element_comments").insert({
+              element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+              content: `**ポリシー承認で実行** — ${summary}。重要な操作のため記録しています。Space の承認モード（自由行動）により、承認は求めませんでした。`,
+            });
+            if (run.triggered_by) {
+              await admin.from("notifications").insert({
+                recipient_id: run.triggered_by, actor_name: agentName, kind: "status_change", element_id: run.element_id,
+                agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
+              }).then(() => {}, () => {});
+            }
           }
         }
       }
@@ -4072,6 +4122,26 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   const decisionOutcome = await applyDecision(state, pending, a.body.decision, {
     admin, runId: run.id, userId: user.id, addStep: bound,
     saveTranscript, executeApproved: execute,
+    // Graduated autonomy (B7): a rejection revokes the rejected
+    // commands' earned grants in the same flow that records it, so
+    // the next call to the command asks again.
+    onRejected: async (_action, calls) => {
+      const spaceId = context.spaceId ?? run.activity_space_id;
+      if (!spaceId) return;
+      const tools = turn.toolset?.tools ?? new Map();
+      const seen = new Set<string>();
+      for (const c of calls) {
+        const it = tools.get(c.name);
+        if (!it?.command) continue;
+        const key = `${it.integration.id}:${it.command.name}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        await revokeAutonomyForIncident(admin, {
+          spaceId, integrationId: it.integration.id, action: it.command.name,
+          kind: "rejection", runId: run.id,
+        });
+      }
+    },
     // Under the ask mode nothing is rememberable, as in an Element's run.
     rememberApproval: turnMode === "ask" ? undefined : rememberApproval, scheduleContinuation, deadline,
   });
@@ -4192,26 +4262,36 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       `${names.map((n) => `連携「${n}」`).join("、")}は全委任のため、承認を求めずに実行しました。`);
   };
 
-  // The loop's executor: a call the free mode let through records its
-  // policy approval as it runs (policyApproval.ts), settled when it
-  // lands — the decision path above runs its approved calls through the
-  // plain executor, a person's approval already being their record.
+  // The loop's executor: a call the free mode let through — or one an
+  // earned track-record grant let through (B7) — records its policy
+  // approval as it runs (policyApproval.ts), settled when it lands;
+  // the record's decision_source names which lift it was. The decision
+  // path above runs its approved calls through the plain executor, a
+  // person's approval already being their record.
   const loopExecute = async (call: ToolCall) => {
     const v = turn.verdictOf(call);
     let policyActionId: string | null = null;
-    if (v && v.base === "ask" && turnMode === "free") {
+    if (v && v.base === "ask" && (turnMode === "free" || v.lift === "track-record")) {
       const display = approvalDisplayForCall(turn.toolset?.tools ?? new Map(), call);
       const summary = approvalSummary([display]);
+      const byTrackRecord = v.lift === "track-record";
       policyActionId = await recordPolicyApproval(admin, {
         runId: run.id, elementId: null, call, display, mode: turnMode,
         integrationId: turn.toolset?.tools.get(call.name)?.integration.id ?? null,
+        ...(byTrackRecord ? { source: "track-record" as const } : {}),
       });
-      await bound("approval", `ポリシー承認で実行: ${summary}`, "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
-      if (display.critical && run.triggered_by) {
-        await admin.from("notifications").insert({
-          recipient_id: run.triggered_by, actor_name: COPILOT_AGENT_NAME, kind: "status_change",
-          agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
-        }).then(() => {}, () => {});
+      if (byTrackRecord) {
+        const clean = turn.grantOf(call)?.clean ?? 0;
+        await bound("approval", `実績により自動実行: ${summary}`,
+          `この操作は、これまで問題なく完了した実績（${clean} 回）により、承認を求めずに実行しました。記録はポリシー承認（実績）として残ります。`);
+      } else {
+        await bound("approval", `ポリシー承認で実行: ${summary}`, "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
+        if (display.critical && run.triggered_by) {
+          await admin.from("notifications").insert({
+            recipient_id: run.triggered_by, actor_name: COPILOT_AGENT_NAME, kind: "status_change",
+            agent_action_id: policyActionId, title: "重要な操作をポリシー承認で実行しました", body: summary,
+          }).then(() => {}, () => {});
+        }
       }
     }
     if (!policyActionId && v?.final === "allow" && turn.liftOf(call) === "delegation") {

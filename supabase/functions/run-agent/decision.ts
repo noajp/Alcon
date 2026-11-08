@@ -15,9 +15,17 @@ import {
 import { approvalSummary, criticalOfTool, type ApprovalDisplay, type IntegrationTool } from "../_shared/integrationTools.ts";
 import { ruleFromCalls, withRule } from "../_shared/connectorManifest.ts";
 import { errorMessage } from "../_shared/boardTools.ts";
+import type { VerifyCheck } from "../_shared/verifyReads.ts";
 
 /** A turn's writes waiting for a person, as a transcript carries them. */
-export type SavedPending = PendingApproval & { approved?: boolean; results?: ToolResult[] };
+export type SavedPending = PendingApproval & {
+  approved?: boolean;
+  results?: ToolResult[];
+  /** Per-call landings of an approved batch, carried across slices
+   *  beside the results so the batch's settle can seal each call's
+   *  own outcome (decision.ts, the B7 record). */
+  perCall?: { id: string; ok: boolean; verify?: VerifyCheck }[];
+};
 
 export interface Decision {
   actionId?: string;
@@ -35,9 +43,17 @@ export interface DecisionDeps {
   /** Persists the loop's state; with a pending, the paused turn with it. */
   saveTranscript(pending?: SavedPending): Promise<void>;
   /** Runs one approved call. */
-  executeApproved(call: ToolCall): Promise<{ content: string; is_error?: boolean }>;
+  executeApproved(call: ToolCall): Promise<{ content: string; is_error?: boolean; verify?: VerifyCheck }>;
   /** Writes a standing approval for these calls, when the driver has one. */
   rememberApproval?(calls: ToolCall[], fields: string[]): Promise<void>;
+  /**
+   * Told of a rejection in the same flow that records it — the
+   * synchronous demotion hook graduated autonomy (B7) hangs on: a
+   * person rejecting an action revokes its earned grant now, not at
+   * some later evaluation. The rejection itself already stands when
+   * this runs; the hook's own failures never reopen it.
+   */
+  onRejected?(action: Record<string, unknown>, calls: ToolCall[]): Promise<void>;
   /** Hands the rest of an unfinished batch to the next slice. */
   scheduleContinuation(): Promise<void>;
   /** The slice's deadline; the batch yields at it rather than dying mid-call. */
@@ -76,11 +92,16 @@ export async function applyDecision(
       await admin.from("agent_actions").update({ status: "approved", decided_by: userId, decided_at: new Date().toISOString(), decision_note: decision.note ?? null }).eq("id", action.id);
       await deps.addStep("approval", "承認されました", decision.note ?? null);
       if (decision.remember?.length && deps.rememberApproval) await deps.rememberApproval(current.calls, decision.remember);
-      current = { ...current, approved: true, results: [] };
+      current = { ...current, approved: true, results: [], perCall: [] };
       await deps.saveTranscript(current);
     } else {
       await admin.from("agent_actions").update({ status: "rejected", decided_by: userId, decided_at: new Date().toISOString(), decision_note: decision.note ?? null }).eq("id", action.id);
       await deps.addStep("approval", "却下されました", decision.note ?? null);
+      // The rejection is recorded; what it revokes is told in the
+      // same flow (graduated autonomy's demotion). A hook failure
+      // leaves the rejection standing and the evaluator's sweep to
+      // catch the grant from the same record.
+      if (deps.onRejected) await deps.onRejected(action as Record<string, unknown>, current.calls).catch(() => {});
       const rejected: ToolResult[] = current.calls.map((call) => ({
         type: "tool_result", tool_use_id: call.id, is_error: true,
         content: `実行を始めた人が却下しました。${decision.note ? `理由・指示: ${decision.note}` : ""} 実行していません。指示に沿って案を直すか、finish してください。`,
@@ -96,22 +117,29 @@ export async function applyDecision(
   // it left.
   if (current?.approved) {
     const results = current.results ?? [];
+    // The batch's per-call truth as it settles (B7): each call's own
+    // landing and, where its command declared one, its verify
+    // read-back — sealed beside the aggregate so the track record
+    // can attribute a completion (or a mismatch) to the command that
+    // earned it, instead of a batch standing or falling as one blob.
+    const perCall: { id: string; ok: boolean; verify?: VerifyCheck }[] = [...(current.perCall ?? [])];
     const done = new Set(results.map((r) => r.tool_use_id));
     for (const call of current.calls) {
       if (done.has(call.id)) continue;
       if (Date.now() >= deps.deadline) {
-        const carried = { ...current, results };
+        const carried = { ...current, results, perCall };
         await deps.saveTranscript(carried);
         await deps.scheduleContinuation();
         return { pending: carried, continued: true, decided: { approved: true, results } };
       }
-      let r: { content: string; is_error?: boolean };
+      let r: { content: string; is_error?: boolean; verify?: VerifyCheck };
       try { r = await deps.executeApproved(call); } catch (e) { r = { content: `Error: ${errorMessage(e)}`, is_error: true }; }
       results.push({ type: "tool_result", tool_use_id: call.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
+      perCall.push({ id: call.id, ok: !r.is_error, ...(r.verify ? { verify: r.verify } : {}) });
       await deps.saveTranscript({ ...current, results });
     }
     const failed = results.filter((r) => r.is_error).length;
-    await admin.from("agent_actions").update({ status: failed === current.calls.length ? "failed" : "executed", result: { failed, total: current.calls.length } })
+    await admin.from("agent_actions").update({ status: failed === current.calls.length ? "failed" : "executed", result: { failed, total: current.calls.length, perCall } })
       .eq("run_id", runId).eq("status", "approved");
     appendDecisionResults(state, current, results);
     await deps.saveTranscript();
