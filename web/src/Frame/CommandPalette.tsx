@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
+import { ArrowLeft, FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
 import { ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { BAR_TOOLS, MODE_META, TOOL_MODES } from '@/Frame/railApps';
@@ -40,6 +40,10 @@ interface CommandPaletteProps {
   /** Settings opens in its own tab rather than overwriting the active
    *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
   onOpenSettings: () => void;
+  /** The shell's Back, offered as a command when there is a screen to
+   *  go back to. */
+  canGoBack?: boolean;
+  onGoBack?: () => void;
 }
 
 // Action-phrased labels here are intentionally distinct from the sidebar
@@ -75,7 +79,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOpenSettings, canGoBack, onGoBack }: CommandPaletteProps) {
   const full = scope === 'full';
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -326,6 +330,15 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
 
         <CommandSeparator />
         <CommandGroup heading={t('Navigation')}>
+          {canGoBack && onGoBack && (
+            <CommandItem
+              value={`nav-go-back ${t('Go back')}`}
+              onSelect={() => { close(); onGoBack(); }}
+            >
+              <ArrowLeft />
+              <span>{t('Go back')}</span>
+            </CommandItem>
+          )}
           {navCommands.map(c => (
             <CommandItem
               key={c.id}

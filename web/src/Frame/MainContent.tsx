@@ -164,7 +164,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'domains' && (
             <div className="flex-1 overflow-auto bg-card">
-              <DomainsView onOpen={(id) => { setActiveDomainId(id); onNavigate({ objectId: null }); onViewChange?.('domain-overview'); }} />
+              <DomainsView onOpen={(id) => { setActiveDomainId(id); onNavigate({ objectId: null, landOnTab: 'overview' }); onViewChange?.('domain-overview'); }} />
             </div>
           )}
 
@@ -177,7 +177,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               onRefresh={onRefresh}
               activeDomainId={activeDomainId}
               onViewChange={onViewChange}
-              landOn="overview"
             />
           )}
 
@@ -223,7 +222,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               onRefresh={onRefresh}
               activeDomainId={activeDomainId}
               onViewChange={onViewChange}
-              landOn="elements"
             />
           )}
 

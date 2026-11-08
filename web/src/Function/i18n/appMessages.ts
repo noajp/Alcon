@@ -9,6 +9,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'No notification selected': ['通知が選択されていません', '선택된 알림이 없습니다', 'Aucune notification sélectionnée', 'Ninguna notificación seleccionada'],
   'Mark all read': ['すべて既読にする', '모두 읽음으로 표시', 'Tout marquer comme lu', 'Marcar todo como leído'],
   'Unread only': ['未読のみ', '읽지 않음만', 'Non lues uniquement', 'Solo no leídas'],
+  'Go back': ['前に戻る', '뒤로 가기', 'Revenir en arrière', 'Volver atrás'],
   'Show more': ['さらに表示', '더 보기', 'Afficher plus', 'Mostrar más'],
   'Unread': ['未読', '읽지 않음', 'Non lu', 'No leído'],
   'Notification actions': ['通知の操作', '알림 작업', 'Actions de la notification', 'Acciones de la notificación'],

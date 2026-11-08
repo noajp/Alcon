@@ -20,6 +20,11 @@ describe('the open screen a reload comes back to', () => {
     expect(s?.navigation).toEqual({ objectId: null });
   });
 
+  it('drops a one-shot tab landing riding on the navigation', () => {
+    const s = openScreenFrom({ view: 'strategy', navigation: { objectId: null, landOnTab: 'elements' } }, isView);
+    expect(s?.navigation).toEqual({ objectId: null });
+  });
+
   it('opens the home view for a view the shell does not have or an unreadable entry', () => {
     expect(openScreenFrom({ view: 'gone', navigation: {} }, isView)).toBeNull();
     expect(openScreenFrom({ view: 'inbox' }, isView)).toBeNull();

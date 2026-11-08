@@ -63,6 +63,7 @@ const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custo
 // Domain share one view choice (switch one to Timeline → all show Timeline).
 const DOMAIN_TAB_PREFIX = 'domain:activeTabType:';
 const DOMAIN_VISIBLE_TABS_PREFIX = 'domain:visibleTabs:';
+const OBJECT_TAB_PREFIX = 'domain:objectActiveTabType:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
 // A Domain always has its Overview, its Flow and its People; other views are added.
@@ -126,9 +127,6 @@ interface DomainViewProps {
   /** Switch the active top-level activity — e.g. the Object Overview's
    *  "Strategy" property row jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
-  /** The tab to open on: Overview from the Domain itself, All Objects from
-   *  its Objects row. Without it, the tab last used in this Domain. */
-  landOn?: ObjectTabType;
 }
 
 /**
@@ -137,7 +135,7 @@ interface DomainViewProps {
  * Calendar, etc. are now Domain-scoped views, with the same tab choice
  * carrying through when the user drills into a specific Object.
  */
-export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange, landOn }: DomainViewProps) {
+export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
   const explorerData = useExplorerData();
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -150,9 +148,9 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     () => (activeDomainId ? [...domains, ...guestDomains].find(d => d.id === activeDomainId) ?? null : null),
     [domains, guestDomains, activeDomainId],
   );
-  // Domain tab choice persists in localStorage. Object tab choice is per
-  // Object and resets to Overview whenever the user drills into a different
-  // Object — Overview is the canonical landing view for an Object.
+  // Domain tab choice persists in localStorage; Object tab choice is per
+  // Object and remembered the same way — a return to an Object lands on
+  // the tab last used there (Overview is only a first visit's default).
   const domainKey = activeDomainId ?? 'none';
   const [domainActiveType, setDomainActiveType] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return DEFAULT_DOMAIN_TAB;
@@ -172,11 +170,32 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     const saved = window.localStorage.getItem(`${DOMAIN_TAB_PREFIX}${domainKey}`);
     setDomainActiveType(saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB);
     setDomainVisibleTypes(withDomainTabs(loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${domainKey}`, DEFAULT_DOMAIN_TAB_TYPES)));
-    if (landOn) setDomainActiveType(landOn);
-  }, [domainKey, landOn]);
+  }, [domainKey]);
+
+  // An entry point that promised a landing (the sidebar's Domain / Objects
+  // rows) rides in on the navigation as landOnTab. Apply it to this Domain
+  // once — it becomes the remembered tab, like a tab click — then clear
+  // the request so later mounts show the remembered tab, not the promise.
+  // Applied during render (the shell's own adjust-during-render pattern);
+  // the effect below only clears the request through the parent.
+  const landOnTab = navigation.landOnTab ?? null;
+  const [landedTab, setLandedTab] = useState<ObjectTabType | null>(null);
+  if (!landOnTab && landedTab) setLandedTab(null);
+  if (landOnTab && !landedTab) {
+    setLandedTab(landOnTab);
+    setDomainActiveType(landOnTab);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(`${DOMAIN_TAB_PREFIX}${domainKey}`, landOnTab);
+    }
+  }
+  useEffect(() => {
+    if (landOnTab) onNavigate({ landOnTab: null });
+  }, [landOnTab, onNavigate]);
 
   useEffect(() => {
-    setObjectActiveType('overview');
+    if (!navigation.objectId || typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem(`${OBJECT_TAB_PREFIX}${navigation.objectId}`);
+    setObjectActiveType(saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : 'overview');
   }, [navigation.objectId]);
 
   const listedObject = navigation.objectId
@@ -196,7 +215,13 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
 
   const activeType = selectedObject ? objectActiveType : domainActiveType;
   const setActiveTypeOnly = (t: ObjectTabType) => {
-    if (selectedObject) { setObjectActiveType(t); return; }
+    if (selectedObject) {
+      setObjectActiveType(t);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(`${OBJECT_TAB_PREFIX}${selectedObject.id}`, t);
+      }
+      return;
+    }
     setDomainActiveType(t);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(`${DOMAIN_TAB_PREFIX}${domainKey}`, t);
@@ -206,8 +231,9 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const rawVisibleTabTypes = selectedObject
     ? (objectVisibleTypesById[selectedObject.id] ?? DEFAULT_OBJECT_TAB_TYPES).map((t) => (t === 'resource' ? 'workers' : t))
       .filter((t, i, all) => all.indexOf(t) === i)
-    // Opened from the sidebar's Objects row, the Domain shows its list too.
-    : landOn === 'elements' ? [...domainVisibleTypes, 'elements' as ObjectTabType] : domainVisibleTypes;
+    // On the All Objects tab (landed on, or remembered as this Domain's
+    // tab) the Domain shows its list too, though it is not a Domain tab.
+    : domainActiveType === 'elements' ? [...domainVisibleTypes, 'elements' as ObjectTabType] : domainVisibleTypes;
   const sanitizedVisibleTabTypes = rawVisibleTabTypes.filter((type) => ALL_TAB_TYPES.includes(type));
   const visibleTabTypes = sanitizedVisibleTabTypes.length > 0
     ? sanitizedVisibleTabTypes
@@ -458,6 +484,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             canEdit={!viewOnly}
             onNavigate={onNavigate}
             onViewChange={onViewChange}
+            onElementDetailChange={setElementDetailOpen}
           />
         </>
       )}
@@ -516,9 +543,13 @@ interface DomainTabContentProps {
    *  Strategy — the one-click round trip the List tab already has. */
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  /** A tab drilldown's Element detail reports its open state, so the
+   *  Domain chrome above hides and the detail owns the pane — the same
+   *  takeover ObjectDetailView's own detail already gets. */
+  onElementDetailChange: (open: boolean) => void;
 }
 
-function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, canEdit = true, onNavigate, onViewChange }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, canEdit = true, onNavigate, onViewChange, onElementDetailChange }: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -570,7 +601,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   if (activeType === 'calendar') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+        <ElementDrilldown key={domainId} label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
           {openElement => <CalendarView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
@@ -580,7 +611,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   if (activeType === 'flow') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Execution Chain" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+        <ElementDrilldown key={domainId} label="Execution Chain" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
           {openElement => <DomainChain elements={allElements} objects={objects ?? []} domainId={domainId ?? null} canEdit={canEdit} onRefresh={onRefresh} onOpenElement={openElement} />}
         </ElementDrilldown>
       </div>
@@ -599,7 +630,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   if (activeType === 'resource' || activeType === 'workers') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="People" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
+        <ElementDrilldown key={domainId} label="People" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
           {openElement => <ResourceView
             scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
             onElementClick={element => openElement(element.id)}

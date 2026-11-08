@@ -70,6 +70,10 @@ interface AppSidebarProps {
    *  page.tsx's handleOpenSettings / handleCloseSettings. */
   onOpenSettings: () => void;
   onCloseSettings: () => void;
+  /** The shell's Back: shown in the header (the slot Settings' Back uses)
+   *  whenever the active tab has a screen to go back to. */
+  canGoBack?: boolean;
+  onGoBack?: () => void;
   onRefresh?: () => void;
   width: number;
   collapsed: boolean;
@@ -104,6 +108,8 @@ export function AppSidebar({
   onViewChange,
   onOpenSettings,
   onCloseSettings,
+  canGoBack,
+  onGoBack,
   collapsed,
   overlay,
   onCreateNew,
@@ -327,6 +333,17 @@ export function AppSidebar({
             </Button>
           ) : (
             <div className="flex w-full items-center gap-1">
+            {canGoBack && onGoBack && (
+              <button
+                type="button"
+                onClick={onGoBack}
+                title={t('Back')}
+                aria-label={t('Back')}
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+              >
+                <ArrowLeft size={15} />
+              </button>
+            )}
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
@@ -419,7 +436,7 @@ export function AppSidebar({
                   activeView={activeView}
                   onOpen={() => {
                     setActiveDomainId(d.id);
-                    onNavigate({ objectId: null });
+                    onNavigate({ objectId: null, landOnTab: 'overview' });
                     onViewChange('domain-overview');
                   }}
                   onToggle={() => setExpandedDomainIds(prev => {
@@ -430,7 +447,7 @@ export function AppSidebar({
                   onOpenSettings={() => setSettingsDomain(d)}
                   onSelectExecItem={(viewId) => {
                     if (d.id !== activeDomain?.id) setActiveDomainId(d.id);
-                    onNavigate({ objectId: null });
+                    onNavigate({ objectId: null, ...(viewId === 'objects' ? { landOnTab: 'elements' as const } : {}) });
                     onViewChange(viewId);
                   }}
                 />
@@ -443,13 +460,13 @@ export function AppSidebar({
               of a Space. */}
           {guestDomains.map(d => <DomainNavigationRow key={d.id} name={d.name} mark={<DomainMark domain={d} size={16} />}
             active={d.id === activeDomain?.id} expanded={expandedDomainIds.has(d.id)} activeView={activeView}
-            onOpen={() => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange('domain-overview'); }}
+            onOpen={() => { setActiveDomainId(d.id); onNavigate({ objectId: null, landOnTab: 'overview' }); onViewChange('domain-overview'); }}
             onToggle={() => setExpandedDomainIds(prev => {
               const next = new Set(prev);
               if (next.has(d.id)) next.delete(d.id); else next.add(d.id);
               return next;
             })}
-            onSelect={view => { setActiveDomainId(d.id); onNavigate({ objectId: null }); onViewChange(view); }}
+            onSelect={view => { setActiveDomainId(d.id); onNavigate({ objectId: null, ...(view === 'objects' ? { landOnTab: 'elements' as const } : {}) }); onViewChange(view); }}
             onSettings={() => setSettingsDomain(d)}
           />)}
           </SidebarFold>

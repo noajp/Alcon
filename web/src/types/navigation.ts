@@ -1,5 +1,6 @@
 import type { AuditRoute } from '@/Function/audit/auditRoute';
 import type { FilesRoute } from '@/Function/files/filesRoute';
+import type { ObjectTabType } from '@/types/database';
 
 /** Where an Element opened from ⌘K goes back to: the view, its Object and
  *  the Domain that were open when it was opened. */
@@ -48,6 +49,13 @@ export interface NavigationState {
    *  navigation so the request lands in this tab's surface once it is
    *  mounted, not in whichever listener happened to exist. */
   strategyCreate?: boolean | null;
+  /** A one-shot request that the Domain surface open on this tab. Set by
+   *  the entry points that promise a landing (the sidebar's Domain row
+   *  promises Overview, its Objects row promises All Objects); DomainView
+   *  applies it once and clears it, so an incidental mount shows the tab
+   *  last used in that Domain instead. Not a place: excluded from history
+   *  route keys and stripped on reload restore, like `strategyCreate`. */
+  landOnTab?: ObjectTabType | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */
