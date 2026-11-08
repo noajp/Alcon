@@ -22,11 +22,58 @@ export interface ToolEvent {
   result?: { ok: boolean; rows?: number; error?: string };
 }
 
+/** One call on an approval card, as the function described it: the same
+ *  display contract as a run's approval card. */
+export interface CopilotApprovalCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  display: {
+    integration: string;
+    operation: string;
+    destination: string;
+    detail: string | null;
+    effect: 'read' | 'write';
+    critical: string | null;
+    rememberable: boolean;
+  };
+}
+
+/**
+ * Integration writes the approval policy held, waiting for the person's
+ * decision on a card in this chat. Nothing has run. Approving runs exactly
+ * these calls with exactly this input (inputHash binds them); denying runs
+ * nothing. The decision is taken here, by the person at the keyboard — this
+ * is not the runs' approval queue (an agent_actions row belongs to an
+ * Element's run), and a batch left undecided simply never runs.
+ */
+export interface CopilotApproval {
+  calls: CopilotApprovalCall[];
+  inputHash: string;
+  status: 'pending' | 'executing' | 'executed' | 'denied' | 'failed';
+  /** What each call answered, once approval ran it. */
+  results?: { name: string; ok: boolean; content: string }[];
+}
+
 /** A finished turn: done, and any step still waiting for its result marked
  *  as not run — the stream has ended, so no result is coming and the step
- *  should stop reading as in progress. */
+ *  should stop reading as in progress. Steps whose calls are waiting on an
+ *  approval card say so instead: they are held, not skipped. */
 function settle(message: CopilotMessage): CopilotMessage {
-  const events = message.toolEvents?.map((e) => (e.result ? e : { ...e, result: { ok: false, error: translate('Not run') } }));
+  const waiting = new Map<string, number>();
+  for (const a of message.approvals ?? []) {
+    if (a.status !== 'pending') continue;
+    for (const c of a.calls) waiting.set(c.name, (waiting.get(c.name) ?? 0) + 1);
+  }
+  const events = message.toolEvents?.map((e) => {
+    if (e.result) return e;
+    const held = waiting.get(e.name) ?? 0;
+    if (held > 0) {
+      waiting.set(e.name, held - 1);
+      return { ...e, result: { ok: false, error: translate('Awaiting approval') } };
+    }
+    return { ...e, result: { ok: false, error: translate('Not run') } };
+  });
   return { ...message, done: true, ...(events ? { toolEvents: events } : {}) };
 }
 
@@ -46,6 +93,8 @@ export interface CopilotMessage {
   attachments?: CopilotAttachment[];
   /** Tool-use timeline for assistant turns (one entry per tool call). */
   toolEvents?: ToolEvent[];
+  /** Integration writes held for the person's decision on a card. */
+  approvals?: CopilotApproval[];
   /** True once the stream for this assistant turn has finished. */
   done?: boolean;
   /** When the turn was sent or began (ms). */
@@ -298,6 +347,13 @@ export function useAlconCopilot() {
           }
         }
         next[i] = { ...last, toolEvents: events };
+      } else if (evt === 'approval') {
+        const approval: CopilotApproval = {
+          calls: (payload.calls as CopilotApprovalCall[] | undefined) ?? [],
+          inputHash: String(payload.inputHash ?? ''),
+          status: 'pending',
+        };
+        next[i] = { ...last, approvals: [...(last.approvals ?? []), approval] };
       } else if (evt === 'done') {
         // Cut off by the length limit with no calls left to run: say so,
         // rather than end mid-sentence as if that were the answer.
@@ -311,6 +367,72 @@ export function useAlconCopilot() {
       return next;
     });
   }
+
+  /**
+   * The person's decision on an approval card. Denying is local — nothing
+   * was ever sent anywhere, and nothing runs. Approving posts the batch
+   * back to the function in "execute" mode, which re-derives the Space's
+   * tools and runs exactly these calls with exactly this input. Either
+   * way, the outcome is noted on the message, so a later turn (which only
+   * sees the conversation's text) knows what happened.
+   */
+  const decideApproval = useCallback(async (approval: CopilotApproval, approve: boolean, spaceId?: string) => {
+    const patch = (status: CopilotApproval['status'], note?: string, results?: CopilotApproval['results']) => {
+      setMessages((prev) => prev.map((m) => {
+        if (m.role !== 'assistant' || !m.approvals?.some((a) => a.inputHash === approval.inputHash)) return m;
+        return {
+          ...m,
+          approvals: m.approvals.map((a) => (a.inputHash === approval.inputHash ? { ...a, status, ...(results ? { results } : {}) } : a)),
+          ...(note ? { content: m.content + note } : {}),
+        };
+      }));
+    };
+    const ops = [...new Set(approval.calls.map((c) => `${c.display.integration} · ${c.display.operation}`))].join('、');
+    if (!approve) {
+      patch('denied', `\n\n_(${translate('You denied this operation. It was not run.')})_`);
+      return;
+    }
+    patch('executing');
+    try {
+      const url = functionsUrl();
+      if (!url) throw new Error(translate('Supabase URL is not configured.'));
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error(translate('Sign in to continue.'));
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: 'execute',
+          calls: approval.calls.map(({ id, name, input }) => ({ id, name, input })),
+          inputHash: approval.inputHash,
+          context: { spaceId },
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as { results?: { name: string; ok: boolean; content: string }[]; error?: string } | null;
+      if (!res.ok || !data?.results) {
+        // The function refused (the content no longer matches what was
+        // approved, the connection changed): the batch did not run.
+        patch('failed', `\n\n_(${translate('Could not run the approved operations. Try again.')})_`,
+          [{ name: '', ok: false, content: data?.error ?? `HTTP ${res.status}` }]);
+        return;
+      }
+      const results = data.results.map((r) => ({ name: r.name, ok: r.ok, content: r.content.slice(0, 300) }));
+      const failed = results.some((r) => !r.ok);
+      patch(
+        failed ? 'failed' : 'executed',
+        `\n\n_(${translate(failed ? 'The approved operations ran with failures: {ops}' : 'Ran the approved operations: {ops}', { ops })})_`,
+        results,
+      );
+    } catch {
+      // The request never landed (offline, the tab tore down): the card
+      // stays decidable, and the note says nothing ran.
+      patch('pending', `\n\n_(${translate('Could not run the approved operations. Try again.')})_`);
+    }
+  }, []);
 
   /** Drops the turns from `index` on — editing a question starts over from it. */
   const truncate = useCallback((index: number) => {
@@ -328,5 +450,5 @@ export function useAlconCopilot() {
     void send(question.content, { ...opts, attachments: (question.attachments ?? []).filter((a) => a.data) });
   }, [messages, streaming, send]);
 
-  return { messages, streaming, error, send, cancel, reset, load, truncate, retry };
+  return { messages, streaming, error, send, cancel, reset, load, truncate, retry, decideApproval };
 }

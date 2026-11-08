@@ -59,10 +59,13 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     const finished = wasStreaming.current && !streaming;
     wasStreaming.current = streaming;
     if (!finished || messages.length === 0) return;
-    // A file's contents are not kept, only its name.
-    const kept = messages.map(({ role, content, toolEvents, attachments }) => ({
+    // A file's contents are not kept, only its name. An approval card is
+    // kept whole: a batch left pending can still be decided when the
+    // conversation is reopened (its calls and hash are the whole record).
+    const kept = messages.map(({ role, content, toolEvents, attachments, approvals }) => ({
       role, content,
       ...(toolEvents?.length ? { toolEvents } : {}),
+      ...(approvals?.length ? { approvals } : {}),
       ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
     }));
     void saveSession(sessionId, { title: titleOf(messages), folder_id: folderForNew.current, messages: kept })

@@ -42,15 +42,19 @@ import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_s
 import { runStrategyTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
-  McpSession, callHttp, httpIsRead, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow, type RemoteTool,
+  McpSession, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow,
 } from "../_shared/integrationClient.ts";
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
-import { DRIVE_TOOLS, driveOperationLabel, runDriveTool } from "../_shared/googleDrive.ts";
+import { DRIVE_TOOLS } from "../_shared/googleDrive.ts";
 import { RECORD_TOOLS } from "./records.ts";
 import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type RecordScope } from "./recordStore.ts";
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
-import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, webSteps, webTools } from "./agentTools.ts";
+import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
+import {
+  approvalDisplayForCall, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, operationOf, planManifestTools,
+  type ApprovalDisplay, type IntegrationTool,
+} from "../_shared/integrationTools.ts";
 import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, type ConversationContext } from "./conversation.ts";
@@ -60,8 +64,8 @@ import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.
 import { resolveDefinition, type DefinitionCandidate } from "../_shared/definitionResolution.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
-import { commandSchema, criticalClassForTokens, criticalClassOf, decide, offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type CriticalClass, type Manifest, type ManifestCommand } from "../_shared/connectorManifest.ts";
-import { needsApprovalFor, type ApprovalFacts } from "../_shared/approvalPolicy.ts";
+import { offeredCommands, parseManifest, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
+import { needsApprovalFor } from "../_shared/approvalPolicy.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
@@ -121,30 +125,9 @@ type Run = {
   continuation_count: number; continuation_token: string | null;
 };
 
-/**
- * One integration tool the agent sees. `remote` describes an MCP tool or a
- * typed Drive tool (its readOnly decides read vs write); null is the generic
- * http_request. `drive` marks the Google Drive tools, which run through
- * runDriveTool with `secret` as the access token.
- */
-interface IntegrationTool {
-  integration: IntegrationRow; remote: RemoteTool | null; secret: string | null; session: McpSession | null; drive?: boolean;
-  /** The declared command this tool is, when the integration has a manifest. */
-  command?: ManifestCommand; manifest?: Manifest;
-}
-
-/** One call as the approval card shows it, stored with the pending action. */
-interface ApprovalDisplay {
-  id: string; integration: string; operation: string;
-  /** Where the call goes: the connection's base URL, or "Alcon" for its own tools. */
-  destination: string;
-  /** A manifest HTTP command's resolved request line (`POST /repos/…`), when it has one. */
-  detail: string | null;
-  effect: "read" | "write";
-  critical: CriticalClass | null;
-  /** Only a manifest command that is not critical can become a standing rule. */
-  rememberable: boolean;
-}
+// IntegrationTool and ApprovalDisplay live in _shared/integrationTools.ts,
+// with the manifest→tool planning, the approval facts and the executor every
+// caller shares (run-agent and alcon-copilot alike).
 
 /** An integration this run cannot use, told to the agent with the reason. */
 function downIntegration(name: string, reason: string): TaskContext["integrations"][number] {
@@ -159,14 +142,6 @@ const PRESET_NAMES: Record<string, string> = {
 
 /** The fold harness connector names are matched by (the same fold as checkHarness). */
 const foldName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
-
-/** The operation an integration call shows on the approval card and in the log. */
-function operationOf(it: IntegrationTool | undefined, input: Record<string, unknown>): string {
-  if (it?.command) return it.command.action;
-  if (it?.drive && it.remote) return driveOperationLabel(it.remote.name, input);
-  if (it?.remote) return it.remote.name;
-  return `${input.method ?? ""} ${input.path ?? ""}`.trim();
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -312,19 +287,9 @@ async function pauseOnError(admin: SupabaseClient, run: Run, message: string) {
   }
 }
 
-/** Pure. A valid tool name (≤64 chars, [a-zA-Z0-9_-]) not already taken. */
 /** A GitHub integration: the preset, or a custom connection to GitHub's MCP server or API. */
 function isGithubRow(row: IntegrationRow): boolean {
   return row.preset === "github" || /^https:\/\/(api\.)?github(copilot)?\.com\//.test(row.endpoint);
-}
-
-function uniqueToolName(raw: string, taken: Map<string, unknown>): string {
-  const base = raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
-  if (!taken.has(base)) return base;
-  for (let n = 2; ; n++) {
-    const candidate = `${base.slice(0, 64 - String(n).length - 1)}_${n}`;
-    if (!taken.has(candidate)) return candidate;
-  }
 }
 
 // Step numbers are read from the table once per invocation and counted here
@@ -568,29 +533,28 @@ async function execute(a: ExecArgs): Promise<void> {
           const session = new McpSession(row, secret);
           await session.initialize();
           const tools = await session.listTools();
-          // With a manifest, only the MCP tools it declares, under its commands' names and permissions.
-          const declared = manifest ? offeredCommands(manifest).filter((c) => c.mcp) : null;
+          // With a manifest, only the MCP tools it declares, under its
+          // commands' names and permissions — planned by the shared code the
+          // AI panel uses too (_shared/integrationTools.ts). A manifest is
+          // always present here: an untested MCP connection stayed closed above.
+          const planned = planManifestTools(row, manifest, tools, integrationTools);
           let offered = 0;
-          for (const t of tools) {
+          for (const p of planned) {
             if (integrationDefs.length >= MAX_TOOLS) break;
-            const command = declared?.find((c) => c.mcp === t.name);
-            if (declared && !command) continue;
-            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${command?.name ?? t.name}`, integrationTools);
-            integrationTools.set(name, { integration: row, remote: t, secret, session, ...(command ? { command, manifest: manifest! } : {}) });
-            integrationDefs.push({ name, description: `[${row.name}] ${command?.description || t.description}`.slice(0, 1024), input_schema: t.inputSchema });
+            integrationTools.set(p.name, { integration: row, remote: p.remote, secret, session, command: p.command, manifest: manifest! });
+            integrationDefs.push({ name: p.name, description: p.description, input_schema: p.input_schema });
             offered++;
           }
           integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
         } else if (manifest) {
           // An API with a manifest: its declared commands, never a raw request.
-          const commands = offeredCommands(manifest).filter((c) => c.http);
-          for (const c of commands) {
+          const planned = planManifestTools(row, manifest, null, integrationTools);
+          for (const p of planned) {
             if (integrationDefs.length >= MAX_TOOLS) break;
-            const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${c.name}`, integrationTools);
-            integrationTools.set(name, { integration: row, remote: null, secret, session: null, command: c, manifest });
-            integrationDefs.push({ name, description: `[${row.name}] ${c.description || c.action}（${c.effect === "read" ? "読み取り" : "書き込み"}）`.slice(0, 1024), input_schema: commandSchema(c) });
+            integrationTools.set(p.name, { integration: row, remote: null, secret, session: null, command: p.command, manifest });
+            integrationDefs.push({ name: p.name, description: p.description, input_schema: p.input_schema });
           }
-          integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: commands.length, declared: true, guide: row.guide });
+          integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: planned.length, declared: true, guide: row.guide });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
           integrationTools.set(name, { integration: row, remote: null, secret, session: null });
@@ -655,43 +619,9 @@ async function execute(a: ExecArgs): Promise<void> {
     if (isRunnerTool(name) || isMachineTool(name)) return "read";
     return "write"; // decided per call below
   };
-  const isRead = (call: ToolCall): boolean => {
-    const it = integrationTools.get(call.name);
-    if (!it) return false;
-    if (it.command) return it.command.effect === "read";
-    return it.remote ? it.remote.readOnly : httpIsRead(call.input);
-  };
-  /** The critical class of a call, from its command's fields or (Drive) its tool's name. */
-  const criticalOf = (it: IntegrationTool | undefined): CriticalClass | null => {
-    if (!it) return null;
-    if (it.command) return criticalClassOf(it.command);
-    if (it.drive && it.remote) return criticalClassForTokens(it.remote.name, "write");
-    return null;
-  };
-  /** What the approval card is told about one call: where it goes, what it
-   *  is, whether it is critical, and whether approving may be remembered. */
-  const approvalDisplayFor = (c: ToolCall): ApprovalDisplay => {
-    const it = integrationTools.get(c.name);
-    if (!it) {
-      if (isCatalogTool(c.name)) {
-        return { id: c.id, integration: "Alcon", operation: catalogOperation(c.name, c.input), destination: "Alcon", detail: null, effect: "write", critical: null, rememberable: false };
-      }
-      const parts = c.name.split(INTEGRATION_SEPARATOR);
-      return { id: c.id, integration: parts[0], operation: parts.slice(1).join(INTEGRATION_SEPARATOR) || c.name, destination: parts[0], detail: null, effect: "write", critical: null, rememberable: false };
-    }
-    const critical = criticalOf(it);
-    let detail: string | null = null;
-    if (it.command?.http) {
-      const req = requestFor(it.command, c.input);
-      if (!("error" in req)) detail = `${req.method} ${req.path}`;
-    }
-    return {
-      id: c.id, integration: it.integration.name, operation: operationOf(it, c.input),
-      destination: it.integration.endpoint, detail,
-      effect: it.command ? it.command.effect : isRead(c) ? "read" : "write",
-      critical, rememberable: !!it.command && !critical,
-    };
-  };
+  /** What the approval card is told about one call — the shared builder in
+   *  _shared/integrationTools.ts, so the run's card and the panel's agree. */
+  const approvalDisplayFor = (c: ToolCall): ApprovalDisplay => approvalDisplayForCall(integrationTools, c);
 
   // ── Executors ───────────────────────────────────────────────────────────
   // The Sub-elements of this Element (Elements whose parent it is): the only
@@ -705,23 +635,11 @@ async function execute(a: ExecArgs): Promise<void> {
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
-    // Checked again at the moment it runs: an approval given before a rule
-    // denied these arguments does not carry them through.
-    if (it.command && it.manifest && decide(it.manifest, it.command, call.input).permission === "deny") {
-      return { content: `${it.command.name} はこの引数では許可されていません（連携のルール）。別の引数にするか、人に頼んでください。`, is_error: true };
-    }
-    // A declared API command becomes exactly the request its manifest maps it to.
-    let httpInput: Record<string, unknown> = call.input;
-    if (it.command?.http) {
-      const req = requestFor(it.command, call.input);
-      if ("error" in req) return { content: req.error, is_error: true };
-      httpInput = req;
-    }
-    const r = it.drive && it.remote
-      ? await runDriveTool(it.remote.name, call.input, it.secret ?? "")
-      : it.remote && it.session
-        ? await it.session.callTool(it.remote.name, call.input)
-        : await callHttp(it.integration, it.secret, httpInput);
+    // The call itself is the shared executor (deny rules re-checked at the
+    // moment it runs, declared commands mapped to their requests); linking
+    // the GitHub pulls it opened to this run's Element stays the run's own
+    // post-step.
+    const r = await executeIntegrationTool(it, call);
     if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
       await linkOpenedPulls(r.text, it.secret);
     }
@@ -976,7 +894,7 @@ async function execute(a: ExecArgs): Promise<void> {
     const first = its[0];
     const command = first?.command;
     // A critical operation asks every time; it never becomes a standing rule.
-    if (its.some((it) => criticalOf(it))) {
+    if (its.some((it) => criticalOfTool(it))) {
       await addStep(admin, run.id, "approval", "重要な操作は、今後の自動実行の条件にできません");
       return;
     }
@@ -1178,22 +1096,8 @@ async function execute(a: ExecArgs): Promise<void> {
         const tool = catalogTool(call.name);
         return needsApprovalFor({ catalogDecision: tool ? decideCall("element", tool, call.input) : "allow", isWrite: true, isRead: false });
       }
-      const it = integrationTools.get(call.name);
-      const facts: ApprovalFacts = {
-        isWrite: kindOf(call.name) === "write",
-        isRead: isRead(call),
-        delegation: it?.integration.delegation ?? null,
-      };
-      if (it?.command && it.manifest) {
-        const d = decide(it.manifest, it.command, call.input);
-        facts.manifest = { permission: d.permission, rule: d.rule, critical: criticalClassOf(it.command) };
-      } else if (it?.drive && it.remote) {
-        facts.critical = criticalClassForTokens(it.remote.name, "write");
-      } else if (it && !it.remote) {
-        // No command and no typed tool: the raw http_request tool.
-        facts.rawHttp = true;
-      }
-      return needsApprovalFor(facts);
+      // The facts are gathered by the shared adapter (_shared/integrationTools.ts).
+      return needsApprovalFor(integrationApprovalFacts(integrationTools.get(call.name), call, kindOf(call.name) === "write"));
     },
     execute: (call) => executeCall(call),
     onUsage: recordUsage,
