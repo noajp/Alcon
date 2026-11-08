@@ -3,6 +3,11 @@ import { RECORD_TOOLS } from "./records.ts";
 import { isCatalogTool, toolsFor } from "../_shared/catalog.ts";
 import type { RunToolDef } from "../_shared/toolLoading.ts";
 import type { ToolKind } from "../_shared/agentLoop.ts";
+// Integration tool naming lives in _shared/integrationTools.ts, with the
+// rest of the integration machinery every caller shares; re-exported here
+// because the run's own modules (and the engine tests) import them from here.
+import { INTEGRATION_SEPARATOR, integrationPrefix, uniqueToolName } from "../_shared/integrationTools.ts";
+export { INTEGRATION_SEPARATOR, integrationPrefix, uniqueToolName };
 
 // What an Element-executing agent can do. Alcon's own operations come from the
 // one catalog under the Element policy (reads and writes, nothing that
@@ -138,20 +143,11 @@ export function baseAgentTools(): RunToolDef[] {
   return [...INTERNAL_TOOLS, ...toolsFor("element")];
 }
 
-/** Integration tools are named `<prefix>__<tool>`; everything else is ours. */
-export const INTEGRATION_SEPARATOR = "__";
-
 export function baseKindOf(name: string): ToolKind | null {
   if (name === "finish") return "finish";
   if (INTERNAL.has(name)) return "internal";
   if (isCatalogTool(name)) return "board";
   return null;
-}
-
-/** Pure. A tool-name prefix for an integration, stable across a run's slices (keyed on its id). */
-export function integrationPrefix(name: string, id: string): string {
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
-  return `${base || "x"}_${id.replace(/-/g, "").slice(0, 4)}`;
 }
 
 /** Pure. "Echo Test · POST /notify × 3、Linear · create_issue" — one line for a batch of writes. */

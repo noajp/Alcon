@@ -1,12 +1,19 @@
 // alcon-copilot — the AI panel's backend.
 //
 // Answers the person's message over Server-Sent Events. It is the same agent
-// as every other entry: the tools come from the one catalog
-// (_shared/catalog.ts, the panel's policy) and the turns run through the one
-// loop (_shared/agentLoop.ts). What is particular to the panel is its context
-// (the view the person is on, the files they attached) and that it streams.
-// Tools beyond the core load when the model searches for them; the system
-// prompt lists their names and one line each.
+// as every other entry: Alcon's own tools come from the one catalog
+// (_shared/catalog.ts, the panel's policy), the current Space's connected
+// integrations add their manifests' declared commands (assembled by
+// _shared/integrationTools.ts — the same code a run uses), and the turns run
+// through the one loop (_shared/agentLoop.ts). What is particular to the
+// panel is its context (the view the person is on, the files they attached)
+// and that it streams. Tools beyond the core load when the model searches
+// for them; the system prompt lists their names and one line each.
+//
+// An integration write the approval policy holds (the same policy as a
+// run's) stops the turn: the calls go out as an `approval` event, the panel
+// shows them on a card in the chat, and nothing runs until the person
+// approves there. Approving calls back with mode "execute" (below).
 //
 // Request body:
 //   {
@@ -15,7 +22,7 @@
 //                (a PDF's data is base64, a text file's is its text; each goes to
 //                 the model as a document block before the turn's text)
 //     context?:  { viewLabel?: string; elementId?: string; objectId?: string; domainId?: string; spaceId?: string; strategyId?: string; today?: string },
-//     mode?:     "json" | "probe"
+//     mode?:     "json" | "probe" | "execute"
 //   }
 //
 // mode "json" is for callers that send untrusted text (a pasted customer email)
@@ -24,23 +31,41 @@
 // { modes: ["json"] } without calling the model, so a client can confirm the
 // tool-free mode exists before it sends any such text.
 //
+// mode "execute" runs a batch the person just approved on the panel's card:
+// { mode: "execute", calls: [{ id, name, input }], inputHash, context: { spaceId } }.
+// inputHash is the sha256 of the calls' canonical form, exactly what the
+// approval event carried; a mismatch is refused. The Space's toolset is
+// rebuilt fresh for the call, and the shared executor checks the manifest's
+// deny rules again at the moment each call runs — the same discipline as a
+// run's approved batch. The answer is JSON: { results: [{ id, name, ok, content }] }.
+//
 // Response: text/event-stream. Each event is JSON, prefixed by `event:` / `data:`.
 //   event: text         → { delta: string }                  partial assistant text
 //   event: tool_use     → { name: string; input: object }    a tool call started
 //   event: tool_result  → { name: string; ok: boolean; rows?: number; error?: string }
+//   event: approval     → { calls: [{ id, name, input, display }], inputHash }
 //   event: done         → { stop_reason: string }            stream end
 //   event: error        → { error: string }
 //
-// Auth: verify_jwt=true. Every tool runs with the caller's JWT, so RLS gates
-// every read and write; the Anthropic key is the only privileged secret here.
+// Auth: verify_jwt=true. Every Alcon tool runs with the caller's JWT, so RLS
+// gates every read and write. The service role appears only to read
+// integration secrets from Vault (get_integration_secret), as in run-agent —
+// never to reach data. An integration call carries the connection's own
+// credential to its service, under the same approval policy as a run's.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk@0.110.0";
 import type { BoardActor } from "../_shared/boardTools.ts";
 import { catalogIndex, runCatalogTool, toolsFor } from "../_shared/catalog.ts";
 import { TOOL_SEARCH, toolParamsFor } from "../_shared/toolLoading.ts";
-import { runLoop, type Block, type Msg } from "../_shared/agentLoop.ts";
+import { canonicalCalls, runLoop, type Block, type Msg, type ToolCall } from "../_shared/agentLoop.ts";
+import { needsApprovalFor } from "../_shared/approvalPolicy.ts";
+import {
+  approvalDisplayForCall, buildSpaceIntegrationTools, executeIntegrationTool, integrationApprovalFacts,
+  integrationIndexLines, integrationPromptSection, type IntegrationTool,
+} from "../_shared/integrationTools.ts";
+import { sha256Hex } from "../_shared/googleOAuth.ts";
 import { DEFAULT_AGENT_MODEL } from "../_shared/aiPricing.ts";
 
 const MODEL = DEFAULT_AGENT_MODEL;
@@ -70,6 +95,7 @@ const SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人と AI が一�
 - ファイル: Element・Object・Strategy・Artifacts のフォルダに付いたファイルの一覧（listFiles）、読み取り（readFile）、書き込み（writeFile。同じ名前は新しい版になる）。
 - ハーネス: Space の仕事のやり方（listHarnesses / readHarness）。依頼に合うものがあれば読んで従う。
 - Table（tableData）、ボードのウィジェット（widgetBoard）、成功条件の実績（campaignMeasure）。
+- 連携（外部サービス）: この Space に接続された連携の、宣言された操作が道具として使えることがある（下の「この Space の連携」に、使える連携と使えない理由が書かれている）。
 - 最初から読み込まれていない道具は、末尾の一覧にある名前で道具の検索をすると使えるようになる。
 
 # 進め方
@@ -143,7 +169,9 @@ Deno.serve(async (req: Request) => {
   let body: {
     messages: Array<{ role: "user" | "assistant"; content: string; attachments?: Attachment[] }>;
     context?: { viewLabel?: string; elementId?: string; objectId?: string; domainId?: string; spaceId?: string; strategyId?: string; today?: string };
-    mode?: "json" | "probe";
+    mode?: "json" | "probe" | "execute";
+    calls?: Array<{ id?: unknown; name?: unknown; input?: unknown }>;
+    inputHash?: string;
   };
   try {
     body = await req.json();
@@ -151,13 +179,53 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "invalid JSON body" }, 400);
   }
   if (body.mode === "probe") return jsonResponse({ modes: ["json"] });
-  const jsonOnly = body.mode === "json";
-  if (!Array.isArray(body.messages) || body.messages.length === 0) return jsonResponse({ error: "messages required" }, 400);
 
   // Per-request client with the user's JWT → RLS sees auth.uid().
   const supabase = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-  const client = new Anthropic({ apiKey: anthropicKey });
+  // The service role, used only to read integration secrets from Vault.
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const admin: SupabaseClient | null = serviceKey
+    ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+    : null;
   const { data: { user } } = await supabase.auth.getUser();
+
+  // The person approved a batch on the panel's card: run exactly those
+  // calls, with exactly that input, or nothing.
+  if (body.mode === "execute") {
+    if (!user) return jsonResponse({ error: "sign-in required" }, 401);
+    if (!admin) return jsonResponse({ error: "server env not configured" }, 500);
+    const calls: ToolCall[] = (Array.isArray(body.calls) ? body.calls : [])
+      .filter((c) => typeof c?.id === "string" && typeof c?.name === "string" && c.input != null && typeof c.input === "object" && !Array.isArray(c.input))
+      .map((c) => ({ id: c.id as string, name: c.name as string, input: c.input as Record<string, unknown> }));
+    if (!calls.length || calls.length > 10) return jsonResponse({ error: "calls required" }, 400);
+    const spaceId = typeof body.context?.spaceId === "string" ? body.context.spaceId : null;
+    if (!spaceId) return jsonResponse({ error: "context.spaceId required" }, 400);
+    if (typeof body.inputHash !== "string" || (await sha256Hex(canonicalCalls(calls))) !== body.inputHash) {
+      return jsonResponse({ error: "承認の内容が、提示されたものと一致しません。チャットで依頼し直してください。" }, 409);
+    }
+    const toolset = await buildSpaceIntegrationTools({ userDb: supabase, admin, spaceId, supabaseUrl });
+    const results: { id: string; name: string; ok: boolean; content: string }[] = [];
+    for (const call of calls) {
+      const it = toolset.tools.get(call.name);
+      if (!it) {
+        results.push({ id: call.id, name: call.name, ok: false, content: "その連携の道具は今は使えません（接続が変わった可能性があります）。チャットで依頼し直してください。" });
+        continue;
+      }
+      try {
+        // The shared executor checks the manifest's deny rules again here.
+        const r = await executeIntegrationTool(it, call);
+        results.push({ id: call.id, name: call.name, ok: !r.isError, content: r.text.slice(0, 20_000) });
+      } catch (e) {
+        results.push({ id: call.id, name: call.name, ok: false, content: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return jsonResponse({ results });
+  }
+
+  const jsonOnly = body.mode === "json";
+  if (!Array.isArray(body.messages) || body.messages.length === 0) return jsonResponse({ error: "messages required" }, 400);
+
+  const client = new Anthropic({ apiKey: anthropicKey });
   // What the AI writes stays traceable to the person who asked.
   const actor: BoardActor = { agent: "Alcon Copilot", userId: user?.id ?? null };
 
@@ -172,14 +240,29 @@ Deno.serve(async (req: Request) => {
     /^\d{4}-\d{2}-\d{2}$/.test(ctx.today ?? "") ? `ユーザーの業務日付: ${ctx.today}` : `今日の日付 (UTC): ${new Date().toISOString().slice(0, 10)}`,
   ].filter(Boolean).join("\n");
 
-  const tools = jsonOnly ? [] : toolsFor("panel");
+  // The Space's connected integrations as tools, beside the catalog: their
+  // manifests' declared commands, assembled by the same code as a run's.
+  // The assembly reads the connection rows with the person's JWT (their
+  // membership decides) and their secrets through the service role, once per
+  // message — this function keeps no state between requests. Without a Space
+  // (or the service key) there is nothing to add, and no prompt section.
+  const toolset = !jsonOnly && ctx.spaceId && admin
+    ? await buildSpaceIntegrationTools({ userDb: supabase, admin, spaceId: ctx.spaceId, supabaseUrl }).catch(() => null)
+    : null;
+
+  const catalogTools = jsonOnly ? [] : toolsFor("panel");
+  const tools = [...catalogTools, ...(toolset?.defs ?? [])];
   const cache = { cache_control: { type: "ephemeral" as const } };
   const toolParams = jsonOnly ? [] : [TOOL_SEARCH, ...toolParamsFor(tools, cache, false)];
-  const index = catalogIndex(tools);
+  const index = [catalogIndex(catalogTools), toolset ? integrationIndexLines(toolset) : ""].filter(Boolean).join("\n");
   const system = jsonOnly
     ? [{ type: "text" as const, text: JSON_SYSTEM_PROMPT }]
     : [
-      { type: "text" as const, text: index ? `${SYSTEM_PROMPT}\n\n${index}` : SYSTEM_PROMPT, ...cache },
+      {
+        type: "text" as const,
+        text: [SYSTEM_PROMPT, toolset ? integrationPromptSection(toolset) : "", index].filter(Boolean).join("\n\n"),
+        ...cache,
+      },
       { type: "text" as const, text: `# 現在の文脈\n${contextHint}\n（明示されない限りこのスコープを優先してください）` },
     ];
 
@@ -224,9 +307,30 @@ Deno.serve(async (req: Request) => {
             // deno-lint-ignore no-explicit-any
             return { content: final.content as any, stop_reason: final.stop_reason, usage: final.usage };
           },
-          kindOf: () => "board",
-          needsApproval: () => false,
+          // An integration tool is an external write for the loop: the
+          // approval policy then decides per call, exactly as in a run.
+          // Alcon's own tools stay "board" — the panel's catalog policy
+          // decides them, as before.
+          kindOf: (name) => (toolset?.tools.has(name) ? "write" : "board"),
+          needsApproval: (call) => {
+            const it = toolset?.tools.get(call.name);
+            return it ? needsApprovalFor(integrationApprovalFacts(it, call, true)) : false;
+          },
           execute: async (call) => {
+            const it = toolset?.tools.get(call.name);
+            if (it) {
+              try {
+                const r = await executeIntegrationTool(it, call);
+                send("tool_result", { name: call.name, ok: !r.isError, error: r.isError ? r.text.slice(0, 300) : undefined });
+                return r.isError
+                  ? { content: JSON.stringify({ error: r.text }).slice(0, 100_000), is_error: true }
+                  : { content: r.text.slice(0, 100_000) };
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                send("tool_result", { name: call.name, ok: false, error: msg });
+                return { content: JSON.stringify({ error: msg }), is_error: true };
+              }
+            }
             const r = await runCatalogTool(supabase, call.name, call.input, actor, { entry: "panel" });
             send("tool_result", { name: call.name, ok: r.ok, rows: r.ok ? r.meta?.rows : undefined, error: r.ok ? undefined : r.error });
             return r.ok ? { content: JSON.stringify(r.data).slice(0, 100_000) } : { content: JSON.stringify({ error: r.error }), is_error: true };
@@ -241,6 +345,25 @@ Deno.serve(async (req: Request) => {
           case "finished":
             send("done", { stop_reason: "end_turn" });
             break;
+          case "approval": {
+            // The calls wait for the person, on a card in this chat (the
+            // panel renders the `approval` event). Approving calls back in
+            // "execute" mode with exactly these calls and this hash;
+            // denying runs nothing. The turn ends here — the panel notes
+            // the outcome in the conversation, and the person's next
+            // message carries it to the model.
+            const pending = outcome.pending;
+            const toolsMap: Map<string, IntegrationTool> = toolset ? toolset.tools : new Map();
+            const displays = pending.calls.map((c) => approvalDisplayForCall(toolsMap, c));
+            const inputHash = await sha256Hex(canonicalCalls(pending.calls));
+            send("approval", {
+              calls: pending.calls.map((c, i) => ({ id: c.id, name: c.name, input: c.input, display: displays[i] })),
+              inputHash,
+            });
+            send("text", { delta: "承認が必要な操作があります。上の承認カードで内容を確認してください。承認されるまで実行されません。" });
+            send("done", { stop_reason: "approval" });
+            break;
+          }
           case "refusal":
             send("error", { error: `この依頼には答えられませんでした: ${outcome.detail.slice(0, 300)}` });
             break;

@@ -87,7 +87,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
-  const { messages, streaming, error, send, cancel, newConversation, retry, truncate } = useCopilotConversation();
+  const { messages, streaming, error, send, cancel, newConversation, retry, truncate, decideApproval } = useCopilotConversation();
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLElement>(null);
@@ -307,7 +307,8 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
           {messages.map((m, i) => (
             <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done}
               onRetry={!streaming && m.role === 'assistant' && i === messages.length - 1 ? () => retry({ context: contextNow() }) : undefined}
-              onEdit={!streaming && i === lastUser ? editLast : undefined} />
+              onEdit={!streaming && i === lastUser ? editLast : undefined}
+              onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve) => void decideApproval(a, approve, contextNow().spaceId) : undefined} />
           ))}
           {error && (
             <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">
