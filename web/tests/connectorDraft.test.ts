@@ -247,6 +247,26 @@ describe('content hashes', () => {
     expect(await draftStructureHashWeb(like)).toBe(await cd.draftStructureHash(content));
     expect(await draftPermissionHashWeb(like)).toBe(await cd.draftPermissionHash(content));
   });
+
+  it('binds manifest v2 fields into the tested hashes: verify and reversibility are structure', async () => {
+    const v2 = JSON.parse(JSON.stringify(MANIFEST));
+    v2.commands[2].verify = { command: 'get_item', expect: { title: 'title' } };
+    v2.commands[2].reversibility = 'contained';
+    const withV2 = { ...content, manifest: v2 };
+    // Gaining a read-back declaration is a new tested content and a new
+    // structure — what was smoke-tested is what runs — but no permission
+    // moved, so the permission hash stands.
+    expect(await cd.draftContentHash(withV2)).not.toBe(await cd.draftContentHash(content));
+    expect(await cd.draftStructureHash(withV2)).not.toBe(await cd.draftStructureHash(content));
+    expect(await cd.draftPermissionHash(withV2)).toBe(await cd.draftPermissionHash(content));
+    // Changing only the declaration moves the structure hash again.
+    const moved = JSON.parse(JSON.stringify(v2));
+    moved.commands[2].verify.expect = { name: 'title' };
+    expect(await cd.draftStructureHash({ ...content, manifest: moved })).not.toBe(await cd.draftStructureHash(withV2));
+    // The web twin agrees on a v2 manifest, field for field.
+    expect(draftStructureOfWeb(withV2 as DraftContentLike)).toEqual(cd.draftStructureOf(withV2));
+    expect(await draftStructureHashWeb(withV2 as DraftContentLike)).toBe(await cd.draftStructureHash(withV2));
+  });
 });
 
 describe('failure classification', () => {

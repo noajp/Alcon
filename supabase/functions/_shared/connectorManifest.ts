@@ -27,9 +27,46 @@
 // characters, case is ignored); the first rule whose fields all match
 // decides, under any delegation. A command denied as a whole but allowed by
 // a rule is an allowlist: only the calls a rule lets through can happen.
+//
+// Manifest v2 (back-half B2) adds two declarations a v1 manifest simply
+// does not carry; a manifest without them parses exactly as before.
+//   verify: on a write command — after the write runs, the engine reads
+//     the target back through the named read command and compares the
+//     read-back state with the write's intent (verifyReads.ts):
+//       "verify": { "command": "get_file", "expect": { "title": "title" },
+//                   "delay_ms": 500 }
+//     `expect` maps a read-back field to a write-input field name (or a
+//     literal the read-back must carry). A verify must name a read
+//     command of the same manifest — anything else is a parse error and
+//     the command is left out, because a verify that cannot run must
+//     never read as a verify that passed.
+//   reversibility: on any command — "contained" | "wide" | "none", the
+//     blast-radius lane input B7's graduated autonomy reads. Absent is
+//     derived (reversibilityOf): a critical class → "none", any other
+//     write → "wide", a read → none of the lanes.
 
 export type Effect = "read" | "write";
 export type Permission = "allow" | "ask" | "deny";
+
+/** How far a call's effects reach, declared or derived: the lane input
+ *  graduated autonomy (B7) reads. "contained" — a bad call costs a revert
+ *  of one contained thing; "wide" — shared state, many readers; "none" —
+ *  hard to reverse (sends, money, deletes, contracts). */
+export type Reversibility = "contained" | "wide" | "none";
+
+/**
+ * A write's read-back declaration (manifest v2): after the write runs,
+ * the named read command reads the target state back and its fields are
+ * compared with the write's intent. `expect` maps a read-back field to
+ * either a write-input field name or a literal value (verifyReads.ts
+ * holds the exact reading). `delayMs` is the one bounded retry's wait
+ * for read-after-write inconsistency — default 0, capped at parse time.
+ */
+export interface VerifyDeclaration {
+  command: string;
+  expect: Record<string, unknown>;
+  delayMs: number;
+}
 
 export interface HttpMapping {
   method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -78,6 +115,10 @@ export interface ManifestCommand {
   rules: CommandRule[];
   /** How a call reads on an approval card, when the manifest says. */
   present: CommandPresent | null;
+  /** The read-back that proves this write landed (writes only), when declared. */
+  verify: VerifyDeclaration | null;
+  /** The declared blast radius, when the manifest says; null derives it. */
+  reversibility: Reversibility | null;
 }
 
 export interface Manifest {
@@ -128,6 +169,48 @@ export function parsePresent(raw: unknown): CommandPresent | null {
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null);
+
+export const MAX_VERIFY_EXPECT = 16;
+export const MAX_VERIFY_DELAY_MS = 5000;
+const REVERSIBILITIES = new Set(["contained", "wide", "none"]);
+
+/**
+ * Pure. A command's verify declaration: undefined when it carries none,
+ * null when what it carries is malformed, the declaration otherwise.
+ * Malformed is distinct from absent because the caller treats it as a
+ * parse error (a verify is enforcement, not presentation): an expect
+ * map of at most 16 fields, each value a JSON value of at most 500
+ * chars serialized, and a delay that clamps into [0, 5000] — the cap is
+ * part of the declaration's meaning, so an over-large one is read as
+ * the cap rather than failing the manifest.
+ */
+export function parseVerify(raw: unknown): VerifyDeclaration | null | undefined {
+  if (raw === undefined) return undefined;
+  const x = obj(raw);
+  if (!x) return null;
+  if (typeof x.command !== "string" || !NAME.test(x.command)) return null;
+  const expectRaw = obj(x.expect);
+  if (!expectRaw) return null;
+  const entries = Object.entries(expectRaw);
+  if (!entries.length || entries.length > MAX_VERIFY_EXPECT) return null;
+  for (const [k, v] of entries) {
+    if (!FIELD.test(k)) return null;
+    try { if (JSON.stringify(v)?.length > 500) return null; } catch { return null; }
+  }
+  let delayMs = 0;
+  if (x.delay_ms !== undefined) {
+    if (typeof x.delay_ms !== "number" || !Number.isFinite(x.delay_ms)) return null;
+    delayMs = Math.min(MAX_VERIFY_DELAY_MS, Math.max(0, Math.floor(x.delay_ms)));
+  }
+  return { command: x.command, expect: { ...expectRaw }, delayMs };
+}
+
+/** Pure. A command's declared reversibility; an unreadable value is
+ *  absent (the derivation in reversibilityOf is the designed default,
+ *  so a typo falls back to it rather than inventing a fourth lane). */
+export function parseReversibility(raw: unknown): Reversibility | null {
+  return typeof raw === "string" && REVERSIBILITIES.has(raw) ? raw as Reversibility : null;
+}
 
 /** Pure. The rules stored on a command; one that cannot be read is left out. */
 export function parseRules(raw: unknown): CommandRule[] {
@@ -254,6 +337,8 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
     }
     const mcp = typeof x.mcp === "string" && x.mcp ? x.mcp : null;
     if (!http && !mcp) { errors.push(`${name}: http か mcp のどちらかが必要です`); continue; }
+    const verify = parseVerify(x.verify);
+    if (verify === null) { errors.push(`${name}: verify の形が読めません（command と expect が必要です）`); continue; }
     seen.add(name);
     commands.push({
       name, effect, permission, http, mcp,
@@ -263,11 +348,24 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       required: strings(x.required),
       rules: parseRules(x.rules),
       present: parsePresent(x.present),
+      verify: verify ?? null,
+      reversibility: parseReversibility(x.reversibility),
     });
   }
+  // A verify is only as real as its target: it must sit on a write and
+  // name a read command of this same manifest. Anything else is a parse
+  // error and the command is left out — a declaration that cannot run
+  // must never survive as one that merely never fires.
+  const effectByName = new Map(commands.map((c) => [c.name, c.effect]));
+  const kept = commands.filter((c) => {
+    if (!c.verify) return true;
+    if (c.effect !== "write") { errors.push(`${c.name}: verify は write のコマンドにだけ宣言できます`); return false; }
+    if (effectByName.get(c.verify.command) !== "read") { errors.push(`${c.name}: verify の ${c.verify.command} は read のコマンドではありません`); return false; }
+    return true;
+  });
   const aliases: Record<string, string> = {};
   for (const [k, v] of Object.entries(obj(m.aliases) ?? {})) if (typeof v === "string") aliases[k] = v;
-  return { manifest: { commands, aliases }, errors };
+  return { manifest: { commands: kept, aliases }, errors };
 }
 
 /** Pure. The canonical action a name stands for: its own, or the one an alias points to. */
@@ -371,11 +469,42 @@ export function criticalClassOf(command: Pick<ManifestCommand, "name" | "action"
   return criticalClassForTokens([command.action, command.name, command.mcp ?? "", command.http?.path ?? ""].join(" "), command.effect);
 }
 
+/**
+ * Pure. A command's reversibility lane: the declared value wins; absent
+ * one, a critical class is "none" (hard to reverse by definition), any
+ * other write is "wide", and a read sits in no lane (null). Lane 1
+ * ("contained") exists only by declaration — a command earns the
+ * narrowest lane by saying so, never by derivation (design §4.1).
+ */
+export function reversibilityOf(command: ManifestCommand): Reversibility | null {
+  if (command.reversibility) return command.reversibility;
+  if (command.effect !== "write") return null;
+  return criticalClassOf(command) ? "none" : "wide";
+}
+
 /** Pure. A command name from a tool's: lower case, letters, digits and _. */
 export function commandNameOf(tool: string): string {
   const base = tool.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
   return (/^[a-z]/.test(base) ? base : `t_${base}`).slice(0, 48) || "tool";
 }
+
+/**
+ * The verify declarations the built-in GitHub MCP server's key writes
+ * carry (back-half B2, PR3): a file write is proven by reading the file
+ * back and comparing its content; a pull request by reading it back and
+ * comparing the branches it was opened between. Both are "contained" —
+ * one file reverts with one write, one PR closes with one call.
+ * Stamped by manifestFromTools only when the verify target is itself
+ * listed, read-only, by the same server — so the declaration is
+ * self-consistent by construction on any server that happens to share
+ * a tool name — and never over a declaration already stored: what a
+ * person (or an earlier draft) declared is theirs, and a connection
+ * test must not wipe it, exactly like `present`.
+ */
+const BUILTIN_VERIFY: Record<string, { verifyTool: string; expect: Record<string, unknown>; reversibility: Reversibility }> = {
+  create_or_update_file: { verifyTool: "get_file_contents", expect: { content: "content" }, reversibility: "contained" },
+  create_pull_request: { verifyTool: "get_pull_request", expect: { head: "head", base: "base" }, reversibility: "contained" },
+};
 
 /**
  * Pure. An MCP integration's manifest from the tools its server lists: one
@@ -402,9 +531,26 @@ export function manifestFromTools(tools: { name: string; description?: string; r
       ...(typeof before?.permission === "string" && PERMISSIONS.has(before.permission) ? { permission: before.permission } : {}),
       ...(Array.isArray(before?.rules) && before!.rules.length ? { rules: before!.rules } : {}),
       ...(obj(before?.present) ? { present: before!.present } : {}),
+      ...(obj(before?.verify) ? { verify: before!.verify } : {}),
+      ...(parseReversibility(before?.reversibility) ? { reversibility: before!.reversibility } : {}),
       description: (t.description ?? "").slice(0, 1000),
       mcp: t.name,
     });
+  }
+  // The built-in verify declarations, stamped where the stored manifest
+  // does not already carry the person's own (see BUILTIN_VERIFY above).
+  const readOnlyByTool = new Map(tools.map((t) => [t.name, t.readOnly]));
+  const nameByTool = new Map<string, string>();
+  for (const c of commands) if (typeof c.mcp === "string" && typeof c.name === "string") nameByTool.set(c.mcp, c.name);
+  for (const c of commands) {
+    if (typeof c.mcp !== "string") continue;
+    const builtin = BUILTIN_VERIFY[c.mcp];
+    if (!builtin) continue;
+    if (c.verify === undefined && readOnlyByTool.get(builtin.verifyTool) === true) {
+      const target = nameByTool.get(builtin.verifyTool);
+      if (target) c.verify = { command: target, expect: { ...builtin.expect } };
+    }
+    if (c.reversibility === undefined) c.reversibility = builtin.reversibility;
   }
   return { version: 1, defaults: obj(prior?.defaults) ?? { read: "allow", write: "ask" }, commands, ...(obj(prior?.aliases) ? { aliases: prior!.aliases } : {}) };
 }

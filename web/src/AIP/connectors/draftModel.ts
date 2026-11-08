@@ -208,21 +208,50 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+interface TwinVerify { command: string; expect: Record<string, unknown>; delayMs: number }
+
 interface TwinCommand {
   name: string; action: string; effect: 'read' | 'write'; permission: 'allow' | 'ask' | 'deny';
   http: { method: string; path: string; query: string[]; body: string[] } | null;
   mcp: string | null;
   input: Record<string, unknown>; required: string[];
   rules: { when: Record<string, string>; permission: 'allow' | 'ask' | 'deny' }[];
+  verify: TwinVerify | null;
+  reversibility: 'contained' | 'wide' | 'none' | null;
 }
 
 const NAME_RE = /^[a-z][a-z0-9_]{0,47}$/;
 const FIELD_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const PERMISSIONS = new Set(['allow', 'ask', 'deny']);
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
+const REVERSIBILITIES = new Set(['contained', 'wide', 'none']);
 
 const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null);
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+/** A command's verify declaration, read as the server's parseVerify reads
+ *  it: undefined when absent, null when malformed, the declaration
+ *  otherwise (delay clamped to the same [0, 5000] cap). */
+function parseVerifyTwin(raw: unknown): TwinVerify | null | undefined {
+  if (raw === undefined) return undefined;
+  const x = obj(raw);
+  if (!x) return null;
+  if (typeof x.command !== 'string' || !NAME_RE.test(x.command)) return null;
+  const expectRaw = obj(x.expect);
+  if (!expectRaw) return null;
+  const entries = Object.entries(expectRaw);
+  if (!entries.length || entries.length > 16) return null;
+  for (const [k, v] of entries) {
+    if (!FIELD_RE.test(k)) return null;
+    try { if (JSON.stringify(v)?.length > 500) return null; } catch { return null; }
+  }
+  let delayMs = 0;
+  if (x.delay_ms !== undefined) {
+    if (typeof x.delay_ms !== 'number' || !Number.isFinite(x.delay_ms)) return null;
+    delayMs = Math.min(5000, Math.max(0, Math.floor(x.delay_ms)));
+  }
+  return { command: x.command, expect: { ...expectRaw }, delayMs };
+}
 
 /** A stored manifest read the way the server's parseManifest reads it —
  *  for manifests that were validated when drafted, so the loose cases
@@ -254,6 +283,8 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
     }
     const mcp = typeof x.mcp === 'string' && x.mcp ? x.mcp : null;
     if (!http && !mcp) continue;
+    const verify = parseVerifyTwin(x.verify);
+    if (verify === null) continue;
     seen.add(name);
     const rules = (Array.isArray(x.rules) ? x.rules : []).flatMap((r): TwinCommand['rules'] => {
       const y = obj(r);
@@ -269,11 +300,17 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
       permission: typeof x.permission === 'string' && PERMISSIONS.has(x.permission) ? x.permission as 'allow' | 'ask' | 'deny' : def(effect),
       input: obj(x.input) ?? {},
       required: strings(x.required),
+      verify: verify ?? null,
+      reversibility: typeof x.reversibility === 'string' && REVERSIBILITIES.has(x.reversibility) ? x.reversibility as TwinCommand['reversibility'] : null,
     });
   }
+  // The server's second pass, mirrored: a verify must sit on a write and
+  // name a read command of the same manifest, or the command is out.
+  const effectByName = new Map(commands.map((c) => [c.name, c.effect]));
+  const kept = commands.filter((c) => !c.verify || (c.effect === 'write' && effectByName.get(c.verify.command) === 'read'));
   const aliases: Record<string, string> = {};
   for (const [k, v] of Object.entries(obj(m.aliases) ?? {})) if (typeof v === 'string') aliases[k] = v;
-  return { commands, aliases, defaults };
+  return { commands: kept, aliases, defaults };
 }
 
 export interface DraftContentLike {
@@ -291,7 +328,7 @@ export function draftStructureOfWeb(c: DraftContentLike): unknown {
   return {
     name: c.name, endpoint: c.endpoint, auth_type: c.auth_type, auth_header: c.auth_header, guide: c.guide,
     commands: commands
-      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required }))
+      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases,
   };

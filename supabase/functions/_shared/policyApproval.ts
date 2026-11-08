@@ -15,6 +15,7 @@ import { canonicalCalls, type ToolCall } from "./agentLoop.ts";
 import { approvalSummary, type ApprovalDisplay } from "./integrationTools.ts";
 import { sha256Hex } from "./googleOAuth.ts";
 import type { ApprovalMode } from "./approvalPolicy.ts";
+import type { VerifyCheck } from "./verifyReads.ts";
 
 /** Pure. The row a policy approval is written as. Single-call, always:
  *  a batch a person would have approved together is still one execution
@@ -64,10 +65,16 @@ export async function recordPolicyApproval(
 }
 
 /** Settles a policy approval once its call has run, the way a decided
- *  batch settles: executed, or failed when the call answered in error. */
-export async function settlePolicyApproval(admin: SupabaseClient, actionId: string, ok: boolean): Promise<void> {
+ *  batch settles: executed, or failed when the call answered in error.
+ *  A verify read-back the call carried (B2) is sealed into the same
+ *  result, so the per-call record answers "did it land as intended",
+ *  not only "did it run". */
+export async function settlePolicyApproval(
+  admin: SupabaseClient, actionId: string, ok: boolean, verify?: VerifyCheck,
+): Promise<void> {
   await admin.from("agent_actions").update({
-    status: ok ? "executed" : "failed", result: { failed: ok ? 0 : 1, total: 1 },
+    status: ok ? "executed" : "failed",
+    result: { failed: ok ? 0 : 1, total: 1, ...(verify ? { verify } : {}) },
   }).eq("id", actionId).eq("status", "approved");
 }
 

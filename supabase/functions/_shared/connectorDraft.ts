@@ -365,7 +365,12 @@ export async function draftContentHash(c: DraftContent): Promise<string> {
 }
 
 /** Pure but for the digest. The draft's shape with permissions stripped:
- *  names, endpoint, auth, guide, and each command's structure. */
+ *  names, endpoint, auth, guide, and each command's structure. Manifest
+ *  v2's verify and reversibility ride here (B2): they are structure —
+ *  what the command promises and how far it reaches — not permission,
+ *  so a draft cannot gain or lose a read-back declaration without the
+ *  structure hash moving, exactly like an http mapping. (The content
+ *  hash already binds the raw manifest whole.) */
 export function draftStructureOf(c: DraftContent): unknown {
   const { manifest } = parseManifest(c.manifest);
   return {
@@ -374,6 +379,7 @@ export function draftStructureOf(c: DraftContent): unknown {
       .map((cmd) => ({
         name: cmd.name, action: cmd.action, effect: cmd.effect,
         http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required,
+        verify: cmd.verify, reversibility: cmd.reversibility,
       }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases: manifest.aliases,
