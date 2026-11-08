@@ -28,8 +28,9 @@ export function openScreenFrom(raw: unknown, isView: (view: string) => boolean):
   const view = str(x?.view);
   const nav = obj(x?.navigation);
   if (!x || !view || !isView(view) || !nav) return null;
-  const { strategyCreate: _once, ...navigation } = nav;
+  const { strategyCreate: _once, landOnTab: _land, ...navigation } = nav;
   void _once;
+  void _land;
   const settingsReturn = str(x.settingsReturn);
   const s = obj(x.settings);
   const section = str(s?.section);

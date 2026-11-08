@@ -116,6 +116,20 @@ const STRATEGY_TABS: readonly { id: StrategyTab; label: string }[] = [
   { id: 'chain', label: 'Execution Chain' },
 ];
 
+/** Each Strategy remembers its own open tab, like a Domain does — a
+ *  detour away and back lands where the person left this Strategy, and
+ *  Overview is only a first visit's default. */
+const STRATEGY_TAB_PREFIX = 'strategy:activeTab:';
+function loadStrategyTab(strategyId: string): StrategyTab {
+  if (typeof window === 'undefined') return 'overview';
+  try {
+    const saved = window.localStorage.getItem(`${STRATEGY_TAB_PREFIX}${strategyId}`);
+    return STRATEGY_TABS.some((x) => x.id === saved) ? (saved as StrategyTab) : 'overview';
+  } catch {
+    return 'overview';
+  }
+}
+
 /** The Strategy's widget board. The surface key is the persisted
  *  boards.surface, not a display string: it stays 'campaign'. */
 function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }: {
@@ -603,12 +617,18 @@ function StrategyDetailView({
   // The conversation opens on request; another Strategy opens without it,
   // on its Overview.
   const [talking, setTalking] = useState(false);
-  const [tab, setTab] = useState<StrategyTab>('overview');
+  const [tab, setTab] = useState<StrategyTab>(() => loadStrategyTab(strategy.id));
   // The boards' orientation — the one preference every board shares,
   // owned here so the tabs-row toggle turns the mounted board live.
   const [boardOrientation, setBoardOrientation] = useBoardOrientation();
   const [talkingFor, setTalkingFor] = useState(strategy.id);
-  if (talkingFor !== strategy.id) { setTalkingFor(strategy.id); setTalking(false); setTab('overview'); }
+  // A different Strategy closes the conversation, but opens on its own
+  // remembered tab rather than always Overview.
+  if (talkingFor !== strategy.id) { setTalkingFor(strategy.id); setTalking(false); setTab(loadStrategyTab(strategy.id)); }
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { window.localStorage.setItem(`${STRATEGY_TAB_PREFIX}${strategy.id}`, tab); } catch { /* a full storage keeps the tab for this mount only */ }
+  }, [tab, strategy.id]);
   // Opened on the Overview, the conversation is below the description:
   // bring it into view.
   // Only the content scrolls; the header and its tabs stay.

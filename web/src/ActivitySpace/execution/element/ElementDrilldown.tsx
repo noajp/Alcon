@@ -24,6 +24,10 @@ interface Props {
    *  it came back to. Without it the root reads "Back" and the Element floats
    *  free of the Domain it belongs to. */
   domainName?: string | null;
+  /** Reports the open detail the moment its id is set (and cleared on
+   *  close), so the host can give the detail the whole pane — the same
+   *  contract ObjectDetailView's onElementDetailChange already honours. */
+  onDetailChange?: (open: boolean) => void;
 }
 
 /** Keep a tool's filters and scroll position while editing the actual Element. */
@@ -33,9 +37,12 @@ export function ElementDrilldown(props: Props) {
   return <Drilldown key={`${userId}:${spaceId}`} {...props} />;
 }
 
-function Drilldown({ label, children, onNavigate, onViewChange, domainName }: Props) {
+function Drilldown({ label, children, onNavigate, onViewChange, domainName, onDetailChange }: Props) {
   const { t } = useI18n();
   const [elementId, setElementId] = useState<string | null>(null);
+  // The host hears about the detail when the id changes, not when its data
+  // arrives — the takeover must not wait for the query.
+  useEffect(() => { onDetailChange?.(elementId !== null); }, [elementId, onDetailChange]);
   const [navigationError, setNavigationError] = useState<string | null>(null);
   const { data: domains } = useSustainmentDomains();
   const { guestDomains } = useDomains();

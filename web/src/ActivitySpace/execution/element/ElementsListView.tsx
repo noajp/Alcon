@@ -115,6 +115,11 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   const { t } = useI18n();
   const explorerData = useExplorerData();
   const [detailId, setDetailId] = useState<string | null>(null);
+  // A Gantt / Calendar drilldown's Element detail takes over the pane:
+  // this view's header and TabBar hide while it is open, as the Domain
+  // shell's do. (The list's own detail paths are full-view returns and
+  // never reach this state.)
+  const [drillDetailOpen, setDrillDetailOpen] = useState(false);
   const openedQuery = useQuery({
     queryKey: ['element-detail', openElementId],
     enabled: !!openElementId,
@@ -552,6 +557,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {!drillDetailOpen && (
       <ElementsHierarchyHeader
         domainName={activeDomainName ?? 'Domain'}
         onDomainClick={() => {
@@ -559,13 +565,15 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           onNavigate?.({ objectId: null });
         }}
       />
+      )}
 
       {/* View-mode tabs — uses the shared shell `TabBar` so the look
           matches Object detail's Elements tab exactly. visible-set +
           active are localStorage-backed; "+" surfaces the same Object /
           Gantt / Calendar / Workers picker as the Object-level
           tab bar. The right slot holds the shared Filter / Display
-          controls. */}
+          controls. Hidden while a drilldown's Element detail is open. */}
+      {!drillDetailOpen && (
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
@@ -595,6 +603,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           />
         }
       />
+      )}
 
       {effectiveViewMode === 'elements' && (
         <div className="flex-1 overflow-auto">
@@ -623,14 +632,14 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
             {openElement => <GanttView elements={filteredElements} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} onElementOpen={(el) => openElement(el.id)} />}
           </ElementDrilldown>
         </div>
       )}
       {effectiveViewMode === 'calendar' && (
         <div className="flex-1 overflow-hidden">
-          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Calendar')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName}>
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Calendar')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
             {openElement => <CalendarView elements={filteredElements} onElementClick={(el) => openElement(el.id)} onRefresh={onRefresh} />}
           </ElementDrilldown>
         </div>

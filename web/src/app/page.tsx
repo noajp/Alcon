@@ -17,6 +17,7 @@ import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
 import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
 import { CopilotProvider } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
+import { popBack, recordNavigation } from '@/Frame/historyState';
 import { mergeNavigation, navigationAfterDomainChange, navigationForView } from '@/Frame/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
@@ -105,6 +106,7 @@ function makeNewTab(activeView = 'inbox', navigation: NavigationState = { object
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
     navigation,
+    back: [],
   };
 }
 
@@ -293,12 +295,19 @@ function WorkspaceContent({
   // Per-tab updaters — operate on the tab id that's passed in, not whichever
   // tab happens to be active. Each tab's MainContent gets a stable handler
   // bound to its own id so background tabs can keep their state correctly.
+  // Both updaters record the screen left on the tab's Back stack
+  // (historyState.ts). Route keys are computed from the tab's stored
+  // view/navigation, never the scope-remapped activeTab, so a Space scope
+  // flip cannot corrupt them. Restore paths (the OAuth return, a Domain
+  // switch's selection cleanup) write setTabs directly and never record.
   const updateTab = (id: string, partial: Partial<Omit<AppTab, 'id'>>) => {
     const next = partial.activeView === undefined ? partial : { ...partial, activeView: scopedView(partial.activeView, scope) };
     setTabs(prev => prev.map(t => {
       if (t.id !== id) return t;
       const merged = { ...t, ...next };
-      return next.activeView === undefined ? merged : { ...merged, navigation: navigationForView(merged.navigation, merged.activeView) };
+      const landed = next.activeView === undefined ? merged : { ...merged, navigation: navigationForView(merged.navigation, merged.activeView) };
+      const back = recordNavigation(t.back, { view: t.activeView, navigation: t.navigation }, { view: landed.activeView, navigation: landed.navigation });
+      return { ...landed, back };
     }));
   };
   const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
@@ -306,10 +315,47 @@ function WorkspaceContent({
       onActiveDomainChange(partial.objectDomainId);
       setActiveDomainId(partial.objectDomainId);
     }
+    setTabs(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      const navigation = mergeNavigation(t.navigation, partial, activeDomainId);
+      const back = recordNavigation(t.back, { view: t.activeView, navigation: t.navigation }, { view: t.activeView, navigation });
+      return { ...t, navigation, back };
+    }));
+  };
+
+  // Back: restore the most recent screen this tab left. A raw write — going
+  // back is not itself a navigation to record — with the same Domain sync
+  // updateTabNavigation performs for an Object in another Domain. It
+  // restores shell-level screens only: a tab drilldown's transiently open
+  // Element never entered the navigation, so Back lands on that tab with
+  // its remembered content instead.
+  const goBack = () => {
+    const popped = popBack(storedTab.back);
+    if (!popped) return;
+    const { screen, stack } = popped;
+    if (screen.navigation.objectId && screen.navigation.objectDomainId && screen.navigation.objectDomainId !== activeDomainId) {
+      onActiveDomainChange(screen.navigation.objectDomainId);
+      setActiveDomainId(screen.navigation.objectDomainId);
+    }
     setTabs(prev => prev.map(t => (
-      t.id === id ? { ...t, navigation: mergeNavigation(t.navigation, partial, activeDomainId) } : t
+      t.id === storedTab.id ? { ...t, activeView: screen.view, navigation: screen.navigation, back: stack } : t
     )));
   };
+
+  // ⌘[ / Alt+← go back, like a browser. Ignored while typing — the guard
+  // the app's other global keys use. Re-subscribed each render so goBack
+  // always reads the tab active now.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!((e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft'))) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      e.preventDefault();
+      goBack();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
 
   // Active-tab convenience writers (for sidebar + command palette which target
   // the visible tab).
@@ -599,6 +645,8 @@ function WorkspaceContent({
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
           onCloseSettings={handleCloseSettings}
+          canGoBack={storedTab.back.length > 0}
+          onGoBack={goBack}
           onRefresh={refetch}
           width={260}
           collapsed={sidebarCollapsed}
@@ -684,7 +732,7 @@ function WorkspaceContent({
       />
 
       {/* Global ⌘K command palette */}
-      <CommandPalette scope={scope} returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
+      <CommandPalette scope={scope} returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} canGoBack={storedTab.back.length > 0} onGoBack={goBack} />
       {scope === 'full' && <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />}
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
