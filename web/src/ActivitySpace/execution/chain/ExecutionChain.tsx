@@ -5,7 +5,7 @@ import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
-import { BoardColumn, BoardLane } from '../element/board/BoardColumn';
+import { BoardColumn, BoardLane, CHAIN_COLUMN_WIDTH } from '../element/board/BoardColumn';
 
 // The Execution Chain: work in Status columns, drawn with the shared
 // columns and cards. What waits on a person is a chip on its card
@@ -57,7 +57,7 @@ export function ExecutionChain({ columns, className, onDropStatus, columnAction,
       <div className={className ?? 'flex h-full flex-col gap-3 overflow-y-auto px-4 pb-4 pt-1'}>
         {STATUS_ORDER.map((status) => (
           <BoardLane key={status} {...groupProps(status)}>
-            {columns[status].map((c) => <div key={c.key} className="w-72 shrink-0">{c.node}</div>)}
+            {columns[status].map((c) => <div key={c.key} className={`${CHAIN_COLUMN_WIDTH} shrink-0`}>{c.node}</div>)}
           </BoardLane>
         ))}
       </div>

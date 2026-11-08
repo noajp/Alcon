@@ -31,6 +31,11 @@ export function Chip({ children, className, style, title }: {
 const WARNING = 'var(--status-warning)';
 const DANGER = 'var(--status-danger)';
 
+/** The one width of a chain column — and of a card in a horizontal lane,
+ *  which keeps its column's width. Single-sourced so the two can never
+ *  drift apart. */
+export const CHAIN_COLUMN_WIDTH = 'w-80';
+
 type Translate = ReturnType<typeof useI18n>['t'];
 
 /** The chip's short label for a reason: why this card waits, in the words
@@ -82,7 +87,7 @@ export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, em
   return (
     <section
       aria-label={label}
-      className="flex w-72 flex-shrink-0 flex-col rounded-lg bg-muted/60 dark:bg-muted/30"
+      className={cn('flex flex-shrink-0 flex-col rounded-lg bg-muted/60 dark:bg-muted/30', CHAIN_COLUMN_WIDTH)}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
