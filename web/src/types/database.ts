@@ -1657,6 +1657,65 @@ export interface PlanningConstraint {
   updated_at: string
 }
 
+export type AutonomyLevel = 'ask' | 'auto'
+export type AutonomyIncidentKind =
+  | 'rejection' | 'verify_mismatch' | 'reopen' | 'rollback' | 'verdict_fail' | 'record_lapsed' | 'lane_closed'
+
+/** The counts a grant was standing on when the evaluator last judged
+ *  it: the record the person reads to see why the command runs
+ *  unasked ("auto because 15 clean runs"). */
+export interface AutonomyBasis {
+  cleanStreak?: number
+  checkedInStreak?: number
+  verifyGreenStreak?: number
+  incidents?: number
+  requiredClean?: number
+  windowDays?: number
+}
+
+/** One command's graduated-autonomy standing in a Space (B7): the
+ *  level the approval gate honors, the lane its reversibility puts
+ *  it in, and the basis it stands on. Written only by the tick
+ *  evaluator (granted_by 'system') and by an owner's pin through
+ *  set_autonomy_pin (granted_by 'owner', pinned). */
+export interface AutonomyGrant {
+  id: string
+  activity_space_id: string
+  integration_id: string
+  action: string
+  lane: 1 | 2 | 3
+  level: AutonomyLevel
+  basis: AutonomyBasis
+  granted_by: 'system' | 'owner'
+  pinned: boolean
+  required_clean: number
+  last_incident_at: string | null
+  last_incident_kind: AutonomyIncidentKind | null
+  created_at: string
+  updated_at: string
+}
+
+/** One command's measured track record in a Space (B7): the counts
+ *  the evaluator recomputes from sealed records each tick. */
+export interface CommandTrackRecord {
+  id: string
+  activity_space_id: string
+  integration_id: string
+  action: string
+  window_start: string
+  window_days: number
+  clean_completions: number
+  checked_passes: number
+  clean_streak: number
+  checked_in_streak: number
+  verify_checked: number
+  verify_ok: number
+  verify_green_streak: number
+  incidents: number
+  last_incident_at: string | null
+  updated_at: string
+}
+
 export type IntegrationDraftStatus =
   | 'drafting' | 'awaiting_input' | 'testing' | 'awaiting_review'
   | 'active' | 'rejected' | 'failed' | 'expired' | 'superseded' | 'rerouted'
@@ -1898,8 +1957,10 @@ export interface AgentAction {
   decided_by: string | null
   decided_at: string | null
   decision_note: string | null
-  /** Who decided: null is a person; 'policy' is the Space's free mode deciding by standing policy. */
-  decision_source?: 'policy' | null
+  /** Who decided: null is a person; 'policy' is the Space's free mode
+   *  deciding by standing policy; 'track-record' is the action's earned
+   *  autonomy (B7) letting it run unasked. */
+  decision_source?: 'policy' | 'track-record' | null
   /** The approval mode in force when the policy decided. */
   policy_mode?: 'ask' | 'auto' | 'free' | null
   result: Record<string, unknown> | null

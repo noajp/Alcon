@@ -11,6 +11,9 @@ import {
 import { useSpaceApprovalMode } from './approvalModeData';
 import type { ApprovalMode } from './approvalModeModel';
 import { useIntegrationActions } from './data';
+import { useSpaceAutonomy, setAutonomyPin } from './autonomyData';
+import { autonomyLineFor, laneOfManifestCommand, pinChoicesFor, AUTONOMY_INCIDENT_WORDS, type AutonomyLine } from './autonomyModel';
+import type { AutonomyGrant, CommandTrackRecord } from '@/types/database';
 
 // What agents may do with an MCP connection, command by command. The
 // commands come from the server's own tool list (the connection test writes
@@ -32,6 +35,9 @@ interface CommandPresent { title?: string; fields?: { arg: string; label: string
 interface Command {
   name: string; action: string; effect: 'read' | 'write'; permission: Permission | null; description: string; rules: Rule[];
   mcp: string | null; http: { method: string; path: string } | null; present: CommandPresent | null;
+  /** The declared reversibility (B2), when the manifest carries one:
+   *  graduated autonomy's lane derives from it (autonomyModel.ts). */
+  reversibility: 'contained' | 'wide' | 'none' | null;
 }
 
 const LABEL: Record<Permission, string> = { allow: 'Allowed', ask: 'Asks first', deny: 'Not allowed' };
@@ -85,6 +91,7 @@ function readCommands(manifest: Json | null): { commands: Command[]; defaults: R
       mcp: typeof x.mcp === 'string' && x.mcp ? x.mcp : null,
       http: h && typeof h.method === 'string' && typeof h.path === 'string' ? { method: h.method, path: h.path } : null,
       present,
+      reversibility: x.reversibility === 'contained' || x.reversibility === 'wide' || x.reversibility === 'none' ? x.reversibility : null,
     }];
   });
   return { commands, defaults };
@@ -98,6 +105,20 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
   // nothing — so a chip is never shown on a guess.
   const spaceMode = useSpaceApprovalMode(spaceId);
   const mode: ApprovalMode = spaceMode.mode ?? 'auto';
+  // Graduated autonomy (B7): each command's standing, read from the
+  // grants and records the evaluator keeps. The rows below show the
+  // standing as a line with its one explaining number; an owner pins
+  // a level through the RPC, which logs the change itself.
+  const autonomy = useSpaceAutonomy(spaceId);
+  const [pinBusy, setPinBusy] = useState<string | null>(null);
+  const pin = (name: string, level: 'ask' | 'auto' | null) => {
+    setError(null);
+    setPinBusy(name);
+    setAutonomyPin(spaceId, integration.id, name, level)
+      .then(() => autonomy.refetch())
+      .catch((e) => setError(formatError(e)))
+      .finally(() => setPinBusy(null));
+  };
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const { commands, defaults } = readCommands(integration.manifest);
@@ -171,6 +192,17 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
               </select>
             </div>
             <CommandRules rules={c.rules} disabled={readOnly || actions.update.isPending} onChange={(rules) => setRules(c.name, rules)} />
+            {c.effect === 'write' && (
+              <CommandAutonomy
+                grant={autonomy.grants.get(`${integration.id}:${c.name}`) ?? null}
+                record={autonomy.records.get(`${integration.id}:${c.name}`) ?? null}
+                lane={laneOfManifestCommand(c)}
+                critical={critical !== null}
+                readOnly={readOnly}
+                busy={pinBusy === c.name}
+                onPin={(level) => pin(c.name, level)}
+              />
+            )}
             </li>
           );
         })}
@@ -230,6 +262,47 @@ function CommandRules({ rules, disabled, onChange }: { rules: Rule[]; disabled: 
         </form>
       ) : (
         <button type="button" onClick={() => setAdding(true)} className="text-[11px] text-muted-foreground hover:text-foreground">+ {t('Condition')}</button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A command's graduated-autonomy standing (B7): the level line — what
+ * it is and the one number or event that explains it — and, for an
+ * owner, the pin controls. A pin is the owner's own standing word:
+ * pinned ask outranks every rule, pinned auto is their standing
+ * approval; the evaluator never moves a pinned grant. Nothing renders
+ * when there is neither a standing to report nor a control to offer.
+ */
+function CommandAutonomy({ grant, record, lane, critical, readOnly, busy, onPin }: {
+  grant: AutonomyGrant | null;
+  record: CommandTrackRecord | null;
+  lane: 1 | 2 | 3 | null;
+  critical: boolean;
+  readOnly: boolean;
+  busy: boolean;
+  onPin: (level: 'ask' | 'auto' | null) => void;
+}) {
+  const { t } = useI18n();
+  const line: AutonomyLine | null = autonomyLineFor(grant, record);
+  const choices = pinChoicesFor(grant, lane, critical);
+  if (!line && (readOnly || choices.length === 0)) return null;
+  const text = line === null ? null
+    : line.kind === 'pinned-auto' ? t('Pinned by the owner: runs without asking')
+    : line.kind === 'pinned-ask' ? t('Pinned by the owner: asks first')
+    : line.kind === 'earned' ? t('Runs without asking — earned by {n} clean completions', { n: line.clean })
+    : line.kind === 'stopped' ? t('Asks first — stopped by {cause}', { cause: t(AUTONOMY_INCIDENT_WORDS[line.cause]) })
+    : t('Asks first — {n} clean completions so far', { n: line.clean });
+  return (
+    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2 pl-3 text-[11px] text-muted-foreground">
+      {text && <span>{text}</span>}
+      {!readOnly && choices.map((choice) => (
+        <button key={choice} type="button" disabled={busy}
+          onClick={() => onPin(choice === 'unpin' ? null : choice)}
+          className="rounded px-1 text-muted-foreground hover:bg-muted/50 hover:text-foreground disabled:opacity-50">
+          {choice === 'unpin' ? t('Unpin') : choice === 'ask' ? t('Pin: asks first') : t('Pin: runs without asking')}
+        </button>
       ))}
     </div>
   );

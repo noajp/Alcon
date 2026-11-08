@@ -1156,6 +1156,126 @@ export type Database = {
           },
         ]
       }
+      autonomy_changes: {
+        Row: {
+          action: string
+          activity_space_id: string
+          cause: string
+          changed_by: string | null
+          created_at: string
+          detail: Json
+          from_level: string | null
+          id: string
+          integration_id: string
+          to_level: string
+        }
+        Insert: {
+          action: string
+          activity_space_id: string
+          cause: string
+          changed_by?: string | null
+          created_at?: string
+          detail?: Json
+          from_level?: string | null
+          id?: string
+          integration_id: string
+          to_level: string
+        }
+        Update: {
+          action?: string
+          activity_space_id?: string
+          cause?: string
+          changed_by?: string | null
+          created_at?: string
+          detail?: Json
+          from_level?: string | null
+          id?: string
+          integration_id?: string
+          to_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomy_changes_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomy_changes_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autonomy_grants: {
+        Row: {
+          action: string
+          activity_space_id: string
+          basis: Json
+          created_at: string
+          granted_by: string
+          id: string
+          integration_id: string
+          lane: number
+          last_incident_at: string | null
+          last_incident_kind: string | null
+          level: string
+          pinned: boolean
+          required_clean: number
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          activity_space_id: string
+          basis?: Json
+          created_at?: string
+          granted_by?: string
+          id?: string
+          integration_id: string
+          lane: number
+          last_incident_at?: string | null
+          last_incident_kind?: string | null
+          level?: string
+          pinned?: boolean
+          required_clean?: number
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          activity_space_id?: string
+          basis?: Json
+          created_at?: string
+          granted_by?: string
+          id?: string
+          integration_id?: string
+          lane?: number
+          last_incident_at?: string | null
+          last_incident_kind?: string | null
+          level?: string
+          pinned?: boolean
+          required_clean?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomy_grants_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autonomy_grants_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       board_placements: {
         Row: {
           board_id: string
@@ -1278,6 +1398,78 @@ export type Database = {
           version?: number
         }
         Relationships: []
+      }
+      command_track_records: {
+        Row: {
+          action: string
+          activity_space_id: string
+          checked_in_streak: number
+          checked_passes: number
+          clean_completions: number
+          clean_streak: number
+          id: string
+          incidents: number
+          integration_id: string
+          last_incident_at: string | null
+          updated_at: string
+          verify_checked: number
+          verify_green_streak: number
+          verify_ok: number
+          window_days: number
+          window_start: string
+        }
+        Insert: {
+          action: string
+          activity_space_id: string
+          checked_in_streak?: number
+          checked_passes?: number
+          clean_completions?: number
+          clean_streak?: number
+          id?: string
+          incidents?: number
+          integration_id: string
+          last_incident_at?: string | null
+          updated_at?: string
+          verify_checked?: number
+          verify_green_streak?: number
+          verify_ok?: number
+          window_days: number
+          window_start: string
+        }
+        Update: {
+          action?: string
+          activity_space_id?: string
+          checked_in_streak?: number
+          checked_passes?: number
+          clean_completions?: number
+          clean_streak?: number
+          id?: string
+          incidents?: number
+          integration_id?: string
+          last_incident_at?: string | null
+          updated_at?: string
+          verify_checked?: number
+          verify_green_streak?: number
+          verify_ok?: number
+          window_days?: number
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "command_track_records_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "command_track_records_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       code_change_comments: {
         Row: {
@@ -7045,6 +7237,15 @@ export type Database = {
       }
       set_space_approval_mode: {
         Args: { p_mode: string; p_space_id: string }
+        Returns: string
+      }
+      set_autonomy_pin: {
+        Args: {
+          p_action: string
+          p_integration_id: string
+          p_level: string | null
+          p_space_id: string
+        }
         Returns: string
       }
       set_space_heartbeat: {

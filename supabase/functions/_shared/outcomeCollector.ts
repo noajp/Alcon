@@ -113,14 +113,22 @@ export function driverKindOf(run: Pick<OutcomeRunRow, "element_id" | "strategy_i
   return "execute";
 }
 
+/** Whether an action was decided by a standing policy rather than a
+ *  person: the Space's free mode ('policy') or an earned track-record
+ *  grant ('track-record', B7). Both are counted as policy, never as a
+ *  person's ask or approval — the distinction between them lives on
+ *  the row, not in these counts. */
+const isPolicyDecision = (source: string | null): boolean => source === "policy" || source === "track-record";
+
 /** Pure. The approval counts of one run, from its agent_actions rows.
  *  Asked / approved / rejected count a person's proposals only; a policy
  *  approval (decision_source 'policy' — the Space's mode ran the call
- *  without asking) is its own count, never laundered into "approved". */
+ *  without asking — or 'track-record', an earned grant) is its own
+ *  count, never laundered into "approved". */
 export function approvalCountsOf(actions: readonly OutcomeActionRow[]): Pick<OutcomeInsert, "approvals_asked" | "approvals_approved" | "approvals_rejected" | "approvals_policy"> {
   let asked = 0, approved = 0, rejected = 0, policy = 0;
   for (const a of actions) {
-    if (a.decision_source === "policy") { policy += 1; continue; }
+    if (isPolicyDecision(a.decision_source)) { policy += 1; continue; }
     asked += 1;
     if (a.status === "rejected") rejected += 1;
     else if (a.status === "approved" || a.status === "executed" || a.status === "failed") approved += 1;
@@ -253,7 +261,7 @@ export function signalCandidatesOf(args: {
   const out: SignalCandidate[] = [];
 
   for (const a of actions) {
-    if (a.decision_source === "policy") continue;
+    if (isPolicyDecision(a.decision_source)) continue;
     if (a.status === "rejected" && a.decided_at) {
       out.push({ signal: "rejected", source: "approval", at: a.decided_at, by: a.decided_by });
     }
@@ -396,7 +404,7 @@ export function rollupRowsOf(args: {
       const key = `${a.integration_id}:${a.tool}`;
       const c = byCommand.get(key) ?? { actions: 0, asked: 0, approved: 0, rejected: 0, policy: 0, executed: 0, failed: 0, pending: 0, runs: 0 };
       c.actions += 1;
-      if (a.decision_source === "policy") c.policy += 1;
+      if (isPolicyDecision(a.decision_source)) c.policy += 1;
       else {
         c.asked += 1;
         if (a.status === "rejected") c.rejected += 1;

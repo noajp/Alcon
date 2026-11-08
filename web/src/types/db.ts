@@ -31,6 +31,7 @@ import type {
   IntegrationDraftStatus, DraftRequestContext, DraftDrop, DraftChangeEvent,
   PromotionDraftStatus, PromotionBinding, PromotionMaterialSource, PromotionDraftEvent,
   RevisionCandidateReason, RevisionCandidateStatus,
+  AutonomyLevel, AutonomyIncidentKind, AutonomyBasis,
   ConstraintScope, ConstraintDerivedFrom, ConstraintDraftStatus, ConstraintClusterRecord, ConstraintDraftEvent,
   PlanningConstraintStatus, ConstraintEffectStatus, ConstraintEffectRecord,
 } from './database'
@@ -108,8 +109,21 @@ interface ColumnOverrides {
     input: { calls?: { id: string; name: string; input: Record<string, unknown> }[] }
     status: AgentActionStatus
     result: Record<string, unknown> | null
-    decision_source: 'policy' | null
+    decision_source: 'policy' | 'track-record' | null
     policy_mode: 'ask' | 'auto' | 'free' | null
+  }
+  autonomy_grants: {
+    level: AutonomyLevel
+    granted_by: 'system' | 'owner'
+    lane: 1 | 2 | 3
+    last_incident_kind: AutonomyIncidentKind | null
+    basis: AutonomyBasis
+  }
+  autonomy_changes: {
+    cause: 'promotion' | 'demotion' | 'pin' | 'unpin'
+    from_level: AutonomyLevel | null
+    to_level: AutonomyLevel
+    detail: Record<string, unknown>
   }
   integrations: {
     kind: 'mcp' | 'http' | 'model'

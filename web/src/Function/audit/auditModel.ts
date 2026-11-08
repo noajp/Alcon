@@ -773,8 +773,9 @@ export interface AgentActionRow {
   summary: string;
   created_at: string;
   /** Who decided: null/absent is a person; 'policy' is the Space's free
-   *  approval mode, with the mode in policy_mode. */
-  decision_source?: 'policy' | null;
+   *  approval mode, with the mode in policy_mode; 'track-record' is the
+   *  action's earned autonomy (B7), also with the mode in policy_mode. */
+  decision_source?: 'policy' | 'track-record' | null;
   policy_mode?: string | null;
 }
 
@@ -802,8 +803,12 @@ export function agentRunEvents(steps: readonly AgentRunStepRow[], actions: reado
       result: ACTION_RESULT[action.status],
       // A policy approval is nobody's decision: the event says so, so
       // what ran unasked under the free mode never reads as approved
-      // by a person who was never asked.
-      reason: action.decision_source === 'policy' ? `ポリシー承認: ${action.summary}` : action.summary,
+      // by a person who was never asked. A track-record approval says
+      // the same in its own words: the action's record decided, not a
+      // person and not the Space's blanket policy.
+      reason: action.decision_source === 'policy' ? `ポリシー承認: ${action.summary}`
+        : action.decision_source === 'track-record' ? `自動実行（実績）: ${action.summary}`
+        : action.summary,
       outside_grant: false,
     });
   };
