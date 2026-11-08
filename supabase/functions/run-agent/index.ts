@@ -52,9 +52,10 @@ import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type R
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
 import {
-  approvalDisplayForCall, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, operationOf, planManifestTools,
-  type ApprovalDisplay, type IntegrationTool,
+  adoptPlannedTools, approvalDisplayForCall, bindingOf, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, lazyBinding, operationOf, planManifestTools,
+  type ApprovalDisplay, type IntegrationBinding, type IntegrationTool, type PlannedIntegrationTool,
 } from "../_shared/integrationTools.ts";
+import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
 import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
@@ -232,10 +233,7 @@ Deno.serve(async (req: Request) => {
   const conversation = !!run.strategy_id && !run.element_id;
   // A Copilot session's anchor run: driven only by decisions on the
   // approval it holds (and the continuations those set in motion).
-  const copilotRun = (!!run.ai_session_id || run.mode === "copilot") && !run.element_id && !run.strategy_id;
-  // An anchor whose conversation was deleted keeps its record but has no
-  // turn left to continue; its approval lapses on the automations tick.
-  if (copilotRun && !run.ai_session_id) return json({ error: "この会話は削除されています。承認は期限で自動的に取り消されます。" }, 409);
+  const copilotRun = !!run.ai_session_id && !run.element_id && !run.strategy_id;
   const said = typeof body.message === "string" ? body.message.trim() : "";
   if (body.message !== undefined) {
     if (!conversation) return json({ error: "この実行は会話ではありません。" }, 400);
@@ -474,8 +472,12 @@ async function execute(a: ExecArgs): Promise<void> {
   const integrationSummary: TaskContext["integrations"] = [];
   if (run.activity_space_id) {
     const { data: rows } = await userDb.from("integrations")
-      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide")
+      .select("id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation, enabled, manifest, guide, updated_at")
       .eq("activity_space_id", run.activity_space_id).eq("enabled", true).in("kind", ["mcp", "http"]).order("created_at");
+    // The integrations' cached tool plans, read once for the whole Space:
+    // this slice plans fresh only what the cache cannot vouch for, and a
+    // connection's secret and session bind when a call runs, not here.
+    const cachedPlans = await loadToolPlans(admin, (rows ?? []).map((r) => (r as { id: string }).id));
     // The connectors the definition names (「# 使うコネクタ」): when it names
     // any, only those are offered — a connection is matched the way the
     // editor matches it, by the name the Space gave it, its preset's id, or
@@ -483,7 +485,7 @@ async function execute(a: ExecArgs): Promise<void> {
     // after the loop; the rows above are already enabled-only.
     const wantedConnectors = parsedAll?.connectors ?? [];
     const matchedConnectors = new Set<string>();
-    for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null })[]) {
+    for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null; updated_at?: string | null })[]) {
       if (wantedConnectors.length) {
         const names = [row.name, row.preset ?? "", PRESET_NAMES[row.preset ?? ""] ?? ""].filter(Boolean);
         const hits = wantedConnectors.filter((c) => names.some((n) => foldName(n) === foldName(c)));
@@ -516,18 +518,18 @@ async function execute(a: ExecArgs): Promise<void> {
       }
       // OAuth is Google Drive's or GitHub's sign-in; any other OAuth row has no way to authenticate.
       if (row.auth_type === "oauth" && !isGoogleDriveRow(row) && !isGithubOAuthRow(row)) continue;
-      const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
       const prefix = integrationPrefix(row.name, row.id);
+      const fingerprint = await planFingerprint(row);
+      const cached = cachedPlans.get(row.id);
       try {
-        // An OAuth token set becomes a current access token here (refreshed
-        // when due); other credentials pass through as stored.
-        const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
-        if (isGithubOAuthRow(row) && !secret) {
-          await addStep(admin, run.id, "error", `連携「${row.name}」は GitHub への接続が必要です`, "Settings › Customize で GitHub にサインインし直すと使えます。");
-          integrationSummary.push(downIntegration(row.name, "GitHub にサインインしていない（Settings › Customize でサインインが必要）"));
-          continue;
-        }
         if (isGoogleDriveRow(row)) {
+          // Drive's typed tools stay the run's own path, bound eagerly as
+          // before: they are not manifest commands, and a Drive row whose
+          // token cannot be resolved is reported here, not at call time.
+          const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
+          // An OAuth token set becomes a current access token here
+          // (refreshed when due); other credentials pass through as stored.
+          const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
           if (!secret) {
             await addStep(admin, run.id, "error", `連携「${row.name}」は Google への接続が必要です`, "Settings › Customize で Google にサインインし直すと使えます。");
             integrationSummary.push(downIntegration(row.name, "Google にサインインしていない（Settings › Customize でサインインが必要）"));
@@ -544,34 +546,87 @@ async function execute(a: ExecArgs): Promise<void> {
           }
           integrationSummary.push({ name: row.name, kind: "Google Drive", delegation: row.delegation, tools: DRIVE_TOOLS.length });
         } else if (row.kind === "mcp") {
-          const session = new McpSession(row, secret);
-          await session.initialize();
-          const tools = await session.listTools();
           // With a manifest, only the MCP tools it declares, under its
-          // commands' names and permissions — planned by the shared code the
-          // AI panel uses too (_shared/integrationTools.ts). A manifest is
-          // always present here: an untested MCP connection stayed closed above.
-          const planned = planManifestTools(row, manifest, tools, integrationTools);
-          let offered = 0;
-          for (const p of planned) {
-            if (integrationDefs.length >= MAX_TOOLS) break;
-            integrationTools.set(p.name, { integration: row, remote: p.remote, secret, session, command: p.command, manifest: manifest! });
-            integrationDefs.push({ name: p.name, description: p.description, input_schema: p.input_schema });
-            offered++;
+          // commands' names and permissions — planned by the shared code
+          // the AI panel uses too (_shared/integrationTools.ts). A manifest
+          // is always present here: an untested MCP connection stayed
+          // closed above. The plan comes from the cache while the cache
+          // can vouch for it; a slice that must refresh pays for the
+          // listing once, stores the plan for every later slice, and
+          // keeps the session it opened as those tools' binding. All
+          // other tools bind lazily when a call runs, so a slice no
+          // longer re-reads every secret and re-opens every session
+          // just to offer the tools.
+          const offerPlanned = (planned: PlannedIntegrationTool[], bind: IntegrationTool["bind"]) => {
+            let offered = 0;
+            for (const p of planned) {
+              if (integrationDefs.length >= MAX_TOOLS) break;
+              integrationTools.set(p.name, { integration: row, remote: p.remote, command: p.command, manifest: manifest!, bind });
+              integrationDefs.push({ name: p.name, description: p.description, input_schema: p.input_schema });
+              offered++;
+            }
+            integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
+          };
+          if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
+            offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row));
+          } else {
+            let refreshed: { planned: PlannedIntegrationTool[]; bound: Promise<IntegrationBinding> } | null = null;
+            try {
+              const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
+              const secret = await resolveCredential(admin, row, (raw as string | null) ?? null);
+              if (isGithubOAuthRow(row) && !secret) {
+                await addStep(admin, run.id, "error", `連携「${row.name}」は GitHub への接続が必要です`, "Settings › Customize で GitHub にサインインし直すと使えます。");
+                integrationSummary.push(downIntegration(row.name, "GitHub にサインインしていない（Settings › Customize でサインインが必要）"));
+                continue;
+              }
+              const session = new McpSession(row, secret);
+              await session.initialize();
+              const tools = await session.listTools();
+              refreshed = {
+                planned: planManifestTools(row, manifest, tools, integrationTools),
+                bound: Promise.resolve<IntegrationBinding>({ secret, session }),
+              };
+            } catch (refreshError) {
+              if (!cached) throw refreshError;
+              // The stored plan still names what this connection
+              // declared; the run offers it, bound lazily, and the
+              // failure stays on the record — a refused credential is
+              // the connection's state, not this run's.
+              const message = errorMessage(refreshError);
+              await addStep(admin, run.id, "error", `連携「${row.name}」の道具一覧を更新できませんでした`, `前回取得した一覧で続けます: ${message}`);
+              if (isAuthFailure(message)) {
+                await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: message.slice(0, 300) } }).eq("id", row.id);
+              }
+            }
+            if (refreshed) {
+              await saveToolPlan(admin, row.id, fingerprint, refreshed.planned);
+              const bound = refreshed.bound;
+              offerPlanned(refreshed.planned, () => bound);
+            } else if (cached) {
+              offerPlanned(adoptPlannedTools(cached.plan, integrationTools), lazyBinding(admin, row));
+            }
           }
-          integrationSummary.push({ name: row.name, kind: "MCP", delegation: row.delegation, tools: offered, declared: !!manifest, guide: row.guide });
         } else if (manifest) {
-          // An API with a manifest: its declared commands, never a raw request.
-          const planned = planManifestTools(row, manifest, null, integrationTools);
+          // An API with a manifest: its declared commands, never a raw
+          // request. The plan is pure, so the cache only saves the
+          // planning; the secret binds when a call runs.
+          const bind = lazyBinding(admin, row);
+          let planned: PlannedIntegrationTool[];
+          if (cached && planCacheState(cached, fingerprint, row.kind, Date.now()) === "use") {
+            planned = adoptPlannedTools(cached.plan, integrationTools);
+          } else {
+            planned = planManifestTools(row, manifest, null, integrationTools);
+            await saveToolPlan(admin, row.id, fingerprint, planned);
+          }
           for (const p of planned) {
             if (integrationDefs.length >= MAX_TOOLS) break;
-            integrationTools.set(p.name, { integration: row, remote: null, secret, session: null, command: p.command, manifest });
+            integrationTools.set(p.name, { integration: row, remote: null, command: p.command, manifest, bind });
             integrationDefs.push({ name: p.name, description: p.description, input_schema: p.input_schema });
           }
           integrationSummary.push({ name: row.name, kind: "API", delegation: row.delegation, tools: planned.length, declared: true, guide: row.guide });
         } else {
           const name = `${prefix}${INTEGRATION_SEPARATOR}http_request`;
-          integrationTools.set(name, { integration: row, remote: null, secret, session: null });
+          integrationTools.set(name, { integration: row, remote: null, bind: lazyBinding(admin, row) });
           integrationDefs.push({
             name,
             description: `[${row.name}] ${row.description ?? ""} の API（base: ${row.endpoint}）に HTTP リクエストを送る。GET / HEAD は読み取り、それ以外は書き込み。`.slice(0, 1024),
@@ -669,7 +724,10 @@ async function execute(a: ExecArgs): Promise<void> {
     // post-step.
     const r = await executeIntegrationTool(it, call);
     if (!r.isError && isGithubRow(it.integration) && it.remote && /^(create|update)_pull_request$/i.test(it.remote.name)) {
-      await linkOpenedPulls(r.text, it.secret);
+      // The token the call ran with: bindingOf returns the binding the
+      // executor just resolved (memoized on the tool for this slice).
+      const binding = await bindingOf(it).catch(() => null);
+      await linkOpenedPulls(r.text, binding?.secret ?? null);
     }
     return { content: r.text, ...(r.isError ? { is_error: true } : {}) };
   };

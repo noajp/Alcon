@@ -9,7 +9,9 @@
 //     mcp   initialize + tools/list → connected for a preset, reachable for
 //           a custom server; tool_count and up to 20 tools ({ name, readOnly }).
 //           The integration's manifest is rebuilt from every listed tool
-//           (manifestFromTools), keeping the permissions people set.
+//           (manifestFromTools), keeping the permissions people set, and
+//           the tool plan the assemblies cache is warmed from the same
+//           listing, so the next assembly starts from this test's answer.
 //     http  a preset with a credential check (VERIFY) → connected or
 //           auth_failed. Any other API: GET on the base URL; a response
 //           below 500 other than 401 / 403 is only "reachable".
@@ -32,10 +34,12 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow } from "../_shared/integrationClient.ts";
+import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow, type RemoteTool } from "../_shared/integrationClient.ts";
 import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
-import { manifestFromTools } from "../_shared/connectorManifest.ts";
+import { manifestFromTools, parseManifest } from "../_shared/connectorManifest.ts";
+import { planManifestTools } from "../_shared/integrationTools.ts";
+import { planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,8 +61,8 @@ interface LastTest {
   /** A technical note for errors (already scrubbed of the secret); empty otherwise. */
   detail: string;
   tools?: { name: string; readOnly: boolean }[];
-  /** Every tool the server listed, for the manifest; never saved in last_test. */
-  all?: { name: string; description: string; readOnly: boolean }[];
+  /** Every tool the server listed, for the manifest and the plan; never saved in last_test. */
+  all?: { name: string; description: string; readOnly: boolean; inputSchema: Record<string, unknown> }[];
   tool_count?: number;
   status?: number;
 }
@@ -118,7 +122,7 @@ async function runTest(row: IntegrationRow & { preset: string | null }, secret: 
         ok: true, at, code: row.preset ? "connected" : "reachable", detail: "",
         tool_count: tools.length,
         tools: tools.slice(0, MAX_LISTED_TOOLS).map((t) => ({ name: t.name, readOnly: t.readOnly })),
-        all: tools.map((t) => ({ name: t.name, description: t.description, readOnly: t.readOnly })),
+        all: tools.map((t) => ({ name: t.name, description: t.description, readOnly: t.readOnly, inputSchema: t.inputSchema })),
       };
     }
     const verify = row.preset ? VERIFY[row.preset] : undefined;
@@ -236,6 +240,27 @@ Deno.serve(async (req: Request) => {
   }
   const { error: writeErr } = await admin.from("integrations").update(patch).eq("id", integrationId);
   if (writeErr) return json({ error: "could not save the result", last_test: lastTest }, 500);
+
+  // The test just listed the server's tools and rebuilt the manifest from
+  // them: warm the cached tool plan from the same listing, fingerprinted
+  // against the row as it now stands, so the next assembly starts from
+  // this test's answer instead of listing again. Best-effort — a plan
+  // that fails to store only means the next assembly lists for itself.
+  if (all && lastTest.ok && row.kind === "mcp" && patch.manifest) {
+    try {
+      const { data: fresh } = await admin.from("integrations")
+        .select("name, endpoint, kind, auth_type, manifest, updated_at")
+        .eq("id", integrationId).maybeSingle();
+      if (fresh) {
+        const remoteTools: RemoteTool[] = all.map((t) => ({
+          name: t.name, description: t.description, readOnly: t.readOnly,
+          inputSchema: t.inputSchema ?? { type: "object", properties: {} },
+        }));
+        const plan = planManifestTools({ name: fresh.name as string, id: integrationId }, parseManifest(fresh.manifest).manifest, remoteTools, new Map());
+        await saveToolPlan(admin, integrationId, await planFingerprint(fresh as Parameters<typeof planFingerprint>[0]), plan);
+      }
+    } catch { /* warming the cache is best-effort */ }
+  }
 
   return json({ last_test: lastTest });
 });
