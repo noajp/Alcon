@@ -106,6 +106,16 @@ export interface ConversationContext {
    *  conversation, appended to the opening. Absent when nothing is
    *  remembered. */
   memories?: string;
+  /** B6: the Strategy's activated constraints, rendered as a section
+   *  (driver context, the Memory channel). Absent when none govern
+   *  this Strategy. */
+  constraints?: string;
+  /** B6: the conversation definition's activated constraints, as a
+   *  block appended under its body in the opening. */
+  definitionConstraints?: string;
+  /** B6: the constraint offer, claimed once per draft — a possibility
+   *  the agent may raise if the conversation invites it. */
+  offer?: string;
   today: string;
 }
 
@@ -182,7 +192,7 @@ ${lines(s.children.map((c) => `- ${c.name}`))}
 ${s.objects.length ? `Object: ${s.objects.map((o) => o.name).join("、")} / Element ${s.elements.length} 件（完了 ${done} 件）` : "(まだない — 計画は Planner が作る)"}
 
 ## 仕事の定義
-${ctx.definition ? `「${ctx.definition.name}」\n${ctx.definition.body.slice(0, 8000)}` : "(なし)"}
+${ctx.definition ? `「${ctx.definition.name}」\n${ctx.definition.body.slice(0, 8000)}${ctx.definitionConstraints ?? ""}` : "(なし)"}
 
 ## この Space の外部連携
 ${lines(ctx.integrations.map((i) => `- ${i.name}（${i.kind}、${i.delegation === "full_delegation" ? "全委任" : "書き込みは承認制"}）`))}
@@ -193,7 +203,7 @@ ${lines(ctx.missingConnectors.map((n) => {
   return `- ${n}${draft ? `（${CONNECTOR_DRAFT_STATE[draft.status] ?? draft.status}）` : ""}`;
 }))}
 この Strategy の定義が使うコネクタのうち、まだ接続されていない（または無効な）もの。仕事がこれらを必要としたら、黙って進めず、propose_connection で接続を提案する。状態が付いた名前は、接続の定義の起草が進んでいる（または審査・回答を待っている）もの。その進み具合を人に伝え、接続のカードにも起草の状態がそのまま出る。
-` : ""}${ctx.memories ? `\n${ctx.memories}\n` : ""}
+` : ""}${ctx.memories ? `\n${ctx.memories}\n` : ""}${ctx.constraints ? `\n${ctx.constraints}\n` : ""}${ctx.offer ? `\n${ctx.offer}\n` : ""}
 今日の日付: ${ctx.today}
 
 ---

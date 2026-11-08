@@ -40,6 +40,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseDefinition } from "../_shared/definition.ts";
 import { resolveDefinition, type DefinitionCandidate } from "../_shared/definitionResolution.ts";
+import { strategyConstraintSection, type ActiveConstraintFact } from "../_shared/constraintDrafts.ts";
 import { chunkText, DIGEST_SYSTEM, inBatches, readStrategySources, sourceReport, type Source } from "./sources.ts";
 
 const corsHeaders = {
@@ -303,6 +304,26 @@ Deno.serve(async (req: Request) => {
     ? { name: String((harnessRow as Row).name ?? ""), breakdown: harnessSections.breakdown, assignment: harnessSections.assignment }
     : null;
 
+  // B6: the Strategy's activated constraints — the learning edge's
+  // landing in the splitter's brief. planning_constraints is the
+  // truth; the section is rendered from it here, in the planner's
+  // context assembly beside the Strategy's own sources. Nothing
+  // lands before activation: this read finds only active rows.
+  let constraintsSection = "";
+  try {
+    const { data: conRows, error: conError } = await db.from("planning_constraints")
+      .select("id, draft_id, constraint_text, signature, derived_from, activated_at")
+      .eq("status", "active").eq("target_strategy_id", initiativeId)
+      .order("activated_at", { ascending: true });
+    if (!conError && conRows?.length) {
+      constraintsSection = strategyConstraintSection((conRows as { id: string; draft_id: string; constraint_text: string; signature: string; derived_from: string; activated_at: string }[])
+        .map((r) => ({
+          id: r.id, draftId: r.draft_id, text: r.constraint_text, signature: r.signature,
+          derivedFrom: r.derived_from as ActiveConstraintFact["derivedFrom"], activatedAt: r.activated_at,
+        })));
+    }
+  } catch { /* a database without the table yet plans without the section */ }
+
   const elements = (elementsRes.data ?? []) as Row[];
   const objects = (objectsRes.data ?? []) as Row[];
   const domains = (domainsRes.data ?? []) as Row[];
@@ -377,7 +398,7 @@ ${list(existing)}
 
 # 人（human のタスクを任せられる、この Space の人）
 ${list(peopleLines)}
-${harness?.assignment ? `\n# 担当の決め方（ハーネス「${harness.name}」。human のタスクを誰に任せるか）\n${harness.assignment}\n` : ""}${harness?.breakdown ? `\n# 分け方（ハーネス「${harness.name}」。この Space が決めた分解の仕方）\n${harness.breakdown}\n` : ""}${guidance ? `\n# 依頼した人からの補足\n${guidance}\n` : ""}${answers.length ? `\n# 質問への回答（依頼した人から）\n${answers.map((x) => `- ${x.question} → ${x.answer}`).join("\n")}\n` : ""}
+${harness?.assignment ? `\n# 担当の決め方（ハーネス「${harness.name}」。human のタスクを誰に任せるか）\n${harness.assignment}\n` : ""}${harness?.breakdown ? `\n# 分け方（ハーネス「${harness.name}」。この Space が決めた分解の仕方）\n${harness.breakdown}\n` : ""}${constraintsSection ? `\n${constraintsSection}\n` : ""}${guidance ? `\n# 依頼した人からの補足\n${guidance}\n` : ""}${answers.length ? `\n# 質問への回答（依頼した人から）\n${answers.map((x) => `- ${x.question} → ${x.answer}`).join("\n")}\n` : ""}
 ${filesSection}
 ${mayAsk ? "この Strategy を達成するための作戦を submit_plan で提出してください。作戦を大きく左右する条件が分からないときだけ、代わりに ask_questions で先に尋ねてください。" : "この Strategy を達成するための作戦を submit_plan で提出してください。"}`;
 

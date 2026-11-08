@@ -40,6 +40,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseRunVerdict } from "./runVerdict.ts";
 import { parseProposedReadings, type ProposedReading } from "./readingsGate.ts";
 import { resolveDefinition, type DefinitionCandidate } from "./definitionResolution.ts";
+import { activeConstraintIdsAt } from "./constraintDrafts.ts";
 
 // ── Shapes, as fetched ────────────────────────────────────────────────
 
@@ -54,6 +55,9 @@ export interface OutcomeRunRow {
   proposed_readings: unknown;
   cost_usd: number | string | null;
   finished_at: string | null;
+  /** When the run began — the moment the constraints it ran under
+   *  are judged against (B6's evidence stamp). */
+  created_at?: string | null;
   rehearsal?: boolean | null;
   integration_draft_id?: string | null;
   promotion_draft_id?: string | null;
@@ -528,7 +532,7 @@ export async function collectOutcomes(
 
   // ── 1. Settle pass ──────────────────────────────────────────────────
   const { data: settled } = await admin.from("agent_runs")
-    .select("id, element_id, strategy_id, activity_space_id, mode, status, verdict, proposed_readings, cost_usd, finished_at, rehearsal, integration_draft_id, promotion_draft_id, ai_session_id")
+    .select("id, element_id, strategy_id, activity_space_id, mode, status, verdict, proposed_readings, cost_usd, finished_at, created_at, rehearsal, integration_draft_id, promotion_draft_id, ai_session_id")
     .not("finished_at", "is", null).in("status", TERMINAL_STATUSES)
     .order("finished_at", { ascending: true }).limit(SETTLE_PER_TICK);
   const settledRuns = (settled ?? []) as unknown as OutcomeRunRow[];
@@ -574,8 +578,41 @@ export async function collectOutcomes(
         definition: definitions.get(run.id) ?? null,
         strategyId: strategyIdOf(run, linkedByElement),
       }));
+      // B6's evidence stamp: the constraints this run ran under,
+      // judged at the run's own start (activated before it, not yet
+      // retired) — the record B6's effect evaluator attributes the
+      // outcome to. Read failure-tolerantly: a Space without the
+      // constraints tables yet (preview replay) stamps nothing and
+      // the collector's own work is never hostage to it.
+      let constraintRows: { id: string; scope: "definition" | "strategy"; target_definition_id: string | null; target_strategy_id: string | null; activated_at: string; retired_at: string | null }[] = [];
+      try {
+        const spaces = [...new Set(fresh.map((r) => r.activity_space_id).filter((x): x is string => !!x))];
+        if (spaces.length) {
+          const { data, error } = await admin.from("planning_constraints")
+            .select("id, scope, target_definition_id, target_strategy_id, activated_at, retired_at")
+            .in("activity_space_id", spaces);
+          if (!error) constraintRows = (data ?? []) as typeof constraintRows;
+        }
+      } catch { /* evidence is additive; its absence is honest */ }
+      const stamped = rows.map((row, i) => ({
+        ...row,
+        evidence: {
+          constraint_ids: activeConstraintIdsAt(
+            constraintRows.map((c) => ({
+              id: c.id, scope: c.scope,
+              targetDefinitionId: c.target_definition_id, targetStrategyId: c.target_strategy_id,
+              activatedAt: c.activated_at, retiredAt: c.retired_at,
+            })),
+            {
+              definitionId: row.definition_id,
+              strategyId: row.strategy_id,
+              createdAt: fresh[i].created_at ?? row.finished_at,
+            },
+          ),
+        },
+      }));
       const { data: wrote, error } = await admin.from("run_outcomes")
-        .upsert(rows, { onConflict: "run_id", ignoreDuplicates: true }).select("run_id");
+        .upsert(stamped, { onConflict: "run_id", ignoreDuplicates: true }).select("run_id");
       if (error) console.error("outcomes: settle insert failed", error.message);
       else inserted = (wrote ?? []).length;
     }

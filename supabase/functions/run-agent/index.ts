@@ -151,6 +151,7 @@ import {
 } from "../_shared/heartbeatSnapshot.ts";
 import { credentialAnomalySignals, type CredentialUseFact } from "../_shared/credentialAnomalies.ts";
 import { calibrationCandidateSignals, type CalibrationCandidateFact } from "../_shared/verifierCalibration.ts";
+import { constraintDraftSignals, constraintOfferCandidate, constraintOfferText, definitionConstraintBlock, effectiveDefinitionText, strategyConstraintSection, type ActiveConstraintFact } from "../_shared/constraintDrafts.ts";
 import { recordIntegrationAuthFailure, recordIntegrationUse } from "../_shared/credentialUseAudit.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
 import { captureMemories, captureScopeOf, landingWorthDistilling, loadStepTitles } from "./memoryCapture.ts";
@@ -585,7 +586,7 @@ async function execute(a: ExecArgs): Promise<void> {
   // row, so nothing is born before activation — in place of whatever
   // the Element itself names.
   const definition = run.rehearsal && run.transcript?.rehearsalDefinition
-    ? { name: run.transcript.rehearsalDefinition.name, body: run.transcript.rehearsalDefinition.body, scope: "element" as const }
+    ? { id: null as string | null, name: run.transcript.rehearsalDefinition.name, body: run.transcript.rehearsalDefinition.body, scope: "element" as const }
     : loadedDefinition.definition;
   if (loadedDefinition.skippedDisabled.length) {
     await addStep(admin, run.id, "status", `無効化されているハーネス「${loadedDefinition.skippedDisabled.join("」「")}」は使わずに進めます`);
@@ -1611,10 +1612,20 @@ async function execute(a: ExecArgs): Promise<void> {
     const task = taskMessage(ctx);
     // The injected bodies count as uses of those memories (PR3).
     if (ctx.memoryUsedIds?.length) await noteMemoryUse(admin, run.id, ctx.memoryUsedIds);
+    // B6: the resolved definition's activated constraints render into
+    // its effective body here, at resolution — computed from the
+    // truth table, never written into the stored body, so
+    // deactivating one takes effect on the next run and the person's
+    // text is untouched. A rehearsal tries a draft body, not a row:
+    // no constraints land on it.
+    const defConstraints = !run.rehearsal && definition?.id
+      ? await loadActiveConstraints(userDb, "definition", definition.id)
+      : [];
+    const effectiveBody = definition ? effectiveDefinitionText(definition.body, defConstraints) : "";
     const defText = definition && parsedAll
       ? definition.scope === "element"
-        ? definitionPrompt(definition.name, definition.body, parsedAll)
-        : `# Strategy の定義「${definition.name}」（この Strategy 全体の方針。依頼した人が定めたもので、従う。成果物の型とループはこの Element には課されない）\n${definition.body.slice(0, 40_000)}`
+        ? definitionPrompt(definition.name, effectiveBody, parsedAll)
+        : `# Strategy の定義「${definition.name}」（この Strategy 全体の方針。依頼した人が定めたもので、従う。成果物の型とループはこの Element には課されない）\n${effectiveBody.slice(0, 40_000)}`
       : null;
     const opening = defText ? `${task}\n\n${defText}` : task;
     state = { messages: [{ role: "user", content: run.rehearsal ? `${opening}\n\n${REHEARSAL_TASK_NOTICE}` : opening }], turns: 0, nudges: 0 };
@@ -2148,6 +2159,15 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     if (mem) {
       ctx.memories = mem.text;
       await noteMemoryUse(admin, run.id, mem.usedIds);
+    }
+    // B6: the constraint offer, once per draft (the promotion
+    // pattern): an awaiting-review draft in this Space that has
+    // never been offered rides the opening as a possibility the
+    // agent may raise once — the stamp is claimed first, so two
+    // conversations cannot both offer it.
+    if (run.activity_space_id) {
+      const offer = await constraintOfferForConversation(userDb, admin, run.activity_space_id).catch(() => null);
+      if (offer) ctx.offer = offer;
     }
     state = { messages: [{ role: "user", content: conversationOpening(ctx, said) }], turns: 0, nudges: 0 };
     await addStep(admin, run.id, "status", "会話を開始", `${agentName} / ${config.modelLabel}`);
@@ -3587,6 +3607,40 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
     signals.push(...calibrationCandidateSignals(facts, new Map(defs.map((d) => [d.id, d.name]))));
   }
 
+  // ── Constraint drafts waiting for review (B6) ──
+  // The tick's derivation drafts these from outcome clusters; the
+  // wait is the owner's activation decision, standing since the
+  // draft was written. The shaping is the shared pure one
+  // (constraintDrafts.ts): the heartbeat can only tell about a
+  // draft — activating one is the owner's act in the harness queue,
+  // through the owner-checked RPC.
+  const constraintDraftRows = await guard(
+    userDb.from("constraint_drafts").select("id, constraint_text, target_definition_id, target_strategy_id, created_at, expires_at")
+      .eq("activity_space_id", spaceId).eq("status", "awaiting_review")
+      .order("created_at", { ascending: true }).limit(20),
+    [] as { id: string; constraint_text: string | null; target_definition_id: string | null; target_strategy_id: string | null; created_at: string; expires_at: string | null }[],
+  );
+  if (constraintDraftRows.length) {
+    const nameOf = new Map<string, string>();
+    const defIds = [...new Set(constraintDraftRows.map((d) => d.target_definition_id).filter((x): x is string => !!x))];
+    const stratIds = [...new Set(constraintDraftRows.map((d) => d.target_strategy_id).filter((x): x is string => !!x))];
+    if (defIds.length) {
+      const defs = await guard(userDb.from("definitions").select("id, name").in("id", defIds), [] as { id: string; name: string }[]);
+      for (const d of defs) nameOf.set(d.id, d.name);
+    }
+    if (stratIds.length) {
+      const strats = await guard(userDb.from("strategies").select("id, name").in("id", stratIds), [] as { id: string; name: string }[]);
+      for (const s of strats) nameOf.set(s.id, s.name);
+    }
+    signals.push(...constraintDraftSignals(constraintDraftRows.map((d) => ({
+      id: d.id,
+      text: d.constraint_text ?? "",
+      targetName: (d.target_definition_id ? nameOf.get(d.target_definition_id) : d.target_strategy_id ? nameOf.get(d.target_strategy_id) : undefined) ?? "対象",
+      createdAt: d.created_at,
+      expiresAt: d.expires_at,
+    }))));
+  }
+
   return signals;
 }
 
@@ -4370,6 +4424,12 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
       .in("status", [...DRAFT_OPEN_STATUSES]);
     connectorDrafts = openDraftsForNames(missingConnectors, (draftRows ?? []) as { id: string; name_key: string; status: string }[]);
   }
+  // B6: the activated constraints land here too — the Strategy's own
+  // as a section, and the conversation definition's as a block under
+  // its body — through the same driver-context channel Memory uses,
+  // never the cached system prompt.
+  const strategyConstraints = await loadActiveConstraints(userDb, "strategy", strategyId);
+  const defConstraints = definitionId ? await loadActiveConstraints(userDb, "definition", definitionId) : [];
   return {
     strategy: {
       id: d.id, name: d.name, description: d.description, intents: d.intents, objects: d.objects,
@@ -4381,6 +4441,8 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
     integrations: (integrations ?? []) as { name: string; kind: string; delegation: string }[],
     missingConnectors,
     connectorDrafts,
+    constraints: strategyConstraints.length ? strategyConstraintSection(strategyConstraints) : undefined,
+    definitionConstraints: defConstraints.length ? definitionConstraintBlock(defConstraints) : undefined,
     today: new Date().toISOString().slice(0, 10),
   };
 }
@@ -4539,10 +4601,73 @@ async function applyHeldReadings(a: { admin: SupabaseClient; userDb: SupabaseCli
   await admin.from("agent_runs").update({ proposed_readings: next }).eq("id", latest.id);
 }
 
+/** The active constraints on one target (B6's landing reads): the
+ *  truth table, read through the caller's client — member RLS is the
+ *  field of view, and a read failure (or a database without the
+ *  table yet) yields none rather than failing work about to start. */
+async function loadActiveConstraints(
+  db: SupabaseClient, scope: "definition" | "strategy", targetId: string,
+): Promise<ActiveConstraintFact[]> {
+  try {
+    const column = scope === "definition" ? "target_definition_id" : "target_strategy_id";
+    const { data, error } = await db.from("planning_constraints")
+      .select("id, draft_id, constraint_text, signature, derived_from, activated_at")
+      .eq("status", "active").eq(column, targetId)
+      .order("activated_at", { ascending: true });
+    if (error) return [];
+    return ((data ?? []) as { id: string; draft_id: string; constraint_text: string; signature: string; derived_from: string; activated_at: string }[])
+      .map((r) => ({
+        id: r.id, draftId: r.draft_id, text: r.constraint_text, signature: r.signature,
+        derivedFrom: r.derived_from as ActiveConstraintFact["derivedFrom"], activatedAt: r.activated_at,
+      }));
+  } catch { return []; }
+}
+
+/**
+ * B6's conversational offer, once per draft (the promotion pattern):
+ * the Space's oldest awaiting-review, never-offered draft is claimed
+ * by stamping offered_at first — the update wins or the offer is
+ * not made — so two conversations cannot both raise the same draft.
+ * Returns the offer text for the opening, or null.
+ */
+async function constraintOfferForConversation(
+  userDb: SupabaseClient, admin: SupabaseClient, spaceId: string,
+): Promise<string | null> {
+  const { data } = await userDb.from("constraint_drafts")
+    .select("id, constraint_text, target_definition_id, target_strategy_id, offered_at, created_at")
+    .eq("activity_space_id", spaceId).eq("status", "awaiting_review").is("offered_at", null)
+    .order("created_at", { ascending: true }).limit(5);
+  const rows = (data ?? []) as { id: string; constraint_text: string | null; target_definition_id: string | null; target_strategy_id: string | null; offered_at: string | null; created_at: string }[];
+  if (!rows.length) return null;
+  const nameOf = new Map<string, string>();
+  const defIds = [...new Set(rows.map((r) => r.target_definition_id).filter((x): x is string => !!x))];
+  const stratIds = [...new Set(rows.map((r) => r.target_strategy_id).filter((x): x is string => !!x))];
+  if (defIds.length) {
+    const { data: defs } = await userDb.from("definitions").select("id, name").in("id", defIds);
+    for (const d of (defs ?? []) as { id: string; name: string }[]) nameOf.set(d.id, d.name);
+  }
+  if (stratIds.length) {
+    const { data: strats } = await userDb.from("strategies").select("id, name").in("id", stratIds);
+    for (const s of (strats ?? []) as { id: string; name: string }[]) nameOf.set(s.id, s.name);
+  }
+  const candidate = constraintOfferCandidate(rows.map((r) => ({
+    id: r.id,
+    text: r.constraint_text ?? "",
+    targetName: (r.target_definition_id ? nameOf.get(r.target_definition_id) : r.target_strategy_id ? nameOf.get(r.target_strategy_id) : undefined) ?? "対象",
+    offeredAt: r.offered_at,
+  })));
+  if (!candidate) return null;
+  const { data: stamped } = await admin.from("constraint_drafts")
+    .update({ offered_at: new Date().toISOString() })
+    .eq("id", candidate.id).is("offered_at", null).select("id").maybeSingle();
+  if (!stamped) return null;
+  return constraintOfferText(candidate);
+}
+
 /** The definition an Element follows: its own, else the first enabled of its
  *  Strategies'. A disabled definition is skipped as if its slot were empty;
  *  the skipped names come back so the run can say it went on without them. */
-async function loadDefinition(userDb: SupabaseClient, elementId: string): Promise<{ definition: { name: string; body: string; scope: "element" | "strategy" } | null; skippedDisabled: string[] }> {
+async function loadDefinition(userDb: SupabaseClient, elementId: string): Promise<{ definition: { id: string; name: string; body: string; scope: "element" | "strategy" } | null; skippedDisabled: string[] }> {
   const { data: el } = await userDb.from("elements").select("definition_id, object_id").eq("id", elementId).maybeSingle();
   const ownId = (el as { definition_id?: string | null } | null)?.definition_id ?? null;
   const candidates: (DefinitionCandidate | null)[] = [];
@@ -4568,7 +4693,7 @@ async function loadDefinition(userDb: SupabaseClient, elementId: string): Promis
   if (!id) return { definition: null, skippedDisabled };
   const { data: d } = await userDb.from("definitions").select("name, body").eq("id", id).maybeSingle();
   if (!d) return { definition: null, skippedDisabled };
-  return { definition: { ...(d as { name: string; body: string }), scope: id === ownId ? "element" : "strategy" }, skippedDisabled };
+  return { definition: { id, ...(d as { name: string; body: string }), scope: id === ownId ? "element" : "strategy" }, skippedDisabled };
 }
 
 /** One measure of a Strategy an Element serves, as the readings gate and

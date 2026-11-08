@@ -31,6 +31,8 @@ import type {
   IntegrationDraftStatus, DraftRequestContext, DraftDrop, DraftChangeEvent,
   PromotionDraftStatus, PromotionBinding, PromotionMaterialSource, PromotionDraftEvent,
   RevisionCandidateReason, RevisionCandidateStatus,
+  ConstraintScope, ConstraintDerivedFrom, ConstraintDraftStatus, ConstraintClusterRecord, ConstraintDraftEvent,
+  PlanningConstraintStatus, ConstraintEffectStatus, ConstraintEffectRecord,
 } from './database'
 import type { ElementImportResult, ElementImportRow } from '@/Function/shared/element/intakeModel'
 import type { DeploymentGrant, GrantOperation } from '@/Function/audit/auditModel'
@@ -136,6 +138,21 @@ interface ColumnOverrides {
   definition_revision_candidates: {
     reason: RevisionCandidateReason
     status: RevisionCandidateStatus
+  }
+  constraint_drafts: {
+    scope: ConstraintScope
+    derived_from: ConstraintDerivedFrom
+    status: ConstraintDraftStatus
+    cluster: ConstraintClusterRecord
+    events: ConstraintDraftEvent[]
+  }
+  planning_constraints: {
+    scope: ConstraintScope
+    derived_from: ConstraintDerivedFrom
+    status: PlanningConstraintStatus
+    effect_status: ConstraintEffectStatus
+    effect: ConstraintEffectRecord
+    retire_reason: 'owner' | 'folded' | null
   }
   code_changes: { provider: 'github'; state: CodeChangeState; linked_via: 'manual' | 'agent' }
   code_change_reviews: { verdict: 'comment' | 'matches' | 'needs_changes' }

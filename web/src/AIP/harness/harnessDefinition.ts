@@ -22,6 +22,9 @@
 //   # 使うコネクタ / Connectors "- GitHub": the connectors the work needs
 //   # 分け方 / Breakdown       how the Planner breaks a Strategy into Objects and Elements
 //   # 担当の決め方 / Assignment which person of the Space the Planner gives a person's task to
+//   # 制約 / Constraints       standing lessons folded into the body by hand —
+//                              distinct from activated constraint drafts (B6),
+//                              which land as a projection and never rewrite this text
 
 export type OutputFormat = "markdown" | "html" | "csv" | "json";
 
@@ -42,12 +45,18 @@ export interface ParsedDefinition {
    *  a fact of that type may have before a finish's claim to it is stale.
    *  Declared only — freshnessTableOf layers these over the defaults. */
   freshness: FreshnessTable;
+  /** The body's own 制約 section: lessons a person folded into the body
+   *  by hand. Activated constraint drafts (planning_constraints) are NOT
+   *  parsed from here — they land as a projection at resolution,
+   *  computed from the table, so rolling one back never rewrites what
+   *  a person wrote. */
+  constraints: string[];
 }
 
 /** How old a fact of a data type may be, in ms, before a claim to it is stale. */
 export type FreshnessTable = Record<string, number>;
 
-export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown" | "assignment";
+export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown" | "assignment" | "constraints";
 
 const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["goal", /^(目的|ゴール|goal|purpose)/i],
@@ -60,6 +69,7 @@ const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["connectors", /^(使うコネクタ|コネクタ|connectors?)/i],
   ["breakdown", /^(分け方|分解の仕方|分解|breakdown|decomposition)/i],
   ["assignment", /^(担当の決め方|担当|assignment)/i],
+  ["constraints", /^(制約|守ること|constraints?)/i],
 ];
 
 /** Pure. The section a heading names, or null for a heading of the author's own. */
@@ -80,7 +90,7 @@ function num(raw: string): number | null {
 }
 
 export function parseDefinition(body: string): ParsedDefinition {
-  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "", assignment: "" } as Record<SectionKey, string>;
+  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "", assignment: "", constraints: "" } as Record<SectionKey, string>;
   let current: SectionKey | null = null;
   let checksHeading = "";
   let inFence = false;
@@ -126,7 +136,7 @@ export function parseDefinition(body: string): ParsedDefinition {
   }
   const connectors = [...new Set(bullets(sections.connectors).map((c) => c.split(/[（(:：]/)[0].trim()).filter(Boolean))];
   const freshness = parseFreshness(sections.conditions);
-  return { sections, metric, stop, checks, output, connectors, freshness };
+  return { sections, metric, stop, checks, output, connectors, freshness, constraints: bullets(sections.constraints) };
 }
 
 // ── Freshness: how old a fact may be before a claim to it is stale ─────────

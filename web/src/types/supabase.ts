@@ -1474,6 +1474,116 @@ export type Database = {
           },
         ]
       }
+      constraint_drafts: {
+        Row: {
+          activated_constraint_id: string | null
+          activity_space_id: string
+          binding_hash: string | null
+          calibration_candidate_id: string | null
+          cluster: Json
+          constraint_text: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          derived_from: string
+          events: Json
+          evidence_outcome_ids: string[]
+          expires_at: string | null
+          id: string
+          offered_at: string | null
+          scope: string
+          signature: string
+          status: string
+          structure_hash: string | null
+          target_definition_id: string | null
+          target_snapshot: string | null
+          target_strategy_id: string | null
+          target_version: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated_constraint_id?: string | null
+          activity_space_id: string
+          binding_hash?: string | null
+          calibration_candidate_id?: string | null
+          cluster?: Json
+          constraint_text?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          derived_from: string
+          events?: Json
+          evidence_outcome_ids?: string[]
+          expires_at?: string | null
+          id?: string
+          offered_at?: string | null
+          scope: string
+          signature: string
+          status?: string
+          structure_hash?: string | null
+          target_definition_id?: string | null
+          target_snapshot?: string | null
+          target_strategy_id?: string | null
+          target_version?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated_constraint_id?: string | null
+          activity_space_id?: string
+          binding_hash?: string | null
+          calibration_candidate_id?: string | null
+          cluster?: Json
+          constraint_text?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          derived_from?: string
+          events?: Json
+          evidence_outcome_ids?: string[]
+          expires_at?: string | null
+          id?: string
+          offered_at?: string | null
+          scope?: string
+          signature?: string
+          status?: string
+          structure_hash?: string | null
+          target_definition_id?: string | null
+          target_snapshot?: string | null
+          target_strategy_id?: string | null
+          target_version?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "constraint_drafts_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "constraint_drafts_target_definition_id_fkey"
+            columns: ["target_definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "constraint_drafts_target_strategy_id_fkey"
+            columns: ["target_strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "constraint_drafts_activated_fk"
+            columns: ["activated_constraint_id"]
+            isOneToOne: false
+            referencedRelation: "planning_constraints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credential_requests: {
         Row: {
           activity_space_id: string
@@ -4721,6 +4831,110 @@ export type Database = {
           },
         ]
       }
+      planning_constraints: {
+        Row: {
+          activated_at: string
+          activated_by: string
+          activity_space_id: string
+          baseline_outcomes: number
+          baseline_rate: number
+          baseline_with: number
+          constraint_text: string
+          created_at: string
+          derived_from: string
+          draft_id: string
+          effect: Json
+          effect_status: string
+          id: string
+          retire_reason: string | null
+          retired_at: string | null
+          retired_by: string | null
+          scope: string
+          signature: string
+          status: string
+          target_definition_id: string | null
+          target_strategy_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string
+          activated_by: string
+          activity_space_id: string
+          baseline_outcomes: number
+          baseline_rate: number
+          baseline_with: number
+          constraint_text: string
+          created_at?: string
+          derived_from: string
+          draft_id: string
+          effect?: Json
+          effect_status?: string
+          id?: string
+          retire_reason?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          scope: string
+          signature: string
+          status?: string
+          target_definition_id?: string | null
+          target_strategy_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string
+          activated_by?: string
+          activity_space_id?: string
+          baseline_outcomes?: number
+          baseline_rate?: number
+          baseline_with?: number
+          constraint_text?: string
+          created_at?: string
+          derived_from?: string
+          draft_id?: string
+          effect?: Json
+          effect_status?: string
+          id?: string
+          retire_reason?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          scope?: string
+          signature?: string
+          status?: string
+          target_definition_id?: string | null
+          target_strategy_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planning_constraints_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planning_constraints_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "constraint_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planning_constraints_target_definition_id_fkey"
+            columns: ["target_definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planning_constraints_target_strategy_id_fkey"
+            columns: ["target_strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -4797,6 +5011,104 @@ export type Database = {
             foreignKeyName: "run_iterations_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      run_outcomes: {
+        Row: {
+          activity_space_id: string | null
+          approvals_approved: number
+          approvals_asked: number
+          approvals_policy: number
+          approvals_rejected: number
+          cost_usd: number
+          created_at: string
+          definition_id: string | null
+          definition_version: number | null
+          driver: string
+          element_id: string | null
+          evidence: Json
+          finished_at: string
+          human_signal: string
+          id: string
+          outcome: string | null
+          readings_applied: number
+          readings_held: number
+          revisions: number
+          run_id: string
+          signal_at: string | null
+          signal_by: string | null
+          signal_source: string | null
+          strategy_id: string | null
+          updated_at: string
+          verdict_reason: string | null
+          verdict_result: string | null
+        }
+        Insert: {
+          activity_space_id?: string | null
+          approvals_approved?: number
+          approvals_asked?: number
+          approvals_policy?: number
+          approvals_rejected?: number
+          cost_usd?: number
+          created_at?: string
+          definition_id?: string | null
+          definition_version?: number | null
+          driver: string
+          element_id?: string | null
+          evidence?: Json
+          finished_at: string
+          human_signal?: string
+          id?: string
+          outcome?: string | null
+          readings_applied?: number
+          readings_held?: number
+          revisions?: number
+          run_id: string
+          signal_at?: string | null
+          signal_by?: string | null
+          signal_source?: string | null
+          strategy_id?: string | null
+          updated_at?: string
+          verdict_reason?: string | null
+          verdict_result?: string | null
+        }
+        Update: {
+          activity_space_id?: string | null
+          approvals_approved?: number
+          approvals_asked?: number
+          approvals_policy?: number
+          approvals_rejected?: number
+          cost_usd?: number
+          created_at?: string
+          definition_id?: string | null
+          definition_version?: number | null
+          driver?: string
+          element_id?: string | null
+          evidence?: Json
+          finished_at?: string
+          human_signal?: string
+          id?: string
+          outcome?: string | null
+          readings_applied?: number
+          readings_held?: number
+          revisions?: number
+          run_id?: string
+          signal_at?: string | null
+          signal_by?: string | null
+          signal_source?: string | null
+          strategy_id?: string | null
+          updated_at?: string
+          verdict_reason?: string | null
+          verdict_result?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_outcomes_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
             referencedRelation: "agent_runs"
             referencedColumns: ["id"]
           },
@@ -4897,6 +5209,7 @@ export type Database = {
           id: string
           name: string
           order_index: number | null
+          planner_constraints: Json
           scope: Json
           status: string | null
           updated_at: string
@@ -4913,6 +5226,7 @@ export type Database = {
           id?: string
           name: string
           order_index?: number | null
+          planner_constraints?: Json
           scope?: Json
           status?: string | null
           updated_at?: string
@@ -4929,6 +5243,7 @@ export type Database = {
           id?: string
           name?: string
           order_index?: number | null
+          planner_constraints?: Json
           scope?: Json
           status?: string | null
           updated_at?: string
@@ -6275,6 +6590,10 @@ export type Database = {
       activate_integration_draft: { Args: { p_draft_id: string }; Returns: string }
       activate_promotion_draft: { Args: { p_draft_id: string }; Returns: string }
       accept_unverifiable_promotion: { Args: { p_draft_id: string }; Returns: boolean }
+      activate_constraint_draft: {
+        Args: { p_draft_id: string }
+        Returns: string
+      }
       add_widget: {
         Args: {
           p_board_id: string
@@ -6359,6 +6678,10 @@ export type Database = {
         Returns: Json
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      deactivate_planning_constraint: {
+        Args: { p_constraint_id: string; p_reason?: string }
+        Returns: boolean
+      }
       decide_workflow_approval: {
         Args: { _approval_id: string; _approve: boolean; _note?: string }
         Returns: Json
@@ -6551,6 +6874,7 @@ export type Database = {
         Args: { p_asset_id: string; p_events: Json }
         Returns: number
       }
+      reject_constraint_draft: { Args: { p_draft_id: string }; Returns: boolean }
       reject_integration_draft: { Args: { p_draft_id: string }; Returns: boolean }
       reject_promotion_draft: { Args: { p_draft_id: string }; Returns: boolean }
       rollback_promoted_definition: { Args: { p_draft_id: string }; Returns: boolean }

@@ -18,6 +18,8 @@ import { saveOAuthReturnSettingsTab, useOAuthOutcome } from '@/AIP/connectors/oa
 import { applyDefinitionCatalogUpdate, createDefinition, deleteDefinition, markDefinitionCatalogVersion, setDefinitionEnabled, updateDefinition, useDefinitions, useSpaceDefaultHarness, type Definition } from '@/hooks/definitionData';
 import { resolveRevisionCandidate, useDefinitionCalibration } from '@/hooks/calibrationData';
 import { calibrationSummaryOf, candidateErrorCount, ratePercent } from './calibrationModel';
+import { activateConstraintDraft, deactivatePlanningConstraint, rejectConstraintDraft, useDefinitionConstraints, useSpaceConstraintQueue } from '@/hooks/constraintData';
+import { constraintEffectOf, constraintKpiOf, draftBaselineOf } from './constraintModel';
 import { useCatalog, useConnectorDirectory, type CatalogDefinition } from '@/hooks/customizeData';
 import { checkHarness, parseDefinition, type Diagnostic } from './harnessDefinition';
 import { catalogRelation, lineDiffCounts } from './installState';
@@ -282,6 +284,10 @@ export function HarnessesPanel() {
       {mode === 'yours' && (
         <PromotionsSection spaceId={spaceId} isOwner={isOwner} definitions={library.data}
           onChanged={() => { void library.refetch(); }} />
+      )}
+
+      {mode === 'yours' && (
+        <ConstraintsSection spaceId={spaceId} isOwner={isOwner} />
       )}
 
       {mode === 'yours' ? (
@@ -573,6 +579,7 @@ function HarnessEditor({ spaceId, definition, connected, isOwner, onClose, onSav
             placeholder={'# 目的\n…\n# 進め方\n1. …\n# 止める条件\n- …\n# 使うコネクタ\n- GitHub\n# 成果物の型\n```md\n# …\n```'} />
           {body.trim() && <Diagnostics diagnostics={diagnostics} />}
           {definition && <CalibrationSection spaceId={spaceId} definitionId={definition.id} isOwner={isOwner} />}
+          {definition && <ActiveConstraintsSection spaceId={spaceId} definitionId={definition.id} isOwner={isOwner} />}
           {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
         <DialogFooter>
@@ -644,6 +651,137 @@ function CalibrationSection({ spaceId, definitionId, isOwner }: {
           {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The learned-constraints queue (B6): the lessons the tick's
+ *  derivation drafted from this Space's outcome clusters, waiting for
+ *  an owner's Activate / Reject. Each draft shows its text, its
+ *  target, where the lesson came from, the baseline it claims it
+ *  will move (the failure's rate over the target's recent runs) and
+ *  how many outcomes stand as evidence — the decision minimum for
+ *  "do I believe this lesson", and nothing else. Activation goes
+ *  through the owner-checked, hash-bound RPC: if the target was
+ *  edited after drafting, the RPC refuses and the error says why.
+ *  The KPI line is the loop's own scoreboard: drafted / active /
+ *  established / not helping. Nothing renders at all until the
+ *  derivation has something to say. */
+function ConstraintsSection({ spaceId, isOwner }: { spaceId: string | null; isOwner: boolean }) {
+  const { t } = useI18n();
+  const { drafts, constraints, loading, refetch } = useSpaceConstraintQueue(spaceId);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!spaceId || (drafts.length === 0 && constraints.length === 0 && !loading)) return null;
+  const kpi = constraintKpiOf(drafts, constraints);
+  const derivedLabel = (d: (typeof drafts)[number]) =>
+    d.derived_from === 'verifier_gap' ? t('From verifier gaps')
+      : d.derived_from === 'rejection_cluster' ? t('From work people rejected')
+      : t('From a repeated correction');
+  const decide = async (id: string, act: 'activate' | 'reject') => {
+    setBusyId(id); setError(null);
+    try {
+      if (act === 'activate') await activateConstraintDraft(id);
+      else await rejectConstraintDraft(id);
+      refetch();
+    } catch (e) { setError(formatError(e)); }
+    setBusyId(null);
+  };
+  return (
+    <div className="space-y-2">
+      <h3 className="text-[13px] font-medium text-foreground">{t('Learned constraints')}</h3>
+      <p className="text-[11px] tabular-nums text-muted-foreground">
+        {t('{proposed} drafted · {activated} active · {established} established · {ineffective} not helping', {
+          proposed: kpi.proposed, activated: kpi.active, established: kpi.established, ineffective: kpi.ineffective,
+        })}
+      </p>
+      <div>
+        {drafts.map((d) => {
+          const baseline = draftBaselineOf(d);
+          return (
+            <div key={d.id} className="-mx-2 flex w-[calc(100%+16px)] items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-[var(--surface-strong)]">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="text-[13px] font-medium text-foreground">{d.constraint_text}</div>
+                <div className="truncate text-[12px] text-muted-foreground">
+                  {d.targetName} · {derivedLabel(d)}
+                </div>
+                {baseline && (
+                  <div className="text-[11px] tabular-nums text-muted-foreground">
+                    {t('This failure showed in {with} of {total} runs ({rate}%)', {
+                      with: baseline.withSignature, total: baseline.windowOutcomes, rate: baseline.ratePercent,
+                    })}
+                    {' · '}
+                    {t('Evidence: {n} results', { n: d.evidence_outcome_ids.length })}
+                    {d.expires_at ? ` · ${t('Review by {date}', { date: d.expires_at.slice(0, 10) })}` : ''}
+                  </div>
+                )}
+              </div>
+              {isOwner && (
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button size="xs" variant="secondary" disabled={busyId !== null} onClick={() => void decide(d.id, 'activate')}>{t('Activate')}</Button>
+                  <Button size="xs" variant="ghost" disabled={busyId !== null} onClick={() => void decide(d.id, 'reject')}>{t('Reject')}</Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+    </div>
+  );
+}
+
+/** A definition's active constraints (B6), in its editor: the rules
+ *  currently layered over this body — rendered into its effective
+ *  body at resolution, never written into the body itself — each with
+ *  its scoreboard. A constraint whose failure is not going down is
+ *  flagged here in warning tone; flagging is all the measurement
+ *  does. Retiring one is the owner's act (Deactivate), here or
+ *  nowhere — nothing retires a constraint on its own. */
+function ActiveConstraintsSection({ spaceId, definitionId, isOwner }: {
+  spaceId: string; definitionId: string; isOwner: boolean;
+}) {
+  const { t } = useI18n();
+  const { constraints, loading, refetch } = useDefinitionConstraints(spaceId, definitionId);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (loading || constraints.length === 0) return null;
+  const retire = async (id: string) => {
+    setBusyId(id); setError(null);
+    try { await deactivatePlanningConstraint(id, 'owner'); refetch(); }
+    catch (e) { setError(formatError(e)); }
+    setBusyId(null);
+  };
+  return (
+    <div className="space-y-2 rounded-md border border-[var(--border-default)] p-3">
+      <div className="text-[11px] text-muted-foreground">{t('Active constraints')}</div>
+      {constraints.map((c) => {
+        const fx = constraintEffectOf(c);
+        return (
+          <div key={c.id} className="space-y-1">
+            <div className="flex items-start gap-2">
+              <p className="min-w-0 flex-1 text-[12px] text-foreground">{c.constraint_text}</p>
+              {isOwner && (
+                <Button size="xs" variant="ghost" className="shrink-0" disabled={busyId !== null} onClick={() => void retire(c.id)}>{t('Deactivate')}</Button>
+              )}
+            </div>
+            <p className={`text-[11px] tabular-nums ${fx.status === 'ineffective' ? 'text-[var(--status-warning)]' : 'text-muted-foreground'}`}>
+              {fx.status === 'ineffective'
+                ? t('Not helping — the failure it targets has not gone down ({with} of {under} runs under it; it was {rate}% before)', {
+                    with: fx.withSignature, under: fx.under, rate: fx.baselinePercent,
+                  })
+                : fx.status === 'established'
+                  ? t('Holding — the failure rate has stayed below where it started')
+                  : fx.status === 'improving'
+                    ? t('Helping — the failure is going down ({with} of {under} runs under it; it was {rate}% before)', {
+                        with: fx.withSignature, under: fx.under, rate: fx.baselinePercent,
+                      })
+                    : t('Still measuring — {under} runs under it so far', { under: fx.under })}
+            </p>
+          </div>
+        );
+      })}
+      {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
     </div>
   );
 }

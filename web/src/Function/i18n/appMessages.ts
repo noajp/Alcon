@@ -910,6 +910,19 @@ const APP_MESSAGES: Record<string, Row> = {
   'Queued for revision: this verifier fails work people accept ({errors} of {n} paired results, {rate}%).': ['見直し待ち：この検証は、人が受け入れる成果を落としがちです（ペア {n} 件中 {errors} 件、{rate}%）。', '수정 대기 중: 이 검증은 사람이 받아들이는 결과를 떨어뜨리는 경향이 있습니다(페어 {n}건 중 {errors}건, {rate}%).', 'En attente de révision : ce vérificateur rejette des travaux que les personnes acceptent ({errors} sur {n} paires, {rate} %).', 'En espera de revisión: este verificador rechaza trabajo que las personas aceptan ({errors} de {n} pares, {rate}%).'],
   'Queued for revision.': ['見直し待ちです。', '수정 대기 중입니다.', 'En attente de révision.', 'En espera de revisión.'],
   'Mark addressed': ['対応済みにする', '대응 완료로 표시', 'Marquer comme traité', 'Marcar como atendido'],
+  'Learned constraints': ['学んだ制約', '학습한 제약', 'Contraintes apprises', 'Restricciones aprendidas'],
+  '{proposed} drafted · {activated} active · {established} established · {ineffective} not helping': ['草案 {proposed} · 有効 {activated} · 定着 {established} · 効果なし {ineffective}', '초안 {proposed} · 활성 {activated} · 정착 {established} · 효과 없음 {ineffective}', '{proposed} en brouillon · {activated} actives · {established} établies · {ineffective} sans effet', '{proposed} en borrador · {activated} activas · {established} establecidas · {ineffective} sin efecto'],
+  'From verifier gaps': ['検証の不足から', '검증의 부족에서', 'Des écarts du vérificateur', 'De las carencias del verificador'],
+  'From work people rejected': ['人が差し戻した仕事から', '사람이 반려한 작업에서', 'Des travaux renvoyés par les personnes', 'Del trabajo que las personas rechazaron'],
+  'From a repeated correction': ['繰り返された修正から', '반복된 수정에서', 'D’une correction répétée', 'De una corrección repetida'],
+  'This failure showed in {with} of {total} runs ({rate}%)': ['この失敗は {total} 件中 {with} 件に出ていました（{rate}%）', '이 실패는 {total}건 중 {with}건에서 나타났습니다({rate}%)', 'Cet échec apparaissait dans {with} exécutions sur {total} ({rate} %)', 'Este fallo aparecía en {with} de {total} ejecuciones ({rate} %)'],
+  'Evidence: {n} results': ['証拠: 結果 {n} 件', '증거: 결과 {n}건', 'Preuves : {n} résultats', 'Evidencia: {n} resultados'],
+  'Review by {date}': ['{date} までに審査', '{date}까지 검토', 'À examiner avant le {date}', 'Revisar antes del {date}'],
+  'Active constraints': ['有効な制約', '활성 제약', 'Contraintes actives', 'Restricciones activas'],
+  'Not helping — the failure it targets has not gone down ({with} of {under} runs under it; it was {rate}% before)': ['効果が出ていません — 対象の失敗は減っていません（有効化後の {under} 件中 {with} 件、以前は {rate}%）', '효과가 나타나지 않습니다 — 대상 실패가 줄지 않았습니다(활성화 후 {under}건 중 {with}건, 이전 {rate}%)', 'Sans effet — l’échec visé n’a pas baissé ({with} exécutions sur {under} depuis l’activation ; {rate} % avant)', 'Sin efecto: el fallo objetivo no ha bajado ({with} de {under} ejecuciones desde la activación; antes {rate} %)'],
+  'Helping — the failure is going down ({with} of {under} runs under it; it was {rate}% before)': ['効いています — 対象の失敗は減っています（有効化後の {under} 件中 {with} 件、以前は {rate}%）', '효과가 있습니다 — 대상 실패가 줄고 있습니다(활성화 후 {under}건 중 {with}건, 이전 {rate}%)', 'Efficace — l’échec visé baisse ({with} exécutions sur {under} depuis l’activation ; {rate} % avant)', 'Funciona: el fallo objetivo está bajando ({with} de {under} ejecuciones desde la activación; antes {rate} %)'],
+  'Holding — the failure rate has stayed below where it started': ['定着しています — 失敗率は下がったままです', '정착했습니다 — 실패율이 낮아진 상태를 유지합니다', 'Établi — le taux d’échec est resté en dessous de son niveau de départ', 'Establecida: la tasa de fallos se ha mantenido por debajo del inicio'],
+  'Still measuring — {under} runs under it so far': ['測定中 — 有効化後の実行はまだ {under} 件です', '측정 중 — 활성화 후 실행이 아직 {under}건입니다', 'Mesure en cours — {under} exécutions depuis l’activation', 'Midiendo: {under} ejecuciones desde la activación'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));
