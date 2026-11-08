@@ -48,6 +48,7 @@ export type Database = {
       activity_spaces: {
         Row: {
           ai_monthly_budget_usd: number
+          approval_mode: string
           color: string | null
           created_at: string
           created_by: string
@@ -62,6 +63,7 @@ export type Database = {
         }
         Insert: {
           ai_monthly_budget_usd?: number
+          approval_mode?: string
           color?: string | null
           created_at?: string
           created_by?: string
@@ -76,6 +78,7 @@ export type Database = {
         }
         Update: {
           ai_monthly_budget_usd?: number
+          approval_mode?: string
           color?: string | null
           created_at?: string
           created_by?: string
@@ -96,12 +99,14 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           decision_note: string | null
+          decision_source: string | null
           element_id: string | null
           expires_at: string | null
           id: string
           input: Json
           input_hash: string
           integration_id: string | null
+          policy_mode: string | null
           result: Json | null
           run_id: string
           status: string
@@ -114,12 +119,14 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
+          decision_source?: string | null
           element_id?: string | null
           expires_at?: string | null
           id?: string
           input?: Json
           input_hash: string
           integration_id?: string | null
+          policy_mode?: string | null
           result?: Json | null
           run_id: string
           status?: string
@@ -132,12 +139,14 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
+          decision_source?: string | null
           element_id?: string | null
           expires_at?: string | null
           id?: string
           input?: Json
           input_hash?: string
           integration_id?: string | null
+          policy_mode?: string | null
           result?: Json | null
           run_id?: string
           status?: string
@@ -258,6 +267,7 @@ export type Database = {
         Row: {
           activity_space_id: string | null
           ai_session_id: string | null
+          approval_mode: string | null
           continuation_count: number
           continuation_token: string | null
           cost_usd: number
@@ -290,6 +300,7 @@ export type Database = {
         Insert: {
           activity_space_id?: string | null
           ai_session_id?: string | null
+          approval_mode?: string | null
           continuation_count?: number
           continuation_token?: string | null
           cost_usd?: number
@@ -322,6 +333,7 @@ export type Database = {
         Update: {
           activity_space_id?: string | null
           ai_session_id?: string | null
+          approval_mode?: string | null
           continuation_count?: number
           continuation_token?: string | null
           cost_usd?: number
@@ -4384,6 +4396,41 @@ export type Database = {
           },
         ]
       }
+      space_approval_mode_changes: {
+        Row: {
+          activity_space_id: string
+          changed_by: string | null
+          created_at: string
+          from_mode: string | null
+          id: string
+          to_mode: string
+        }
+        Insert: {
+          activity_space_id: string
+          changed_by?: string | null
+          created_at?: string
+          from_mode?: string | null
+          id?: string
+          to_mode: string
+        }
+        Update: {
+          activity_space_id?: string
+          changed_by?: string | null
+          created_at?: string
+          from_mode?: string | null
+          id?: string
+          to_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_approval_mode_changes_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategies: {
         Row: {
           activity_space_id: string | null
@@ -5963,6 +6010,10 @@ export type Database = {
       set_oauth_client_access: {
         Args: { p_access: string; p_client_id: string }
         Returns: undefined
+      }
+      set_space_approval_mode: {
+        Args: { p_mode: string; p_space_id: string }
+        Returns: string
       }
       space_ai_spend_this_month: {
         Args: { p_space_id: string }

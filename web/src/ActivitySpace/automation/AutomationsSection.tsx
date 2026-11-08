@@ -13,7 +13,7 @@ import { describeCron, parseCron, nextCronRun } from '@/AIP/automation/cron';
 import { useDefinitions } from '@/hooks/definitionData';
 import { enabledDefinitions } from '@/AIP/harness/installState';
 import {
-  createAutomation, deleteAutomation, issueWebhookToken, runAutomationNow, setAutomationEnabled,
+  createAutomation, deleteAutomation, issueWebhookToken, runAutomationNow, runWaitingOnApproval, setAutomationEnabled,
   useAutomationEvents, useAutomations, webhookUrl, type Automation, type AutomationKind,
 } from '@/hooks/automationData';
 
@@ -155,6 +155,7 @@ function RecentStarts({ automationId, onOpenElement }: { automationId: string; o
   if (events.loading) return <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>;
   if (events.data.length === 0) return <p className="text-[12px] text-muted-foreground">{t('It has not started yet.')}</p>;
   const label: Record<string, string> = { schedule: 'On schedule', webhook: 'From outside', manual: 'Run now' };
+  const latestWaiting = events.data.length > 0 && runWaitingOnApproval(events.data[0].run_status);
   return (
     <div>
       <p className="mb-1 text-[12px] font-medium text-foreground">{t('Recent starts')}</p>
@@ -168,9 +169,19 @@ function RecentStarts({ automationId, onOpenElement }: { automationId: string; o
               : e.element_id && onOpenElement
                 ? <button type="button" onClick={() => onOpenElement(e.element_id!)} className="min-w-0 flex-1 truncate text-left text-foreground hover:underline">{t('Open the Element')}</button>
                 : <span className="min-w-0 flex-1 text-muted-foreground">{t(e.status === 'started' ? 'Started' : 'Received')}</span>}
+            {runWaitingOnApproval(e.run_status) && (
+              <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--status-warning)]">
+                {t('Waiting for approval')}
+              </span>
+            )}
           </li>
         ))}
       </ul>
+      {latestWaiting && (
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          {t('The latest run stopped at an approval on its Element, as the approval mode specifies. It continues as soon as someone approves — under Free action, unattended runs go to the end.')}
+        </p>
+      )}
     </div>
   );
 }

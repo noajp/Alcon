@@ -187,6 +187,13 @@ export function catalogIndex(tools: (RunToolDef & { area?: ToolArea })[]): strin
 
 // ── Executor ────────────────────────────────────────────────────────────────
 
+/** Pure. The refusal a denied catalog call is answered with — one wording,
+ *  whether the refusal comes from the approval gate (a deny verdict is
+ *  answered before dispatch) or from the executor's own recheck below. */
+export function catalogDenyRefusal(name: string, input: Record<string, unknown>): string {
+  return `この操作（${catalogOperation(name, input)}）はここからは実行できません。必要なら人に頼んでください。`;
+}
+
 /**
  * Runs one catalog tool with the caller's client, under the entry's policy:
  * a call the entry may not run is refused, and one that needs approval runs
@@ -199,7 +206,7 @@ export async function runCatalogTool(
   const tool = BY_NAME.get(name);
   if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
   const decision = decideCall(under.entry, tool, input);
-  if (decision === "deny") return { ok: false, error: `この操作（${catalogOperation(name, input)}）はここからは実行できません。必要なら人に頼んでください。` };
+  if (decision === "deny") return { ok: false, error: catalogDenyRefusal(name, input) };
   if (decision === "approve" && !under.approved) return { ok: false, error: `この操作（${catalogOperation(name, input)}）は承認を受けてから実行されます。` };
   try {
     if (name === "campaignMeasure") return await runMeasureTool(db, input);

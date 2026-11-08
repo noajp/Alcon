@@ -233,9 +233,16 @@ export function integrationApprovalFacts(it: IntegrationTool | undefined, call: 
  * maps it to. What a caller does with a successful answer (a run links the
  * GitHub pulls it opened to its Element) is the caller's own post-step.
  */
+/** Pure. The refusal a manifest-denied call is answered with — one wording,
+ *  whether the refusal comes from the approval gate (a deny verdict is
+ *  answered before dispatch) or from the executor's own recheck below. */
+export function manifestDenyRefusal(commandName: string): string {
+  return `${commandName} はこの引数では許可されていません（連携のルール）。別の引数にするか、人に頼んでください。`;
+}
+
 export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall): Promise<{ text: string; isError: boolean }> {
   if (it.command && it.manifest && decide(it.manifest, it.command, call.input).permission === "deny") {
-    return { text: `${it.command.name} はこの引数では許可されていません（連携のルール）。別の引数にするか、人に頼んでください。`, isError: true };
+    return { text: manifestDenyRefusal(it.command.name), isError: true };
   }
   // A declared API command becomes exactly the request its manifest maps it to.
   let httpInput: Record<string, unknown> = call.input;

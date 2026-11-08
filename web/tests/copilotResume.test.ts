@@ -31,6 +31,29 @@ describe("copilot turn assembly (Athena's chat driver)", () => {
   it('names the Copilot as its steps and notifications sign', () => {
     expect(anchorMod.COPILOT_AGENT_NAME).toBe('Alcon Copilot');
   });
+
+  it('carries the approval mode it was built under, defaulting to auto', async () => {
+    const plain = await turnMod.buildCopilotTurn({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      userDb: {} as any, admin: null,
+      context: { viewLabel: 'ボード', today: '2026-11-08' },
+      supabaseUrl: null, actor: { agent: 'Alcon Copilot', userId: 'u1' },
+    });
+    expect(plain.approvalMode).toBe('auto');
+    // Without an integration toolset there is no verdict to give: the
+    // catalog's own tools are the entry policy's alone.
+    expect(plain.verdictOf({ id: 'x', name: 'anything', input: {} })).toBeNull();
+
+    const freed = await turnMod.buildCopilotTurn({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      userDb: {} as any, admin: null,
+      context: { viewLabel: 'ボード', today: '2026-11-08' },
+      supabaseUrl: null, actor: { agent: 'Alcon Copilot', userId: 'u1' },
+      approvalMode: 'free',
+    });
+    expect(freed.approvalMode).toBe('free');
+    expect(freed.needsApproval({ id: 'x', name: 'anything', input: {} })).toBe(false);
+  });
 });
 
 type Block = Record<string, unknown>;
