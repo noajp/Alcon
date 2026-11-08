@@ -35,7 +35,7 @@ export function DelegateToAiForm({
   /** Why the last start failed, shown under the form. */
   error?: string | null;
   /** Unless the run started, the form stays with the note kept for another try. */
-  onStart: (opts: { workerId: string | null; prompt: string }) => Promise<AgentStartOutcome>;
+  onStart: (opts: { workerId: string | null; prompt: string; planMode: boolean }) => Promise<AgentStartOutcome>;
   /** The run started; the caller closes the form. */
   onStarted: () => void;
   /** Go to the run already going (the caller closes the form onto the
@@ -47,11 +47,14 @@ export function DelegateToAiForm({
   const [prompt, setPrompt] = useState(defaultPrompt ?? '');
   const [outcome, setOutcome] = useState<AgentStartOutcome | null>(null);
   const [workerId, setWorkerId] = useState<string | null>(defaultWorkerId ?? aiWorkers[0]?.id ?? null);
+  // Plan mode (B8): the run first walks the task as a dry run — reads for
+  // real, writes recorded as one plan — and only an approved plan applies.
+  const [planMode, setPlanMode] = useState(false);
   const chosen = aiWorkers.find((w) => w.id === workerId) ?? null;
 
   const run = async () => {
     if (busy || starting) return;
-    const result = await onStart({ workerId, prompt });
+    const result = await onStart({ workerId, prompt, planMode });
     setOutcome(result);
     if (result !== 'started') return;
     setPrompt('');
@@ -99,6 +102,22 @@ export function DelegateToAiForm({
           </Button>
         }
       />
+      {/* Plan mode is offered where the run is delegated: one checkbox
+          with its consequence in plain words — nothing is written until
+          the whole plan is approved. */}
+      <label className="mt-2 flex items-start gap-2 text-[12px] text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={planMode}
+          disabled={starting || busy}
+          onChange={(e) => setPlanMode(e.target.checked)}
+          className="mt-0.5 accent-primary"
+        />
+        <span>
+          {t('Plan first')}
+          <span className="block">{t('The agent first works through the task without writing anything, and shows the whole plan as one approval. Nothing is written until you approve it.')}</span>
+        </span>
+      </label>
       {outcome === 'busy' && (
         <p className="mt-2 text-[12px] text-muted-foreground">{t('The agent is already working on this Element. Stop it or wait for it to finish, then ask again.')}</p>
       )}

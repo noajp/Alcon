@@ -84,7 +84,22 @@ describe('DelegateToAiForm — the dialog’s content', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() => expect(onStarted).toHaveBeenCalledTimes(1));
-    expect(onStart).toHaveBeenCalledWith({ workerId: 'w-ai', prompt: '' });
+    expect(onStart).toHaveBeenCalledWith({ workerId: 'w-ai', prompt: '', planMode: false });
+  });
+
+  it('plan mode: checking “Plan first” starts a plan run (B8)', async () => {
+    const onStart = vi.fn(async () => 'started' as const);
+    const onStarted = vi.fn();
+    render(
+      <I18nProvider>
+        <DelegateToAiForm aiWorkers={[aiWorker]} defaultWorkerId="w-ai"
+          onStart={onStart} onStarted={onStarted} />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    await waitFor(() => expect(onStarted).toHaveBeenCalledTimes(1));
+    expect(onStart).toHaveBeenCalledWith({ workerId: 'w-ai', prompt: '', planMode: true });
   });
 
   it('busy: the form explains itself, offers the way to the run, and Run is off', async () => {

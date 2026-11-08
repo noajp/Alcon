@@ -1304,6 +1304,8 @@ export interface AgentRun {
   cost_usd: number | string
   activity_space_id: string | null
   continuation_count: number
+  /** A plan run (B8): writes recorded as a plan instead of executed. */
+  plan_mode?: boolean
 }
 
 export interface AgentRunInsert {
@@ -1318,6 +1320,8 @@ export interface AgentRunInsert {
   mode?: AgentRunMode
   prompt?: string | null
   reply_to?: string | null
+  /** Start as a plan run (B8): the dry run whose plan is one approval. */
+  plan_mode?: boolean
 }
 
 export interface AgentRunUpdate {
@@ -1959,8 +1963,9 @@ export interface AgentAction {
   decision_note: string | null
   /** Who decided: null is a person; 'policy' is the Space's free mode
    *  deciding by standing policy; 'track-record' is the action's earned
-   *  autonomy (B7) letting it run unasked. */
-  decision_source?: 'policy' | 'track-record' | null
+   *  autonomy (B7) letting it run unasked; 'plan' is an approved plan
+   *  (B8) covering the call it listed. */
+  decision_source?: 'policy' | 'track-record' | 'plan' | null
   /** The approval mode in force when the policy decided. */
   policy_mode?: 'ask' | 'auto' | 'free' | null
   result: Record<string, unknown> | null

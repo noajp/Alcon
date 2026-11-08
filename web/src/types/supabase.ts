@@ -319,6 +319,7 @@ export type Database = {
           mode: string
           model: string | null
           output_tokens: number
+          plan_mode: boolean
           promotion_draft_id: string | null
           prompt: string | null
           proposed_readings: Json | null
@@ -354,6 +355,7 @@ export type Database = {
           mode?: string
           model?: string | null
           output_tokens?: number
+          plan_mode?: boolean
           promotion_draft_id?: string | null
           prompt?: string | null
           proposed_readings?: Json | null
@@ -389,6 +391,7 @@ export type Database = {
           mode?: string
           model?: string | null
           output_tokens?: number
+          plan_mode?: boolean
           promotion_draft_id?: string | null
           prompt?: string | null
           proposed_readings?: Json | null
