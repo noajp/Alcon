@@ -9,11 +9,16 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { StrategyDelegation } from '@/types/database';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { AutomationsSection } from './AutomationsSection';
+import { OptionMenu } from '@/Function/shared/OptionMenu';
+import { setStrategyDefinition, useDefinitions } from '@/hooks/definitionData';
+
+/** The harness picker's value for "no harness of its own". */
+const SPACE_DEFAULT = '__space';
 
 // What runs on its own, in one place: the automations that start a harness
-// by themselves, and, for each Strategy's AI work, whether a verified result
-// goes on to the next step by itself or waits for a person — the same choice
-// its page offers under Execution.
+// by themselves, and, for each Strategy's AI work, the harness it follows and
+// whether a verified result goes on to the next step by itself or waits for a
+// person.
 
 const CHOICES: { value: StrategyDelegation; label: string }[] = [
   { value: 'manual', label: 'A person reviews each result' },
@@ -26,10 +31,17 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
   const { data: strategies, loading, refetch } = useStrategiesInSpace();
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const library = useDefinitions(spaceId);
 
   const change = async (id: string, delegation: StrategyDelegation) => {
     setSaving(id); setError(null);
     try { await updateStrategy(id, { delegation }); refetch(); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setSaving(null); }
+  };
+  const changeHarness = async (id: string, definitionId: string | null) => {
+    setSaving(id); setError(null);
+    try { await setStrategyDefinition(id, definitionId); refetch(); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setSaving(null); }
   };
@@ -55,6 +67,19 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
                 <button type="button" onClick={() => onOpenStrategy(s.id)} className="min-w-0 flex-1 truncate text-left text-[13px] text-foreground hover:underline">
                   {s.name}
                 </button>
+                {(() => {
+                  const harness = library.data.find((d) => d.id === s.definition_id) ?? null;
+                  return (
+                    <OptionMenu label={t('Harness')} value={harness?.id ?? SPACE_DEFAULT} disabled={saving === s.id}
+                      onChange={(v) => void changeHarness(s.id, v === SPACE_DEFAULT ? null : v)}
+                      options={[
+                        { value: SPACE_DEFAULT, label: t("The Space's default") },
+                        // A binding to an off harness stays stored and is shown as such.
+                        ...(harness && !harness.enabled ? [{ value: harness.id, label: `${harness.name} · ${t('Off')}` }] : []),
+                        ...library.data.filter((d) => d.enabled).map((d) => ({ value: d.id, label: d.name })),
+                      ]} />
+                  );
+                })()}
                 <div role="radiogroup" aria-label={t('When an AI finishes')} className="flex shrink-0 items-center gap-0.5 rounded-md bg-muted/40 p-0.5">
                   {CHOICES.map((c) => {
                     const on = (s.delegation ?? 'manual') === c.value;
