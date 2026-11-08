@@ -10,7 +10,8 @@
 //                                      The same tick lapses Copilot
 //                                      approvals left undecided past their
 //                                      seven days (Element approvals never
-//                                      expire).
+//                                      expire), and AI-drafted connections
+//                                      whose review window ran out (G4).
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -29,6 +30,7 @@ import { usableDefinition } from "../_shared/definitionResolution.ts";
 import { appendDecisionResults, type LoopState, type Msg, type PendingApproval } from "../_shared/agentLoop.ts";
 import { expiredApprovalResults, withApprovalDecision } from "../_shared/copilotSession.ts";
 import { COPILOT_AGENT_NAME, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
+import { deleteStagedRow, loadDraft, transitionDraft } from "../_shared/integrationDrafts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -260,7 +262,26 @@ async function tick(env: Env): Promise<Record<string, number>> {
     try { if (await expireCopilotApproval(env, a.id as string, a.run_id as string)) expired += 1; }
     catch (e) { console.error("automations: could not expire", a.id, e instanceof Error ? e.message : e); }
   }
-  return { fired, scheduled, resumed, expired };
+
+  // Drafted connections whose review window ran out undecided (G4):
+  // the draft expires and its staged row goes with it, so an unreviewed
+  // definition never lingers as a connection-shaped leftover.
+  let draftsExpired = 0;
+  const { data: staleDrafts } = await env.admin.from("integration_drafts").select("id")
+    .eq("status", "awaiting_review").not("expires_at", "is", null).lt("expires_at", now.toISOString())
+    .limit(20);
+  for (const row of staleDrafts ?? []) {
+    try {
+      const draft = await loadDraft(env.admin, row.id as string);
+      if (draft && await transitionDraft(env.admin, draft, "expired")) {
+        await deleteStagedRow(env.admin, draft);
+        draftsExpired += 1;
+      }
+    } catch (e) {
+      console.error("automations: could not expire draft", row.id, e instanceof Error ? e.message : e);
+    }
+  }
+  return { fired, scheduled, resumed, expired, draftsExpired };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

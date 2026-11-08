@@ -7,6 +7,9 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { missingConnectors, type ConnectorNeed } from '@/AIP/harness/installFlow';
 import { ConnectDialogHost, openedForPreset, type OpenedConnection } from './ConnectDialogHost';
 import { useIntegrations, useIsSpaceOwner } from './data';
+import { createDraft, useIntegrationDrafts } from './draftData';
+import { openDraftForName } from './draftModel';
+import { IntegrationDraftDialog } from './IntegrationDraftDialog';
 
 // The ask to connect, shown where work was delegated: it names what is
 // not connected and the work waiting on it, and its button opens the
@@ -29,8 +32,12 @@ export function ConnectRequestCard({ spaceId, needs, waitingFor }: {
 }) {
   const { t } = useI18n();
   const integrations = useIntegrations(spaceId);
+  const drafts = useIntegrationDrafts(spaceId);
   const isOwner = useIsSpaceOwner(spaceId);
   const [opened, setOpened] = useState<OpenedConnection | null>(null);
+  const [openedDraftId, setOpenedDraftId] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const names = useMemo(() => needs.map((n) => n.name), [needs]);
   // Until the live rows land, the snapshot stands; after, only what is
   // still missing is offered.
@@ -48,26 +55,67 @@ export function ConnectRequestCard({ spaceId, needs, waitingFor }: {
     );
   }
   const next = missing[0];
+  // A name with no preset can be drafted by the AI instead (G4): the
+  // card shows the draft's live state for that name, and offers to start
+  // one. Drafting checks the Registry and the presets again on the
+  // server before it writes anything, and activation stays an owner's
+  // act in the review dialog — starting a draft connects nothing.
+  const draft = openDraftForName(drafts.data, next.name);
+  const openedDraft = openedDraftId ? drafts.data.find((d) => d.id === openedDraftId) ?? null : null;
+  const startDraft = async () => {
+    setStarting(true); setStartError(null);
+    try {
+      const created = await createDraft(spaceId, {
+        name: next.name, purpose: waitingFor ?? '', entry: 'connect_card', waitingFor: waitingFor ?? null,
+      }, drafts.data);
+      void drafts.refetch();
+      setOpenedDraftId(created.id);
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStarting(false);
+    }
+  };
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 px-3 py-2.5">
       <Plug size={15} className="shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <p className="text-[13px] text-foreground">{t('Not connected: {names}', { names: missing.map((m) => m.name).join('、') })}</p>
         {waitingFor && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{t('{work} is waiting on this connection', { work: waitingFor })}</p>}
-        {isOwner === false && <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Only a Space owner can connect it.')}</p>}
-        {isOwner === true && !next.preset && (
-          <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Find and connect it from the MCP Registry in Settings › Customize')}</p>
+        {isOwner === false && !draft && <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Only a Space owner can connect it.')}</p>}
+        {draft && (
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            {draft.status === 'awaiting_review'
+              ? t('The drafted connection is waiting for review.')
+              : t('The AI is drafting this connection.')}
+          </p>
         )}
+        {startError && <p className="mt-0.5 text-[12px] text-[var(--status-danger)]">{startError}</p>}
       </div>
       {isOwner === true && next.preset && (
         <Button size="sm" variant="primary" onClick={() => setOpened(openedForPreset(next.preset!, integrations.data))}>
           {t('Connect {name}', { name: next.name })}
         </Button>
       )}
+      {draft ? (
+        <Button size="sm" variant="secondary" onClick={() => setOpenedDraftId(draft.id)}>
+          {t('Open the draft')}
+        </Button>
+      ) : !next.preset && isOwner !== null && (
+        <Button size="sm" variant="secondary" onClick={() => void startDraft()} disabled={starting}>
+          {starting ? t('Starting…') : t('Have the AI draft it')}
+        </Button>
+      )}
       {opened && (
         <ConnectDialogHost spaceId={spaceId} opened={opened} integrations={integrations.data} canEdit={isOwner === true}
           onClose={() => { setOpened(null); void integrations.refetch(); }}
           onCreated={(created) => setOpened((o) => (o ? { preset: o.preset, integration: created } : o))} />
+      )}
+      {openedDraft && (
+        <IntegrationDraftDialog spaceId={spaceId} draft={openedDraft} integrations={integrations.data}
+          canReview={isOwner === true}
+          onClose={() => setOpenedDraftId(null)}
+          onChanged={() => { void drafts.refetch(); void integrations.refetch(); }} />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, Check } from '@/ui/icons';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
@@ -17,6 +17,8 @@ import {
 } from './catalog';
 import { useIntegrationActions, useIntegrationOAuthStatus } from './data';
 import { CommandPermissions } from './CommandPermissions';
+import { useActiveDraftForIntegration } from './draftData';
+import { draftPermissionHashWeb, draftStructureHashWeb } from './draftModel';
 
 // One integration: connect a preset (or a custom MCP / API), or manage an
 // existing connection — credential, on/off, connection test,
@@ -416,6 +418,10 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
             </Field>
           )}
 
+          {integration?.preset === 'ai-drafted' && (
+            <DraftDriftNote integration={integration} />
+          )}
+
           {integration && (
             <Field label={t('Connection test')}>
               <div className="space-y-2">
@@ -479,6 +485,70 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** §4.11: a drafted connection against what was approved. A drafted
+ *  definition is stored trust — it keeps being used — so a change to
+ *  its structure (where requests go, how they authenticate, what the
+ *  commands are, the guide) is called out loudly, while a permission-
+ *  only change, the owner's ordinary tuning, is a quiet note. The
+ *  draft's change log says when the approved content last moved. */
+function DraftDriftNote({ integration }: { integration: Integration }) {
+  const { t, locale } = useI18n();
+  const { draft } = useActiveDraftForIntegration(integration.id);
+  const [computed, setComputed] = useState<{ key: string; drift: 'structure' | 'permission' | 'none' } | null>(null);
+  const structureHash = draft?.activated_structure_hash ?? null;
+  const permissionHash = draft?.activated_permission_hash ?? null;
+  const contentKey = `${integration.id}:${integration.updated_at}:${structureHash ?? ''}`;
+  useEffect(() => {
+    if (!draft || !structureHash) return;
+    let live = true;
+    const content = {
+      name: integration.name, endpoint: integration.endpoint, auth_type: integration.auth_type,
+      auth_header: integration.auth_header, manifest: integration.manifest, guide: integration.guide,
+    };
+    void (async () => {
+      const [s, p] = await Promise.all([draftStructureHashWeb(content), draftPermissionHashWeb(content)]);
+      if (!live) return;
+      setComputed({
+        key: contentKey,
+        drift: s !== structureHash ? 'structure' : permissionHash && p !== permissionHash ? 'permission' : 'none',
+      });
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- contentKey carries the row's identity and version
+  }, [draft, structureHash, permissionHash, contentKey]);
+  const drift = computed && computed.key === contentKey ? computed.drift : null;
+  if (!draft) return null;
+  const events = [...(draft.change_events ?? [])].slice(-5).reverse();
+  return (
+    <Field label={t('AI draft')}>
+      <div className="space-y-1.5 text-[12px]">
+        <p className="text-muted-foreground">
+          {draft.decided_at
+            ? t('Drafted by the AI and approved on {when}.', { when: new Date(draft.decided_at).toLocaleString(locale) })
+            : t('Drafted by the AI.')}
+        </p>
+        {drift === 'structure' && (
+          <p className="font-medium text-[var(--status-danger)]">
+            {t('This connection has changed since it was approved. Test it again before relying on it.')}
+          </p>
+        )}
+        {drift === 'permission' && (
+          <p className="text-muted-foreground">{t('Its permissions have been changed since it was approved.')}</p>
+        )}
+        {events.length > 0 && (
+          <ul className="space-y-0.5">
+            {events.map((e, i) => (
+              <li key={i} className="text-muted-foreground">
+                {t('Changed {fields} on {when}.', { fields: e.fields.join(', '), when: new Date(e.at).toLocaleString(locale) })}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Field>
   );
 }
 

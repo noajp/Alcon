@@ -269,6 +269,7 @@ export type Database = {
           finished_at: string | null
           id: string
           input_tokens: number
+          integration_draft_id: string | null
           mode: string
           model: string | null
           output_tokens: number
@@ -300,6 +301,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           input_tokens?: number
+          integration_draft_id?: string | null
           mode?: string
           model?: string | null
           output_tokens?: number
@@ -331,6 +333,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           input_tokens?: number
+          integration_draft_id?: string | null
           mode?: string
           model?: string | null
           output_tokens?: number
@@ -2794,6 +2797,155 @@ export type Database = {
           },
         ]
       }
+      integration_drafts: {
+        Row: {
+          activated_hash: string | null
+          activated_integration_id: string | null
+          activated_permission_hash: string | null
+          activated_structure_hash: string | null
+          activity_space_id: string
+          auth_header: string | null
+          auth_type: string | null
+          awaiting_question: string | null
+          change_events: Json
+          created_at: string
+          created_by: string | null
+          decided_at: string | null
+          decided_by: string | null
+          draft_run_id: string | null
+          dropped_commands: Json
+          endpoint: string | null
+          expires_at: string | null
+          failure_class: string | null
+          guide: string | null
+          id: string
+          kind: string
+          manifest: Json | null
+          materialized_integration_id: string | null
+          name: string
+          name_key: string
+          request_context: Json
+          required_commands: Json
+          sources: Json
+          status: string
+          target_integration_id: string | null
+          test_inputs: Json
+          test_results: Json | null
+          tested_content: Json | null
+          tested_hash: string | null
+          tested_permission_hash: string | null
+          tested_structure_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated_hash?: string | null
+          activated_integration_id?: string | null
+          activated_permission_hash?: string | null
+          activated_structure_hash?: string | null
+          activity_space_id: string
+          auth_header?: string | null
+          auth_type?: string | null
+          awaiting_question?: string | null
+          change_events?: Json
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          draft_run_id?: string | null
+          dropped_commands?: Json
+          endpoint?: string | null
+          expires_at?: string | null
+          failure_class?: string | null
+          guide?: string | null
+          id?: string
+          kind?: string
+          manifest?: Json | null
+          materialized_integration_id?: string | null
+          name: string
+          name_key: string
+          request_context?: Json
+          required_commands?: Json
+          sources?: Json
+          status?: string
+          target_integration_id?: string | null
+          test_inputs?: Json
+          test_results?: Json | null
+          tested_content?: Json | null
+          tested_hash?: string | null
+          tested_permission_hash?: string | null
+          tested_structure_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated_hash?: string | null
+          activated_integration_id?: string | null
+          activated_permission_hash?: string | null
+          activated_structure_hash?: string | null
+          activity_space_id?: string
+          auth_header?: string | null
+          auth_type?: string | null
+          awaiting_question?: string | null
+          change_events?: Json
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          draft_run_id?: string | null
+          dropped_commands?: Json
+          endpoint?: string | null
+          expires_at?: string | null
+          failure_class?: string | null
+          guide?: string | null
+          id?: string
+          kind?: string
+          manifest?: Json | null
+          materialized_integration_id?: string | null
+          name?: string
+          name_key?: string
+          request_context?: Json
+          required_commands?: Json
+          sources?: Json
+          status?: string
+          target_integration_id?: string | null
+          test_inputs?: Json
+          test_results?: Json | null
+          tested_content?: Json | null
+          tested_hash?: string | null
+          tested_permission_hash?: string | null
+          tested_structure_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_drafts_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_drafts_materialized_integration_id_fkey"
+            columns: ["materialized_integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_drafts_target_integration_id_fkey"
+            columns: ["target_integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_drafts_activated_integration_id_fkey"
+            columns: ["activated_integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
           activity_space_id: string
@@ -3581,6 +3733,7 @@ export type Database = {
           id: string
           intent_id: string | null
           invitation_id: string | null
+          integration_draft_id: string | null
           is_archived: boolean
           is_read: boolean
           kind: string
@@ -3602,6 +3755,7 @@ export type Database = {
           id?: string
           intent_id?: string | null
           invitation_id?: string | null
+          integration_draft_id?: string | null
           is_archived?: boolean
           is_read?: boolean
           kind: string
@@ -3623,6 +3777,7 @@ export type Database = {
           id?: string
           intent_id?: string | null
           invitation_id?: string | null
+          integration_draft_id?: string | null
           is_archived?: boolean
           is_read?: boolean
           kind?: string
@@ -5433,6 +5588,7 @@ export type Database = {
     }
     Functions: {
       accept_asset: { Args: { p_asset_id: string }; Returns: undefined }
+      activate_integration_draft: { Args: { p_draft_id: string }; Returns: string }
       add_widget: {
         Args: {
           p_board_id: string
@@ -5502,6 +5658,10 @@ export type Database = {
       }
       coordination_element_in_space: {
         Args: { p_element_id: string; p_space_id: string }
+        Returns: boolean
+      }
+      copy_integration_secret: {
+        Args: { p_from_id: string; p_to_id: string }
         Returns: boolean
       }
       create_personal_access_token: {
@@ -5689,6 +5849,7 @@ export type Database = {
         Args: { p_asset_id: string; p_events: Json }
         Returns: number
       }
+      reject_integration_draft: { Args: { p_draft_id: string }; Returns: boolean }
       release_element: {
         Args: { p_element_id: string; p_holder: string }
         Returns: boolean

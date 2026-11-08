@@ -1116,6 +1116,8 @@ export interface Notification {
   workflow_approval_id?: string | null
   /** The agent approval an 'approval_requested' notification is about, when it has no Element (a Copilot session's). */
   agent_action_id?: string | null
+  /** The AI-drafted connection an 'approval_requested' notification is about (G4). */
+  integration_draft_id?: string | null
   title: string
   body: string | null
   is_read: boolean
@@ -1165,7 +1167,7 @@ export type AgentRunStatus =
   | 'failed'
   | 'cancelled'
 
-export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot'
+export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot' | 'draft'
 
 export type AgentRunStepType =
   | 'plan'
@@ -1198,6 +1200,8 @@ export interface AgentRun {
   strategy_id: string | null
   /** The Copilot session an anchor run belongs to; null for every other run. */
   ai_session_id: string | null
+  /** The connection draft a drafting run (G4) belongs to; null for every other run. */
+  integration_draft_id?: string | null
   domain_id: string | null
   worker_id: string | null
   status: AgentRunStatus
@@ -1351,6 +1355,81 @@ export interface Integration {
 
 export type IntegrationUpdate = Partial<Pick<Integration,
   'name' | 'description' | 'endpoint' | 'auth_type' | 'auth_header' | 'delegation' | 'enabled' | 'manifest'>>
+
+export type IntegrationDraftStatus =
+  | 'drafting' | 'awaiting_input' | 'testing' | 'awaiting_review'
+  | 'active' | 'rejected' | 'failed' | 'expired' | 'superseded' | 'rerouted'
+
+/** Why a draft was started: who asked, from where, and what work waits on it. */
+export interface DraftRequestContext {
+  /** connect_card | conversation | settings | copilot */
+  entry?: string
+  /** The work waiting on this connection, in the words it was asked with. */
+  waitingFor?: string | null
+  /** Entry C (Settings): what the connection is for, in the person's words. */
+  purpose?: string | null
+  /** A documentation URL the person supplied, if any. */
+  docsUrl?: string | null
+  /** The run / session / automation the ask came from, when there is one. */
+  sourceRunId?: string | null
+  sourceSessionId?: string | null
+  elementIds?: string[]
+}
+
+/** A required command the drafter dropped, with the reason the review shows. */
+export interface DraftDrop { name: string; reason: string }
+
+/** A post-activation edit to a drafted connection, kept on its draft (§4.11). */
+export interface DraftChangeEvent { at: string; by: string | null; fields: string[] }
+
+// A connection the AI is drafting for this Space (G4). It holds no secret,
+// ever: the candidate (endpoint, auth, manifest, guide), where it came
+// from, every test round's evidence, what exactly was tested, and the
+// owner's decision. Testing happens against a staged integration row — a
+// disabled new row, or a disabled clone when the draft updates a live
+// connection (target_integration_id) — and activation is the only way the
+// tested content goes live.
+export interface IntegrationDraft {
+  id: string
+  activity_space_id: string
+  name: string
+  name_key: string
+  kind: 'http'
+  status: IntegrationDraftStatus
+  request_context: DraftRequestContext
+  endpoint: string | null
+  auth_type: 'none' | 'bearer' | 'header' | 'oauth' | null
+  auth_header: string | null
+  manifest: Json | null
+  guide: string | null
+  test_inputs: Record<string, Record<string, unknown>>
+  sources: string[]
+  /** DraftTestRound[] (AIP/connectors/draftModel.ts reads them). */
+  test_results: Json | null
+  required_commands: string[]
+  dropped_commands: DraftDrop[]
+  tested_hash: string | null
+  tested_structure_hash: string | null
+  tested_permission_hash: string | null
+  /** The normalised tested payload activation compares against (Json of DraftContent). */
+  tested_content: Json | null
+  materialized_integration_id: string | null
+  target_integration_id: string | null
+  activated_integration_id: string | null
+  draft_run_id: string | null
+  decided_by: string | null
+  decided_at: string | null
+  activated_hash: string | null
+  activated_structure_hash: string | null
+  activated_permission_hash: string | null
+  failure_class: string | null
+  awaiting_question: string | null
+  change_events: DraftChangeEvent[]
+  expires_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
 
 export type AssetKind = 'app' | 'ai_agent' | 'script' | 'service' | 'other'
 export type AssetStatus = 'unclaimed' | 'active' | 'revoked'

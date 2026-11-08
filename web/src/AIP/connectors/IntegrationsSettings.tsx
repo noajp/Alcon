@@ -17,6 +17,11 @@ import {
   type CatalogFilter, type IntegrationPreset,
 } from './catalog';
 import { useIntegrations, useIsSpaceOwner } from './data';
+import { createDraft, useIntegrationDrafts } from './draftData';
+import { DRAFT_STATUS_LABELS, reconcileDraftWeb } from './draftModel';
+import { IntegrationDraftDialog } from './IntegrationDraftDialog';
+import { Textarea } from '@/ui/textarea';
+import type { IntegrationDraft } from '@/types/database';
 import { IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
 import { ConnectDialogHost, openedForIntegration, openedForPreset, openedForRegistryEntry, type OpenedConnection } from './ConnectDialogHost';
 import { AlconConnectPanel } from './AlconConnectPanel';
@@ -54,7 +59,11 @@ export function IntegrationsSettings({ tab }: { tab: string | null }) {
 function ExternalServicesPanel() {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
-  const { data: integrations, loading, error } = useIntegrations(spaceId);
+  const { data: integrations, loading, error, refetch: refetchIntegrations } = useIntegrations(spaceId);
+  const draftsQuery = useIntegrationDrafts(spaceId);
+  const drafts = draftsQuery.data;
+  const [openedDraftId, setOpenedDraftId] = useState<string | null>(null);
+  const openedDraft = openedDraftId ? drafts.find((d) => d.id === openedDraftId) ?? null : null;
   const ownerRole = useIsSpaceOwner(spaceId);
   const isOwner = ownerRole === true;
   const [filter, setFilter] = useState<CatalogFilter>(EMPTY_FILTER);
@@ -149,6 +158,16 @@ function ExternalServicesPanel() {
 
       {mode === 'discover' && <RegistrySection connectedEndpoints={connectedEndpoints} canAdd={isOwner} onAdd={addFromRegistry} />}
 
+      {mode === 'discover' && spaceId && (
+        <DraftCreateSection
+          spaceId={spaceId}
+          integrations={integrations}
+          drafts={drafts}
+          onCreated={(draft) => { void draftsQuery.refetch(); setOpenedDraftId(draft.id); }}
+          onOpenDraft={(draft) => setOpenedDraftId(draft.id)}
+        />
+      )}
+
       {mode === 'yours' && <section className="space-y-3">
         <h3 className={FONT.label}>{t('Installed connections')}</h3>
         {error ? (
@@ -163,6 +182,38 @@ function ExternalServicesPanel() {
           </div>
         )}
       </section>}
+
+      {mode === 'yours' && drafts.length > 0 && (
+        <section className="space-y-3">
+          <h3 className={FONT.label}>{t('Drafted connections')}</h3>
+          <div>
+            {drafts.map((d) => (
+              <button key={d.id} type="button" onClick={() => setOpenedDraftId(d.id)}
+                className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-medium text-foreground">{d.name}</div>
+                  <div className="truncate text-[12px] text-muted-foreground">{d.endpoint ?? t('No definition yet')}</div>
+                </div>
+                <span className={cn('inline-flex shrink-0 items-center text-[11px]',
+                  d.status === 'awaiting_review' ? 'text-[var(--status-warning)]' : d.status === 'active' ? 'text-[var(--status-success)]' : 'text-muted-foreground')}>
+                  {t(DRAFT_STATUS_LABELS[d.status])}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {openedDraft && spaceId && (
+        <IntegrationDraftDialog
+          draft={openedDraft}
+          spaceId={spaceId}
+          integrations={integrations}
+          canReview={isOwner}
+          onClose={() => setOpenedDraftId(null)}
+          onChanged={() => { void draftsQuery.refetch(); void refetchIntegrations(); }}
+        />
+      )}
 
       {opened && spaceId && (
         <ConnectDialogHost
@@ -275,6 +326,96 @@ function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpe
       </div>
       <StatusChip integration={integration} />
     </button>
+  );
+}
+
+/** Entry C (G4): ask the AI to draft a connection for a service the
+ *  catalog and the Registry do not have. The reconcile runs in the open
+ *  as the person types — a name that already has a route is never
+ *  drafted around, here or on the server (which reconciles again). */
+function DraftCreateSection({ spaceId, integrations, drafts, onCreated, onOpenDraft }: {
+  spaceId: string;
+  integrations: Integration[];
+  drafts: IntegrationDraft[];
+  onCreated: (draft: IntegrationDraft) => void;
+  onOpenDraft: (draft: IntegrationDraft) => void;
+}) {
+  const { t } = useI18n();
+  const [name, setName] = useState('');
+  const [docsUrl, setDocsUrl] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  const knownHost = useMemo(() => {
+    try { return docsUrl.trim() ? new URL(docsUrl.trim()).hostname : null; } catch { return null; }
+  }, [docsUrl]);
+  const outcome = useMemo(
+    () => (name.trim() ? reconcileDraftWeb({ name, integrations, drafts, knownHost }) : null),
+    [name, integrations, drafts, knownHost],
+  );
+  const existingDraft = outcome?.kind === 'join' ? drafts.find((d) => d.id === outcome.draftId) ?? null : null;
+  const canStart = !!name.trim() && !!purpose.trim() && !starting
+    && (outcome?.kind === 'create' || outcome?.kind === 'update');
+
+  const start = async () => {
+    if (!canStart) return;
+    setStarting(true); setStartError(null);
+    try {
+      const draft = await createDraft(spaceId, {
+        name, purpose: purpose.trim(), docsUrl: docsUrl.trim() || null, entry: 'settings',
+      }, drafts);
+      setName(''); setDocsUrl(''); setPurpose('');
+      onCreated(draft);
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className={FONT.label}>{t('Have the AI draft it')}</h3>
+        <p className="mt-1 max-w-xl text-[12px] text-muted-foreground">
+          {t('For a service with a public API that is not in the catalog: the AI reads the official documentation, drafts the connection definition and tests it. An owner reviews and activates it — nothing connects on its own.')}
+        </p>
+      </div>
+      <div className="grid max-w-xl gap-2">
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Service name')}
+          aria-label={t('Service name')} className="h-8 text-[13px] md:text-[13px]" />
+        <Input value={docsUrl} onChange={(e) => setDocsUrl(e.target.value)} placeholder={t('Documentation URL (optional)')}
+          aria-label={t('Documentation URL (optional)')} className="h-8 text-[13px] md:text-[13px]" />
+        <Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)}
+          placeholder={t('What will you use it for? e.g. Look up orders and reply to inquiries')}
+          aria-label={t('What will you use it for?')} className="min-h-16 text-[13px] md:text-[13px]" />
+      </div>
+      {outcome?.kind === 'connected' && (
+        <p className="text-[12px] text-muted-foreground">{t('Already connected — no draft needed.')}</p>
+      )}
+      {outcome?.kind === 'preset' && (
+        <p className="text-[12px] text-muted-foreground">{t('This service has a built-in connection in the catalog above.')}</p>
+      )}
+      {outcome?.kind === 'registry' && (
+        <p className="text-[12px] text-muted-foreground">{t('This service is listed in the MCP Registry above.')}</p>
+      )}
+      {outcome?.kind === 'update' && (
+        <p className="text-[12px] text-muted-foreground">{t('A connection with this name exists. The draft will update its definition instead; the live connection is not touched until activation.')}</p>
+      )}
+      {existingDraft && (
+        <p className="text-[12px] text-muted-foreground">
+          {t('A draft for this service is already open.')}{' '}
+          <button type="button" className="underline underline-offset-2" onClick={() => onOpenDraft(existingDraft)}>
+            {t('Open the draft')}
+          </button>
+        </p>
+      )}
+      {startError && <p className="text-[12px] text-[var(--status-danger)]">{startError}</p>}
+      <Button size="sm" onClick={() => void start()} disabled={!canStart}>
+        {starting ? t('Starting…') : t('Start drafting')}
+      </Button>
+    </section>
   );
 }
 

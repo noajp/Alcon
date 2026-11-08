@@ -6,6 +6,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InvitationCard } from '@/Function/membership/InvitationCard';
 import { WorkflowApprovalCard } from '@/Function/audit/WorkflowApprovalCard';
 import { CopilotApprovalInboxCard } from './CopilotApprovalInboxCard';
+import { DraftReviewInboxCard } from '@/AIP/connectors/DraftReviewInboxCard';
 import { useActiveSpaceScope } from '@/Function/space/data';
 import { useInvitation } from '@/Function/membership/invitations';
 import { Button } from '@/ui/button';
@@ -87,6 +88,10 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       ) : selected.workflow_approval_id ? (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
           <WorkflowApprovalCard key={selected.workflow_approval_id} approvalId={selected.workflow_approval_id} />
+        </article>
+      ) : selected.integration_draft_id ? (
+        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
+          <DraftReviewInboxCard key={selected.integration_draft_id} draftId={selected.integration_draft_id} title={selected.title} body={selected.body} />
         </article>
       ) : selected.kind === 'invite' ? (
         <InvitationNotice key={selected.id} invitationId={selected.invitation_id ?? null} title={selected.title} />

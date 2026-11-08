@@ -258,7 +258,7 @@ const VETTED_MCP: readonly { preset: string; endpoint: RegExp }[] = [
   { preset: "github", endpoint: /^https:\/\/api\.githubcopilot\.com\/mcp\/?$/ },
   { preset: "linear", endpoint: /^https:\/\/mcp\.linear\.app\/mcp\/?$/ },
 ];
-const WRITE_VERB = /(^|[_\-.])(create|update|delete|remove|merge|push|send|post|put|patch|write|add|set|assign|close|archive|move|edit|rename|upload|invite|approve|reject|cancel|comment|reply|publish|run|execute|trigger|save|share|restore|resolve|submit|fork|star|dismiss|lock|request|mark|retire)([_\-.]|$)/i;
+export const WRITE_VERB = /(^|[_\-.])(create|update|delete|remove|merge|push|send|post|put|patch|write|add|set|assign|close|archive|move|edit|rename|upload|invite|approve|reject|cancel|comment|reply|publish|run|execute|trigger|save|share|restore|resolve|submit|fork|star|dismiss|lock|request|mark|retire)([_\-.]|$)/i;
 
 /** Pure. Whether a tool's readOnlyHint may be believed for this connection. */
 export function trustsReadOnlyHint(row: Pick<IntegrationRow, "preset" | "endpoint">, toolName: string): boolean {
