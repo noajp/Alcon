@@ -150,6 +150,7 @@ import {
   HEARTBEAT_KIND_LABEL, type HeartbeatSignal,
 } from "../_shared/heartbeatSnapshot.ts";
 import { credentialAnomalySignals, type CredentialUseFact } from "../_shared/credentialAnomalies.ts";
+import { calibrationCandidateSignals, type CalibrationCandidateFact } from "../_shared/verifierCalibration.ts";
 import { recordIntegrationAuthFailure, recordIntegrationUse } from "../_shared/credentialUseAudit.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
 import { captureMemories, captureScopeOf, landingWorthDistilling, loadStepTitles } from "./memoryCapture.ts";
@@ -3557,6 +3558,33 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
       integrationName: new Map(conns.map((c) => [c.id, c.name])),
       siteOrigin: new Map(sites.map((s) => [s.id, s.origin])),
     }, new Date()));
+  }
+
+  // ── Definition-revision candidates (B5 calibration) ──
+  // The tick evaluator opens these where a definition's verifier and
+  // its humans systematically disagree; the wait is the person's
+  // revision decision, standing since the candidate opened. The rows
+  // are member-readable and the heartbeat reads as the enabling
+  // owner, so the field of view is the Space's own. The shaping is
+  // the shared pure one (verifierCalibration.ts); the heartbeat can
+  // only tell about a candidate — resolving one is the owner's act
+  // in the harness's drill-down, through the owner-checked RPC.
+  const revisionCandidates = await guard(
+    userDb.from("definition_revision_candidates").select("id, definition_id, reason, rate, pairs, created_at")
+      .eq("activity_space_id", spaceId).eq("status", "open")
+      .order("created_at", { ascending: true }).limit(20),
+    [] as { id: string; definition_id: string; reason: string; rate: number | string; pairs: number; created_at: string }[],
+  );
+  if (revisionCandidates.length) {
+    const defs = await guard(
+      userDb.from("definitions").select("id, name").in("id", revisionCandidates.map((c) => c.definition_id)),
+      [] as { id: string; name: string }[],
+    );
+    const facts: CalibrationCandidateFact[] = revisionCandidates.map((c) => ({
+      id: c.id, definitionId: c.definition_id, reason: c.reason,
+      rate: Number(c.rate), pairs: c.pairs, createdAt: c.created_at,
+    }));
+    signals.push(...calibrationCandidateSignals(facts, new Map(defs.map((d) => [d.id, d.name]))));
   }
 
   return signals;

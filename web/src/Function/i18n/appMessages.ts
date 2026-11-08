@@ -904,6 +904,12 @@ const APP_MESSAGES: Record<string, Row> = {
   'This request was replaced by a newer one': ['このリクエストは新しいものに置き換わりました', '이 요청은 새 요청으로 교체되었습니다', 'Cette demande a été remplacée par une plus récente', 'Esta solicitud fue reemplazada por una más reciente'],
   'Waiting for a Space owner to enter it.': ['Space のオーナーの入力待ちです。', 'Space 소유자의 입력을 기다리고 있습니다.', 'En attente de la saisie par un propriétaire du Space.', 'Esperando a que lo introduzca un propietario del Space.'],
   'Enter credential': ['認証情報を入力', '자격 증명 입력', 'Saisir l’identifiant', 'Introducir credencial'],
+  'Verifier calibration': ['検証の校正', '검증 보정', 'Calibrage du vérificateur', 'Calibración del verificador'],
+  'Agree {agree} · False pass {fp} · False fail {ff} — {n} paired results in the last {days} days': ['一致 {agree} · 誤合格 {fp} · 誤不合格 {ff} — 直近 {days} 日のペア {n} 件', '일치 {agree} · 잘못된 합격 {fp} · 잘못된 불합격 {ff} — 최근 {days}일 페어 {n}건', 'Accord {agree} · Faux positifs {fp} · Faux négatifs {ff} — {n} paires sur les {days} derniers jours', 'Acuerdo {agree} · Falsos positivos {fp} · Falsos negativos {ff} — {n} pares en los últimos {days} días'],
+  'Queued for revision: this verifier passes work people send back ({errors} of {n} paired results, {rate}%).': ['見直し待ち：この検証は、人が差し戻す成果を通しがちです（ペア {n} 件中 {errors} 件、{rate}%）。', '수정 대기 중: 이 검증은 사람이 반려하는 결과를 통과시키는 경향이 있습니다(페어 {n}건 중 {errors}건, {rate}%).', 'En attente de révision : ce vérificateur laisse passer des travaux que les personnes renvoient ({errors} sur {n} paires, {rate} %).', 'En espera de revisión: este verificador aprueba trabajo que las personas devuelven ({errors} de {n} pares, {rate}%).'],
+  'Queued for revision: this verifier fails work people accept ({errors} of {n} paired results, {rate}%).': ['見直し待ち：この検証は、人が受け入れる成果を落としがちです（ペア {n} 件中 {errors} 件、{rate}%）。', '수정 대기 중: 이 검증은 사람이 받아들이는 결과를 떨어뜨리는 경향이 있습니다(페어 {n}건 중 {errors}건, {rate}%).', 'En attente de révision : ce vérificateur rejette des travaux que les personnes acceptent ({errors} sur {n} paires, {rate} %).', 'En espera de revisión: este verificador rechaza trabajo que las personas aceptan ({errors} de {n} pares, {rate}%).'],
+  'Queued for revision.': ['見直し待ちです。', '수정 대기 중입니다.', 'En attente de révision.', 'En espera de revisión.'],
+  'Mark addressed': ['対応済みにする', '대응 완료로 표시', 'Marquer comme traité', 'Marcar como atendido'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

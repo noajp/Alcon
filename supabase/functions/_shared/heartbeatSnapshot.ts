@@ -20,7 +20,8 @@ export type HeartbeatSignalKind =
   | "automation_failed"
   | "capability_landed"
   | "credential_refused" | "credential_auth_failed"
-  | "credential_unused" | "credential_unknown_use";
+  | "credential_unused" | "credential_unknown_use"
+  | "calibration_candidate";
 
 /** One thing waiting for a person, as the driver's reads found it. */
 export interface HeartbeatSignal {
@@ -93,6 +94,7 @@ export const HEARTBEAT_KIND_LABEL: Record<HeartbeatSignalKind, string> = {
   credential_auth_failed: "資格情報の認証失敗",
   credential_unused: "使われていない資格情報",
   credential_unknown_use: "実行が特定できない資格情報の使用",
+  calibration_candidate: "定義の見直し候補",
 };
 
 const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
@@ -115,6 +117,7 @@ const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
   credential_auth_failed: "credential_auth_failed",
   credential_unused: "credential_unused",
   credential_unknown_use: "credential_unknown_use",
+  calibration_candidate: "calibration",
 };
 
 /** Pure. A wait's identity across wakes: its kind, its thing, and its

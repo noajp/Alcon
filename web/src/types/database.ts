@@ -1510,10 +1510,53 @@ export interface CredentialRequest {
   created_at: string
 }
 
+/** One definition's verifier calibration (B5): how the verifier's
+ *  checked verdicts paired with the humans' eventual signals over the
+ *  trailing window — agree_pass / agree_fail where they matched,
+ *  false_pass (passed, a person sent it back) and false_fail (failed,
+ *  a person accepted anyway) where they did not. Written only by the
+ *  automations tick's evaluator, by recomputation from run_outcomes. */
+export interface VerifierCalibration {
+  id: string
+  activity_space_id: string
+  definition_id: string
+  window_start: string
+  window_days: number
+  agree_pass: number
+  agree_fail: number
+  false_pass: number
+  false_fail: number
+  /** Pairs counted: both a checked verdict and a human signal spoke. */
+  pairs: number
+  updated_at: string
+}
+
+export type RevisionCandidateReason = 'false_pass_heavy' | 'false_fail_heavy' | 'gap_cluster'
+export type RevisionCandidateStatus = 'open' | 'dismissed' | 'addressed'
+
+/** A definition queued for a person's revision (B5): the tick
+ *  evaluator's claim that this definition's verifier systematically
+ *  disagrees with its humans, in the named direction, at the named
+ *  rate over the named pairs — with the disagreeing outcomes as
+ *  evidence. Opened and refreshed only by the evaluator; resolved
+ *  only by a Space owner through resolve_revision_candidate. */
+export interface DefinitionRevisionCandidate {
+  id: string
+  definition_id: string
+  activity_space_id: string
+  reason: RevisionCandidateReason
+  /** The suspect direction's error rate over the pairs (0–1). */
+  rate: number
+  pairs: number
+  sample_outcome_ids: string[]
+  status: RevisionCandidateStatus
+  created_at: string
+  updated_at: string
+}
+
 export type IntegrationDraftStatus =
   | 'drafting' | 'awaiting_input' | 'testing' | 'awaiting_review'
   | 'active' | 'rejected' | 'failed' | 'expired' | 'superseded' | 'rerouted'
-
 /** Why a draft was started: who asked, from where, and what work waits on it. */
 export interface DraftRequestContext {
   /** connect_card | conversation | settings | copilot */
