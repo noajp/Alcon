@@ -17,7 +17,9 @@ export type HeartbeatSignalKind =
   | "draft_review" | "draft_input"
   | "promotion_review" | "promotion_input"
   | "automation_failed"
-  | "capability_landed";
+  | "capability_landed"
+  | "credential_refused" | "credential_auth_failed"
+  | "credential_unused" | "credential_unknown_use";
 
 /** One thing waiting for a person, as the driver's reads found it. */
 export interface HeartbeatSignal {
@@ -85,6 +87,10 @@ export const HEARTBEAT_KIND_LABEL: Record<HeartbeatSignalKind, string> = {
   promotion_input: "昇格の起草の回答待ち",
   automation_failed: "自動化の失敗",
   capability_landed: "使えるようになった能力",
+  credential_refused: "サインイン情報の受け渡し拒否",
+  credential_auth_failed: "資格情報の認証失敗",
+  credential_unused: "使われていない資格情報",
+  credential_unknown_use: "実行が特定できない資格情報の使用",
 };
 
 const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
@@ -102,6 +108,10 @@ const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
   promotion_input: "promotion_input",
   automation_failed: "automation_failed",
   capability_landed: "capability",
+  credential_refused: "credential_refused",
+  credential_auth_failed: "credential_auth_failed",
+  credential_unused: "credential_unused",
+  credential_unknown_use: "credential_unknown_use",
 };
 
 /** Pure. A wait's identity across wakes: its kind, its thing, and its

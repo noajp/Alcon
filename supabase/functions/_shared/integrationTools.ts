@@ -41,6 +41,7 @@ import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
 import { takeStashedCredentialForIntegration } from "./credentialRequests.ts";
+import { recordIntegrationUse } from "./credentialUseAudit.ts";
 import { driveOperationLabel, runDriveTool } from "./googleDrive.ts";
 import { catalogOperation, catalogTool, decideCall, isCatalogTool, summaryOf } from "./catalog.ts";
 
@@ -122,7 +123,7 @@ export function bindingOf(it: IntegrationTool): Promise<IntegrationBinding> {
 export function lazyBinding(
   admin: SupabaseClient,
   row: IntegrationRow,
-  opts?: { consumeStash?: boolean },
+  opts?: { consumeStash?: boolean; auditUse?: { spaceId: string; runId: string | null } },
 ): () => Promise<IntegrationBinding> {
   return async () => {
     const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: row.id });
@@ -132,13 +133,25 @@ export function lazyBinding(
     // credential a person stashed for this connection's pending
     // capture request. The take is single and deletes the value; it
     // lives in this binding's memory only and is never written back.
+    let fromStash = false;
     if (!secret && opts?.consumeStash && (row.auth_type === "bearer" || row.auth_type === "header")) {
-      secret = await takeStashedCredentialForIntegration(admin, row.id).catch(() => null);
+      secret = await takeStashedCredentialForIntegration(admin, row.id, opts?.auditUse?.runId).catch(() => null);
+      fromStash = !!secret;
     }
     if (row.kind === "mcp") {
       const session = new McpSession(row, secret);
       await session.initialize();
+      // The credential audit (secure-login PR4, §3.8): a binding that
+      // resolved with a real credential records its one 'used' row —
+      // once per binding, after the resolution fully succeeded. A
+      // stash spend is already recorded by the take itself.
+      if (opts?.auditUse && secret && !fromStash) {
+        await recordIntegrationUse(admin, { spaceId: opts.auditUse.spaceId, integrationId: row.id, runId: opts.auditUse.runId });
+      }
       return { secret, session };
+    }
+    if (opts?.auditUse && secret && !fromStash) {
+      await recordIntegrationUse(admin, { spaceId: opts.auditUse.spaceId, integrationId: row.id, runId: opts.auditUse.runId });
     }
     return { secret, session: null };
   };
@@ -529,6 +542,10 @@ export async function buildSpaceIntegrationTools(args: {
   admin: SupabaseClient;
   spaceId: string;
   supabaseUrl: string | null;
+  /** The run this assembly serves, when it serves one (a chat turn's
+   *  run): the credential audit names it as the spender of what its
+   *  bindings resolve. Absent, uses are recorded without a run. */
+  auditRunId?: string | null;
 }): Promise<SpaceIntegrationTools> {
   const { userDb, admin, spaceId } = args;
   const tools = new Map<string, IntegrationTool>();
@@ -584,7 +601,7 @@ export async function buildSpaceIntegrationTools(args: {
     // The panel executes work, so its bindings may take a use-once
     // stash (lazyBinding's rule) — a connection test never comes
     // through here, so a test cannot spend one.
-    const bind = lazyBinding(admin, row, { consumeStash: true });
+    const bind = lazyBinding(admin, row, { consumeStash: true, auditUse: { spaceId, runId: args.auditRunId ?? null } });
     const offer = (planned: PlannedIntegrationTool[], toolBind: IntegrationTool["bind"]) => {
       for (const p of planned) {
         if (defs.length >= MAX_INTEGRATION_TOOLS) break;
@@ -626,6 +643,9 @@ export async function buildSpaceIntegrationTools(args: {
       const session = new McpSession(row, secret);
       await session.initialize();
       const remoteTools = await session.listTools();
+      // The listing opened an authenticated session with the
+      // credential: a spend, recorded like a binding's (PR4, §3.8).
+      if (secret) await recordIntegrationUse(admin, { spaceId, integrationId: row.id, runId: args.auditRunId ?? null });
       const planned = planManifestTools(row, manifest, remoteTools, tools);
       await saveToolPlan(admin, row.id, fingerprint, planned);
       // The listing already paid for this binding: the tools keep it

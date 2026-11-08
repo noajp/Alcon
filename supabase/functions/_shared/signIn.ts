@@ -28,7 +28,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { ToolCall } from "./agentLoop.ts";
 import type { ApprovalDisplay } from "./integrationTools.ts";
 import type { ApprovalMode } from "./approvalPolicy.ts";
-import { normalizeSiteOrigin } from "./credentialRequests.ts";
+import { annotateCredentialOnceUse, normalizeSiteOrigin } from "./credentialRequests.ts";
 
 export const SIGN_IN_TOOL = "pc_sign_in";
 
@@ -222,13 +222,14 @@ export async function hasSignInUse(admin: SupabaseClient, siteCredentialId: stri
   return (data ?? []).length > 0;
 }
 
-export type SignInAuditEvent = "used" | "release_refused";
+export type SignInAuditEvent = "used" | "release_refused" | "test_failed";
 
 /**
- * One audit row for a sign-in spend or refusal. The writers are this
- * function and the take RPC; every field is an id, an origin, or a
- * fixed code — no code path here can write a value, because none is
- * ever passed in.
+ * One audit row for a sign-in spend, a refused release, or a
+ * credential the wall refused (test_failed, the audit's share of
+ * the §3.6 reauth fact). The writers are this function and the take
+ * RPC; every field is an id, an origin, or a fixed code — no code
+ * path here can write a value, because none is ever passed in.
  */
 export async function recordSignInUse(
   admin: SupabaseClient,
@@ -251,18 +252,14 @@ export async function recordSignInUse(
 /**
  * The take RPC writes the once credential's 'used' row itself (it is
  * the moment of the spend) but cannot know the run; annotate that
- * row with the run that spent it. The row is found by the detail the
- * RPC writes — the request's own id — and only while it names no
- * run yet (a take happens once, so at most one row can match).
+ * row with the run that spent it. The annotation itself lives with
+ * the take helpers (credentialRequests.ts) — this name is the
+ * sign-in path's handle on it.
  */
 export async function annotateOnceUseRun(
   admin: SupabaseClient, requestId: string, runId: string,
 ): Promise<void> {
-  await admin.from("credential_uses")
-    .update({ run_id: runId })
-    .eq("credential_kind", "once").eq("event", "used")
-    .eq("detail", `one-time credential for request ${requestId}`)
-    .is("run_id", null);
+  await annotateCredentialOnceUse(admin, requestId, runId);
 }
 
 /** A sign-in's verdict on the credential, in the last_test shape the

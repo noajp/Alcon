@@ -12,6 +12,7 @@ import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
 import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
 import { AlconFilePicker } from './AlconFilePicker';
 import { useCopilotConversation } from './CopilotProvider';
+import { CredentialChatHint } from '@/AIP/connectors/CredentialChatHint';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -237,6 +238,10 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
     send(text, { context: contextNow(), attachments });
   };
 
+  // The capture asks this conversation carries: while one stands,
+  // the composer says the password belongs in its card (PR4).
+  const credentialRequestIds = messages.flatMap((m) => (m.credentials ?? []).map((c) => c.requestId));
+
   // Editing the latest question puts it back in the composer and starts over
   // from it.
   const lastUser = messages.map((m) => m.role).lastIndexOf('user');
@@ -329,6 +334,9 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
       {/* Composer — a soft-bordered box at the foot: files picked, dropped or
           pasted show as chips above the text; Enter sends. */}
       <div className={`pb-3 pt-3 ${page ? 'px-8 pb-6' : 'px-3'}`}>
+        <div className={column}>
+          <CredentialChatHint requestIds={credentialRequestIds} />
+        </div>
         <form
           onSubmit={(e) => { e.preventDefault(); submit(); }}
           onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}

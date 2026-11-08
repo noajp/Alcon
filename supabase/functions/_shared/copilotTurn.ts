@@ -167,11 +167,14 @@ export async function buildCopilotTurn(args: {
    *  to the context block — the uncached part of the system, never the
    *  cached prompt. Absent when nothing is remembered. */
   memories?: string;
+  /** The run this turn executes as: the credential audit names it as
+   *  the spender of the credentials its bindings resolve (PR4). */
+  runId?: string | null;
 }): Promise<CopilotTurn> {
   const { userDb, admin, context: ctx, actor, events } = args;
   const approvalMode: ApprovalMode = args.approvalMode ?? "auto";
   const toolset = ctx.spaceId && admin
-    ? await buildSpaceIntegrationTools({ userDb, admin, spaceId: ctx.spaceId, supabaseUrl: args.supabaseUrl }).catch(() => null)
+    ? await buildSpaceIntegrationTools({ userDb, admin, spaceId: ctx.spaceId, supabaseUrl: args.supabaseUrl, auditRunId: args.runId ?? null }).catch(() => null)
     : null;
 
   // propose_connection rides beside the catalog: internal, always loaded

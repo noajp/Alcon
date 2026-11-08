@@ -396,16 +396,38 @@ export async function notifyCredentialRequestOwners(
 }
 
 /**
+ * Name the run that spent a one-time credential on the audit row
+ * the take RPC wrote for it. The take is the moment of the spend
+ * but the RPC cannot know the spender; the row is found by the
+ * detail the RPC writes — the request's own id — and only while it
+ * names no run yet (a take happens once, so at most one row can
+ * match). The one annotation the append-only trail allows: it adds
+ * the spender to a spend, it never rewrites what happened.
+ */
+export async function annotateCredentialOnceUse(
+  admin: SupabaseClient, requestId: string, runId: string,
+): Promise<void> {
+  await admin.from("credential_uses")
+    .update({ run_id: runId })
+    .eq("credential_kind", "once").eq("event", "used")
+    .eq("detail", `one-time credential for request ${requestId}`)
+    .is("run_id", null);
+}
+
+/**
  * The use-once taker for the token class: when a binding resolves
  * and the connection's slot is empty, a stashed one-time credential
  * addressed to a request for THIS connection is taken — once, by
  * request id, through the service-role-only RPC that deletes it in
  * the taking. Returns the value for this binding's memory only; it
- * is never written anywhere. Null when no stash waits.
+ * is never written anywhere. Null when no stash waits. When the
+ * binding knows its run, the take's audit row is annotated with it,
+ * so the spend stays attributable (secure-login PR4).
  */
 export async function takeStashedCredentialForIntegration(
   admin: SupabaseClient,
   integrationId: string,
+  runId?: string | null,
 ): Promise<string | null> {
   const { data: waiting } = await admin.from("credential_requests")
     .select("id")
@@ -418,7 +440,9 @@ export async function takeStashedCredentialForIntegration(
   if (!requestId) return null;
   const { data } = await admin.rpc("take_credential_once", { p_request_id: requestId });
   const row = (data ?? [])[0] as { value?: unknown } | undefined;
-  return typeof row?.value === "string" && row.value ? row.value : null;
+  const value = typeof row?.value === "string" && row.value ? row.value : null;
+  if (value && runId) await annotateCredentialOnceUse(admin, requestId, runId).catch(() => {});
+  return value;
 }
 
 export { DAY_MS as CREDENTIAL_REQUEST_DAY_MS };
