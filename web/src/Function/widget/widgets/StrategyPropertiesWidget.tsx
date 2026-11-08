@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { RailRow } from '@/Function/shared/RailRow';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
-import { ElementIcon } from '@/Function/shared/conceptIcons';
+import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { completionOf } from '@/Function/shared/completion';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -39,8 +39,13 @@ export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
           <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{progress.pct}%</span>
         </span>
       } />
-      <RailRow name={t('Elements')} icon={<ElementIcon size={12} className="text-muted-foreground" />}
-        label={<span className="tabular-nums">{t('{done} of {all} done', { done: progress.done, all: progress.total })}</span>} />
+      {/* The Status mark filled by the share done, as an in-progress Element
+          is: an empty ring with none done, a check with all. */}
+      <RailRow name={t('Elements')}
+        icon={<ElementProgressMark size={14}
+          status={progress.total > 0 && progress.done === progress.total ? 'done' : progress.done > 0 ? 'in_progress' : 'todo'}
+          progress={progress.total ? (progress.done / progress.total) * 100 : 0} />}
+        label={<span className="tabular-nums">{progress.done}/{progress.total}</span>} />
       <RailRow name={t('Updated')} label={formatRelative(strategy.updated_at)} />
     </div>
   );
