@@ -24,10 +24,11 @@ import { cascadeLevels } from './cascadeModel';
 // board, it stands vertical or lies horizontal — the page's tabs-row
 // toggle decides, on the one shared orientation preference.
 
-/** The column a generation stands in: the root by its own name, then
- *  children, grandchildren, and every deeper generation as descendants. */
-function levelLabel(depth: number, rootName: string, t: ReturnType<typeof useI18n>['t']): string {
-  if (depth === 0) return rootName;
+/** The column a generation stands in: this Strategy (its card already
+ *  carries its name), then children, grandchildren, and every deeper
+ *  generation as descendants. */
+function levelLabel(depth: number, t: ReturnType<typeof useI18n>['t']): string {
+  if (depth === 0) return t('This Strategy');
   if (depth === 1) return t('Child Strategies');
   if (depth === 2) return t('Grandchild Strategies');
   return t('Descendant Strategies');
@@ -114,7 +115,7 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
     mark: depth === 0
       ? <ItemIcon icon={strategy.icon} color={strategy.color} size={14} fallback={<NavStrategyIcon size={14} />} />
       : <NavStrategyIcon size={14} />,
-    label: levelLabel(depth, strategy.name, t),
+    label: levelLabel(depth, t),
     count: ids.length,
     empty: depth === 1 ? t('No child Strategies yet') : undefined,
   });

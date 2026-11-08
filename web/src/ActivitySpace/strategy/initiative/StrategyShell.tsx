@@ -6,9 +6,11 @@ import { ViewTabs } from '@/Function/shared/ViewTabs';
 import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
+import { EmbedHostContext } from '@/Function/notebook/editor/embedBlocks';
+import { useStrategyEmbeds } from './StrategyEmbeds';
 import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
@@ -81,7 +83,6 @@ import {
   WidgetSurface,
   WidgetZone,
   WidgetActionSlotProvider,
-  WidgetActionSlotTarget,
   INITIATIVE_BOARD,
   type BoardLayout,
   type WidgetHost,
@@ -124,7 +125,9 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
   children: React.ReactNode;
 }) {
   const board = useBoard(surface, defaults, subjectId);
-  return <WidgetSurface board={board} host={host} zones={zones} className="space-y-5">{children}</WidgetSurface>;
+  // No "Add widget": what a Strategy shows is written into its description
+  // with "/". Widgets already placed keep drawing.
+  return <WidgetSurface board={board} host={host} zones={zones} addable={false} className="space-y-5">{children}</WidgetSurface>;
 }
 
 // =============================================================
@@ -586,6 +589,15 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
+  // What "/" can place in the description: live blocks over this
+  // Strategy's own Objects and Elements.
+  const strategyObjects = useMemo(() => {
+    const scope = new Set(strategy.objectIds);
+    return allObjects.filter((o) => scope.has(o.id));
+  }, [allObjects, strategy.objectIds]);
+  const embedChanged = useCallback(() => { void refetchObjects(); onSaved(); }, [refetchObjects, onSaved]);
+  const embeds = useStrategyEmbeds({ elements: initiativeElements, objects: strategyObjects, onOpenObject, onChanged: embedChanged });
+
   // The conversation opens on request; another Strategy opens without it,
   // on its Overview.
   const [talking, setTalking] = useState(false);
@@ -935,8 +947,6 @@ function StrategyDetailView({
           </span>
         )}
         <div className="ml-auto flex min-w-0 items-center gap-2">
-          {/* "Add widget" is page chrome: it sits in the header, as on a Domain. */}
-          <WidgetActionSlotTarget className="flex items-center gap-1" />
           {(deleteError || saveError) && (
             <span role="status" className="text-[11px] text-muted-foreground truncate">
               {deleteError ?? t('{error} — change reverted', { error: saveError ?? '' })}
@@ -1022,8 +1032,10 @@ function StrategyDetailView({
             {/* Band — how it is going, right under the name. */}
             <WidgetZone zone="band" className="mt-3" />
           </div>
-          <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
-            placeholder={t('Add description…')} onSave={saveDescription} />
+          <EmbedHostContext.Provider value={embeds}>
+            <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
+              placeholder={t('Add description… Type / for a live block')} onSave={saveDescription} />
+          </EmbedHostContext.Provider>
 
           {/* Under the description, as on an Element: one quiet row —
               reactions, attaching a file, and the "…" of other things to do

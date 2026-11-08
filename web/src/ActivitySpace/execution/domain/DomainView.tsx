@@ -631,7 +631,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
 // Objects render as a flat list (matching "one bar per Object"). Status is
 // pinned to 'todo' for a neutral bar colour — Objects don't carry a status of
 // their own, and showing them all the same colour is the honest read.
-function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
+export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
   return {
     id: o.id,
     object_id: null,
