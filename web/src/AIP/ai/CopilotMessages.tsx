@@ -8,9 +8,12 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import type { AgentAction } from '@/types/database';
-import type { CopilotApproval, CopilotAttachment, CopilotMessage, ToolEvent } from './useAlconCopilot';
+import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotMessage, ToolEvent } from './useAlconCopilot';
 import { toolVerb } from './copilotFiles';
 import { splitAnswer } from './chartSpec';
+import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
+import { missingConnectors } from '@/AIP/harness/installFlow';
+import { useIntegrations } from '@/AIP/connectors/data';
 
 const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: () => <div className="h-52 rounded-lg border border-border/60" /> });
 
@@ -18,7 +21,7 @@ const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: ()
  *  bare asterisks; its work shows as steps above it. Under each turn, as in
  *  Claude's chat: copy, and on the latest exchange retry (an answer) or edit
  *  (a question); the time shows beside them. */
-export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval }: {
+export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval, spaceId, onContinueConnection }: {
   message: CopilotMessage;
   streaming: boolean;
   /** Present on the latest answer once it is in. */
@@ -29,6 +32,10 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   onDecideApproval?: (approval: CopilotApproval, approve: boolean, opts: { note?: string; remember?: string[] }) => void;
   /** Whether the viewer owns the Space (a standing approval is theirs to give). */
   canRememberApproval?: boolean;
+  /** The conversation's Space — what a connection proposal's card reads and opens against. */
+  spaceId?: string | null;
+  /** Continue the work a connection proposal was waiting on (person-pressed). */
+  onContinueConnection?: (proposal: CopilotConnectionProposal) => void;
 }) {
   const { t } = useI18n();
   if (message.role === 'user') {
@@ -62,6 +69,10 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
         <ApprovalCard key={a.inputHash} approval={a} canRemember={canRememberApproval}
           onDecide={onDecideApproval ? (approve, opts) => onDecideApproval(a, approve, opts) : undefined} />
       ))}
+      {message.connections?.map((c, i) => (
+        <ConnectProposalCard key={i} spaceId={spaceId ?? null} proposal={c}
+          onContinue={onContinueConnection ? () => onContinueConnection(c) : undefined} />
+      ))}
       {settled && message.content && (
         <div className={`flex items-center gap-0.5 transition-opacity ${onRetry ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
           <CopyButton text={message.content} />
@@ -73,6 +84,31 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   );
 }
 
+/**
+ * A connection the turn proposed, as the same card the Strategy
+ * conversation shows: the needs are re-read from the Space's live
+ * connections (a name connected since drops off; one whose latest test
+ * failed stays, as a reauth), and connecting happens in the dialog the
+ * card opens — the person's act, as everywhere. Once everything asked
+ * for is connected, the card offers to continue the waiting work; the
+ * resume itself is the person's button press, so it never fires on a
+ * connection made for another reason.
+ */
+function ConnectProposalCard({ spaceId, proposal, onContinue }: {
+  spaceId: string | null;
+  proposal: CopilotConnectionProposal;
+  onContinue?: () => void;
+}) {
+  const integrations = useIntegrations(spaceId);
+  const needs = useMemo(() => {
+    const still = missingConnectors(proposal.names, integrations.data);
+    return proposal.names.map((name) => still.find((n) => n.name === name) ?? { name, preset: null, kind: 'missing' as const });
+  }, [integrations.data, proposal.names]);
+  return (
+    <ConnectRequestCard spaceId={spaceId} needs={needs} waitingFor={proposal.waitingFor || null}
+      onContinue={onContinue} />
+  );
+}
 
 /**
  * Integration writes waiting for the person's decision, on a card in the

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { forwardRef, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronsUpDown, FileCode2, Github, MessageSquarePlus, RefreshCw, RotateCcw, Trash2 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -346,7 +347,7 @@ function CommentComposer({ onSubmit, onCancel }: { onSubmit: (body: string) => P
     if (!draft.trim() || busy) return;
     setBusy(true);
     setError(null);
-    try { await onSubmit(draft.trim()); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    try { await onSubmit(draft.trim()); } catch (e) { setError(formatError(e)); } finally { setBusy(false); }
   };
   return (
     <div className="py-1">

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight, Folder as FolderIcon, FolderInput, Loader2, MoreHorizontal, Plus, RotateCcw, Search, Trash2, Upload, X } from '@/ui/icons';
@@ -181,7 +182,7 @@ function ArtifactsBrowser({ navigation, onNavigate, onViewChange }: {
   const select = (f: SpaceFile | null) => here({ folderId, fileId: f?.id ?? null });
   const who = (f: SpaceFile) => workers.find((w) => w.user_id === f.uploaded_by)?.name ?? t('Someone');
 
-  const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
+  const fail = (e: unknown) => void appDialog.alert(formatError(e));
   // Where something new goes: the open folder, else this tab's root.
   const target = async () => folder?.id ?? await ensureArtifactRoot(spaceId!, place!);
   const refresh = () => {
@@ -365,7 +366,7 @@ const TAB_HINT: Record<ArtifactTab, string> = {
 function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.ReactNode; onOpen: () => void }) {
   const { t } = useI18n();
   const { rename, remove } = useFolderActions('files');
-  const fail = (e: unknown) => void appDialog.alert(e instanceof Error ? e.message : String(e));
+  const fail = (e: unknown) => void appDialog.alert(formatError(e));
   return (
     <div className="group/row flex h-9 items-center gap-3 rounded-md px-[18px] hover:bg-foreground/[0.05]">
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -451,7 +452,7 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
               <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Move to')} title={t('Move to')}><FolderInput size={13} /></Button>
             </DropdownMenuTrigger>
             <MenuShell as="dropdown" align="end">
-              <MoveToFolderItems app="files" domainId={file.domain_id} current={file.folder_id} onMove={(id) => { if (id) void moveFileToFolder(file, id).catch((e) => void appDialog.alert(e instanceof Error ? e.message : String(e))); }} />
+              <MoveToFolderItems app="files" domainId={file.domain_id} current={file.folder_id} onMove={(id) => { if (id) void moveFileToFolder(file, id).catch((e) => void appDialog.alert(formatError(e))); }} />
             </MenuShell>
           </DropdownMenu>
         )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -111,7 +112,7 @@ export function CommandPermissions({ integration, spaceId, readOnly }: { integra
       ...m,
       commands: (m.commands as Record<string, unknown>[]).map((c) => (c.name === name ? patch(c) : c)),
     } as Json;
-    actions.update.mutate({ id: integration.id, patch: { manifest: next } }, { onError: (e) => setError(e instanceof Error ? e.message : String(e)) });
+    actions.update.mutate({ id: integration.id, patch: { manifest: next } }, { onError: (e) => setError(formatError(e)) });
   };
   const set = (name: string, permission: Permission) => write(name, (c) => ({ ...c, permission }));
   const setRules = (name: string, rules: Rule[]) => write(name, (c) => ({ ...c, rules }));

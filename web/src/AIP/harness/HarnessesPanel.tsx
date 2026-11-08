@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
@@ -213,7 +214,7 @@ export function HarnessesPanel() {
 
   const act = async (id: string, f: () => Promise<unknown>) => {
     setBusy(id); setError(null);
-    try { await f(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    try { await f(); } catch (e) { setError(formatError(e)); }
     setBusy(null);
   };
   const add = (item: CatalogDefinition) => act(item.id, async () => {
@@ -436,7 +437,7 @@ function CatalogReviewDialog({ definition, item, onClose, onDone }: {
   const [error, setError] = useState<string | null>(null);
   const run = async (f: () => Promise<unknown>) => {
     setBusy(true); setError(null);
-    try { await f(); onDone(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
+    try { await f(); onDone(); } catch (e) { setError(formatError(e)); setBusy(false); }
   };
   const canUpdate = relation.kind === 'update-available' || (relation.kind === 'legacy-unknown' && differs);
   const canRecord = relation.kind === 'legacy-unknown' && !differs;
@@ -550,7 +551,7 @@ function HarnessEditor({ spaceId, definition, connected, onClose, onSaved }: {
   const hasErrors = diagnostics.some((d) => d.severity === 'error');
   const run = async (f: () => Promise<unknown>) => {
     setBusy(true); setError(null);
-    try { await f(); onSaved(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
+    try { await f(); onSaved(); } catch (e) { setError(formatError(e)); setBusy(false); }
   };
   const save = () => run(() => (definition
     ? updateDefinition(definition.id, { name: name.trim(), body })

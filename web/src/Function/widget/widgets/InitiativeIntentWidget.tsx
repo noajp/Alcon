@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { linkObjectToStrategy, useStrategies, useStrategiesInSpace } from '@/hooks/useSupabase';
 import { StrategyIntentBody } from '@/ActivitySpace/execution/object/overview/StrategyIntentBody';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { formatError } from '@/Function/shared/formatError';
 import type { WidgetHost } from '../types';
 
 /**
@@ -55,7 +56,7 @@ function NoInitiative({ objectId }: { objectId: string }) {
       const failure = e as { code?: string; message?: string } | null;
       setError(failure?.code === '42501'
         ? t('Only the Strategy’s owner or an owner of its Space can link Objects to it.')
-        : failure?.message ?? String(e));
+        : failure?.message ?? formatError(e));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
@@ -109,7 +110,7 @@ export function useStrategyConversation(strategyId: string, onAnswered?: () => v
       await sendToEngine(runId, message);
       await qc.invalidateQueries({ queryKey: key });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setSending(false);
       setPendingText(null);

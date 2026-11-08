@@ -8,6 +8,7 @@ import { Input } from '@/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { appDialog } from '@/Function/shared/appDialogStore';
+import { formatError } from '@/Function/shared/formatError';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ToggleRow } from '@/Function/settings/SettingsControls';
 import type { Integration } from '@/types/database';
@@ -114,12 +115,6 @@ export function SourceChip({ source }: { source: IntegrationSource }) {
   );
 }
 
-function errorText(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string') return (e as { message: string }).message;
-  return String(e);
-}
-
 export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit, onClose, onCreated, initial }: {
   spaceId: string;
   preset: IntegrationPreset;
@@ -156,7 +151,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   const setDelegation = (v: IntegrationDelegation) => {
     if (!integration) { setNewDelegation(v); return; }
     setError(null);
-    actions.update.mutate({ id: integration.id, patch: { delegation: v } }, { onError: (e) => setError(t(errorText(e))) });
+    actions.update.mutate({ id: integration.id, patch: { delegation: v } }, { onError: (e) => setError(t(formatError(e))) });
   };
   const enabled = integration?.enabled ?? newEnabled;
   const needsSecret = auth === 'bearer' || auth === 'header';
@@ -198,17 +193,17 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
       created = await actions.create.mutateAsync({ row: built.row, secret: needsSecret ? secretInput.trim() : '' });
       setSecretInput('');
       onCreated(created);
-    } catch (e) { setError(t(errorText(e))); return; }
+    } catch (e) { setError(t(formatError(e))); return; }
     if (oauth) {
       // The row stays when sign-in can't start; Sign in retries.
-      try { await signIn(created.id); } catch (e) { setError(t(errorText(e))); }
+      try { await signIn(created.id); } catch (e) { setError(t(formatError(e))); }
     }
   };
 
   const reconnect = async () => {
     if (!integration) return;
     setError(null);
-    try { await signIn(integration.id); } catch (e) { setError(t(errorText(e))); }
+    try { await signIn(integration.id); } catch (e) { setError(t(formatError(e))); }
   };
 
   const setLive = (patch: { enabled?: boolean }) => {
@@ -217,7 +212,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
       return;
     }
     setError(null);
-    actions.update.mutate({ id: integration.id, patch }, { onError: (e) => setError(t(errorText(e))) });
+    actions.update.mutate({ id: integration.id, patch }, { onError: (e) => setError(t(formatError(e))) });
   };
 
   const saveCustom = async () => {
@@ -233,7 +228,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
       && !await appDialog.confirm(t('Changing the address or how the credential is sent deletes the stored credential. Enter it again afterwards. Continue?'))) return;
     try {
       await actions.update.mutateAsync({ id: integration.id, patch: { name: n, endpoint: ep, auth_type, auth_header } });
-    } catch (e) { setError(t(errorText(e))); }
+    } catch (e) { setError(t(formatError(e))); }
   };
 
   const saveSecret = async () => {
@@ -243,20 +238,20 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
       await actions.secret.mutateAsync({ id: integration.id, value: secretInput.trim() });
       setSecretInput('');
       setEditingSecret(false);
-    } catch (e) { setError(t(errorText(e))); }
+    } catch (e) { setError(t(formatError(e))); }
   };
 
   const clearSecret = async () => {
     if (!integration) return;
     if (!await appDialog.confirm(t('Delete the stored credential for {name}? Agents can no longer use this connection until a new one is set.', { name: integration.name }))) return;
     setError(null);
-    try { await actions.secret.mutateAsync({ id: integration.id, value: '' }); } catch (e) { setError(t(errorText(e))); }
+    try { await actions.secret.mutateAsync({ id: integration.id, value: '' }); } catch (e) { setError(t(formatError(e))); }
   };
 
   const runTest = () => {
     if (!integration) return;
     setError(null);
-    actions.test.mutate(integration.id, { onError: (e) => setError(t(errorText(e))) });
+    actions.test.mutate(integration.id, { onError: (e) => setError(t(formatError(e))) });
   };
 
   const disconnect = async () => {
@@ -281,7 +276,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
       }
       await actions.remove.mutateAsync(integration.id);
       onClose();
-    } catch (e) { setError(t(errorText(e))); }
+    } catch (e) { setError(t(formatError(e))); }
   };
 
   return (

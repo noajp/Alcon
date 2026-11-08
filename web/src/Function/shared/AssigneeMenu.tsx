@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from './formatError';
 import * as React from 'react';
 import { Check, X } from '@/ui/icons';
 import {
@@ -289,7 +290,7 @@ function AiPresetItems({ workers, onAdd }: { workers: AssignableWorker[]; onAdd:
       const created = await createWorker({ name: p.name, type: 'ai_agent', ai_model: p.model });
       onAdd(created.id);
     } catch (e) {
-      void appDialog.alert(e instanceof Error ? e.message : String(e));
+      void appDialog.alert(formatError(e));
     }
   };
   return (

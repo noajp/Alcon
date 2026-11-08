@@ -430,28 +430,46 @@ export function displayIdCandidates(raw: string): string[] {
 // display_id is matched on its own column: an `id.eq.<display_id>` filter
 // makes Postgres reject the whole query as an invalid uuid.
 export async function resolveElementId(supabase: SupabaseClient, idArg: string): Promise<string | null> {
+  return (await resolveElementIdTraced(supabase, idArg)).id;
+}
+
+/** The stage a resolution reached: the last lookup it ran. A failure's
+ *  stage says WHERE the identifier died — a UUID the session cannot see
+ *  (stage "uuid") is a different defect from a display spelling nothing
+ *  answers to ("display") or a sequence number that matched nothing or
+ *  too much ("sequence") — and until failures recorded it, a failed
+ *  write-back was undiagnosable: the argument was recorded nowhere. */
+export type ResolveStage = "empty" | "uuid" | "display" | "sequence";
+
+export interface TracedResolution {
+  id: string | null;
+  stage: ResolveStage;
+}
+
+/** resolveElementId, reporting the stage it reached either way. */
+export async function resolveElementIdTraced(supabase: SupabaseClient, idArg: string): Promise<TracedResolution> {
   const v = String(idArg ?? "").trim();
-  if (!v) return null;
+  if (!v) return { id: null, stage: "empty" };
   // A UUID is checked too: some child tables (element_comments) are wider
   // than elements under RLS, so an id the caller cannot see must not pass.
   if (UUID_RE.test(v)) {
     const { data } = await supabase.from("elements").select("id").eq("id", v).maybeSingle();
-    return (data?.id as string | undefined) ?? null;
+    return { id: (data?.id as string | undefined) ?? null, stage: "uuid" };
   }
 
   const { data: hits } = await supabase
     .from("elements").select("id").in("display_id", displayIdCandidates(v)).limit(2);
-  if (hits?.length === 1) return hits[0].id as string;
-  if ((hits?.length ?? 0) > 1) return null;
+  if (hits?.length === 1) return { id: hits[0].id as string, stage: "display" };
+  if ((hits?.length ?? 0) > 1) return { id: null, stage: "display" };
 
   const seqMatch = v.replace(/^(ELE_|el_|ELE-)/i, "").match(/^(\d{1,4})$/);
   if (seqMatch) {
     const seqStr = seqMatch[1].padStart(3, "0");
     const { data } = await supabase
       .from("elements").select("id").ilike("display_id", `%-${seqStr}`).limit(2);
-    if (data?.length === 1) return data[0].id as string;
+    return { id: data?.length === 1 ? data[0].id as string : null, stage: "sequence" };
   }
-  return null;
+  return { id: null, stage: "display" };
 }
 
 /**
@@ -493,6 +511,60 @@ async function audit(supabase: SupabaseClient, actor: BoardActor, elementId: str
 export function describePatch(patch: Record<string, unknown>): string {
   const keys = Object.keys(patch).filter((k) => k !== "progress" && k !== "updated_at");
   return keys.length ? `Updated ${keys.join(", ")}` : "Updated";
+}
+
+/**
+ * updateElement's write, addressed by a canonical id the caller already
+ * holds — no resolution. The board case resolves a model-supplied string
+ * first and then lands here; a caller with an authoritative id (a run's
+ * agent_runs.element_id, threaded by agentReportTools) lands here
+ * directly, so its write never depends on the resolver's view.
+ */
+export async function updateElementById(
+  supabase: SupabaseClient,
+  id: string,
+  input: Record<string, unknown>,
+  actor: BoardActor,
+): Promise<ToolResult> {
+  const patch: Record<string, unknown> = {};
+  for (const k of ["title", "description", "status", "priority", "type", "due_date", "due_time", "estimated_hours"]) {
+    if (input[k] !== undefined) patch[k] = input[k];
+  }
+  if (Array.isArray(input.labels)) patch.labels = input.labels;
+  if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+  const normalized = normalizeStatusPatch(patch);
+  const { data, error } = await supabase
+    .from("elements").update({ ...normalized, updated_at: new Date().toISOString() }).eq("id", id)
+    .select("id, display_id, title, status, priority, progress").single();
+  if (error) throw error;
+  await audit(supabase, actor, id, describePatch(patch));
+  return { ok: true, data, meta: { rows: 1 } };
+}
+
+/**
+ * addElementComment's write, addressed by a canonical id the caller
+ * already holds — no resolution (see updateElementById for why the
+ * bound form exists).
+ */
+export async function addElementCommentById(
+  supabase: SupabaseClient,
+  elementId: string,
+  body: unknown,
+  actor: BoardActor,
+): Promise<ToolResult> {
+  const text = String(body ?? "").trim();
+  if (!text) return { ok: false, error: "body is required" };
+  const { data, error } = await supabase
+    .from("element_comments").insert({
+      element_id: elementId,
+      content: text,
+      author_id: actor.userId,
+      author_kind: "ai_agent",
+      author_name: actor.agent,
+    })
+    .select("id, content, author_name, created_at").single();
+  if (error) throw error;
+  return { ok: true, data, meta: { rows: 1 } };
 }
 
 export async function runBoardTool(
@@ -743,19 +815,7 @@ export async function runBoardTool(
       case "updateElement": {
         const id = await resolveElementId(supabase, String(input.id ?? ""));
         if (!id) return { ok: false, error: "Element not found" };
-        const patch: Record<string, unknown> = {};
-        for (const k of ["title", "description", "status", "priority", "type", "due_date", "due_time", "estimated_hours"]) {
-          if (input[k] !== undefined) patch[k] = input[k];
-        }
-        if (Array.isArray(input.labels)) patch.labels = input.labels;
-        if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
-        const normalized = normalizeStatusPatch(patch);
-        const { data, error } = await supabase
-          .from("elements").update({ ...normalized, updated_at: new Date().toISOString() }).eq("id", id)
-          .select("id, display_id, title, status, priority, progress").single();
-        if (error) throw error;
-        await audit(supabase, actor, id, describePatch(patch));
-        return { ok: true, data, meta: { rows: 1 } };
+        return await updateElementById(supabase, id, input, actor);
       }
 
       case "deleteElement": {
@@ -997,19 +1057,7 @@ export async function runBoardTool(
       case "addElementComment": {
         const elementId = await resolveElementId(supabase, String(input.elementId ?? ""));
         if (!elementId) return { ok: false, error: "Element not found" };
-        const body = String(input.body ?? "").trim();
-        if (!body) return { ok: false, error: "body is required" };
-        const { data, error } = await supabase
-          .from("element_comments").insert({
-            element_id: elementId,
-            content: body,
-            author_id: actor.userId,
-            author_kind: "ai_agent",
-            author_name: actor.agent,
-          })
-          .select("id, content, author_name, created_at").single();
-        if (error) throw error;
-        return { ok: true, data, meta: { rows: 1 } };
+        return await addElementCommentById(supabase, elementId, input.body, actor);
       }
 
       // ── Write: Bulk ───────────────────────────────────────────────────

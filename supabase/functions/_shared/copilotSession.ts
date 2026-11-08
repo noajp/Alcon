@@ -62,6 +62,10 @@ export interface PanelMessage {
   done?: boolean;
   toolEvents?: PanelToolEvent[];
   approvals?: PanelApproval[];
+  /** Connection proposals the turn made (propose_connection), kept with
+   *  the message so their cards render after the panel re-opens — the
+   *  Strategy conversation's connection_request step, in panel form. */
+  connections?: { names: string[]; waitingFor: string }[];
   [k: string]: unknown;
 }
 
@@ -90,6 +94,7 @@ export function resumedAssistantMessage(args: {
   text: string;
   toolEvents?: PanelToolEvent[];
   approval?: PanelApproval | null;
+  connections?: { names: string[]; waitingFor: string }[];
 }): PanelMessage {
   return {
     role: "assistant",
@@ -97,6 +102,7 @@ export function resumedAssistantMessage(args: {
     done: true,
     ...(args.toolEvents?.length ? { toolEvents: args.toolEvents } : {}),
     ...(args.approval ? { approvals: [args.approval] } : {}),
+    ...(args.connections?.length ? { connections: args.connections } : {}),
   };
 }
 

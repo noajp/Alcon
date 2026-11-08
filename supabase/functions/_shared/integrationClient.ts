@@ -258,6 +258,31 @@ const VETTED_MCP: readonly { preset: string; endpoint: RegExp }[] = [
   { preset: "github", endpoint: /^https:\/\/api\.githubcopilot\.com\/mcp\/?$/ },
   { preset: "linear", endpoint: /^https:\/\/mcp\.linear\.app\/mcp\/?$/ },
 ];
+
+// Per-preset MCP request headers, for the same vetted endpoints: what a
+// hosted server must hear to list its full tool surface. GitHub's hosted
+// server selects toolsets per connection (X-MCP-Toolsets / X-MCP-Tools);
+// as configured by default it does not list delete_branch, so the GitHub
+// command set has no branch deletion and a standing rule about merged
+// branches cannot even be recorded against a real command. Asking for
+// the repos toolset and the tool by name is additive — every other tool
+// keeps listing as before — and once listed, classification needs no
+// code: a write named *delete* is critical class delete, which always
+// asks in Auto mode. Scoped to the vetted endpoint exactly like
+// VETTED_MCP: an arbitrary server is never sent preset headers.
+const MCP_PRESET_HEADERS: readonly { preset: string; endpoint: RegExp; headers: Record<string, string> }[] = [
+  {
+    preset: "github",
+    endpoint: /^https:\/\/api\.githubcopilot\.com\/mcp\/?$/,
+    headers: { "X-MCP-Toolsets": "default,repos", "X-MCP-Tools": "delete_branch" },
+  },
+];
+
+/** Pure. The extra headers an MCP session to this connection sends. */
+export function mcpPresetHeaders(row: Pick<IntegrationRow, "preset" | "endpoint">): Record<string, string> {
+  const hit = MCP_PRESET_HEADERS.find((v) => v.preset === row.preset && v.endpoint.test(row.endpoint));
+  return hit ? { ...hit.headers } : {};
+}
 export const WRITE_VERB = /(^|[_\-.])(create|update|delete|remove|merge|push|send|post|put|patch|write|add|set|assign|close|archive|move|edit|rename|upload|invite|approve|reject|cancel|comment|reply|publish|run|execute|trigger|save|share|restore|resolve|submit|fork|star|dismiss|lock|request|mark|retire)([_\-.]|$)/i;
 
 /** Pure. Whether a tool's readOnlyHint may be believed for this connection. */
@@ -280,6 +305,7 @@ export class McpSession {
       accept: "application/json, text/event-stream",
       "mcp-protocol-version": this.protocolVersion,
       ...authHeaders(this.row, this.secret),
+      ...mcpPresetHeaders(this.row),
     };
     if (this.sessionId) headers["mcp-session-id"] = this.sessionId;
     const body = notify ? { jsonrpc: "2.0", method, params } : { jsonrpc: "2.0", id, method, params };

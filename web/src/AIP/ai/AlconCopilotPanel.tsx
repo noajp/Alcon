@@ -1,4 +1,5 @@
 'use client';
+import { formatError } from '@/Function/shared/formatError';
 import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
 
@@ -219,7 +220,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
           setFileError(e.reason === 'type'
             ? t('{name}: only PDF, Markdown and text files can be read.', { name: e.fileName })
             : t('{name} is too large (PDF up to {mb} MB).', { name: e.fileName, mb: MAX_PDF_BYTES / 1024 / 1024 }));
-        } else setFileError(e instanceof Error ? e.message : String(e));
+        } else setFileError(formatError(e));
       }
     }
     if (read.length) setFiles((prev) => [...prev, ...read]);
@@ -312,6 +313,8 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               onRetry={!streaming && m.role === 'assistant' && i === messages.length - 1 ? () => retry({ context: contextNow() }) : undefined}
               onEdit={!streaming && i === lastUser ? editLast : undefined}
               canRememberApproval={canRememberApproval}
+              spaceId={getActiveSpaceId()}
+              onContinueConnection={!streaming && m.role === 'assistant' ? (c) => send(`${c.waitingFor}を続けてください（${c.names.join('、')}を接続しました）`, { context: contextNow() }) : undefined}
               onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve, opts) => void decideApproval(a, approve, opts) : undefined} />
           ))}
           {error && (

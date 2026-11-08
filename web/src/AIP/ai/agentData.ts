@@ -1,4 +1,5 @@
 'use client';
+import { formatError } from '@/Function/shared/formatError';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import type { AgentAction, AgentOutput, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep } from '@/types/database';
 import { parseProposedReadings, parseRunVerdict, type ProposedReading, type RunVerdict } from '@/Function/audit/auditModel';
@@ -202,11 +203,15 @@ async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run
   if (error) throw error;
   const run = parseAgentRun(data) as ParsedAgentRun;
   // The engine answers 202 at once and works in the background. If the
-  // hand-off fails, the queued row is closed so it doesn't hold the Element.
+  // hand-off fails, the queued row is closed so it doesn't hold the
+  // Element — with the failure's detail kept on the row itself: the
+  // surface shows the person's readable line (the hook's error state),
+  // and the record keeps why the start failed, so a failed start is
+  // diagnosable from its own row instead of vanishing into a coercion.
   try {
     await invokeEngine({ runId: run.id });
   } catch (e) {
-    await cancelAgentRun(run.id).catch(() => undefined);
+    await cancelAgentRun(run.id, formatError(e)).catch(() => undefined);
     throw e;
   }
   return { run, existing: false };
@@ -235,10 +240,13 @@ export async function advanceFromElement(elementId: string): Promise<number> {
   return Array.isArray((data as { started?: unknown })?.started) ? (data as { started: unknown[] }).started.length : 0;
 }
 
-async function cancelAgentRun(runId: string): Promise<void> {
+async function cancelAgentRun(runId: string, errorDetail?: string): Promise<void> {
   const { error } = await supabase
     .from('agent_runs')
-    .update({ status: 'cancelled', finished_at: new Date().toISOString() })
+    .update({
+      status: 'cancelled', finished_at: new Date().toISOString(),
+      ...(errorDetail ? { error: errorDetail } : {}),
+    })
     .eq('id', runId)
     .in('status', AGENT_RUN_OPEN_STATUSES);
   if (error) throw error;
@@ -408,7 +416,7 @@ export function useAgentAction(actionId: string | null) {
       } else setRun(null);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setLoading(false);
     }
@@ -448,7 +456,7 @@ export function usePendingAgentAction(runId: string | null) {
       } else setRun(null);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setLoading(false);
     }
@@ -608,7 +616,7 @@ export function useAgentRun(
         setSteps([]);
         return 'started';
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(formatError(e));
         return 'failed';
       } finally {
         startingRef.current = false;
@@ -628,7 +636,7 @@ export function useAgentRun(
     } catch (e) {
       setRun(before.run);
       setPending(before.pending);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     }
   }, [run, pending]);
 
@@ -641,7 +649,7 @@ export function useAgentRun(
       await resumeAgentRun(run.id);
     } catch (e) {
       setRun(before);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     }
   }, [run]);
 
@@ -657,7 +665,7 @@ export function useAgentRun(
     } catch (e) {
       setRun(before.run);
       setPending(before.pending);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(formatError(e));
     } finally {
       setDeciding(false);
     }

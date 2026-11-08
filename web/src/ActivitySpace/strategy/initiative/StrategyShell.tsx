@@ -1,5 +1,7 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
+
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { ViewTabs } from '@/Function/shared/ViewTabs';
@@ -885,7 +887,7 @@ function StrategyDetailView({
       closePicker();
     } catch (e) {
       console.error('create Object failed:', e);
-      void appDialog.alert(e instanceof Error ? e.message : String(e));
+      void appDialog.alert(formatError(e));
     } finally {
       setCreatingObject(false);
     }

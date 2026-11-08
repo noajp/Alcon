@@ -38,6 +38,7 @@ import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, ty
 import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { manifestFromTools, parseManifest } from "../_shared/connectorManifest.ts";
+import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
 import { planManifestTools } from "../_shared/integrationTools.ts";
 import { planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
 
@@ -240,6 +241,32 @@ Deno.serve(async (req: Request) => {
   }
   const { error: writeErr } = await admin.from("integrations").update(patch).eq("id", integrationId);
   if (writeErr) return json({ error: "could not save the result", last_test: lastTest }, 500);
+
+  // A capability someone is waiting on may have just landed: the rebuilt
+  // manifest's command names are matched against the pending-capability
+  // rules recorded for this Space — and the testing owner's own — and a
+  // match tells the owner in their Inbox. The rule stays active (the
+  // memory is the record; honouring it is a conversation, and the
+  // heartbeat's deduped signal is the periodic backstop). Best-effort:
+  // a surfacing failure never fails the test.
+  if (patch.manifest) {
+    try {
+      const commandNames = (patch.manifest as { commands?: { name?: unknown }[] }).commands
+        ?.map((c) => (typeof c?.name === "string" ? c.name : "")).filter(Boolean) ?? [];
+      const { data: ruleRows } = await admin.from("memories")
+        .select("id, topic_key, title, created_at, scope, activity_space_id, user_id")
+        .eq("status", "active").eq("kind", "procedure").like("topic_key", "pending-capability:%");
+      const scoped = ((ruleRows ?? []) as { id: string; topic_key: string | null; title: string; created_at: string; scope: string; activity_space_id: string | null; user_id: string | null }[])
+        .filter((r) => (r.scope === "space" ? r.activity_space_id === row.activity_space_id : r.user_id === user.id));
+      for (const rule of matchPendingCapabilities(scoped, row.preset, commandNames)) {
+        await admin.from("notifications").insert({
+          recipient_id: user.id, actor_name: "Alcon Agent", kind: "status_change", element_id: null,
+          title: `使えるようになりました: ${rule.command}`,
+          body: `${row.name} で ${rule.command} が使えるようになりました。能力待ちのルール「${rule.title}」を効かせ始められます。`,
+        }).then(() => {}, () => {});
+      }
+    } catch { /* surfacing is best-effort */ }
+  }
 
   // The test just listed the server's tools and rebuilt the manifest from
   // them: warm the cached tool plan from the same listing, fingerprinted

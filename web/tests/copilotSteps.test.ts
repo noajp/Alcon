@@ -59,7 +59,18 @@ describe('liveTurnFromSteps', () => {
   });
 
   it('no steps yet reads as an empty turn', () => {
-    expect(liveTurnFromSteps([])).toEqual({ content: '', toolEvents: [] });
+    expect(liveTurnFromSteps([])).toEqual({ content: '', toolEvents: [], connections: [] });
+  });
+
+  it('maps connection_request steps to the turn’s proposals', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('connection_request', '接続を提案しました', JSON.stringify({ names: ['GitHub'], waitingFor: 'PR を作る' })),
+      step('connection_request', '壊れた詳細', 'not json'),
+      step('reply', 'カードを出しました', 'カードを出しました'),
+    ]);
+    expect(live.connections).toEqual([{ names: ['GitHub'], waitingFor: 'PR を作る' }]);
+    expect(live.content).toBe('カードを出しました');
   });
 });
 
@@ -71,6 +82,7 @@ describe('toKeptMessages', () => {
         role: 'assistant', content: '読みました', done: true, at: 124,
         toolEvents: [{ name: 'readFile', result: { ok: true } }],
         approvals: [{ calls: [], inputHash: 'h', status: 'pending', runId: 'r', actionId: 'a' }],
+        connections: [{ names: ['GitHub'], waitingFor: 'PR を作る' }],
       },
       { role: 'assistant', content: '', done: false },
     ];
@@ -80,6 +92,7 @@ describe('toKeptMessages', () => {
         role: 'assistant', content: '読みました',
         toolEvents: [{ name: 'readFile', result: { ok: true } }],
         approvals: [{ calls: [], inputHash: 'h', status: 'pending', runId: 'r', actionId: 'a' }],
+        connections: [{ names: ['GitHub'], waitingFor: 'PR を作る' }],
       },
       { role: 'assistant', content: '' },
     ]);

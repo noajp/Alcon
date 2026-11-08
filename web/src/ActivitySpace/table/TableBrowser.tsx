@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useMemo } from 'react';
 import { FolderInput } from '@/ui/icons';
 import { Button } from '@/ui/button';
@@ -62,7 +63,7 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
         </DropdownMenuTrigger>
         <MenuShell as="dropdown" align="end">
           <MoveToFolderItems app="tables" domainId={tb.domain_id} current={tb.folder_id} allowNone onMove={(id) => {
-            void updateDataTable(tb.id, { folder_id: id }).then(onRefresh).catch((e) => void appDialog.alert(e instanceof Error ? e.message : String(e)));
+            void updateDataTable(tb.id, { folder_id: id }).then(onRefresh).catch((e) => void appDialog.alert(formatError(e)));
           }} />
         </MenuShell>
       </DropdownMenu>

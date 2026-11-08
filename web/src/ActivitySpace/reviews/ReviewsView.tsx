@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useMemo, useState } from 'react';
 import { Bot, CheckCircle2, Github, Inbox, ListOrdered, RefreshCw } from '@/ui/icons';
 import { Button } from '@/ui/button';
@@ -237,7 +238,7 @@ function ConnectGithub({ spaceId, existing }: { spaceId: string; existing: Integ
       try { sessionStorage.setItem(OAUTH_RETURN_VIEW_KEY, 'reviews'); } catch { /* lands in Settings › AI instead */ }
       window.location.assign(url);
     } catch (e) {
-      setError(t(e instanceof Error ? e.message : String(e)));
+      setError(t(formatError(e)));
     }
   };
 

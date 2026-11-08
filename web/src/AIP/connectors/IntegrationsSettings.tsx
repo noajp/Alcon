@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from '@/ui/icons';
@@ -255,7 +256,7 @@ function ApprovalModeSection({ spaceId, isOwner }: { spaceId: string; isOwner: b
       await setSpaceApprovalMode(spaceId, next);
       await refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      setSaveError(formatError(e));
     } finally {
       setSaving(false);
     }
@@ -447,7 +448,7 @@ function DraftCreateSection({ spaceId, integrations, drafts, onCreated, onOpenDr
       setName(''); setDocsUrl(''); setPurpose('');
       onCreated(draft);
     } catch (e) {
-      setStartError(e instanceof Error ? e.message : String(e));
+      setStartError(formatError(e));
     } finally {
       setStarting(false);
     }

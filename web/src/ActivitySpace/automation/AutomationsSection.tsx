@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useMemo, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
@@ -34,7 +35,7 @@ const PRESETS: { cron: string; label: string }[] = [
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
 
 function cronProblem(cron: string): string | null {
-  try { parseCron(cron); return null; } catch (e) { return e instanceof Error ? e.message : String(e); }
+  try { parseCron(cron); return null; } catch (e) { return formatError(e); }
 }
 
 export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string | null; onOpenElement?: (id: string) => void }) {
@@ -56,7 +57,7 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
   const act = async (id: string, f: () => Promise<void>, done?: string) => {
     setBusy(id); setError(null); setNotice(null);
     try { await f(); if (done) setNotice(done); automations.refetch(); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    catch (e) { setError(formatError(e)); }
     finally { setBusy(null); }
   };
 
@@ -80,7 +81,7 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
             setCreating(false); setOpen(a.id); automations.refetch();
             if (a.kind === 'webhook') {
               try { setToken({ id: a.id, value: await issueWebhookToken(a.id) }); automations.refetch(); }
-              catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+              catch (e) { setError(formatError(e)); }
             }
           }} />
       )}
@@ -269,7 +270,7 @@ function NewAutomation({ spaceId, harnesses, objects, onCancel, onCreated }: {
   const save = async () => {
     setSaving(true); setError(null);
     try { onCreated(await createAutomation({ spaceId, name, definitionId, objectId, kind, cron: kind === 'schedule' ? cron : null, timezone: TIMEZONE })); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    catch (e) { setError(formatError(e)); }
     finally { setSaving(false); }
   };
 

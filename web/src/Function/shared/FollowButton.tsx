@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from './formatError';
 import { Star } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -15,7 +16,7 @@ export function FollowButton({ kind, id }: { kind: FollowKind; id: string }) {
   return (
     <Button type="button" variant="ghost" size="icon-xs" aria-pressed={following} aria-label={label} title={label}
       disabled={toggle.isPending}
-      onClick={() => toggle.mutate(undefined, { onError: (e) => void appDialog.alert(e instanceof Error ? e.message : String(e)) })}
+      onClick={() => toggle.mutate(undefined, { onError: (e) => void appDialog.alert(formatError(e)) })}
       className={following ? 'text-[var(--status-warning)]' : 'text-muted-foreground'}>
       <Star size={14} fill={following ? 'currentColor' : 'none'} />
     </Button>

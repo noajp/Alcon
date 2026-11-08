@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { errorMessage, resolveElementId, runBoardTool, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
+import {
+  addElementCommentById, errorMessage, resolveElementIdTraced, runBoardTool, updateElementById,
+  type BoardActor, type ResolveStage, type ToolDef, type ToolResult,
+} from "./boardTools.ts";
 
 // How an agent outside the app (Claude Code over MCP, a script over REST)
 // reports on an Element it works: take it (the lease), say how it is going,
@@ -117,6 +120,33 @@ export function outcomeNotice(
 }
 
 const SESSION_UNSAFE = /[^A-Za-z0-9._-]/g;
+const UUID_ARG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A failed resolution, recorded by whoever dispatched the call: the raw
+ *  identifier, the stage it died at, and the session's user. Audit only —
+ *  the surface keeps the translated "Element not found". Until this was
+ *  recorded, a failed write-back was undiagnosable: the argument existed
+ *  nowhere. */
+export interface ResolveFailure {
+  idArg: string;
+  stage: ResolveStage;
+  userId: string | null;
+}
+
+/**
+ * The binding a dispatch may carry: the Element a run is about
+ * (agent_runs.element_id), held by the driver that started the work.
+ * Bound, the report tools act on that id directly — never a fresh string
+ * resolution against the session's RLS luck (the smoke run's result
+ * comment failed twice that way, once by UUID and once by display
+ * number, while the run's own bookkeeping landed fine). Unbound callers
+ * (a person chatting, an outside agent naming its Element) resolve
+ * strings as before.
+ */
+export interface ReportBinding {
+  elementId?: string | null;
+  onResolveFailure?: (failure: ResolveFailure) => void | Promise<void>;
+}
 
 /**
  * Pure. The lease holder token for a caller: `<agent>@<user>[.<session>]`.
@@ -182,10 +212,33 @@ export async function runAgentReportTool(
   input: Record<string, unknown>,
   actor: BoardActor,
   notify?: CallerNotifier,
+  binding?: ReportBinding,
 ): Promise<ToolResult> {
   try {
-    const id = await resolveElementId(supabase, String(input.elementId ?? ""));
-    if (!id) return { ok: false, error: "Element not found" };
+    // The Element this call acts on: the binding when the dispatch
+    // carries one (authoritative — a model-supplied UUID that disagrees
+    // is an error the model can correct, never a re-resolution), else
+    // the model-supplied string resolved under this session.
+    const boundId = binding?.elementId || null;
+    let id: string;
+    if (boundId) {
+      const supplied = String(input.elementId ?? "").trim();
+      if (supplied && UUID_ARG.test(supplied) && supplied.toLowerCase() !== boundId.toLowerCase()) {
+        return { ok: false, error: "elementId does not match the Element this work is bound to. Report on the bound Element (omit elementId), or start separate work for the other Element." };
+      }
+      id = boundId;
+    } else {
+      const traced = await resolveElementIdTraced(supabase, String(input.elementId ?? ""));
+      if (!traced.id) {
+        if (binding?.onResolveFailure) {
+          await Promise.resolve(binding.onResolveFailure({
+            idArg: String(input.elementId ?? ""), stage: traced.stage, userId: actor.userId ?? null,
+          })).catch(() => undefined);
+        }
+        return { ok: false, error: "Element not found" };
+      }
+      id = traced.id;
+    }
     const holder = leaseHolder(actor, input.session);
 
     switch (name) {
@@ -213,7 +266,13 @@ export async function runAgentReportTool(
         const title = str(input.title).slice(0, 300);
         if (!title) return { ok: false, error: "title is required" };
         const steps = Array.isArray(input.steps) ? (input.steps as unknown[]).map(str).filter(Boolean).slice(0, 20) : undefined;
-        const posted = await runBoardTool(supabase, "addElementComment", { elementId: id, body: progressComment(title, str(input.detail), steps) }, actor);
+        const body = progressComment(title, str(input.detail), steps);
+        // Bound: the comment lands on the bound id directly. Unbound: the
+        // board tool, which re-resolves the (already canonical) id — the
+        // conversational path, where there is no run to bind to.
+        const posted = boundId
+          ? await addElementCommentById(supabase, id, body, actor)
+          : await runBoardTool(supabase, "addElementComment", { elementId: id, body }, actor);
         if (!posted.ok) return posted;
         const renewed = await renewIfHeld(supabase, id, holder);
         return { ok: true, data: { comment: posted.data, leaseRenewed: renewed }, meta: { rows: 1 } };
@@ -232,10 +291,15 @@ export async function runAgentReportTool(
         const el = elRow as { status?: string | null; display_id?: string | null; title?: string | null } | null;
         const next = outcomeStatus(outcome, el?.status ?? null);
         if (next) {
-          const moved = await runBoardTool(supabase, "updateElement", { id, status: next }, actor);
+          const moved = boundId
+            ? await updateElementById(supabase, id, { status: next }, actor)
+            : await runBoardTool(supabase, "updateElement", { id, status: next }, actor);
           if (!moved.ok) return moved;
         }
-        const posted = await runBoardTool(supabase, "addElementComment", { elementId: id, body: outcomeComment(outcome, summary, message) }, actor);
+        const commentBody = outcomeComment(outcome, summary, message);
+        const posted = boundId
+          ? await addElementCommentById(supabase, id, commentBody, actor)
+          : await runBoardTool(supabase, "addElementComment", { elementId: id, body: commentBody }, actor);
         if (!posted.ok) return posted;
         const released = await releaseIfHeld(supabase, id, holder);
         // A failed notification does not undo a report that already landed.

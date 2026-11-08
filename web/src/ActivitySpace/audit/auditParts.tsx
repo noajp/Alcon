@@ -1,5 +1,6 @@
 'use client';
 
+import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FlaskConical, X } from '@/ui/icons';
 import { Button } from '@/ui/button';
@@ -268,7 +269,7 @@ export function AgentRunPanel({ run, onClose }: { run: AgentRunRecord; onClose: 
       await createPromotionDraftFromRun(run.id, run.domain_id);
       setPromoState('done');
     } catch (e) {
-      setPromoState(e instanceof Error ? e.message : String(e));
+      setPromoState(formatError(e));
     }
   };
   const readings = run.proposed_readings ?? [];

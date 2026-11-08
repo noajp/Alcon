@@ -372,7 +372,7 @@ function ConnectCard({ item, spaceId, integrations }: {
   const proposal = item.proposal;
   if (!proposal || proposal.kind !== 'connect') return null;
   const stillMissing = missingConnectors(proposal.names, integrations);
-  const needs = proposal.names.map((name) => stillMissing.find((n) => n.name === name) ?? { name, preset: null });
+  const needs = proposal.names.map((name) => stillMissing.find((n) => n.name === name) ?? { name, preset: null, kind: 'missing' as const });
   return <ConnectRequestCard spaceId={spaceId} needs={needs} waitingFor={proposal.waitingFor || null} />;
 }
 

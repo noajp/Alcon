@@ -57,7 +57,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk@0.110.0";
-import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
+import { resolveElementIdTraced, runBoardTool, updateElementById, errorMessage, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
 import { runStrategyTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, costOf, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
@@ -79,6 +79,8 @@ import { catalogDenyRefusal, catalogIndex, catalogOperation, catalogTool, decide
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName, missingConnectorNames } from "../_shared/connectorNeeds.ts";
+import { CONNECTION_PROPOSED_REPLY, resolveConnectionProposal } from "../_shared/connectProposal.ts";
+import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
@@ -1098,6 +1100,18 @@ async function execute(a: ExecArgs): Promise<void> {
     if (baseKindOf(call.name) === "board") {
       const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved });
       await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
+      // A failed Element resolution is recorded with its evidence — the
+      // raw identifier, the stage it died at, the session's user (audit
+      // only; the surface keeps the translated line). A write-back that
+      // fails as "Element not found" was undiagnosable while the
+      // argument existed nowhere; the traced re-check is read-only and
+      // runs only on that failure.
+      if (!r.ok && r.error === "Element not found") {
+        const idArg = String(input.elementId ?? input.id ?? "");
+        const traced = await resolveElementIdTraced(userDb, idArg).catch(() => null);
+        await addStep(admin, run.id, "error", "Element を特定できませんでした",
+          JSON.stringify({ idArg, stage: traced?.stage ?? "unknown", userId: user.id }));
+      }
       // A recall's bodies count as uses of those memories (PR3).
       if (call.name === "recall_memory" && r.ok) await noteMemoryUse(admin, run.id, usedIdsOf(r.data));
       return r.ok ? { content: JSON.stringify(r.data).slice(0, 20_000) } : { content: r.error, is_error: true };
@@ -1691,22 +1705,18 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     // The connection proposal follows the same pattern: the step carries
     // the ask (which connectors, and what work waits on them), a card is
     // shown, and connecting itself is the person's act in the dialog the
-    // card opens. Names that are already connected are dropped here — the
-    // card re-reads the live state anyway, so a stale ask cannot survive.
+    // card opens. The judgement itself is shared with the Copilot panel
+    // driver (_shared/connectProposal.ts): names that are already
+    // connected — or whose latest test failed, a reauth — are resolved
+    // there; the card re-reads the live state anyway, so a stale ask
+    // cannot survive.
     if (call.name === CONNECT_TOOL.name) {
-      const asked = Array.isArray(call.input.names)
-        ? call.input.names.filter((v): v is string => typeof v === "string").map((v) => v.trim().slice(0, 80)).filter(Boolean).slice(0, 5)
-        : [];
-      const waitingFor = String(call.input.waitingFor ?? "").trim().slice(0, 300);
-      if (!asked.length || !waitingFor) return { content: "names（未接続のコネクタ名）と waitingFor（待っている仕事）が要ります。", is_error: true };
-      const { data: rows } = run.activity_space_id
-        ? await userDb.from("integrations").select("name, preset, enabled").eq("activity_space_id", run.activity_space_id).in("kind", ["mcp", "http"])
-        : { data: [] };
-      const names = missingConnectorNames(asked, (rows ?? []) as { name: string; preset: string | null; enabled: boolean }[]);
-      if (!names.length) return { content: `${asked.join("、")} はすでに接続されています。接続の提案は要りません。` };
-      const detail = JSON.stringify({ names, waitingFor });
+      const r = await resolveConnectionProposal(userDb, run.activity_space_id, call.input);
+      if (r.kind === "invalid") return { content: r.error, is_error: true };
+      if (r.kind === "already") return { content: `${r.asked.join("、")} はすでに接続されています。接続の提案は要りません。` };
+      const detail = JSON.stringify({ names: r.names, waitingFor: r.waitingFor });
       await addStep(admin, run.id, "connection_request", "接続を提案しました", detail);
-      return { content: "会話に「接続する」カードを出しました。接続は人がカードからダイアログを開いて行います。接続したとは言わないでください。" };
+      return { content: CONNECTION_PROPOSED_REPLY };
     }
     if (call.name === ANSWER_TOOL.name) {
       const runId = String(call.input.runId ?? "");
@@ -2952,6 +2962,43 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
     signals.push({ kind: "automation_failed", id: au.id, since, version: since, label: au.name, place: "自動化の画面で確認できます" });
   }
 
+  // ── Pending-capability rules whose command has landed ──
+  // A rule waited from the day it was recorded (its `since`), so the
+  // threshold reads as how long the person has waited for the
+  // capability — and the fingerprint (capability:<memory id>) dedups
+  // it to one telling, however it arrived: a connection test's rebuild,
+  // a G4 activation, a preset update. The rules read here are this
+  // Space's and the heartbeat owner's own (their session's RLS view);
+  // the match itself is the shared deterministic one.
+  const pendingRules = await guard(
+    userDb.from("memories").select("id, topic_key, title, created_at, scope, activity_space_id")
+      .eq("status", "active").eq("kind", "procedure").like("topic_key", "pending-capability:%")
+      .order("created_at", { ascending: true }).limit(40),
+    [] as { id: string; topic_key: string | null; title: string; created_at: string; scope: string; activity_space_id: string | null }[],
+  );
+  const spaceRules = pendingRules.filter((r) => r.scope === "personal" || r.activity_space_id === spaceId);
+  if (spaceRules.length) {
+    const conns = await guard(
+      userDb.from("integrations").select("preset, manifest")
+        .eq("activity_space_id", spaceId).in("kind", ["mcp", "http"]),
+      [] as { preset: string | null; manifest: unknown }[],
+    );
+    const namesByPreset = new Map<string, string[]>();
+    for (const c of conns) {
+      if (!c.preset) continue;
+      const names = parseManifest(c.manifest).manifest.commands.map((cmd) => cmd.name);
+      namesByPreset.set(c.preset, [...(namesByPreset.get(c.preset) ?? []), ...names]);
+    }
+    for (const [preset, names] of namesByPreset) {
+      for (const rule of matchPendingCapabilities(spaceRules, preset, names)) {
+        signals.push({
+          kind: "capability_landed", id: rule.id, since: rule.created_at,
+          label: rule.title, place: "会話で効かせ始められます",
+        });
+      }
+    }
+  }
+
   return signals;
 }
 
@@ -3237,6 +3284,10 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   // the kept message the turn ends in. Calls pair with their results
   // by name, earliest first, as the panel has always paired them.
   const toolEvents: PanelToolEvent[] = [];
+  // Connection proposals this turn makes (propose_connection): recorded
+  // as connection_request steps for the live panel, and kept with the
+  // turn's message so the card renders after the panel re-opens.
+  const connectProposals: { names: string[]; waitingFor: string }[] = [];
   const callInputs: { name: string; input: Record<string, unknown> }[] = [];
   let stepChain: Promise<unknown> = Promise.resolve();
   const stepLater = (type: string, title: string, detail?: string | null) => {
@@ -3265,6 +3316,15 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
             ? { ok: true, ...(r.rows !== undefined ? { rows: r.rows } : {}) }
             : { ok: false, ...(r.error ? { error: r.error } : {}) },
         });
+        if (r.connectionProposal) {
+          // A proposal is recorded in the conversation's own medium — a
+          // connection_request step, the shape the Strategy conversation
+          // writes — not as a generic action step.
+          connectProposals.push(r.connectionProposal);
+          stepLater("connection_request", "接続を提案しました",
+            JSON.stringify(r.connectionProposal));
+          return;
+        }
         stepLater(
           r.ok ? (turn.kindOf(r.name) === "write" ? "write" : "action") : "error",
           r.name,
@@ -3571,7 +3631,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       await saveTranscript();
       const text = outcome.finish.message || outcome.finish.summary;
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
-        resumedAssistantMessage({ text, toolEvents })]);
+        resumedAssistantMessage({ text, toolEvents, connections: connectProposals })]);
       // The answer's words are already a step: the streaming call folded
       // its draft into the reply.
       await rest("awaiting_input", outcome.finish.summary);
@@ -3610,7 +3670,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       });
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
         resumedAssistantMessage({
-          text: lastWords(), toolEvents,
+          text: lastWords(), toolEvents, connections: connectProposals,
           approval: { calls: p.calls, inputHash: persisted.inputHash, status: "pending", runId: run.id, actionId: persisted.actionId },
         })]);
       await bound("approval", "承認待ち", persisted.summary);
@@ -3634,7 +3694,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
         : outcome.kind === "refusal" ? "モデルがこの依頼を断ったため、続きは止まりました。"
         : "作業の上限に達したため、続きは止まりました。チャットで話しかけると続けられます。";
       await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
-        resumedAssistantMessage({ text: note, toolEvents })]);
+        resumedAssistantMessage({ text: note, toolEvents, connections: connectProposals })]);
       if (outcome.kind === "budget") {
         await bound("error", "予算の上限に達しました", note);
         await pause(note);
@@ -3670,9 +3730,10 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
       : Promise.resolve({ data: [] }),
     // Every row, enabled or not: what the definition names but the Space
     // has not connected is computed against these (a switched-off row is
-    // not a connection).
+    // not a connection; neither is one whose latest test failed — its
+    // sign-in is gone, so the conversation names it as a need too).
     run.activity_space_id
-      ? userDb.from("integrations").select("name, preset, enabled").eq("activity_space_id", run.activity_space_id).in("kind", ["mcp", "http"])
+      ? userDb.from("integrations").select("name, preset, enabled, last_test").eq("activity_space_id", run.activity_space_id).in("kind", ["mcp", "http"])
       : Promise.resolve({ data: [] }),
   ]);
   // The harness the Strategy is worked by: its own, else the Space's
@@ -3743,7 +3804,10 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     // in review rather than staying "to do" where nobody would see it.
     const next = finish.outcome === "completed" ? (auto ? "done" : "review") : finish.outcome === "blocked" ? "blocked" : "review";
     if (el && next && !["done", "cancelled"].includes(el.status ?? "") && el.status !== next) {
-      await runBoardTool(userDb, "updateElement", { id: run.element_id, status: next }, { agent: `${agentName}（AI）`, userId: user.id });
+      // The move acts on the run's bound element_id directly — no fresh
+      // resolution of a string under the session's view (write-back
+      // binding): the run is about this Element by construction.
+      await updateElementById(userDb, run.element_id, { status: next }, { agent: `${agentName}（AI）`, userId: user.id });
       await addStep(admin, run.id, "status", next === "review" ? "Element をレビュー待ちに移動" : next === "done" ? "Element を完了に移動（自動で進める設定）" : "Element をブロック中に移動");
     }
   }
