@@ -222,6 +222,19 @@ async function events(req: Request, db: SupabaseClient, asset: ResolvedAsset): P
   return json(200, { recorded: data, status: asset.status });
 }
 
+/** A staged sign-in pair, read strictly: only the two fields the
+ *  fill needs, only as non-empty strings. Anything else is not a
+ *  pair and the call is not delivered. */
+function parsePair(text: string): { username: string; password: string } | null {
+  let v: unknown;
+  try { v = JSON.parse(text); } catch { return null; }
+  if (!isObject(v)) return null;
+  const { username, password } = v as { username?: unknown; password?: unknown };
+  if (typeof username !== "string" || !username) return null;
+  if (typeof password !== "string" || !password) return null;
+  return { username, password };
+}
+
 const CALL_WAIT_MS = 20_000;
 const CALL_POLL_MS = 800;
 /** A call nobody picked up for this long is stale: the run has given up on it. */
@@ -244,7 +257,27 @@ async function nextCall(db: SupabaseClient, asset: ResolvedAsset): Promise<Respo
       // Claimed only if still pending: two pollers never take the same call.
       const { data: claimed } = await db.from("asset_calls").update({ status: "claimed", claimed_at: new Date().toISOString() })
         .eq("id", c.id).eq("status", "pending").select("id").maybeSingle();
-      if (claimed) return json(200, { call: { id: c.id, tool: c.tool, input: c.input } });
+      if (!claimed) continue;
+      if (c.tool === "sign_in") {
+        // A sign-in call is never delivered without its pair, and the
+        // pair never sits in the call row (Space members read those):
+        // it was staged in the Vault under this call's id by the
+        // releasing server, and is taken — read and deleted in one
+        // RPC — only now, into this token-authenticated response.
+        // No pair yet (the releaser stages a moment after queueing)
+        // or an unreadable one: hand the call back to pending and
+        // let the poll come around again; it is never delivered dry.
+        const { data: staged } = await db.rpc("take_sign_in_payload", { p_call_id: c.id });
+        const pair = typeof staged === "string" ? parsePair(staged) : null;
+        if (!pair) {
+          await db.from("asset_calls").update({ status: "pending", claimed_at: null })
+            .eq("id", c.id).eq("status", "claimed");
+          continue;
+        }
+        const input = isObject(c.input) ? { ...c.input, pair } : { pair };
+        return json(200, { call: { id: c.id, tool: c.tool, input } });
+      }
+      return json(200, { call: { id: c.id, tool: c.tool, input: c.input } });
     }
     if (Date.now() + CALL_POLL_MS > until) return json(200, { call: null, status: asset.status });
     await new Promise((r) => setTimeout(r, CALL_POLL_MS));

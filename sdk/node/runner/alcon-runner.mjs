@@ -16,6 +16,10 @@
 // or logins with your everyday Chrome; sign in there only to sites you want
 // the AI to see as you. Read-only by default: a page navigation that sends a
 // form (anything but GET) is stopped. Start with --allow-writes to lift that.
+// One exception, by design: a sign_in call carries a credential pair the
+// server released for this page's origin alone; its submit on that origin
+// is let through while the fill is armed, and the pair is held in memory
+// only for the fill — never logged, never written anywhere.
 //
 // Options (environment or flags):
 //   ALCON_RELAY / --relay       the relay URL                       required
@@ -54,7 +58,7 @@ const SHELL = ISOLATED && flag('shell');
 /** Where shell commands run and relative file paths point. */
 const WORKDIR = process.env.ALCON_WORKDIR ?? join(HOME, 'work');
 const ALLOW_WRITES = flag('allow-writes');
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 const log = (...m) => console.error(`[alcon-runner ${new Date().toLocaleTimeString()}]`, ...m);
 if (!RELAY) { log('ALCON_RELAY (or --relay) is required'); process.exit(1); }
@@ -116,6 +120,13 @@ async function browser() {
       await context.route('**/*', (route) => {
         const req = route.request();
         if (req.isNavigationRequest() && req.method() !== 'GET' && req.method() !== 'HEAD') {
+          // The one write a read-only runner lets through: a sign-in
+          // submit on the credential's own origin, while a sign-in fill
+          // is armed (see sign_in below). Origin-exact and time-boxed;
+          // everything else is stopped as before.
+          if (signInAllowance && Date.now() <= signInAllowance.until && originOfUrl(req.url()) === signInAllowance.origin) {
+            return route.continue();
+          }
           // Only the page's own submissions are worth a line; trackers in
           // hidden frames are stopped quietly.
           if (req.frame() === req.frame().page()?.mainFrame()) log(`Stopped a ${req.method()} to ${req.url()} (read-only)`);
@@ -135,6 +146,39 @@ async function settle(p) {
   await p.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
 }
 
+/** The canonical origin of a URL (scheme://host[:port], default port
+ *  dropped, host lowercased — the URL parser's own rules, which are the
+ *  server's normalize rules too). Null for anything not http(s). */
+const originOfUrl = (u) => {
+  try {
+    const x = new URL(u);
+    return x.protocol === 'http:' || x.protocol === 'https:' ? x.origin : null;
+  } catch { return null; }
+};
+
+/** The asset token, once announced — wall reports ride it. */
+let assetToken = null;
+
+/** A sign-in fill in progress: { origin, until } while armed. The
+ *  read-only route gate lets a submit through only for this origin,
+ *  only until this moment. */
+let signInAllowance = null;
+
+const wallReportedAt = new Map();
+
+/** Tell the Space a login wall stands on this origin (an asset event —
+ *  the server raises the capture ask from the runner's reports).
+ *  Best-effort and throttled: a wall is one fact per origin, not one
+ *  per page read. */
+function reportWall(origin) {
+  if (!assetToken || !origin) return;
+  const last = wallReportedAt.get(origin) ?? 0;
+  if (Date.now() - last < 10 * 60_000) return;
+  wallReportedAt.set(origin, Date.now());
+  relay('/events', { events: [{ kind: 'login_wall', summary: `ログイン画面を検出: ${origin}`, payload: { origin } }] }, assetToken)
+    .catch(() => {});
+}
+
 /** The page as the agent reads it: where it is, its text, its links. */
 async function snapshot(p, note) {
   const data = await p.evaluate(() => {
@@ -152,9 +196,22 @@ async function snapshot(p, note) {
       links.push({ text: label.slice(0, 80), href });
       if (links.length >= 150) break;
     }
-    return { title: document.title, text: text.slice(0, 20000), links };
+    // A login wall: a password field a person could actually type
+    // into. Reported as the page's own origin — a server-side fact
+    // about where this browser stands, never anything the model said.
+    let loginWall = null;
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      for (const pw of document.querySelectorAll('input[type="password"]')) {
+        const r = pw.getBoundingClientRect();
+        const s = getComputedStyle(pw);
+        if (r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' && !pw.disabled) { loginWall = location.origin; break; }
+      }
+    }
+    return { title: document.title, text: text.slice(0, 20000), links, loginWall };
   });
-  return { url: p.url(), ...data, ...(note ? { note } : {}) };
+  const { loginWall, ...rest } = data;
+  if (loginWall) reportWall(loginWall);
+  return { url: p.url(), ...rest, ...(loginWall ? { login_wall: loginWall } : {}), ...(note ? { note } : {}) };
 }
 
 async function clickText(p, text) {
@@ -179,6 +236,48 @@ async function fieldFor(p, field) {
     if (await el.count() > 0 && await el.isVisible().catch(() => false)) return el;
   }
   return null;
+}
+
+/** The first match of a locator a person could actually use. */
+async function firstVisible(locator) {
+  const n = await locator.count().catch(() => 0);
+  for (let i = 0; i < n; i++) {
+    const el = locator.nth(i);
+    if (await el.isVisible().catch(() => false)) return el;
+  }
+  return null;
+}
+
+/** The page's password field: the current-password one when the page
+ *  says which it is, else the (single, visible) password input. */
+async function passwordField(p) {
+  for (const sel of ['input[type="password"][autocomplete="current-password"]', 'input[type="password"]']) {
+    const el = await firstVisible(p.locator(sel));
+    if (el) return el;
+  }
+  return null;
+}
+
+/** The field a sign-in name goes in: the page's own username/email
+ *  signals first, then the text input sharing the password's form. */
+async function usernameField(p, passEl) {
+  for (const sel of ['input[autocomplete="username"]', 'input[autocomplete="email"]', 'input[type="email"]']) {
+    const el = await firstVisible(p.locator(sel));
+    if (el) return el;
+  }
+  if (passEl) {
+    const inForm = await firstVisible(p.locator('form').filter({ has: passEl }).locator('input[type="text"], input:not([type])'));
+    if (inForm) return inForm;
+  }
+  return firstVisible(p.locator('input[type="text"]'));
+}
+
+/** Submit the login form: its own submit control when it has one,
+ *  else Enter in the password field, which is how the form expects it. */
+async function submitLogin(p, passEl) {
+  const btn = await firstVisible(p.locator('form:has(input[type="password"]) :is(button[type="submit"], input[type="submit"])'));
+  if (btn) { await btn.click({ timeout: 6000 }); return; }
+  await passEl.press('Enter');
 }
 
 // ── The machine (only on an isolated runner) ─────────────────────────────────
@@ -241,9 +340,53 @@ const TOOLS = {
     const p = await browser();
     const el = await fieldFor(p, String(field ?? ''));
     if (!el) return snapshot(p, `入力欄「${field}」が見つかりませんでした`);
+    // Whether the field is a password field, detected from the DOM:
+    // the server masks the step's text on this report, so a value
+    // typed into one never lands in the run's record.
+    const password_field = await el.evaluate((e) => e.type === 'password' || e.autocomplete === 'current-password' || e.autocomplete === 'new-password')
+      .catch(() => false);
     await el.fill(String(text ?? ''));
     if (submit) { await el.press('Enter'); await settle(p); }
-    return snapshot(p);
+    return { ...(await snapshot(p)), password_field };
+  },
+  /**
+   * Sign in with a pair the server released for this page's origin.
+   * The input is { origin, pair }: the origin the server resolved
+   * from this browser's own report, and the pair, which exists in
+   * this process only for this fill. Every refusal is a result, not
+   * a throw, and no result, log or error ever carries the pair.
+   */
+  async sign_in({ origin, pair }) {
+    const p = await browser();
+    if (!pair || typeof pair.username !== 'string' || !pair.username || typeof pair.password !== 'string' || !pair.password) {
+      return { ...(await snapshot(p)), signed_in: false, reason: 'no_pair' };
+    }
+    // The fill-time leg of the origin check: the page must still be
+    // where the server resolved it. A moved page gets nothing typed.
+    if (originOfUrl(p.url()) !== origin) {
+      return { ...(await snapshot(p)), signed_in: false, reason: 'page_moved' };
+    }
+    const pass = await passwordField(p);
+    const user = pass ? await usernameField(p, pass) : null;
+    if (!pass || !user) {
+      return { ...(await snapshot(p)), signed_in: false, reason: 'no_form' };
+    }
+    signInAllowance = { origin, until: Date.now() + 60_000 };
+    try {
+      await user.fill(pair.username);
+      await pass.fill(pair.password);
+      await submitLogin(p, pass);
+    } catch {
+      // The error is swallowed on purpose: what went wrong is read
+      // off the page below, and no machinery message on this path
+      // may travel with what was typed.
+      return { ...(await snapshot(p)), signed_in: false, reason: 'error' };
+    } finally {
+      signInAllowance = null;
+    }
+    await settle(p);
+    const still = await passwordField(p);
+    return { ...(await snapshot(p)), signed_in: !still, ...(still ? { reason: 'still_walled' } : {}) };
   },
   async back() {
     const p = await browser();
@@ -257,6 +400,7 @@ const TOOLS = {
 
 async function main() {
   let token = await announce();
+  assetToken = token;
   log(`Read-only: ${!ALLOW_WRITES}. Waiting for work…`);
   let backoff = 1000;
   while (true) {
@@ -265,7 +409,8 @@ async function main() {
       backoff = 1000;
       if (!call) continue;
       const tool = TOOLS[call.tool];
-      log(`${call.tool} ${JSON.stringify(call.input).slice(0, 120)}`);
+      // A sign-in call's input carries the pair: it is never logged.
+      log(call.tool === 'sign_in' ? 'sign_in' : `${call.tool} ${JSON.stringify(call.input).slice(0, 120)}`);
       try {
         if (!tool) throw new Error(`unknown tool: ${call.tool}`);
         const result = await tool(call.input ?? {});
@@ -276,7 +421,7 @@ async function main() {
       }
     } catch (e) {
       if (e.status === 403) { log('This runner was revoked in Alcon. Stopping.'); process.exit(1); }
-      if (e.status === 401) { log('The token is not known any more; announcing again.'); saveState({}); token = await announce(); continue; }
+      if (e.status === 401) { log('The token is not known any more; announcing again.'); saveState({}); token = await announce(); assetToken = token; continue; }
       log(`Relay unreachable (${e.message}); retrying.`);
       await new Promise((r) => setTimeout(r, backoff));
       backoff = Math.min(backoff * 2, 30000);

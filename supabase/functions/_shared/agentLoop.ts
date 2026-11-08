@@ -60,7 +60,14 @@ export interface ExecResult { content: string; is_error?: boolean; finish?: Fini
 export interface LoopDeps {
   callModel(messages: Msg[]): Promise<ModelTurn>;
   kindOf(name: string): ToolKind;
-  needsApproval(call: ToolCall): boolean;
+  /**
+   * Whether one write-kind call waits for a person. May answer
+   * asynchronously: a verdict can rest on facts only the driver can
+   * fetch (a stored credential's history, for one). The loop asks
+   * once per write-kind call per turn, in the order the model made
+   * them; drivers keep the answer cheap for the common call.
+   */
+  needsApproval(call: ToolCall): boolean | Promise<boolean>;
   execute(call: ToolCall): Promise<ExecResult>;
   /** Called with every response's usage; record cost here. */
   onUsage(usage: ModelUsage): Promise<void>;
@@ -184,7 +191,10 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       continue;
     }
 
-    const writes = calls.filter((c) => deps.kindOf(c.name) === "write" && deps.needsApproval(c));
+    const writes: ToolCall[] = [];
+    for (const c of calls) {
+      if (deps.kindOf(c.name) === "write" && await deps.needsApproval(c)) writes.push(c);
+    }
     const finishCall = calls.find((c) => deps.kindOf(c.name) === "finish");
     const immediate = calls.filter((c) => !writes.includes(c) && c !== finishCall);
 
