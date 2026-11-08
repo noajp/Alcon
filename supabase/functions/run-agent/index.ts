@@ -103,6 +103,10 @@ import {
 } from "../_shared/approvalPolicy.ts";
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
+import {
+  correctionEnvelopeOf, correctionExhaustedSignals, elementInputsCanonical, formatCorrectionEnvelope,
+  parseCorrectionHistory, standingSkipReason, type CorrectionEnvelope, type CorrectionSource, type ExhaustedRunFact,
+} from "../_shared/correctionEnvelope.ts";
 import { checkFinishClaims, finishDetailOf, normalizeClaims, normalizeUnconfirmed, type ClaimCheck } from "../_shared/finishClaims.ts";
 import { emptyVerifyTally, tallyVerify, verifyDiffText, type VerifyCheck, type VerifyTally } from "../_shared/verifyReads.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
@@ -111,7 +115,7 @@ import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, password
 import {
   runLoop, canonicalCalls,
   type Block, type LoopState, type ToolCall, type ToolKind, type FinishPayload, type Msg,
-  type PendingApproval,
+  type PendingApproval, type Verdict,
 } from "../_shared/agentLoop.ts";
 import { applyDecision, makeRememberApproval, restorePendingApproval, type SavedPending } from "./decision.ts";
 import { buildCopilotTurn, foldCopilotContext, type CopilotContextLike, type CopilotTurn } from "../_shared/copilotTurn.ts";
@@ -204,6 +208,11 @@ type Transcript = {
   /** A rehearsal run's report as it accumulates (reads executed,
    *  writes planned), sealed onto the draft when the run settles. */
   rehearsal?: RehearsalReport;
+  /** The corrections this run's finishes were sent back with (B3),
+   *  as they were issued — carried across slices so the terminal
+   *  verdict record seals the run's whole correction history, not
+   *  just the last slice's. */
+  corrections?: CorrectionEnvelope[];
   /** The definition a rehearsal run is trying, carried here rather
    *  than in a definitions row: nothing is born before activation. */
   rehearsalDefinition?: { name: string; body: string };
@@ -294,7 +303,7 @@ Deno.serve(async (req: Request) => {
     }
     // Cancelled settles a prerequisite as much as done does.
     if (!["done", "cancelled"].includes(el.status ?? "") || (await elementDelegation(userDb, el.id)) !== "auto") return json({ started: [] });
-    const started = await advanceFrom({ admin, userDb, user: { id: user.id, email: user.email ?? null }, jwt, supabaseUrl }, el.id);
+    const { started } = await advanceFrom({ admin, userDb, user: { id: user.id, email: user.email ?? null }, jwt, supabaseUrl }, el.id);
     return json({ started });
   }
   if (!runId) return json({ error: "runId is required" }, 400);
@@ -1620,10 +1629,17 @@ async function execute(a: ExecArgs): Promise<void> {
     ? readRehearsalReport(run.transcript?.rehearsal)
     : emptyRehearsalReport();
 
+  // The corrections this run's finishes have been sent back with so
+  // far (B3): they ride the transcript across slices, and the
+  // terminal finish seals them onto the verdict record — the run's
+  // whole correction history, not just this slice's.
+  const corrections: CorrectionEnvelope[] = parseCorrectionHistory(run.transcript?.corrections);
+
   const saveTranscript = async (p?: SavedPending) => {
     const transcript: Transcript = {
       messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: state.revisions ?? 0, turnBudget, tools,
       ...(p ? { pending: p } : {}),
+      ...(corrections.length ? { corrections } : {}),
       ...(run.rehearsal ? {
         rehearsal: rehearsalReport,
         ...(run.transcript?.rehearsalDefinition ? { rehearsalDefinition: run.transcript.rehearsalDefinition } : {}),
@@ -1719,6 +1735,38 @@ async function execute(a: ExecArgs): Promise<void> {
   let lastCheck: VerdictInputs["lastCheck"] = null;
   let checkAttempted = false;
 
+  // Which check is sending a finish back, and what it read (B3): the
+  // correction envelope is assembled from this at revision time. The
+  // two checks below record their provenance as they answer; the
+  // loop's revision hook reads it in the same turn, so it always
+  // names the check that actually returned the finish.
+  let returnProvenance: { source: CorrectionSource; verifyStepIdx: number | null; artifactIds: string[] } | null = null;
+  let elementTitleCache: string | null = null;
+  const elementTitle = async (): Promise<string> => {
+    if (elementTitleCache !== null) return elementTitleCache;
+    try {
+      const { data: el } = await userDb.from("elements").select("title").eq("id", run.element_id).maybeSingle();
+      elementTitleCache = el?.title ?? "Element";
+    } catch { elementTitleCache = "Element"; }
+    return elementTitleCache;
+  };
+
+  // The return the agent receives is the correction envelope (B3):
+  // unit, verdict, reason, evidence, scope — assembled here, kept in
+  // `corrections` for the record, and formatted as the message.
+  const revisionMessage = async (verdict: Verdict, revision: number): Promise<string | null> => {
+    if (!returnProvenance) return null;
+    const envelope = correctionEnvelopeOf({
+      unit: { id: run.element_id, title: await elementTitle() },
+      source: returnProvenance.source,
+      reason: verdict.gaps,
+      evidence: returnProvenance,
+      attempt: revision,
+    });
+    corrections.push(envelope);
+    return formatCorrectionEnvelope(envelope);
+  };
+
   // The mechanical check of a finish's claims, run by code at the gate
   // before the verifier is consulted (finishClaims.ts): a claim's source
   // and freshness are facts code can settle, so the model never grades
@@ -1737,6 +1785,7 @@ async function execute(a: ExecArgs): Promise<void> {
     checkFinishClaims(finish.claims ?? [], { usedReads: usedReadsOf(), freshness, now: Date.now() });
   const mechanicalCheck = (finish: FinishPayload) => {
     attemptCheck = checkClaimsOf(finish);
+    returnProvenance = { source: "mechanical", verifyStepIdx: null, artifactIds: [] };
     return { gaps: attemptCheck.gaps };
   };
 
@@ -1782,6 +1831,7 @@ async function execute(a: ExecArgs): Promise<void> {
           pass: verdict.pass, gaps: verdict.gaps, model, checkedAt: new Date().toISOString(), verifyStepIdx: stepIdx,
           artifactIds: ((arts ?? []) as { id: string }[]).map((art) => art.id),
         };
+        returnProvenance = { source: "verifier", verifyStepIdx: lastCheck.verifyStepIdx, artifactIds: lastCheck.artifactIds };
       }
       return verdict;
     } catch (e) {
@@ -1924,6 +1974,7 @@ async function execute(a: ExecArgs): Promise<void> {
     onUsage: recordUsage,
     verify: run.mode === "reply" || external ? undefined : verifyFinish,
     mechanicalCheck: run.mode === "reply" || external ? undefined : mechanicalCheck,
+    revisionMessage: run.mode === "reply" || external ? undefined : revisionMessage,
     afterTurn: async () => { await flushLifted(); await saveTranscript(); },
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= runCap,
     cancelled: async () => {
@@ -1942,10 +1993,25 @@ async function execute(a: ExecArgs): Promise<void> {
       // a checked pass/fail, or an honest "unchecked" with its reason. The
       // claim accounting is recomputed from the standing finish itself:
       // the counts describe that finish, whatever path it took to stand.
+      // The record also seals the run's correction history (B3) and the
+      // hash of the Element's inputs as they stand at this finish — the
+      // pair the unit-return rule later compares at dispatch.
+      let inputsHash: string | null = null;
+      if (run.mode !== "reply" && run.element_id) {
+        const { data: elNow } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
+        if (elNow) {
+          inputsHash = await sha256(elementInputsCanonical({
+            title: elNow.title as string, description: (elNow.description as string | null) ?? null,
+            definitionBody: definition?.body ?? null,
+          }));
+        }
+      }
       const verdict = run.mode === "reply" ? null : buildRunVerdict({
         lastCheck, checkAttempted, revisions: state.revisions ?? 0, finish: outcome.finish, external,
         claimCheck: checkClaimsOf(outcome.finish),
         verifyTally,
+        corrections,
+        inputsHash,
       });
       const sealed = await finishRun(a, run, agentName, outcome.finish, undefined, verdict, boundMeasures);
       // Memory: a sealed finish is distilled into episodes — the curated
@@ -3336,13 +3402,14 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
   // ── Runs waiting: for an answer, for review, on their readings,
   //    stopped on an error, or failed ──
   const runs = await guard(
-    userDb.from("agent_runs").select("id, status, element_id, summary, proposed_readings, updated_at, finished_at")
+    userDb.from("agent_runs").select("id, status, element_id, summary, proposed_readings, verdict, updated_at, finished_at")
       .eq("activity_space_id", spaceId)
       .in("status", ["awaiting_input", "awaiting_review", "paused", "failed", "completed"])
       .order("updated_at", { ascending: true }).limit(60),
-    [] as { id: string; status: string; element_id: string | null; summary: string | null; proposed_readings: unknown; updated_at: string; finished_at: string | null }[],
+    [] as { id: string; status: string; element_id: string | null; summary: string | null; proposed_readings: unknown; verdict: unknown; updated_at: string; finished_at: string | null }[],
   );
   const runTitles = await titleOf(runs.map((r) => r.element_id));
+  const exhaustedFacts: ExhaustedRunFact[] = [];
   for (const r of runs) {
     const label = (r.element_id ? runTitles.get(r.element_id) : null) ?? r.summary ?? "実行";
     if (r.status === "awaiting_input") {
@@ -3359,7 +3426,19 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
     if (held) {
       signals.push({ kind: "readings", id: r.id, since: r.finished_at ?? r.updated_at, label, place: "Element の仕事を受け入れると反映されます" });
     }
+    // A run whose revisions ran out (B3) is collected here and judged
+    // by the pure builder below: its finish stood failed, so the wait
+    // is not on the unit but on the plan that produced it.
+    if ((r.status === "completed" || r.status === "awaiting_review") && r.element_id) {
+      exhaustedFacts.push({
+        runId: r.id, elementId: r.element_id,
+        elementTitle: runTitles.get(r.element_id) ?? null,
+        verdict: parseRunVerdict(r.verdict),
+        finishedAt: r.finished_at, updatedAt: r.updated_at,
+      });
+    }
   }
+  signals.push(...correctionExhaustedSignals(exhaustedFacts));
 
   // ── Work itself waiting for a person's review ──
   const reviewing = await guard(
@@ -4364,8 +4443,9 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
 
   if (auto) {
     try {
-      const started = await advanceFrom(a, run.element_id);
+      const { started, skipped } = await advanceFrom(a, run.element_id);
       if (started.length) await addStep(admin, run.id, "status", `次の作業を ${started.length} 件開始しました`);
+      if (skipped.length) await addStep(admin, run.id, "status", `合格済みの ${skipped.length} 件は再実行しませんでした`, "前回の実行で合格（または受け入れ済み）で、Element と定義が変わっていないためです。");
     } catch (e) {
       console.error("run-agent: advance failed", errorMessage(e));
     }
@@ -4512,15 +4592,21 @@ const OPEN_RUN = ["queued", "running", "awaiting_approval", "paused"];
  * its own run. Everything is read with that person's JWT, so the chain only
  * reaches what they could start by hand. A JWT that has expired meanwhile
  * fails the start; the Elements stay ready on the Execution tab.
+ *
+ * The unit-return rule (B3) stands in the dispatch: an Element whose
+ * standing verdict is a pass — or whose readings a person accepted —
+ * over inputs provably unchanged since is not re-run, and the skip is
+ * reported beside the starts. A person's own explicit start (the web's
+ * startElementRun) is not the dispatcher and is never gated by this.
  */
-async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt" | "supabaseUrl">, doneId: string): Promise<string[]> {
+async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt" | "supabaseUrl">, doneId: string): Promise<{ started: string[]; skipped: string[] }> {
   const { admin, userDb, user } = a;
   const { data: out } = await userDb.from("element_edges").select("from_element, to_element").eq("from_element", doneId).eq("edge_type", "depends_on");
   const downIds = [...new Set(((out ?? []) as { to_element: string }[]).map((e) => e.to_element))];
-  if (downIds.length === 0) return [];
+  if (downIds.length === 0) return { started: [], skipped: [] };
   const [{ data: inEdges }, { data: els }, { data: assignees }, { data: open }] = await Promise.all([
     userDb.from("element_edges").select("from_element, to_element").in("to_element", downIds).eq("edge_type", "depends_on"),
-    userDb.from("elements").select("id, status, object_id, objects(domain_id)").in("id", downIds),
+    userDb.from("elements").select("id, status, title, description, object_id, objects(domain_id)").in("id", downIds),
     userDb.from("element_assignees").select("element_id, role, workers(type, ai_config)").in("element_id", downIds),
     admin.from("agent_runs").select("element_id").in("element_id", downIds).in("status", OPEN_RUN),
   ]);
@@ -4533,10 +4619,47 @@ async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt"
     && r.workers?.type === "ai_agent"
     && !(r.workers.ai_config && typeof r.workers.ai_config === "object" && (r.workers.ai_config as Record<string, unknown>).runner === "claude-code"));
   const busy = new Set(((open ?? []) as { element_id: string }[]).map((r) => r.element_id));
-  type ElementRow = { id: string; status: string | null; objects: { domain_id: string | null } | null };
+  type ElementRow = { id: string; status: string | null; title: string; description: string | null; objects: { domain_id: string | null } | null };
   const rows = (els ?? []) as unknown as ElementRow[];
-  const candidates: AdvanceCandidate[] = rows.map((e) => ({ id: e.id, status: e.status, ai: isAi(e.id), openRun: busy.has(e.id) }));
-  const ready = readyDownstream({ doneId, edges: [...((out ?? []) as { from_element: string; to_element: string }[]), ...edges], candidates, statusOf });
+
+  // The standing record behind the unit-return rule: the Element's
+  // latest verdict-bearing terminal run — a rehearsal's verdict
+  // judges a draft definition, never the work, so it cannot stand
+  // for it — judged against the inputs as they stand now, hashed
+  // here at dispatch (loadDefinition resolves the definition the
+  // driver's way, so the two hashes speak of the same inputs).
+  const standingPassOf = async (e: ElementRow): Promise<boolean> => {
+    const { data: last } = await admin.from("agent_runs")
+      .select("verdict, proposed_readings")
+      .eq("element_id", e.id).eq("rehearsal", false)
+      .in("status", ["completed", "awaiting_review"])
+      .not("verdict", "is", null)
+      .order("finished_at", { ascending: false }).limit(1);
+    const row = (last ?? [])[0] as { verdict: unknown; proposed_readings: unknown } | undefined;
+    if (!row) return false;
+    const verdict = parseRunVerdict(row.verdict);
+    if (!verdict?.inputsHash) return false;
+    const readingsLanded = parseProposedReadings(row.proposed_readings)?.some((p) => p.applied) ?? false;
+    if (verdict.result !== "pass" && !readingsLanded) return false;
+    const { definition: defNow } = await loadDefinition(userDb, e.id);
+    const currentInputsHash = await sha256(elementInputsCanonical({
+      title: e.title, description: e.description, definitionBody: defNow?.body ?? null,
+    }));
+    return standingSkipReason({ verdict, readingsLanded, currentInputsHash }) !== null;
+  };
+  const standing = new Map<string, boolean>();
+  for (const e of rows) standing.set(e.id, await standingPassOf(e));
+
+  const candidates: AdvanceCandidate[] = rows.map((e) => ({
+    id: e.id, status: e.status, ai: isAi(e.id), openRun: busy.has(e.id), standingPass: standing.get(e.id) ?? false,
+  }));
+  const allEdges = [...((out ?? []) as { from_element: string; to_element: string }[]), ...edges];
+  const ready = readyDownstream({ doneId, edges: allEdges, candidates, statusOf });
+  // What the rule held back, exactly: ready by every other measure,
+  // and not started. (The decision runs twice over the same pure
+  // inputs; the sets are a chain's next layer, a handful at most.)
+  const wouldStart = readyDownstream({ doneId, edges: allEdges, candidates: candidates.map((c) => ({ ...c, standingPass: false })), statusOf });
+  const skipped = wouldStart.filter((id) => !ready.includes(id));
 
   const started: string[] = [];
   for (const id of ready) {
@@ -4553,7 +4676,7 @@ async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt"
     if (res && res.ok) started.push(id);
     else await admin.from("agent_runs").update({ status: "cancelled", finished_at: new Date().toISOString() }).eq("id", next.id).eq("status", "queued");
   }
-  return started;
+  return { started, skipped };
 }
 
 /** What the Elements this one waits on left behind: their latest report, their

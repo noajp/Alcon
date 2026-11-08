@@ -106,3 +106,32 @@ describe('digestTitleFor', () => {
     expect(snap.digestTitleFor(mixed)).toBe('この Space で 2 件が待っています（最古 30 時間）');
   });
 });
+
+describe('correction_exhausted (B3)', () => {
+  const exhausted = (over: Record<string, unknown> = {}) => signal({
+    kind: 'correction_exhausted', id: 'r9', since: hoursAgo(30),
+    label: '競合を調べる（不足: 件数が足りない）', place: 'Strategy の会話で計画を見直せます', ...over,
+  });
+
+  it('fingerprints by the run — a new exhausted run is a new wait', () => {
+    expect(snap.fingerprintOf(exhausted())).toBe('correction_exhausted:r9');
+    expect(snap.fingerprintOf(exhausted({ id: 'r10' }))).toBe('correction_exhausted:r10');
+  });
+
+  it('an exhausted unit produces exactly one candidate, then stays quiet', () => {
+    const first = build([exhausted()]);
+    expect(first.candidates.map((c: { signalId: string }) => c.signalId)).toEqual(['correction_exhausted:r9']);
+    expect(first.candidates[0].kind).toBe('correction_exhausted');
+    // Told once: the next wake silences it (the snapshot's one
+    // escalation at 3× the threshold is the only re-raise there is).
+    const told = build([exhausted()], ['correction_exhausted:r9']);
+    expect(told.candidates).toEqual([]);
+    expect(told.silenced).toBe(1);
+    expect(told.pending).toHaveLength(1);
+  });
+
+  it('names its kind in a digest title', () => {
+    const candidates = build([exhausted()]).candidates;
+    expect(snap.digestTitleFor(candidates)).toBe('修正が上限に達した実行が 1 件、最古は 30 時間待っています');
+  });
+});

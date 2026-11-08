@@ -20,8 +20,18 @@
 // matched, mismatched, or could not be checked. It is optional within
 // v2 — absent when no verify-declared write ran, which is most runs —
 // because the accounting describes the run's writes, not its finish.
+//
+// B3 adds two more optional v2 fields, on the same terms. The
+// corrections a run's finishes were sent back with (correctionEnvelope
+// .ts), in the order they were issued: the return record, kept with
+// the verdict it fed, so outcomes can attribute corrections per unit
+// later. And the hash of the Element's inputs when the standing
+// finish was sealed — the dispatch-time comparison that tells a
+// standing pass from a stale one (the unit-return rule). Both absent
+// on records written before they existed, and never invented for them.
 
 import type { ClaimCheck } from "./finishClaims.ts";
+import { parseCorrectionEnvelope, type CorrectionEnvelope } from "./correctionEnvelope.ts";
 import type { VerifyTally } from "./verifyReads.ts";
 
 export type RunVerdictResult = "pass" | "fail" | "unchecked";
@@ -75,6 +85,23 @@ export interface RunVerdict {
    * write ran in the run.
    */
   verify?: VerifyTally;
+  /**
+   * v2 only, and optional within it (B3): the corrections this run's
+   * finishes were sent back with, in order — each the envelope the
+   * agent received, naming its unit. Absent when no finish was sent
+   * back, and on records written before envelopes existed.
+   */
+  corrections?: CorrectionEnvelope[];
+  /**
+   * v2 only, and optional within it (B3): the hash of the Element's
+   * inputs (its row plus the definition it followed) at the moment
+   * this record was sealed. The unit-return rule compares it against
+   * the inputs at dispatch: a standing pass holds only for the work
+   * that was actually judged. Absent on records written before it
+   * was kept — and an absent hash proves nothing, so those passes
+   * do not hold.
+   */
+  inputsHash?: string;
 }
 
 export interface VerdictInputs {
@@ -97,6 +124,18 @@ export interface VerdictInputs {
    * writes supplies none, and the record then carries none.
    */
   verifyTally?: VerifyTally | null;
+  /**
+   * B3: the corrections issued during this run, in order (the
+   * envelopes the agent received). Optional: a driver that renders
+   * plain returns supplies none, and the record then carries none.
+   */
+  corrections?: readonly CorrectionEnvelope[];
+  /**
+   * B3: the hash of the Element's inputs when the standing finish was
+   * sealed (correctionEnvelope.ts elementInputsCanonical, hashed by
+   * the driver). Null when the driver could not take it.
+   */
+  inputsHash?: string | null;
 }
 
 const claimFields = (input: VerdictInputs): Pick<RunVerdict, "claims" | "claimGaps"> => ({
@@ -107,6 +146,11 @@ const claimFields = (input: VerdictInputs): Pick<RunVerdict, "claims" | "claimGa
 const verifyFields = (input: VerdictInputs): Pick<RunVerdict, "verify"> => (
   input.verifyTally && input.verifyTally.checked > 0 ? { verify: { ...input.verifyTally } } : {}
 );
+
+const correctionFields = (input: VerdictInputs): Pick<RunVerdict, "corrections" | "inputsHash"> => ({
+  ...(input.corrections?.length ? { corrections: input.corrections.map((c) => ({ ...c, unit: { ...c.unit }, reason: [...c.reason], evidence: { ...c.evidence, artifactIds: [...c.evidence.artifactIds] } })) } : {}),
+  ...(input.inputsHash ? { inputsHash: input.inputsHash } : {}),
+});
 
 const noCheck = (input: VerdictInputs, reason: RunVerdictReason): RunVerdict => ({
   v: 2,
@@ -121,6 +165,7 @@ const noCheck = (input: VerdictInputs, reason: RunVerdictReason): RunVerdict => 
   evidence: { verifyStepIdx: null, artifactIds: [] },
   ...claimFields(input),
   ...verifyFields(input),
+  ...correctionFields(input),
 });
 
 /**
@@ -148,6 +193,7 @@ export function buildRunVerdict(input: VerdictInputs): RunVerdict {
       evidence: { verifyStepIdx: check.verifyStepIdx, artifactIds: [...check.artifactIds] },
       ...claimFields(input),
       ...verifyFields(input),
+      ...correctionFields(input),
     };
   }
   // Attempted or not, from the record's side the fact is the same: the
@@ -211,14 +257,35 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
   // The verify accounting is optional within v2 (absent = no declared
   // write ran), but when present it must be exact: four counts whose
   // outcomes sum to the checks.
-  if (r.verify === undefined) return withClaims;
-  const verify = r.verify;
-  if (!verify || typeof verify !== "object" || Array.isArray(verify)) return null;
-  const vt = verify as Record<string, unknown>;
-  if (!count(vt.checked) || !count(vt.ok) || !count(vt.mismatched) || !count(vt.unverified)) return null;
-  if ((vt.ok as number) + (vt.mismatched as number) + (vt.unverified as number) !== (vt.checked as number)) return null;
-  return {
-    ...withClaims,
-    verify: { checked: vt.checked as number, ok: vt.ok as number, mismatched: vt.mismatched as number, unverified: vt.unverified as number },
-  };
+  let out: RunVerdict = withClaims;
+  if (r.verify !== undefined) {
+    const verify = r.verify;
+    if (!verify || typeof verify !== "object" || Array.isArray(verify)) return null;
+    const vt = verify as Record<string, unknown>;
+    if (!count(vt.checked) || !count(vt.ok) || !count(vt.mismatched) || !count(vt.unverified)) return null;
+    if ((vt.ok as number) + (vt.mismatched as number) + (vt.unverified as number) !== (vt.checked as number)) return null;
+    out = {
+      ...out,
+      verify: { checked: vt.checked as number, ok: vt.ok as number, mismatched: vt.mismatched as number, unverified: vt.unverified as number },
+    };
+  }
+  // B3's fields are optional within v2 the same way, and exact when
+  // present: the inputs hash is a non-empty string, and every
+  // correction must parse as the envelope it claims to be — one bad
+  // entry refuses the record, as with every field above.
+  if (r.inputsHash !== undefined) {
+    if (typeof r.inputsHash !== "string" || !r.inputsHash) return null;
+    out = { ...out, inputsHash: r.inputsHash };
+  }
+  if (r.corrections !== undefined) {
+    if (!Array.isArray(r.corrections)) return null;
+    const corrections: CorrectionEnvelope[] = [];
+    for (const entry of r.corrections) {
+      const parsed = parseCorrectionEnvelope(entry);
+      if (!parsed) return null;
+      corrections.push(parsed);
+    }
+    out = { ...out, corrections };
+  }
+  return out;
 }

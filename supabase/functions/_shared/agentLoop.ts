@@ -89,6 +89,17 @@ export interface LoopDeps {
    * answer); { pass: false } sends the gaps back to the agent.
    */
   verify?(finish: FinishPayload): Promise<Verdict | null>;
+  /**
+   * What a sent-back finish tells the agent, when the driver can say
+   * more than the gaps: run-agent's execute driver renders the
+   * correction envelope (correctionEnvelope.ts) — the unit, the
+   * verdict, the evidence the check read, and the scope the
+   * correction is bounded to — and keeps it for the run's record.
+   * `revision` is the count after this return (1 = the first).
+   * Returning null (or not providing the hook) keeps the plain
+   * return (revisionRequest).
+   */
+  revisionMessage?(verdict: Verdict, revision: number): Promise<string | null> | string | null;
   /** What the model is told after a turn with neither text nor a tool call. */
   nudge?: string;
 }
@@ -233,7 +244,8 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
         else if (deps.verify) verdict = await deps.verify(r.finish);
         if (verdict && !verdict.pass) {
           state.revisions = (state.revisions ?? 0) + 1;
-          results.push({ type: "tool_result", tool_use_id: finishCall.id, is_error: true, content: revisionRequest(verdict) });
+          const content = (await deps.revisionMessage?.(verdict, state.revisions)) ?? revisionRequest(verdict);
+          results.push({ type: "tool_result", tool_use_id: finishCall.id, is_error: true, content });
           state.messages.push({ role: "user", content: orderResults(calls, results) });
           await deps.afterTurn?.();
           continue;
@@ -251,7 +263,9 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
   }
 }
 
-/** Pure. What the agent is told when a finish is sent back. */
+/** Pure. What the agent is told when a finish is sent back, in the
+ *  plain form — the drivers that know the unit render the correction
+ *  envelope instead (LoopDeps.revisionMessage). */
 export function revisionRequest(verdict: Verdict): string {
   const gaps = verdict.gaps.length ? verdict.gaps.map((g) => `- ${g}`).join("\n") : "- 任務の完了条件を満たしていません。";
   return `完了はまだ受け付けられません。検証で次の不足が見つかりました。\n${gaps}\n\n道具を使って不足を埋め、成果物と報告を直してから、もう一度 finish を呼んでください。報告する事実は finish の claims に出典と取得時刻を付けて挙げ、どうしても確かめられない点は finish の unconfirmed に挙げてください。`;

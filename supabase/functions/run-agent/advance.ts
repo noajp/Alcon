@@ -18,12 +18,21 @@ export interface AdvanceCandidate {
   ai: boolean;
   /** Has a queued / running / waiting run already. */
   openRun: boolean;
+  /**
+   * A standing pass covers this Element (the unit-return rule, B3):
+   * its latest judged work passed — or a person accepted it, readings
+   * and all — over inputs provably unchanged since. Re-dispatch skips
+   * it by record; what it already proved is not re-proved. Absent =
+   * no standing pass (every caller before the rule read it this way).
+   */
+  standingPass?: boolean;
 }
 
 /**
  * Pure. The Elements to start now that `doneId` is done: those it unblocks
  * (depends_on edges from it) that are open, an AI's, not already running,
- * and whose every prerequisite is now done or cancelled.
+ * not covered by a standing pass, and whose every prerequisite is now
+ * done or cancelled.
  */
 export function readyDownstream(input: {
   doneId: string;
@@ -42,7 +51,7 @@ export function readyDownstream(input: {
   for (const e of input.edges) {
     if (e.from_element !== input.doneId) continue;
     const c = byId.get(e.to_element);
-    if (!c || !c.ai || c.openRun) continue;
+    if (!c || !c.ai || c.openRun || c.standingPass) continue;
     if (!["todo", "backlog", null].includes(c.status)) continue;
     const prereqs = input.edges.filter((x) => x.to_element === c.id).map((x) => x.from_element);
     if (prereqs.every(settled)) next.add(c.id);

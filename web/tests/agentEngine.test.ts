@@ -402,6 +402,43 @@ describe('typed finish gate', () => {
   });
 });
 
+describe('correction envelope returns', () => {
+  const finishTurn = (id: string) => ({ content: [toolUse(id, 'finish', { outcome: 'completed', summary: 's', message: 'm' })] });
+  const sentBackTexts = (state: { messages: unknown[] }) => state.messages
+    .filter((m) => (m as { role: string }).role === 'user' && Array.isArray((m as { content: unknown }).content))
+    .flatMap((m) => ((m as { content: { content: string; is_error?: boolean }[] }).content).filter((r) => r.is_error).map((r) => r.content));
+
+  it('renders each return through the driver\'s hook, numbered, and never a third', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2'), finishTurn('f3')]);
+    const seen: { gaps: string[]; revision: number }[] = [];
+    const { deps: d } = deps(m, {
+      verify: async () => ({ pass: false, gaps: ['不足'] }),
+      revisionMessage: (v: { gaps: string[] }, revision: number) => { seen.push({ gaps: v.gaps, revision }); return `ENVELOPE ${revision}`; },
+    });
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    // Two finishes were sent back; the third stood — the cap is a
+    // finish-attempt cap, so no envelope is ever made for a fourth.
+    expect(seen).toEqual([{ gaps: ['不足'], revision: 1 }, { gaps: ['不足'], revision: 2 }]);
+    expect(sentBackTexts(state)).toEqual(['ENVELOPE 1', 'ENVELOPE 2']);
+    expect(state.revisions).toBe(loop.MAX_REVISIONS);
+  });
+
+  it('falls back to the plain return when the hook has nothing to say', async () => {
+    const m = scripted([finishTurn('f1'), finishTurn('f2')]);
+    const verdicts = [{ pass: false, gaps: ['出典 URL がない'] }, { pass: true, gaps: [] }];
+    const { deps: d } = deps(m, {
+      verify: async () => verdicts.shift(),
+      revisionMessage: () => null,
+    });
+    const state = fresh();
+    const out = await runLoop(state, d, limits());
+    expect(out.kind).toBe('finished');
+    expect(sentBackTexts(state)[0]).toContain('出典 URL がない');
+  });
+});
+
 describe('verifier', () => {
   it('reads a verdict, and nothing it cannot read', () => {
     expect(verify.readVerdict('{"pass":false,"gaps":["a","",3,"b"]}')).toEqual({ pass: false, gaps: ['a', 'b'] });
