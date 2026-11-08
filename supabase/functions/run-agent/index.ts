@@ -32,6 +32,13 @@
 //                                               from the official spec; a
 //                                               message answers its question
 //                                               or asks it to fix a test
+//   { runId } / { runId, message }              a promotion draft (its run's
+//                                               subject is the draft): Athena
+//                                               drafts a standing harness
+//                                               (a definition and its binding)
+//                                               from one-off work's record; a
+//                                               message answers its question
+//                                               or asks it to fix a rehearsal
 //   { runId, continue: true }                   internal: the next slice of a
 //                                               long run (self-invoked)
 //   { advance: elementId }                      a person finished an Element:
@@ -64,11 +71,11 @@ import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type R
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
 import {
-  adoptPlannedTools, approvalDisplayForCall, bindingOf, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools,
+  adoptPlannedTools, approvalDisplayForCall, bindingOf, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, integrationCallIsRead, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools,
   type ApprovalDisplay, type IntegrationBinding, type IntegrationTool, type PlannedIntegrationTool,
 } from "../_shared/integrationTools.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
-import { catalogDenyRefusal, catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
+import { catalogDenyRefusal, catalogIndex, catalogOperation, catalogTool, decideCall, effectOfCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName, missingConnectorNames } from "../_shared/connectorNeeds.ts";
@@ -78,7 +85,7 @@ import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.
 import { resolveDefinition, type DefinitionCandidate } from "../_shared/definitionResolution.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
-import { offeredCommands, parseManifest, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
+import { offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
 import {
   applyMode, approvalModeOf, approvalVerdict, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
 } from "../_shared/approvalPolicy.ts";
@@ -106,6 +113,17 @@ import {
   type DraftCandidate, type DraftDrop,
 } from "../_shared/connectorDraft.ts";
 import { applyCandidate, askDraft, loadDraft, transitionDraft, type DraftRow } from "../_shared/integrationDrafts.ts";
+import { FINISH_PROMOTION_TOOL, PROMOTE_ASK_TOOL, PROPOSE_PACKAGE_TOOL, promotionKindOf, promotionOpening, promotionSystemPrompt, promotionTools } from "./promoter.ts";
+import { cleanPromotionMaterial, promotionStructureHash, reconcilePromotionPackage, REHEARSAL_COST_CAP_USD, type PromotionPackage } from "../_shared/promotion.ts";
+import {
+  emptyRehearsalReport, readRehearsalReport, summarizeRehearsalReport, REHEARSAL_TASK_NOTICE,
+  type RehearsalReport,
+} from "../_shared/rehearsal.ts";
+import {
+  applyPromotionPackage, appendPromotionEvent, askPromotionDraft, draftPackageOf, loadPromotionDraft, transitionPromotionDraft,
+  type PromotionDraftRow, type PromotionMaterialSource,
+} from "../_shared/promotionDrafts.ts";
+import { connectedConnectorNames, evaluatePromotionPackage, freezePromotionPackage, launchPromotionRehearsal, settlePromotionRehearsal } from "../_shared/promotionTest.ts";
 import { draftRounds, materializeDraft, runDraftTestRound, summarizeRound } from "../_shared/draftTest.ts";
 import { REGISTRY_URL, entriesOf } from "../_shared/connectorDirectory.ts";
 import { draftDue } from "./draft.ts";
@@ -167,10 +185,18 @@ type Transcript = {
    *  wake does not tell it again (dedup reads the last completed
    *  wake's, in _shared/heartbeatSnapshot.ts). */
   digest?: { at: string; fingerprints: string[] };
+  /** A rehearsal run's report as it accumulates (reads executed,
+   *  writes planned), sealed onto the draft when the run settles. */
+  rehearsal?: RehearsalReport;
+  /** The definition a rehearsal run is trying, carried here rather
+   *  than in a definitions row: nothing is born before activation. */
+  rehearsalDefinition?: { name: string; body: string };
 };
 type Run = {
-  id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
+  id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; promotion_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
+  /** A run trying a definition with its writes blocked (the rehearsal substrate). */
+  rehearsal: boolean;
   transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
   continuation_count: number; continuation_token: string | null;
@@ -340,7 +366,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl, approvalMode };
-  const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : driver === "heartbeat" ? heartbeat(args) : execute(args))
+  const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : driver === "promote" ? promote(args, said) : driver === "heartbeat" ? heartbeat(args) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
       await pauseOnError(admin, run, errorMessage(e));
@@ -434,6 +460,21 @@ async function noteMemoryUse(
   }
 }
 
+/** Starts a promotion drafting run a conversation just created. The
+ *  start_promotion tool makes the records (it runs on the catalog's
+ *  context, which holds no JWT); starting is the driver's act, with the
+ *  starter's own JWT, like every run start. Fire-and-forget: a run
+ *  left queued can be started from the draft's screen. */
+function startPromotionRunFromTool(a: ExecArgs, data: unknown): void {
+  const runId = (data as { promotionRunId?: unknown } | null)?.promotionRunId;
+  if (typeof runId !== "string" || !runId) return;
+  void fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+    body: JSON.stringify({ runId }),
+  }).catch(() => {});
+}
+
 /** Rewrites one step in place — a chat draft step becoming the reply it
  *  grew into (draft.ts). The step keeps its place in the trace. */
 async function updateStep(admin: SupabaseClient, runId: string, idx: number, title: string, detail?: string | null, type?: string): Promise<void> {
@@ -514,7 +555,12 @@ async function execute(a: ExecArgs): Promise<void> {
   // The definition the work follows: the Element's own, else its Strategy's.
   // A disabled harness in the way is skipped, and the run says so.
   const loadedDefinition = await loadDefinition(userDb, run.element_id);
-  const definition = loadedDefinition.definition;
+  // A rehearsal run tries the definition its transcript carries — not a
+  // row, so nothing is born before activation — in place of whatever
+  // the Element itself names.
+  const definition = run.rehearsal && run.transcript?.rehearsalDefinition
+    ? { name: run.transcript.rehearsalDefinition.name, body: run.transcript.rehearsalDefinition.body, scope: "element" as const }
+    : loadedDefinition.definition;
   if (loadedDefinition.skippedDisabled.length) {
     await addStep(admin, run.id, "status", `無効化されているハーネス「${loadedDefinition.skippedDisabled.join("」「")}」は使わずに進めます`);
   }
@@ -523,9 +569,13 @@ async function execute(a: ExecArgs): Promise<void> {
   const parsedAll: ParsedDefinition | null = definition ? parseDefinition(definition.body) : null;
   const parsed: ParsedDefinition | null = parsedAll && definition?.scope === "element" ? parsedAll : null;
   // A loop runs for many rounds: it may take more turns, and spend up to the
-  // budget its definition names (never past a hard ceiling).
+  // budget its definition names (never past a hard ceiling). A rehearsal
+  // run's cap is the rehearsal's own ($1): the definition's ceiling is
+  // what the real runs will live under, not what a trial may spend.
   const maxTotalTurns = parsed?.metric ? Math.max(config.maxTotalTurns, 400) : config.maxTotalTurns;
-  const runCap = parsed?.stop.budgetUsd ? Math.min(Math.max(parsed.stop.budgetUsd, MAX_RUN_COST_USD), MAX_DEFINED_RUN_COST_USD) : MAX_RUN_COST_USD;
+  const runCap = run.rehearsal
+    ? REHEARSAL_COST_CAP_USD
+    : parsed?.stop.budgetUsd ? Math.min(Math.max(parsed.stop.budgetUsd, MAX_RUN_COST_USD), MAX_DEFINED_RUN_COST_USD) : MAX_RUN_COST_USD;
   const refuse = async (reason: string) => {
     await admin.from("element_comments").insert({
       element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
@@ -1043,6 +1093,80 @@ async function execute(a: ExecArgs): Promise<void> {
     return { content: "Unknown tool.", is_error: true };
   };
 
+  // ── The rehearsal gate ──────────────────────────────────────────────
+  // A rehearsal run's choke point: the loop's executor wrapper sends
+  // every call here first. Reads run live and are recorded; writes are
+  // assembly-validated and recorded as plans, never executed; the run's
+  // own bookkeeping tools (plan, progress, rounds, finish, artifact)
+  // keep working — the artifact is the trial's own output, saved on the
+  // trial's Element, and it is also how the definition's output shape
+  // gets tried. A plan that could not be assembled is evidence, not a
+  // stop: the model is told, and walks the procedure to its end so the
+  // report covers it.
+  const rehearsalGate = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
+    const plan = async (tool: string, valid: boolean, problem: string | null) => {
+      rehearsalReport.writes.push({ tool, valid, problem });
+      await addStep(admin, run.id, "plan", `試走: 書き込みの計画 — ${tool}`,
+        problem ? `組み立てに問題があります: ${problem}（実行はしません）` : "実行はしません。計画として記録しました。");
+      return {
+        content: problem
+          ? `試走のため、この書き込みは実行しません。なお組み立てに問題があります: ${problem}`
+          : "試走のため、この書き込みは実行しません。計画として記録しました。手順を続けてください。",
+      };
+    };
+    const live = async (tool: string) => {
+      const r = await executeCall(call);
+      rehearsalReport.reads.push({ tool, ok: !r.is_error, authFailure: !!r.is_error && isAuthFailure(r.content) });
+      return r;
+    };
+    switch (call.name) {
+      case "record_plan": case "log_progress": case "record_round": case "finish": case "save_artifact":
+        return await executeCall(call);
+      case "read_records":
+        return await live(`表を読む: ${String(call.input.table ?? "")}`);
+      case "save_records": {
+        const problem = !recordScope
+          ? "この Element は Strategy に属していないので、表は使えません"
+          : typeof call.input.table !== "string" || !call.input.table
+            || typeof call.input.key !== "string" || !call.input.key
+            || !Array.isArray(call.input.records)
+            ? "table / key / records の形が要ります"
+            : null;
+        return await plan(`表に保存: ${String(call.input.table ?? "")}`, !problem, problem);
+      }
+      case "complete_subelement": {
+        const ok = subelementIds.has(String(call.input.subelement_id ?? ""));
+        return await plan("サブ要素を完了", ok, ok ? null : "この Element のサブ要素ではありません");
+      }
+    }
+    if (isRunnerTool(call.name)) return await live(call.name);
+    if (isMachineTool(call.name)) return await plan(call.name, true, null);
+    const it = integrationTools.get(call.name);
+    if (it) {
+      const label = `${it.integration.name}: ${operationOf(it, call.input)}`;
+      if (integrationCallIsRead(it, call)) return await live(label);
+      let problem: string | null = null;
+      if (it.command) {
+        const req = requestFor(it.command, call.input);
+        if ("error" in req) problem = req.error;
+      } else if (it.remote) {
+        const def = tools.find((t) => t.name === call.name);
+        const required = ((def?.input_schema as { required?: unknown } | undefined)?.required ?? []) as string[];
+        const missing = required.filter((f) => call.input[f] === undefined || call.input[f] === null || call.input[f] === "");
+        if (missing.length) problem = `${missing.join("、")} が必要です`;
+      }
+      return await plan(label, !problem, problem);
+    }
+    if (isCatalogTool(call.name)) {
+      const tool = catalogTool(call.name)!;
+      const label = `Alcon: ${catalogOperation(call.name, call.input)}`;
+      if (effectOfCall(tool, call.input) === "read") return await live(label);
+      const decision = decideCall("element", tool, call.input);
+      return await plan(label, decision !== "deny", decision === "deny" ? catalogDenyRefusal(call.name, call.input) : null);
+    }
+    return await executeCall(call);
+  };
+
   // The measures this run may report readings for: those of the Strategies
   // its Element serves — the same set the verifier judges the finish
   // against. Loaded once: the task context lists them for the agent, and
@@ -1074,15 +1198,28 @@ async function execute(a: ExecArgs): Promise<void> {
         ? definitionPrompt(definition.name, definition.body, parsedAll)
         : `# Strategy の定義「${definition.name}」（この Strategy 全体の方針。依頼した人が定めたもので、従う。成果物の型とループはこの Element には課されない）\n${definition.body.slice(0, 40_000)}`
       : null;
-    state = { messages: [{ role: "user", content: defText ? `${task}\n\n${defText}` : task }], turns: 0, nudges: 0 };
+    const opening = defText ? `${task}\n\n${defText}` : task;
+    state = { messages: [{ role: "user", content: run.rehearsal ? `${opening}\n\n${REHEARSAL_TASK_NOTICE}` : opening }], turns: 0, nudges: 0 };
     turnBudget = maxTotalTurns;
     await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}${config.routedBy ? `（重さ: ${WEIGHT_LABEL[config.routedBy]}）` : ""}`);
   }
+
+  // A rehearsal run's report, accumulated across its slices: the reads
+  // it executed and the writes it planned. It rides the transcript, so
+  // whoever settles the rehearsal (the tick, the promote driver) reads
+  // the same evidence the run gathered.
+  const rehearsalReport: RehearsalReport = run.rehearsal
+    ? readRehearsalReport(run.transcript?.rehearsal)
+    : emptyRehearsalReport();
 
   const saveTranscript = async (p?: SavedPending) => {
     const transcript: Transcript = {
       messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: state.revisions ?? 0, turnBudget, tools,
       ...(p ? { pending: p } : {}),
+      ...(run.rehearsal ? {
+        rehearsal: rehearsalReport,
+        ...(run.transcript?.rehearsalDefinition ? { rehearsalDefinition: run.transcript.rehearsalDefinition } : {}),
+      } : {}),
     };
     // jsonb refuses NUL; tool output can carry it.
     const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
@@ -1270,8 +1407,14 @@ async function execute(a: ExecArgs): Promise<void> {
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
     },
     kindOf,
-    needsApproval: (call) => verdictForCall(call).final === "ask",
+    // A rehearsal never asks: its writes are blocked, not approved, so
+    // nothing waits for a person mid-trial.
+    needsApproval: (call) => run.rehearsal ? false : verdictForCall(call).final === "ask",
     execute: async (call) => {
+      // The rehearsal gate stands in front of every executor: a call in
+      // a rehearsal run can only ever read, plan, or keep the run's own
+      // books — the approval composition below is never reached.
+      if (run.rehearsal) return await rehearsalGate(call);
       const v = verdicts.get(call.id);
       // A deny verdict is refused here, by the policy itself: the call is
       // never dispatched, so no executor path can grow around the
@@ -1346,8 +1489,10 @@ async function execute(a: ExecArgs): Promise<void> {
       // layer above this run's sealed record. Best-effort by construction
       // (capture never throws); a run stopped meanwhile (not sealed)
       // teaches nothing, and an external-provider run is skipped (the
-      // distillation calls are Anthropic-shaped).
-      if (sealed) {
+      // distillation calls are Anthropic-shaped). A rehearsal run is
+      // skipped too: a trial's finish is evidence about a definition,
+      // not work the person did, and its report is the record it leaves.
+      if (sealed && !run.rehearsal) {
         const { data: el } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
         await captureMemories({
           admin, userId: user.id,
@@ -1468,7 +1613,7 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     const mem = await loadMemoryContext(userDb, {
       query: [ctx.strategy.name, said].join(" "),
       spaceId: run.activity_space_id, elementId: null,
-    }).catch(() => null);
+    }, admin).catch(() => null);
     if (mem) {
       ctx.memories = mem.text;
       await noteMemoryUse(admin, run.id, mem.usedIds);
@@ -1556,6 +1701,8 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     await addStep(admin, run.id, !r.ok ? "error" : writes ? "write" : "action", `Alcon: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);
     // A recall's bodies count as uses of those memories (PR3).
     if (call.name === "recall_memory" && r.ok) await noteMemoryUse(admin, run.id, usedIdsOf(r.data));
+    // A promotion the person just asked for starts drafting now (PR5).
+    if (call.name === "start_promotion" && r.ok) startPromotionRunFromTool(a, r.data);
     return r.ok ? { content: JSON.stringify(r.data).slice(0, 20_000) } : { content: r.error, is_error: true };
   };
 
@@ -2094,6 +2241,505 @@ async function draft(a: ExecArgs, said: string): Promise<void> {
   }
 }
 
+/** The Space's Objects a binding may choose from (through its Domains). */
+async function spaceObjects(admin: SupabaseClient, spaceId: string): Promise<{ id: string; name: string }[]> {
+  const { data: doms } = await admin.from("domains").select("id").eq("activity_space_id", spaceId);
+  const domainIds = ((doms ?? []) as { id: string }[]).map((d) => d.id);
+  if (!domainIds.length) return [];
+  const { data } = await admin.from("objects").select("id, name").in("domain_id", domainIds).is("archived_at", null).order("name");
+  return (data ?? []) as { id: string; name: string }[];
+}
+
+/**
+ * Assembles a promotion's drafting material from its source (§4.3):
+ * for a memory, the memory itself; for a run, the run's step titles,
+ * its finish, and the Element and definition it worked under. Every
+ * fragment passes the hygiene gate — a tainted fragment drops whole, an
+ * instruction-shaped one is excluded as an instruction — and what was
+ * given (and what was dropped, and why) is recorded on the draft, so
+ * the reviewer can see the provenance of what they approve. Raw tool
+ * I/O, response bodies and attachments never enter: the record is
+ * titles, summaries and the person's own words, the Memory discipline.
+ */
+async function assemblePromotionMaterial(
+  admin: SupabaseClient, d: PromotionDraftRow,
+): Promise<{ text: string; sources: PromotionMaterialSource[]; sourceLine: string } | { missing: string }> {
+  const sources: PromotionMaterialSource[] = [];
+  const parts: string[] = [];
+  const take = (kind: PromotionMaterialSource["kind"], ref: string, label: string, fragment: string) => {
+    const cleaned = cleanPromotionMaterial(fragment);
+    sources.push({ kind, ref, tainted: cleaned.tainted, instructionShaped: cleaned.instructionShaped });
+    if (cleaned.tainted) {
+      parts.push(`### ${label}\n（秘密らしい値を含んでいたため、この断片は材料から外しました）`);
+    } else if (cleaned.instructionShaped) {
+      parts.push(`### ${label}\n（命令形の文を含んでいたため、この断片は指示としては無効化しました。内容の要約だけを残します）`);
+    } else {
+      parts.push(`### ${label}\n${cleaned.text}`);
+    }
+  };
+
+  if (d.source_kind === "memory") {
+    if (!d.source_memory_id) return { missing: "元の記憶が指定されていません。" };
+    const { data: mem } = await admin.from("memories")
+      .select("id, title, gist, body").eq("id", d.source_memory_id).maybeSingle();
+    if (!mem) return { missing: "元の記憶が見つかりませんでした（削除された可能性があります）。" };
+    const m = mem as { id: string; title: string; gist: string; body: string };
+    parts.push(`## 元の記憶「${m.title}」`);
+    take("memory", m.id, "記憶の要約", m.gist);
+    take("memory", m.id, "記憶の本文", m.body);
+    return { text: parts.join("\n\n"), sources, sourceLine: `記憶「${m.title}」（手順の durable 記憶）` };
+  }
+
+  if (!d.source_run_id) return { missing: "元の実行が指定されていません。" };
+  const { data: srcRun } = await admin.from("agent_runs")
+    .select("id, element_id, summary, result, status").eq("id", d.source_run_id).maybeSingle();
+  if (!srcRun) return { missing: "元の実行が見つかりませんでした。" };
+  const r = srcRun as { id: string; element_id: string | null; summary: string | null; result: string | null; status: string };
+  const { data: stepRows } = await admin.from("agent_run_steps")
+    .select("title").eq("run_id", r.id).order("idx", { ascending: true }).limit(120);
+  const titles = ((stepRows ?? []) as { title: string }[]).map((s) => s.title).filter(Boolean);
+  parts.push("## 元の実行の記録");
+  if (titles.length) take("run", r.id, "実行のステップ見出し", titles.map((t) => `- ${t}`).join("\n"));
+  if (r.summary) take("run", r.id, "実行のまとめ", r.summary);
+  if (r.result) take("run", r.id, "実行の成果", r.result);
+  let elementTitle: string | null = null;
+  if (r.element_id) {
+    const { data: el } = await admin.from("elements")
+      .select("id, title, description, definition_id").eq("id", r.element_id).maybeSingle();
+    if (el) {
+      const e = el as { id: string; title: string; description: string | null; definition_id: string | null };
+      elementTitle = e.title;
+      take("element", e.id, "仕事（Element）", [e.title, e.description ?? ""].filter(Boolean).join("\n"));
+      if (e.definition_id) {
+        const { data: defRow } = await admin.from("definitions").select("name, body").eq("id", e.definition_id).maybeSingle();
+        if (defRow) {
+          const df = defRow as { name: string; body: string };
+          take("element", e.definition_id, `その仕事が従った定義「${df.name}」`, df.body);
+        }
+      }
+    }
+  }
+  return {
+    text: parts.join("\n\n"), sources,
+    sourceLine: `実行「${elementTitle ?? (r.summary ?? "").slice(0, 60) ?? "終わった実行"}」（終わった実行）`,
+  };
+}
+
+// ── The promotion driver: one-off work becomes a standing harness ────
+// serve() claimed the run (its subject is the draft). The drafter works
+// from the source's record only, proposes a package (definition +
+// binding), and finishing "ready" runs the testing stage's first half:
+// the static gate and the connector matching, then the tested hashes
+// are frozen and the draft moves to rehearsing. It creates neither a
+// definition nor an Automation — activation is the owner's RPC (PR4).
+async function promote(a: ExecArgs, said: string): Promise<void> {
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
+  const { run, admin, user } = a;
+  const draftId = run.promotion_draft_id!;
+  let d = await loadPromotionDraft(admin, draftId);
+  if (!d) { await failRun(admin, run, "起草の対象が見つかりません。"); return; }
+  if (d.draft_run_id !== run.id) {
+    await admin.from("promotion_drafts").update({ draft_run_id: run.id, updated_at: new Date().toISOString() }).eq("id", d.id);
+    d.draft_run_id = run.id;
+  }
+
+  const config = resolveAgentConfig(null, null, null, run.transcript?.messages?.length ? run.model : null);
+  const { agentName, model } = config;
+  if (!a.anthropicKey) { await failRun(admin, run, "ANTHROPIC_API_KEY が設定されていません。"); return; }
+  const modelClient = new Anthropic({ apiKey: a.anthropicKey });
+  await admin.from("agent_runs").update({ model }).eq("id", run.id);
+
+  const { budget, spentBefore } = await loadRunBudget(admin, run, user.id);
+  let usage = { input: run.input_tokens, output: run.output_tokens, cost: Number(run.cost_usd || 0) };
+
+  const complete = async (summary: string) => {
+    await admin.from("agent_runs").update({
+      status: "completed", summary: summary.slice(0, 300), error: null,
+      finished_at: new Date().toISOString(), continuation_token: null,
+    }).eq("id", run.id).eq("status", "running");
+  };
+  const rest = async (summary: string, error: string | null = null, status = "awaiting_input") => {
+    await admin.from("agent_runs").update({ status, summary: summary.slice(0, 300), error, continuation_token: null })
+      .eq("id", run.id).eq("status", "running");
+  };
+
+  if (d.status === "active" || d.status === "rejected" || d.status === "expired" || d.status === "failed") {
+    await complete(`この起草はすでに終わっています（状態: ${d.status}）。`);
+    return;
+  }
+
+  const startRehearsalRun = async (runId: string, resume: boolean) => {
+    await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+      body: JSON.stringify(resume ? { runId, resume: true } : { runId }),
+    }).catch(() => {});
+  };
+
+  // A draft in rehearsing has no drafting to do: settle a finished
+  // rehearsal (whoever gets here first — the tick settles too), restart
+  // one that never got going, and rest while one is still running. A
+  // rehearsal that failed drops the draft back to drafting below, with
+  // its report put in front of the drafter.
+  if (d.status === "rehearsing") {
+    const settled = await settlePromotionRehearsal(admin, d);
+    d = settled.draft;
+    if (d.status === "awaiting_review") { await complete("試走が通り、審査待ちになりました。審査は設定 › ハーネスで行えます。"); return; }
+    if (d.status === "failed") { await complete("試走の書き直しの上限に達し、起草は失敗として記録されました。"); return; }
+    if (d.status === "rehearsing") {
+      const rep = readRehearsalReport(d.rehearsal_report);
+      if (rep.outcome === "unverifiable") { await complete("試走では確かめきれませんでした。審査へ進めるかは owner の確認待ちです。"); return; }
+      if (d.rehearsal_run_id) {
+        const { data: rr } = await admin.from("agent_runs").select("status").eq("id", d.rehearsal_run_id).maybeSingle();
+        if (rr?.status === "queued") await startRehearsalRun(d.rehearsal_run_id, false);
+        else if (rr?.status === "paused") await startRehearsalRun(d.rehearsal_run_id, true);
+      } else {
+        const pkg = draftPackageOf(d);
+        if (pkg) {
+          await launchPromotionRehearsal({
+            admin, userDb: a.userDb, draft: d, pkg,
+            startRun: async (id) => { await startRehearsalRun(id, false); },
+          });
+          d = (await loadPromotionDraft(admin, draftId)) ?? d;
+        }
+      }
+      await rest("試走が進行中です。終わると審査に進むか、結果を持って起草に戻ります。");
+      return;
+    }
+  }
+
+  const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : promotionTools();
+  let state: LoopState;
+  let finished: { kind: "rehearsal_started" | "failed"; reason: string } | null = null;
+
+  if (run.transcript?.messages?.length) {
+    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: 0, revisions: 0 };
+    if (said) state.messages.push({ role: "user", content: said });
+    if (d.status === "awaiting_input") {
+      await transitionPromotionDraft(admin, d, "drafting", { awaiting_question: null });
+    }
+    // A rehearsal's failure the conversation has not seen enters it
+    // once, so a "fix this" is answered against the evidence.
+    if (d.status === "drafting" && d.failure_class && d.rehearsal_report) {
+      const rep = readRehearsalReport(d.rehearsal_report);
+      const seen = state.messages.some((m) => typeof m.content === "string" && m.content.includes("【試走の結果】"));
+      if (!seen && rep.at) {
+        state.messages.push({
+          role: "user",
+          content: `【試走の結果 ${rep.at}】\n${summarizeRehearsalReport(rep, d.failure_class)}`,
+        });
+      }
+    }
+  } else {
+    // The reconcile (§4.5 rules 1–2): an update target — named at
+    // creation, or found through the draft this source already
+    // activated — pins the base hash the activation will compare.
+    let reconcileNote = "この元の仕事から生まれた定義はまだありません。新規の定義として起草します。";
+    let targetBody: { name: string; body: string } | null = null;
+    const resolveTarget = async (definitionId: string) => {
+      const { data: defRow } = await admin.from("definitions").select("id, name, body").eq("id", definitionId).maybeSingle();
+      if (!defRow) return;
+      const def = defRow as { id: string; name: string; body: string };
+      targetBody = { name: def.name, body: def.body };
+      if (d.target_definition_id !== def.id || !d.base_definition_hash) {
+        const base = await promotionStructureHash(def.name, def.body);
+        await admin.from("promotion_drafts").update({
+          target_definition_id: def.id, base_definition_hash: base,
+          base_name: def.name, base_body: def.body, updated_at: new Date().toISOString(),
+        }).eq("id", d.id);
+        d.target_definition_id = def.id;
+        d.base_definition_hash = base;
+      }
+      reconcileNote = `この元の仕事からはすでに定義「${def.name}」が生まれています。今回はその更新として起草します（元の本文は材料に含めます）。有効化のとき、起草開始時点の姿と照合され、人の編集が入っていれば黙って上書きはしません。`;
+    };
+    if (d.target_definition_id) {
+      await resolveTarget(d.target_definition_id);
+    } else {
+      const sourceCol = d.source_kind === "memory" ? "source_memory_id" : "source_run_id";
+      const sourceVal = d.source_kind === "memory" ? d.source_memory_id : d.source_run_id;
+      if (sourceVal) {
+        const { data: prior } = await admin.from("promotion_drafts")
+          .select("activated_definition_id").eq(sourceCol, sourceVal).eq("status", "active").not("activated_definition_id", "is", null)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const priorDef = (prior as { activated_definition_id?: string | null } | null)?.activated_definition_id;
+        if (priorDef) await resolveTarget(priorDef);
+      }
+    }
+
+    const material = await assemblePromotionMaterial(admin, d);
+    if ("missing" in material) {
+      await transitionPromotionDraft(admin, d, "failed", {});
+      await appendPromotionEvent(admin, d, { at: new Date().toISOString(), kind: "drafting_failed", note: material.missing });
+      await addStep(admin, run.id, "error", "材料が揃いませんでした", material.missing);
+      await complete(material.missing);
+      return;
+    }
+    await admin.from("promotion_drafts").update({
+      material_sources: material.sources as unknown as Record<string, unknown>[],
+      updated_at: new Date().toISOString(),
+    }).eq("id", d.id);
+    d.material_sources = material.sources;
+
+    const objects = await spaceObjects(admin, d.activity_space_id);
+    const materialText = targetBody
+      ? `${material.text}\n\n### 更新元の定義「${targetBody.name}」\n${targetBody.body}`
+      : material.text;
+    state = {
+      messages: [{
+        role: "user",
+        content: promotionOpening({
+          sourceLine: material.sourceLine,
+          material: materialText,
+          reconcileNote,
+          objects,
+          candidateName: d.name,
+          answeredQuestion: d.status === "awaiting_input" ? d.awaiting_question : null,
+          lastFailure: d.failure_class && d.rehearsal_report
+            ? summarizeRehearsalReport(readRehearsalReport(d.rehearsal_report), d.failure_class)
+            : null,
+          today: new Date().toISOString().slice(0, 10),
+        }, said),
+      }],
+      turns: 0, nudges: 0,
+    };
+    await addStep(admin, run.id, "status", "昇格の起草を開始", `${agentName} / ${config.modelLabel}`);
+  }
+  const turnBudget = state.turns + config.maxTotalTurns;
+  if (said) await addStep(admin, run.id, "message", said.split("\n")[0].slice(0, 200), said);
+
+  const saveTranscript = async () => {
+    const transcript: Transcript = { messages: state.messages, turns: state.turns, nudges: 0, revisions: 0, turnBudget, tools };
+    const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
+    const { error } = await admin.from("agent_runs").update({ transcript: clean }).eq("id", run.id);
+    if (error) throw new Error(`経過を保存できませんでした: ${error.message}`);
+  };
+  await saveTranscript();
+
+  const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (call.name === PROPOSE_PACKAGE_TOOL.name) {
+      const input = (call.input ?? {}) as Record<string, unknown>;
+      const name = String(input.name ?? "").trim().slice(0, 120);
+      const body = String(input.body ?? "");
+      const b = (input.binding ?? {}) as Record<string, unknown>;
+      const objectId = typeof b.objectId === "string" && b.objectId ? b.objectId : null;
+      const triggerIn = (b.trigger ?? null) as Record<string, unknown> | null;
+      const pkg: PromotionPackage = {
+        name,
+        body,
+        binding: {
+          objectId,
+          titleTemplate: String(b.titleTemplate ?? ""),
+          descriptionTemplate: String(b.descriptionTemplate ?? ""),
+          trigger: triggerIn && typeof triggerIn.cron === "string" && triggerIn.cron.trim()
+            ? {
+              kind: "schedule",
+              cron: triggerIn.cron.trim(),
+              timezone: typeof triggerIn.timezone === "string" && triggerIn.timezone.trim() ? triggerIn.timezone.trim() : "Asia/Tokyo",
+            }
+            : null,
+        },
+      };
+      if (!pkg.name || !pkg.body.trim()) return { content: "name と body が要ります。", is_error: true };
+      if (pkg.binding.trigger && pkg.binding.trigger.cron.split(/\s+/).length !== 5) {
+        return { content: "trigger.cron は 5 フィールドの cron で書いてください（例: 0 9 * * 1-5）。", is_error: true };
+      }
+      if (pkg.binding.objectId) {
+        const objects = await spaceObjects(admin, d.activity_space_id);
+        if (!objects.some((o) => o.id === pkg.binding.objectId)) {
+          return { content: "binding.objectId は、この Space の Object の候補から選んでください。決められなければ null にして ask_person で聞いてください。", is_error: true };
+        }
+      }
+      const outcome = evaluatePromotionPackage(pkg, []);
+      if (outcome.errors.length) {
+        await addStep(admin, run.id, "error", "候補が静的チェックに通りませんでした", outcome.errors.join("\n"));
+        return { content: `静的チェックで落ちました。直して出し直してください:\n- ${outcome.errors.join("\n- ")}`, is_error: true };
+      }
+      // Rules 3–4, now the package has a name and a binding: a rival
+      // name and a duplicate binding are shown, never silently taken.
+      const [{ data: defRows }, { data: autoRows }] = await Promise.all([
+        admin.from("definitions").select("id, name").eq("activity_space_id", d.activity_space_id),
+        admin.from("automations").select("definition_id, object_id").eq("activity_space_id", d.activity_space_id),
+      ]);
+      const rec = reconcilePromotionPackage({
+        pkg,
+        targetDefinitionId: d.target_definition_id,
+        definitions: (defRows ?? []) as { id: string; name: string }[],
+        automations: ((autoRows ?? []) as { definition_id: string | null; object_id: string | null }[])
+          .map((r) => ({ definitionId: r.definition_id, objectId: r.object_id })),
+      });
+      if (!await applyPromotionPackage(admin, d, pkg)) {
+        return { content: "候補を保存できませんでした（ドラフトの状態が変わっています）。", is_error: true };
+      }
+      d = (await loadPromotionDraft(admin, draftId)) ?? d;
+      await addStep(admin, run.id, "action", "昇格の候補を提出しました",
+        `${pkg.name}\n置き場: ${pkg.binding.objectId ?? "(未定)"} / トリガ: ${pkg.binding.trigger ? `${pkg.binding.trigger.cron} (${pkg.binding.trigger.timezone})` : "なし"}`);
+      const notes: string[] = [];
+      if (rec.nameConflict) notes.push(`同じ名前の定義「${rec.nameConflict.name}」がすでにあります。更新として扱いたいのか、別物として名前を変えるのか、勝手に決めず人に確かめてください（審査でも表示されます）。`);
+      if (rec.bindingDuplicate) notes.push("この定義と Object の組み合わせの自動化がすでにあります。二重に回らないよう、審査で人が判断します（ここにも記録しました）。");
+      if (outcome.warnings.length) notes.push(`注意: ${outcome.warnings.join(" / ")}`);
+      return {
+        content: `候補を受け付けました。${notes.length ? `\n${notes.join("\n")}` : ""}\n検査へ進める形なら finish_promotion(outcome=ready) で終えてください。決められない点があれば ask_person で聞いてください。`,
+      };
+    }
+    if (call.name === PROMOTE_ASK_TOOL.name) {
+      const question = String(call.input.question ?? "").trim();
+      if (!question) return { content: "question が要ります。", is_error: true };
+      if (!await askPromotionDraft(admin, d, question)) return { content: "質問を記録できませんでした（ドラフトの状態が変わっています）。", is_error: true };
+      d = (await loadPromotionDraft(admin, draftId)) ?? d;
+      await addStep(admin, run.id, "status", "人に確認しています", question);
+      return { content: "質問を記録しました。人に短く伝えて、このターンを終えてください。人が答えると起草が再開します。" };
+    }
+    if (call.name === FINISH_PROMOTION_TOOL.name) {
+      const outcomeIn = String(call.input.outcome ?? "");
+      const reason = String(call.input.reason ?? "").trim().slice(0, 500);
+      if (outcomeIn === "ready") {
+        const pkg = draftPackageOf(d);
+        if (!pkg) return { content: "候補がまだ提出されていません。propose_package を先に通してください。", is_error: true };
+        const connected = await connectedConnectorNames(admin, d.activity_space_id);
+        const outcome = evaluatePromotionPackage(pkg, connected);
+        if (outcome.errors.length) {
+          await admin.from("promotion_drafts").update({ failure_class: "definition_invalid", updated_at: new Date().toISOString() }).eq("id", d.id);
+          d.failure_class = "definition_invalid";
+          await addStep(admin, run.id, "error", "静的チェックで落ちました", outcome.errors.join("\n"));
+          return { content: `静的チェックで落ちました。分類は definition_invalid です。直して propose_package → finish_promotion をもう一度行ってください。\n- ${outcome.errors.join("\n- ")}`, is_error: true };
+        }
+        if (outcome.missing.length) {
+          await admin.from("promotion_drafts").update({ failure_class: "connector_missing", updated_at: new Date().toISOString() }).eq("id", d.id);
+          d.failure_class = "connector_missing";
+          await addStep(admin, run.id, "error", "接続が足りません", outcome.missing.join("、"));
+          return {
+            content: `接続が足りません: ${outcome.missing.join("、")}。分類は connector_missing です。接続は人が設定 › AI › コネクタで行います（この起草からは作れません）。候補の「# 使うコネクタ」が材料の仕事で実際に使ったものだけか確かめ、要らない接続なら外して出し直してください。必要な接続なら、その旨を人に伝えて終えてください。`,
+            is_error: true,
+          };
+        }
+        const frozen = await freezePromotionPackage(admin, d, pkg);
+        if (!frozen) return { content: "候補を確定できませんでした（ドラフトの状態が変わっています）。", is_error: true };
+        d = frozen;
+        const launched = await launchPromotionRehearsal({
+          admin, userDb: a.userDb, draft: d, pkg,
+          startRun: async (runId) => { await startRehearsalRun(runId, false); },
+        });
+        if ("error" in launched) {
+          await addStep(admin, run.id, "error", "試走を開始できませんでした", launched.error);
+          return { content: `試走を開始できませんでした: ${launched.error}。理由を人に伝えてください（候補は確定済みで、次に起草を動かしたときに試走から再開します）。`, is_error: true };
+        }
+        d = (await loadPromotionDraft(admin, draftId)) ?? d;
+        finished = { kind: "rehearsal_started", reason: "試走を開始しました。終わると審査に進むか、結果を持って起草に戻ります。" };
+        await addStep(admin, run.id, "status", "試走を開始しました", pkg.name);
+        return { content: "試走を開始しました。何を起草し、どう確かめるか短く報告して終えてください。" };
+      }
+      if (outcomeIn === "failed") {
+        if (!reason) return { content: "reason（理由）が要ります。", is_error: true };
+        await transitionPromotionDraft(admin, d, "failed", {});
+        await appendPromotionEvent(admin, d, { at: new Date().toISOString(), kind: "drafting_failed", note: reason });
+        finished = { kind: "failed", reason };
+        await addStep(admin, run.id, "status", "起草を諦めました", reason);
+        return { content: "記録しました。理由を短く伝えて終えてください。" };
+      }
+      return { content: "outcome は ready / failed のいずれかです。", is_error: true };
+    }
+    return { content: `この起草では使えない道具です: ${call.name}`, is_error: true };
+  };
+
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  const cache = { cache_control: { type: "ephemeral" as const } };
+  const system = [{ type: "text" as const, text: promotionSystemPrompt(agentName), ...cache }];
+  const toolParams = toolParamsFor(tools, cache, false);
+  const deadline = Date.now() + SLICE_MS;
+  const sliceSignal = () => AbortSignal.timeout(Math.max(deadline - Date.now(), 1));
+
+  const outcome = await runLoop(state, {
+    callModel: async (messages) => {
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.beta.messages.create({
+        model,
+        max_tokens: 16000,
+        system,
+        // deno-lint-ignore no-explicit-any
+        tools: toolParams as any,
+        // deno-lint-ignore no-explicit-any
+        messages: messages as any,
+        output_config: { effort: "low" },
+      // deno-lint-ignore no-explicit-any
+      } as any, { signal: sliceSignal() });
+      const blocks = (res.content ?? []) as { type: string; text?: string }[];
+      const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
+      if (words && blocks.some((b) => b.type === "tool_use")) await addStep(admin, run.id, "reply", words.split("\n")[0].slice(0, 200), words);
+      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
+    },
+    kindOf: promotionKindOf,
+    needsApproval: () => false,
+    execute: (call) => executeCall(call),
+    onUsage: recordUsage,
+    afterTurn: () => saveTranscript(),
+    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
+    cancelled: async () => {
+      const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
+      return data?.status === "cancelled";
+    },
+  }, { maxTurnsThisCall: MAX_TURNS_PER_SLICE, maxTotalTurns: turnBudget, deadline });
+
+  await saveTranscript();
+  switch (outcome.kind) {
+    case "finished": {
+      if (finished?.kind === "rehearsal_started") {
+        await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+        await rest(finished.reason);
+        return;
+      }
+      if (finished) {
+        await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+        await complete(finished.reason);
+        return;
+      }
+      await rest(outcome.finish.summary);
+      await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+      return;
+    }
+    case "yield": {
+      const token = crypto.randomUUID();
+      const { data: armed } = await admin.from("agent_runs").update({ continuation_token: token, continuation_count: run.continuation_count + 1 })
+        .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+      if (!armed) return;
+      await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+        body: JSON.stringify({ runId: run.id, continue: true, token }),
+      }).catch(async (e) => rest("続きを開始できませんでした", errorMessage(e), "paused"));
+      return;
+    }
+    case "approval":
+      await rest("承認が要る操作は起草ではできません", "承認が要る操作は起草ではできません", "paused");
+      return;
+    case "limit":
+      await rest("この発言への作業が上限に達しました。続けるには、もう一度話しかけてください。");
+      return;
+    case "budget": {
+      const why = usage.cost >= MAX_RUN_COST_USD
+        ? `この起草の上限（$${MAX_RUN_COST_USD}）に達しました。`
+        : run.activity_space_id ? "この Space の今月の AI 予算の上限に達しました。" : "今月の AI 予算（個人）の上限に達しました。";
+      await rest("予算の上限に達しました", why, "paused");
+      await addStep(admin, run.id, "error", "予算の上限に達しました", why);
+      return;
+    }
+    case "cancelled":
+      await addStep(admin, run.id, "status", "停止しました");
+      return;
+    case "refusal":
+      await rest("モデルがこの依頼を断りました", outcome.detail.slice(0, 300));
+      return;
+  }
+}
+
 // ── Athena's heartbeat driver: a Space's wake ─────────────────────────
 // serve() claimed the run (status running) for a schedule's start, or
 // for the tick's revival of a wake the platform cut off. The wake's
@@ -2248,6 +2894,21 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
       signals.push({ kind: "draft_review", id: d.id, since: d.updated_at, version: "awaiting_review", expiresAt: d.expires_at, label: d.name, place: "接続の審査画面で判断できます" });
     } else {
       signals.push({ kind: "draft_input", id: d.id, since: d.updated_at, version: "awaiting_input", label: d.name, place: "起草の画面で答えられます" });
+    }
+  }
+
+  // ── Promotion drafts waiting the same two ways (condition 5) ──
+  const promotions = await guard(
+    userDb.from("promotion_drafts").select("id, name, status, expires_at, updated_at")
+      .eq("activity_space_id", spaceId).in("status", ["awaiting_review", "awaiting_input"])
+      .order("updated_at", { ascending: true }).limit(20),
+    [] as { id: string; name: string | null; status: string; expires_at: string | null; updated_at: string }[],
+  );
+  for (const p of promotions) {
+    if (p.status === "awaiting_review") {
+      signals.push({ kind: "promotion_review", id: p.id, since: p.updated_at, version: "awaiting_review", expiresAt: p.expires_at, label: p.name ?? "昇格ドラフト", place: "ハーネスの昇格ドラフトで判断できます" });
+    } else {
+      signals.push({ kind: "promotion_input", id: p.id, since: p.updated_at, version: "awaiting_input", label: p.name ?? "昇格ドラフト", place: "昇格の起草の画面で答えられます" });
     }
   }
 
@@ -2559,7 +3220,7 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
   const mem = await loadMemoryContext(userDb, {
     query: said,
     spaceId: context.spaceId ?? run.activity_space_id, elementId: context.elementId ?? null,
-  }).catch(() => null);
+  }, admin).catch(() => null);
   if (mem) await noteMemoryUse(admin, run.id, mem.usedIds, (type, title) => bound(type, title));
   const turn: CopilotTurn = await buildCopilotTurn({
     userDb, admin, context, supabaseUrl: a.supabaseUrl, approvalMode: turnMode,
@@ -2600,6 +3261,10 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       try {
         await noteMemoryUse(admin, run.id, usedIdsOf(JSON.parse(r.content)), (type, title) => bound(type, title));
       } catch { /* a recall's bookkeeping never breaks the turn */ }
+    }
+    // A promotion the person just asked for starts drafting now (PR5).
+    if (call.name === "start_promotion" && !r.is_error) {
+      try { startPromotionRunFromTool(a, JSON.parse(r.content)); } catch { /* starting is a courtesy; the draft's screen can start it */ }
     }
     return r;
   };

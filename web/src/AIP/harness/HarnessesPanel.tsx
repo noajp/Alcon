@@ -21,6 +21,7 @@ import { catalogRelation, lineDiffCounts } from './installState';
 import { enabledConnectedNames, installReadiness, missingConnectors } from './installFlow';
 import { clearInstallSession, saveInstallSession, takeInstallSession } from './installReturn';
 import { RegistrySection } from './RegistrySection';
+import { PromotionsSection } from './PromotionDrafts';
 import { YoursDiscover, type CustomizeMode } from './YoursDiscover';
 import { TryDefinition } from './TryDefinition';
 
@@ -275,6 +276,11 @@ export function HarnessesPanel() {
         </div>
       )}
 
+      {mode === 'yours' && (
+        <PromotionsSection spaceId={spaceId} isOwner={isOwner} definitions={library.data}
+          onChanged={() => { void library.refetch(); }} />
+      )}
+
       {mode === 'yours' ? (
         library.loading ? <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
           : library.data.length === 0 ? (
@@ -294,6 +300,7 @@ export function HarnessesPanel() {
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-[13px] font-medium text-foreground">{d.name}</span>
                           {isDefault && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]">{t('Default')}</span>}
+                          {d.promoted_from_draft_id && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]">{t('Promoted')}</span>}
                           {!d.enabled && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-muted-foreground">{t('Off')}</span>}
                           {(relation.kind === 'current' || relation.kind === 'legacy-unknown') && relation.differs && (
                             <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-muted-foreground">{t('Edited locally')}</span>

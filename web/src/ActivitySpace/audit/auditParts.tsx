@@ -12,6 +12,7 @@ import {
   type WorkflowDeploymentRecord,
 } from '@/Function/audit/auditModel';
 import { useAgentRunEvents } from '@/hooks/useAudit';
+import { createPromotionDraftFromRun } from '@/AIP/harness/promotionData';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
 import { useChainLinks, useRunSteps, sha256Hex, type AuditSource } from './auditSource';
 
@@ -256,6 +257,20 @@ const VERDICT_UNCHECKED_REASON: Record<string, string> = {
 export function AgentRunPanel({ run, onClose }: { run: AgentRunRecord; onClose: () => void }) {
   const { t, locale } = useI18n();
   const detail = useAgentRunEvents(run.id);
+  // The promotion path's run door (condition 5, source B): a finished
+  // run can be pointed at — "make this standing" — and drafting opens
+  // in the Harnesses screen's promotion section.
+  const [promoState, setPromoState] = useState<'idle' | 'busy' | 'done' | string>('idle');
+  const makeStanding = async () => {
+    if (!run.domain_id) return;
+    setPromoState('busy');
+    try {
+      await createPromotionDraftFromRun(run.id, run.domain_id);
+      setPromoState('done');
+    } catch (e) {
+      setPromoState(e instanceof Error ? e.message : String(e));
+    }
+  };
   const readings = run.proposed_readings ?? [];
   const labels = useMeasureLabels(readings.map(r => r.measureId));
   const outcome = agentRunOutcome(run);
@@ -293,6 +308,20 @@ export function AgentRunPanel({ run, onClose }: { run: AgentRunRecord; onClose: 
         {run.summary && <><dt>{t('Summary')}</dt><dd className="text-foreground">{run.summary}</dd></>}
         {run.error && <><dt>{t('Error')}</dt><dd className="text-[var(--status-danger)]">{run.error}</dd></>}
       </dl>
+      {run.status === 'completed' && run.domain_id && (
+        <div className="px-4 pb-4">
+          {promoState === 'done' ? (
+            <p className={`${FONT.sm} text-muted-foreground`}>{t('Drafting has begun — it continues in the Harnesses promotion drafts.')}</p>
+          ) : (
+            <Button size="sm" variant="secondary" disabled={promoState === 'busy'} onClick={() => void makeStanding()}>
+              {t('Make it standing')}
+            </Button>
+          )}
+          {promoState !== 'idle' && promoState !== 'busy' && promoState !== 'done' && (
+            <p className={`${FONT.sm} mt-1 text-[var(--status-danger)]`}>{promoState}</p>
+          )}
+        </div>
+      )}
       {verdict && (
         <div className="px-4 pb-4">
           <p className={`${FONT.sm} flex flex-wrap items-baseline gap-x-2`}>

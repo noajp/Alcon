@@ -10,15 +10,20 @@ import {
   setSpaceAutoCapture, shareMemoryToSpace, updateMemory, usePersonalMemories, useSpaceMemories,
   type MemoryListState,
 } from '@/hooks/memoryData';
-import type { MemoryKind, MemoryLayer } from '@/types/database';
+import type { MemoryKind, MemoryLayer, PromotionDraft } from '@/types/database';
+import { createPromotionDraft, usePromotionObjectNames } from '@/AIP/harness/promotionData';
+import { PromotionDraftDialog } from '@/AIP/harness/PromotionDrafts';
+import { useDefinitions } from '@/hooks/definitionData';
 
 // Memory, where a person controls it (Memory PR4): the auto-capture
 // toggle, the kept memories themselves — read, corrected, pinned,
 // promoted, shared, deleted — and the procedures Athena reaches for
-// most, which is where a future harness promotion starts. One view
-// serves both scopes; the wrappers differ only in whose rows and
-// whose toggle they hold. Everything works without AI: this screen
-// is plain record-keeping over the memories table.
+// most, which is where the promotion path to a standing harness
+// starts (condition 5: "Make it standing" opens the drafting here;
+// the draft itself lives in the Harnesses screen). One view serves
+// both scopes; the wrappers differ only in whose rows and whose
+// toggle they hold. Everything works without AI: this screen is
+// plain record-keeping over the memories table.
 
 interface ViewProps {
   state: MemoryListState;
@@ -49,6 +54,15 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
     [state.memories, layer, kind, query, showHistory],
   );
   const candidates = useMemo(() => promotionCandidates(state.memories).slice(0, 5), [state.memories]);
+
+  // The promotion path's door (condition 5): a candidate that belongs
+  // to a Space can start its drafting here; the draft then lives in
+  // the Harnesses screen's promotion section, and this dialog follows
+  // it. Personal candidates cross only after being shared to a Space
+  // (the share action below is that crossing, with the body shown).
+  const [promoDraft, setPromoDraft] = useState<PromotionDraft | null>(null);
+  const promoDefinitions = useDefinitions(promoDraft?.activity_space_id ?? null);
+  const promoObjectNames = usePromotionObjectNames(promoDraft?.activity_space_id ?? null);
 
   const act = async (fn: () => Promise<void>, failKey: string) => {
     setBusy(true);
@@ -128,7 +142,17 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
             {candidates.map((m) => (
               <li key={m.id} className="flex items-baseline justify-between gap-3 text-[12px]">
                 <button type="button" className="text-left text-foreground hover:underline" onClick={() => { setOpenId(m.id); setLayer('durable'); }}>{m.title}</button>
-                <span className="shrink-0 text-muted-foreground">{t('Used {n} times', { n: m.use_count })}</span>
+                <span className="flex shrink-0 items-baseline gap-2">
+                  <span className="text-muted-foreground">{t('Used {n} times', { n: m.use_count })}</span>
+                  {m.activity_space_id && (
+                    <Button variant="ghost" size="xs" disabled={busy} onClick={() => void act(async () => {
+                      const d = await createPromotionDraft({ spaceId: m.activity_space_id!, source: { kind: 'memory', memoryId: m.id } });
+                      setPromoDraft(d);
+                    }, "Couldn't start the promotion: {error}")}>
+                      {t('Make it standing')}
+                    </Button>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
@@ -246,6 +270,12 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
           );
         })}
       </div>
+      {promoDraft && (
+        <PromotionDraftDialog draft={promoDraft} isOwner={isSpaceOwner}
+          definitions={promoDefinitions.data} objectNames={promoObjectNames}
+          onClose={() => setPromoDraft(null)}
+          onChanged={() => { void state.refetch(); }} />
+      )}
     </>
   );
 }

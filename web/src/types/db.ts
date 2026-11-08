@@ -29,6 +29,7 @@ import type {
   PhaseStatus, StrategyDelegation, StrategyScope, StrategyStatus, WorkerAvailabilityKind, WorkerSkillLevel,
   Element, ElementComment, IssuedPersonalAccessToken,
   IntegrationDraftStatus, DraftRequestContext, DraftDrop, DraftChangeEvent,
+  PromotionDraftStatus, PromotionBinding, PromotionMaterialSource, PromotionDraftEvent,
 } from './database'
 import type { ElementImportResult, ElementImportRow } from '@/Function/shared/element/intakeModel'
 import type { DeploymentGrant, GrantOperation } from '@/Function/audit/auditModel'
@@ -122,6 +123,14 @@ interface ColumnOverrides {
     required_commands: string[]
     dropped_commands: DraftDrop[]
     change_events: DraftChangeEvent[]
+  }
+  promotion_drafts: {
+    status: PromotionDraftStatus
+    source_kind: 'memory' | 'run'
+    binding: PromotionBinding
+    rehearsal_report: Record<string, unknown> | null
+    material_sources: PromotionMaterialSource[]
+    events: PromotionDraftEvent[]
   }
   code_changes: { provider: 'github'; state: CodeChangeState; linked_via: 'manual' | 'agent' }
   code_change_reviews: { verdict: 'comment' | 'matches' | 'needs_changes' }

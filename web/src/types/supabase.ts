@@ -319,8 +319,10 @@ export type Database = {
           mode: string
           model: string | null
           output_tokens: number
+          promotion_draft_id: string | null
           prompt: string | null
           proposed_readings: Json | null
+          rehearsal: boolean
           reply_to: string | null
           result: string | null
           started_at: string | null
@@ -352,8 +354,10 @@ export type Database = {
           mode?: string
           model?: string | null
           output_tokens?: number
+          promotion_draft_id?: string | null
           prompt?: string | null
           proposed_readings?: Json | null
+          rehearsal?: boolean
           reply_to?: string | null
           result?: string | null
           started_at?: string | null
@@ -385,8 +389,10 @@ export type Database = {
           mode?: string
           model?: string | null
           output_tokens?: number
+          promotion_draft_id?: string | null
           prompt?: string | null
           proposed_readings?: Json | null
+          rehearsal?: boolean
           reply_to?: string | null
           result?: string | null
           started_at?: string | null
@@ -965,7 +971,9 @@ export type Database = {
           next_run_at: string | null
           object_id: string
           owner_id: string
+          description_template: string | null
           timezone: string
+          title_template: string | null
           token_hash: string | null
           updated_at: string
         }
@@ -984,7 +992,9 @@ export type Database = {
           next_run_at?: string | null
           object_id: string
           owner_id?: string
+          description_template?: string | null
           timezone?: string
+          title_template?: string | null
           token_hash?: string | null
           updated_at?: string
         }
@@ -1003,7 +1013,9 @@ export type Database = {
           next_run_at?: string | null
           object_id?: string
           owner_id?: string
+          description_template?: string | null
           timezone?: string
+          title_template?: string | null
           token_hash?: string | null
           updated_at?: string
         }
@@ -1727,6 +1739,7 @@ export type Database = {
           enabled: boolean
           id: string
           name: string
+          promoted_from_draft_id: string | null
           source_id: string | null
           source_version: number | null
           updated_at: string
@@ -1739,6 +1752,7 @@ export type Database = {
           enabled?: boolean
           id?: string
           name: string
+          promoted_from_draft_id?: string | null
           source_id?: string | null
           source_version?: number | null
           updated_at?: string
@@ -1751,6 +1765,7 @@ export type Database = {
           enabled?: boolean
           id?: string
           name?: string
+          promoted_from_draft_id?: string | null
           source_id?: string | null
           source_version?: number | null
           updated_at?: string
@@ -3684,6 +3699,7 @@ export type Database = {
           layer: string
           origin: string
           pinned: boolean
+          promotion_offered_at: string | null
           scope: string
           search_text: string
           source_run_id: string | null
@@ -3715,6 +3731,7 @@ export type Database = {
           layer?: string
           origin?: string
           pinned?: boolean
+          promotion_offered_at?: string | null
           scope: string
           source_run_id?: string | null
           source_session_id?: string | null
@@ -3745,6 +3762,7 @@ export type Database = {
           layer?: string
           origin?: string
           pinned?: boolean
+          promotion_offered_at?: string | null
           scope?: string
           source_run_id?: string | null
           source_session_id?: string | null
@@ -3932,6 +3950,7 @@ export type Database = {
           is_read: boolean
           kind: string
           object_id: string | null
+          promotion_draft_id: string | null
           recipient_id: string
           strategy_comment_id: string | null
           strategy_id: string | null
@@ -3955,6 +3974,7 @@ export type Database = {
           is_read?: boolean
           kind: string
           object_id?: string | null
+          promotion_draft_id?: string | null
           recipient_id: string
           strategy_comment_id?: string | null
           strategy_id?: string | null
@@ -3978,6 +3998,7 @@ export type Database = {
           is_read?: boolean
           kind?: string
           object_id?: string | null
+          promotion_draft_id?: string | null
           recipient_id?: string
           strategy_comment_id?: string | null
           strategy_id?: string | null
@@ -4773,6 +4794,133 @@ export type Database = {
             columns: ["strategy_id"]
             isOneToOne: false
             referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promotion_drafts: {
+        Row: {
+          activated_automation_id: string | null
+          activated_body: string | null
+          activated_definition_id: string | null
+          activated_binding_hash: string | null
+          activated_structure_hash: string | null
+          activity_space_id: string
+          awaiting_question: string | null
+          base_definition_hash: string | null
+          binding: Json
+          body: string | null
+          created_at: string
+          created_by: string | null
+          decided_at: string | null
+          decided_by: string | null
+          draft_run_id: string | null
+          events: Json
+          expires_at: string | null
+          failure_class: string | null
+          id: string
+          material_sources: Json
+          name: string | null
+          rehearsal_report: Json | null
+          rehearsal_run_id: string | null
+          requester_id: string | null
+          source_kind: string
+          source_memory_id: string | null
+          source_run_id: string | null
+          status: string
+          target_definition_id: string | null
+          tested_binding_hash: string | null
+          tested_structure_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated_automation_id?: string | null
+          activated_body?: string | null
+          activated_definition_id?: string | null
+          activated_binding_hash?: string | null
+          activated_structure_hash?: string | null
+          activity_space_id: string
+          awaiting_question?: string | null
+          base_definition_hash?: string | null
+          binding?: Json
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          draft_run_id?: string | null
+          events?: Json
+          expires_at?: string | null
+          failure_class?: string | null
+          id?: string
+          material_sources?: Json
+          name?: string | null
+          rehearsal_report?: Json | null
+          rehearsal_run_id?: string | null
+          requester_id?: string | null
+          source_kind: string
+          source_memory_id?: string | null
+          source_run_id?: string | null
+          status?: string
+          target_definition_id?: string | null
+          tested_binding_hash?: string | null
+          tested_structure_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated_automation_id?: string | null
+          activated_body?: string | null
+          activated_definition_id?: string | null
+          activated_binding_hash?: string | null
+          activated_structure_hash?: string | null
+          activity_space_id?: string
+          awaiting_question?: string | null
+          base_definition_hash?: string | null
+          binding?: Json
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          draft_run_id?: string | null
+          events?: Json
+          expires_at?: string | null
+          failure_class?: string | null
+          id?: string
+          material_sources?: Json
+          name?: string | null
+          rehearsal_report?: Json | null
+          rehearsal_run_id?: string | null
+          requester_id?: string | null
+          source_kind?: string
+          source_memory_id?: string | null
+          source_run_id?: string | null
+          status?: string
+          target_definition_id?: string | null
+          tested_binding_hash?: string | null
+          tested_structure_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_drafts_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_drafts_target_definition_id_fkey"
+            columns: ["target_definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_drafts_activated_definition_id_fkey"
+            columns: ["activated_definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
             referencedColumns: ["id"]
           },
         ]
@@ -5823,6 +5971,8 @@ export type Database = {
     Functions: {
       accept_asset: { Args: { p_asset_id: string }; Returns: undefined }
       activate_integration_draft: { Args: { p_draft_id: string }; Returns: string }
+      activate_promotion_draft: { Args: { p_draft_id: string }; Returns: string }
+      accept_unverifiable_promotion: { Args: { p_draft_id: string }; Returns: boolean }
       add_widget: {
         Args: {
           p_board_id: string
@@ -6084,6 +6234,8 @@ export type Database = {
         Returns: number
       }
       reject_integration_draft: { Args: { p_draft_id: string }; Returns: boolean }
+      reject_promotion_draft: { Args: { p_draft_id: string }; Returns: boolean }
+      rollback_promoted_definition: { Args: { p_draft_id: string }; Returns: boolean }
       release_element: {
         Args: { p_element_id: string; p_holder: string }
         Returns: boolean
