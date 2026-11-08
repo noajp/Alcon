@@ -81,6 +81,24 @@ export const INTERNAL_TOOLS: ToolDef[] = [
             required: ["measureId", "value"], additionalProperties: false,
           },
         },
+        claims: {
+          type: "array", maxItems: 50,
+          description: "報告で事実として述べる内容は、ここに 1 件ずつ挙げる。出典と取得時刻と種別が機械的に検査される（出典なし・古すぎる出典は差し戻される）。自分がこの実行で作った・変更したもの（ファイル、PR、成果物）は source に run-record と書く。",
+          items: {
+            type: "object",
+            properties: {
+              text: { type: "string", description: "事実の内容（1 行）" },
+              source: { type: "string", description: "出典：調べた URL・文書名。自分がこの実行で行ったことは run-record" },
+              retrievedAt: { type: "string", description: "その情報を取得した時刻（ISO 8601）。今取得したなら現在時刻" },
+              type: { type: "string", description: "情報の種別：価格や相場は price、在庫や空き状況は availability、組織や人物の事実は org、法規や規約は legal。定義に鮮度の上限が宣言された種別があればそれを使う" },
+            },
+            required: ["text"], additionalProperties: false,
+          },
+        },
+        unconfirmed: {
+          type: "array", maxItems: 20, items: { type: "string" },
+          description: "どうしても確かめられなかった点を 1 件ずつ。ここに挙げれば差し戻しにはならないが、実行の記録に未確認として残り、人の目に触れる。本文に紛れ込ませず、必ずここに挙げる",
+        },
       },
       required: ["outcome", "summary", "message"],
       additionalProperties: false,

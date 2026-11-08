@@ -7,6 +7,7 @@
 // user message that follows it.
 
 import type { ModelUsage } from "./aiPricing.ts";
+import type { FinishClaim } from "./finishClaims.ts";
 
 export type Block = { type: string; id?: string; name?: string; input?: unknown; text?: string; [k: string]: unknown };
 export type Msg = { role: "user" | "assistant"; content: string | Block[] };
@@ -25,6 +26,19 @@ export interface FinishPayload {
    * bound set and the verdict are both known.
    */
   readings?: { measureId: string; value: number }[];
+  /**
+   * The facts the finish states, typed at the source (finishClaims.ts):
+   * each claim carries its source and when it was retrieved, so code can
+   * judge sourcing and freshness mechanically before any verifier reads
+   * prose. Absent on finishes that state no checkable facts.
+   */
+  claims?: FinishClaim[];
+  /**
+   * What the agent could not confirm, as a field of its own — never a
+   * reason to send the finish back, always a mark on it: the record keeps
+   * the list and the Reviews filter finds the run by it.
+   */
+  unconfirmed?: string[];
 }
 
 /**
@@ -54,6 +68,14 @@ export interface LoopDeps {
   cancelled(): Promise<boolean>;
   /** After every completed turn (its tool results appended): persist progress. */
   afterTurn?(): Promise<void>;
+  /**
+   * The mechanical check of a "completed" finish (finishClaims.ts): claim
+   * shape, source presence, freshness — everything code can evaluate alone.
+   * Runs before verify; a finish it fails is sent back on its findings and
+   * the verifier is never consulted for that finish. Null (or no findings)
+   * lets the finish through to the verifier.
+   */
+  mechanicalCheck?(finish: FinishPayload): { gaps: string[] } | null;
   /**
    * A second reader's check of a "completed" finish against the task, before
    * the run may end on it. Null skips the check (no verifier, or it failed to
@@ -188,10 +210,17 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
 
     if (finishCall) {
       const r = await deps.execute(finishCall);
-      // A "completed" is checked by a second reader; gaps go back to the
-      // agent as the finish call's answer, and the run carries on.
-      if (r.finish?.outcome === "completed" && deps.verify && (state.revisions ?? 0) < MAX_REVISIONS) {
-        const verdict = await deps.verify(r.finish);
+      // A "completed" is gated before it may stand. The mechanical check
+      // goes first: what code can evaluate (the claims' sources and
+      // freshness) is never asked of the model, and a finish it fails is
+      // sent back on the mechanical findings alone — the verifier is not
+      // consulted for that finish. Only a mechanically sound finish is
+      // read by the second reader, for the semantic remainder.
+      if (r.finish?.outcome === "completed" && (state.revisions ?? 0) < MAX_REVISIONS && (deps.mechanicalCheck || deps.verify)) {
+        let verdict: Verdict | null = null;
+        const mechanical = deps.mechanicalCheck?.(r.finish);
+        if (mechanical && mechanical.gaps.length) verdict = { pass: false, gaps: mechanical.gaps };
+        else if (deps.verify) verdict = await deps.verify(r.finish);
         if (verdict && !verdict.pass) {
           state.revisions = (state.revisions ?? 0) + 1;
           results.push({ type: "tool_result", tool_use_id: finishCall.id, is_error: true, content: revisionRequest(verdict) });
@@ -212,10 +241,10 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
   }
 }
 
-/** Pure. What the agent is told when the verifier sends its finish back. */
+/** Pure. What the agent is told when a finish is sent back. */
 export function revisionRequest(verdict: Verdict): string {
   const gaps = verdict.gaps.length ? verdict.gaps.map((g) => `- ${g}`).join("\n") : "- 任務の完了条件を満たしていません。";
-  return `完了はまだ受け付けられません。検証で次の不足が見つかりました。\n${gaps}\n\n道具を使って不足を埋め、成果物と報告を直してから、もう一度 finish を呼んでください。どうしても埋められない点は、報告に「未確認」として明記したうえで finish してください。`;
+  return `完了はまだ受け付けられません。検証で次の不足が見つかりました。\n${gaps}\n\n道具を使って不足を埋め、成果物と報告を直してから、もう一度 finish を呼んでください。報告する事実は finish の claims に出典と取得時刻を付けて挙げ、どうしても確かめられない点は finish の unconfirmed に挙げてください。`;
 }
 
 /**

@@ -412,7 +412,7 @@ export type RunVerdictReason =
   | 'external-model';        // runs on an external model have no verifier
 
 export interface RunVerdict {
-  v: 1;
+  v: 1 | 2;
   result: RunVerdictResult;
   /** Who judged. 'verifier' = the separate check; 'none' = nobody did. */
   source: 'verifier' | 'none';
@@ -435,6 +435,12 @@ export interface RunVerdict {
     /** The artifacts the verifier was shown. */
     artifactIds: string[];
   };
+  /** v2 only: the standing finish's claim accounting, counted by code —
+   *  claims made, claims carrying a source, claims stale. Absent on v1. */
+  claims?: { total: number; sourced: number; stale: number };
+  /** v2 only: the mechanical findings on the standing finish (≤5), kept
+   *  apart from the verifier's semantic `gaps`. Absent on v1. */
+  claimGaps?: string[];
 }
 
 const VERDICT_RESULTS: readonly string[] = ['pass', 'fail', 'unchecked'];
@@ -448,7 +454,7 @@ const VERDICT_REASONS: readonly string[] = ['revisions-exhausted', 'verify-unava
 export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  if (r.v !== 1) return null;
+  if (r.v !== 1 && r.v !== 2) return null;
   if (typeof r.result !== 'string' || !VERDICT_RESULTS.includes(r.result)) return null;
   if (typeof r.source !== 'string' || !VERDICT_SOURCES.includes(r.source)) return null;
   if (!(r.model === null || typeof r.model === 'string')) return null;
@@ -462,8 +468,8 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
   const e = evidence as Record<string, unknown>;
   if (!(e.verifyStepIdx === null || (typeof e.verifyStepIdx === 'number' && Number.isInteger(e.verifyStepIdx)))) return null;
   if (!Array.isArray(e.artifactIds) || !e.artifactIds.every((id) => typeof id === 'string')) return null;
-  return {
-    v: 1,
+  const base: RunVerdict = {
+    v: r.v as 1 | 2,
     result: r.result as RunVerdictResult,
     source: r.source as RunVerdict['source'],
     model: r.model as string | null,
@@ -474,6 +480,64 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     reason: r.reason as RunVerdictReason | null,
     evidence: { verifyStepIdx: e.verifyStepIdx as number | null, artifactIds: [...(e.artifactIds as string[])] },
   };
+  if (r.v === 1) return base;
+  // v2 must carry its accounting exactly, as the server writes it.
+  const claims = r.claims;
+  if (!claims || typeof claims !== 'object' || Array.isArray(claims)) return null;
+  const c = claims as Record<string, unknown>;
+  const count = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+  if (!count(c.total) || !count(c.sourced) || !count(c.stale)) return null;
+  if ((c.sourced as number) > (c.total as number) || (c.stale as number) > (c.total as number)) return null;
+  if (!Array.isArray(r.claimGaps) || !r.claimGaps.every((g) => typeof g === 'string')) return null;
+  return {
+    ...base,
+    claims: { total: c.total as number, sourced: c.sourced as number, stale: c.stale as number },
+    claimGaps: [...(r.claimGaps as string[])],
+  };
+}
+
+/** One fact a finish stated, typed at the source (server: finishClaims.ts). */
+export interface FinishClaim {
+  text: string;
+  /** Where it came from: a URL, a document name, or 'run-record' — the
+   *  run's own step log, for things the run itself did. */
+  source: string | null;
+  /** When the agent retrieved it (ISO 8601), or null when it did not say. */
+  retrievedAt: string | null;
+  /** The fact's data type (price / availability / org / legal / declared). */
+  type: string | null;
+}
+
+/** The finish as submitted, sealed on the run (agent_runs.finish_detail). */
+export interface FinishDetail {
+  claims: FinishClaim[];
+  /** What the agent could not confirm — a mark on the finish, never a
+   *  failure of it. The run list's 未確認あり filter is these, found. */
+  unconfirmed: string[];
+}
+
+/** Strict narrowing of the jsonb, mirroring the server's parseFinishDetail
+ *  field for field: not exactly this shape, not a finish detail. */
+export function parseFinishDetail(raw: unknown): FinishDetail | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  if (!Array.isArray(r.claims) || !Array.isArray(r.unconfirmed)) return null;
+  if (!r.unconfirmed.every((x) => typeof x === 'string')) return null;
+  const claims: FinishClaim[] = [];
+  for (const e of r.claims) {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    const c = e as Record<string, unknown>;
+    if (typeof c.text !== 'string' || !c.text) return null;
+    const nullable = (v: unknown) => v === null || typeof v === 'string';
+    if (!nullable(c.source) || !nullable(c.retrievedAt) || !nullable(c.type)) return null;
+    claims.push({ text: c.text, source: c.source as string | null, retrievedAt: c.retrievedAt as string | null, type: c.type as string | null });
+  }
+  return { claims, unconfirmed: [...(r.unconfirmed as string[])] };
+}
+
+/** Whether a sealed finish named things it could not confirm. */
+export function hasUnconfirmed(detail: FinishDetail | null): boolean {
+  return !!detail && detail.unconfirmed.length > 0;
 }
 
 export type ProposedReadingHeldReason =
@@ -520,6 +584,8 @@ export interface AgentRunRecord {
   created_at: string;
   cost_usd: number;
   verdict: RunVerdict | null;
+  /** The finish as submitted, typed (claims + unconfirmed); null pre-B1. */
+  finishDetail: FinishDetail | null;
   proposed_readings: ProposedReading[] | null;
   elementTitle: string;
   elementStatus: string | null;
