@@ -38,6 +38,9 @@ export interface MemoryRow {
   source_run_id: string | null;
   source_session_id: string | null;
   supersedes_id: string | null;
+  /** When the once-only conversational promotion offer was made for
+   *  this memory (condition 5); null until then. */
+  promotion_offered_at: string | null;
   pinned: boolean;
   use_count: number;
   last_used_at: string | null;

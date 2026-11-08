@@ -14,9 +14,10 @@ import {
   decideEpisodeWrite, episodeExpiry, fingerprintOf, promotionDue, supersedeTargetFor, topicKeyOf,
   type MemoryCandidate, type MemoryRow, type MemoryScope,
 } from "./memoryStore.ts";
-import { pickBodies, type RankedMemory } from "./memoryRetrieve.ts";
+import { memorySection, pickBodies, type RankedMemory } from "./memoryRetrieve.ts";
+import { promotionOfferCandidate, promotionOfferText } from "./promotion.ts";
 
-const ROW_COLS = "id, layer, kind, status, scope, activity_space_id, user_id, title, gist, body, topic_key, fingerprint, element_id, domain_id, strategy_id, integration_name, origin, created_by, edited_by, source_run_id, source_session_id, supersedes_id, pinned, use_count, last_used_at, expires_at, created_at, updated_at";
+const ROW_COLS = "id, layer, kind, status, scope, activity_space_id, user_id, title, gist, body, topic_key, fingerprint, element_id, domain_id, strategy_id, integration_name, origin, created_by, edited_by, source_run_id, source_session_id, supersedes_id, pinned, use_count, last_used_at, expires_at, created_at, updated_at, promotion_offered_at";
 
 /**
  * Whether automatic capture stands for a scope: the Space's toggle
@@ -37,6 +38,11 @@ export async function captureEnabled(
 }
 
 export interface MemoryContextLoad {
+  /** The rendered memory section for the run's context, and the ids
+   *  whose BODY entered it (exactly those count as used). This composed
+   *  shape is what every call site consumes. */
+  text: string;
+  usedIds: string[];
   /** Active durable rows of the scope (the index's raw material). */
   indexRows: MemoryRow[];
   /** Bodies picked for this work: search hits + the Element's own
@@ -55,6 +61,7 @@ export interface MemoryContextLoad {
 export async function loadMemoryContext(
   db: SupabaseClient,
   args: { query: string; spaceId: string | null; elementId: string | null },
+  admin?: SupabaseClient,
 ): Promise<MemoryContextLoad> {
   const indexQuery = db.from("memories").select(ROW_COLS)
     .eq("layer", "durable").eq("status", "active")
@@ -75,7 +82,31 @@ export async function loadMemoryContext(
   const indexRows = (indexData ?? []) as unknown as MemoryRow[];
   const ranked = (searchData ?? []) as unknown as RankedMemory[];
   const episodes = (episodeData ?? []) as unknown as MemoryRow[];
-  return { indexRows, bodies: pickBodies(ranked, episodes, args.elementId) };
+  const bodies = pickBodies(ranked, episodes, args.elementId);
+  const section = memorySection(indexRows, bodies);
+  let text = section.text;
+  // The promotion path's conversational offer (condition 5, decision
+  // 9): when a durable procedure's body actually enters a conversation,
+  // the offer to make it standing may ride the section — once per
+  // memory, ever. The stamp is the engine's bookkeeping, so it goes
+  // through the service role when the caller provides it; without one,
+  // no offer is made (an offer that cannot be marked is not made at
+  // all — under-offer rather than nag). A memory already promoted is
+  // stamped silently: the question is settled.
+  if (admin) {
+    try {
+      const candidate = promotionOfferCandidate(bodies);
+      if (candidate) {
+        const { data: promoted } = await admin.from("promotion_drafts")
+          .select("id").eq("source_memory_id", candidate.id).eq("status", "active").limit(1);
+        await admin.from("memories")
+          .update({ promotion_offered_at: new Date().toISOString() })
+          .eq("id", candidate.id).is("promotion_offered_at", null);
+        if (!(promoted ?? []).length) text = `${text}\n\n${promotionOfferText(candidate)}`;
+      }
+    } catch { /* the offer is a courtesy; retrieval never fails for it */ }
+  }
+  return { text, usedIds: section.usedIds, indexRows, bodies };
 }
 
 /**

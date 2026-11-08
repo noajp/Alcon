@@ -15,6 +15,9 @@
     "src/AIP/harness/installReturn.ts#serializeInstallSession": "保存ラッパー（saveInstallSession）が使う純粋な変換。壊れた保存値を弾く検証とあわせて tests/harnessInstallReturn.test.ts が直接確かめるために export している",
     "src/AIP/harness/installReturn.ts#parseInstallSession": "取り出しラッパー（takeInstallSession）が使う純粋な検証。serializeInstallSession と対で tests/harnessInstallReturn.test.ts が直接確かめるために export している",
     "src/AIP/connectors/draftModel.ts#canonicalJson": "サーバ側 canonicalJson の twin。同一ファイルの hash 関数が使い、tests/connectorDraft.test.ts がサーバとの一致を検証するために export",
-    "src/AIP/connectors/draftModel.ts#openDraftForName": "同一ファイルの reconcileDraftWeb が使う純粋な合流判定。tests/connectorDraft.test.ts が直接確かめるために export している"
+    "src/AIP/connectors/draftModel.ts#openDraftForName": "同一ファイルの reconcileDraftWeb が使う純粋な合流判定。tests/connectorDraft.test.ts が直接確かめるために export している",
+    "src/AIP/harness/promotionModel.ts#canonicalJson": "サーバ側 canonicalJson の twin。同一ファイルの hash 関数が使い、tests/promotionModel.test.ts がサーバとの一致を検証するために export",
+    "src/AIP/harness/promotionModel.ts#promotionBindingHashWeb": "サーバ側 promotionBindingHash の twin。tests/promotionModel.test.ts がサーバとの一致を検証するために export（画面は構造ハッシュと drift を使う）",
+    "src/AIP/harness/promotionModel.ts#readPromotionBindingWeb": "同一ファイルの draftPackageWeb が使う読み取り。tests/promotionModel.test.ts がサーバとの一致を検証するために export している"
   }
 }

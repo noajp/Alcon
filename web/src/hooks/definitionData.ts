@@ -25,9 +25,11 @@ export interface Definition {
   source_version: number | null;
   /** Off means installed but inert: nothing runs, plans from or offers it. */
   enabled: boolean;
+  /** The promotion draft this definition was born from, if any (condition 5). */
+  promoted_from_draft_id: string | null;
 }
 
-const COLUMNS = 'id, activity_space_id, name, body, created_by, created_at, updated_at, source_id, source_version, enabled';
+const COLUMNS = 'id, activity_space_id, name, body, created_by, created_at, updated_at, source_id, source_version, enabled, promoted_from_draft_id';
 const key = (spaceId: string | null) => ['definitions', spaceId ?? 'none'] as const;
 
 export function useDefinitions(spaceId: string | null) {

@@ -1161,6 +1161,7 @@ export type NotificationKind =
   | 'asset_announced'
   | 'measure_missed'
   | 'heartbeat'
+  | 'promotion'
 
 export interface Notification {
   id: string
@@ -1188,6 +1189,8 @@ export interface Notification {
   agent_run_id?: string | null
   /** The AI-drafted connection an 'approval_requested' notification is about (G4). */
   integration_draft_id?: string | null
+  /** The promotion draft a 'promotion' notification is about. */
+  promotion_draft_id?: string | null
   title: string
   body: string | null
   is_read: boolean
@@ -1237,7 +1240,7 @@ export type AgentRunStatus =
   | 'failed'
   | 'cancelled'
 
-export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot' | 'draft' | 'heartbeat'
+export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot' | 'draft' | 'promote' | 'heartbeat'
 
 export type AgentRunStepType =
   | 'plan'
@@ -1498,6 +1501,95 @@ export interface IntegrationDraft {
   failure_class: string | null
   awaiting_question: string | null
   change_events: DraftChangeEvent[]
+  expires_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type PromotionDraftStatus =
+  | 'drafting' | 'awaiting_input' | 'rehearsing' | 'awaiting_review'
+  | 'active' | 'rejected' | 'expired' | 'failed'
+
+export type PromotionSourceKind = 'memory' | 'run'
+
+export type PromotionFailureClass =
+  | 'definition_invalid' | 'connector_missing' | 'read_failed'
+  | 'write_plan_invalid' | 'unverifiable'
+
+/** The schedule a promoted harness runs on (v1 drafts schedules only). */
+export interface PromotionTrigger {
+  kind: 'schedule'
+  cron: string
+  timezone: string
+}
+
+/** Where a promoted harness's Elements land and what they are called —
+ *  everything outside the definition body that binds it to the board. */
+export interface PromotionBinding {
+  objectId: string | null
+  titleTemplate: string
+  descriptionTemplate: string
+  trigger: PromotionTrigger | null
+}
+
+/** One entry in a promotion draft's material record: what the drafter
+ *  was given and what cleaning did to it (provenance the reviewer sees). */
+export interface PromotionMaterialSource {
+  kind: 'memory' | 'run' | 'element' | 'person'
+  ref: string
+  tainted?: boolean
+  instructionShaped?: boolean
+  note?: string
+}
+
+/** One lifecycle entry on a promotion draft (activation, rollback, the
+ *  unverifiable acknowledgment). */
+export interface PromotionDraftEvent {
+  at: string
+  kind: string
+  by?: string | null
+  note?: string
+}
+
+// A promotion the AI is drafting for this Space: one-off work (a durable
+// procedure memory, or a finished run a person named) on its way to
+// becoming a standing harness. It holds the proposed package (a
+// definition and its binding), the rehearsal's evidence, what exactly
+// was tested (the structure and binding hashes), and the owner's
+// decision. The drafter can create neither a definition nor an
+// Automation — only the owner's activation RPC does, bound to the
+// tested hashes.
+export interface PromotionDraft {
+  id: string
+  activity_space_id: string
+  status: PromotionDraftStatus
+  source_kind: PromotionSourceKind
+  source_memory_id: string | null
+  source_run_id: string | null
+  target_definition_id: string | null
+  requester_id: string | null
+  name: string | null
+  body: string | null
+  binding: PromotionBinding
+  base_definition_hash: string | null
+  tested_structure_hash: string | null
+  tested_binding_hash: string | null
+  draft_run_id: string | null
+  rehearsal_run_id: string | null
+  /** RehearsalReport (AIP/harness/promotionModel.ts reads it). */
+  rehearsal_report: Json | null
+  failure_class: PromotionFailureClass | null
+  awaiting_question: string | null
+  material_sources: PromotionMaterialSource[]
+  activated_definition_id: string | null
+  activated_automation_id: string | null
+  activated_body: string | null
+  activated_structure_hash: string | null
+  activated_binding_hash: string | null
+  decided_by: string | null
+  decided_at: string | null
+  events: PromotionDraftEvent[]
   expires_at: string | null
   created_by: string | null
   created_at: string

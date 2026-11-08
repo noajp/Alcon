@@ -1,6 +1,8 @@
-// The two memory tools every Athena driver shares, defined once here
+// The memory tools every Athena driver shares, defined once here
 // and offered through the one catalog (area "memory"): recall_memory
-// reads, remember writes. Both run with the caller's JWT — RLS decides
+// reads, remember writes, and start_promotion opens the promotion
+// path's drafting (condition 5 — a draft only; nothing is born
+// standing from a conversation). All run with the caller's JWT — RLS decides
 // whose memories a call may see or write, exactly as for every other
 // catalog tool, and neither is governed by the approval modes (memory
 // is Alcon's internal bookkeeping, like writing a step; the person's
@@ -18,6 +20,9 @@ import {
   fingerprintOf, supersedeTargetFor, topicKeyOf, type MemoryCandidate, type MemoryKind, MEMORY_KINDS,
 } from "./memoryStore.ts";
 import { scrubCandidate } from "./memoryScrub.ts";
+import {
+  MAX_OPEN_PROMOTION_DRAFTS_PER_REQUESTER, MAX_OPEN_PROMOTION_DRAFTS_PER_SPACE, PROMOTION_OPEN_STATUSES,
+} from "./promotion.ts";
 
 export const RECALL_TOOL: ToolDef = {
   name: "recall_memory",
@@ -55,7 +60,22 @@ export const REMEMBER_TOOL: ToolDef = {
   },
 };
 
-export const MEMORY_TOOLS: ToolDef[] = [RECALL_TOOL, REMEMBER_TOOL];
+export const START_PROMOTION_TOOL: ToolDef = {
+  name: "start_promotion",
+  description:
+    "durable な手順の記憶を、ハーネスとして定常化するための起草を始める。人が会話で「定常化して」と言葉で望んだときにだけ使う（記憶の文脈に「定常化の提案」が出ているときは、その memoryId を渡す）。" +
+    "作られるのは下書きまでで、定義も自動化も生まれない — 試走（リハーサル）を経て、Space の owner が審査して初めて有効になる。同じ記憶の下書きがすでにあれば、それに合流する。",
+  input_schema: {
+    type: "object",
+    properties: {
+      memoryId: { type: "string", description: "定常化する durable な手順の記憶の id" },
+    },
+    required: ["memoryId"],
+    additionalProperties: false,
+  },
+};
+
+export const MEMORY_TOOLS: ToolDef[] = [RECALL_TOOL, REMEMBER_TOOL, START_PROMOTION_TOOL];
 
 interface MemoryToolRow {
   id: string; title: string; gist: string; body: string; kind: string; layer: string;
@@ -69,6 +89,7 @@ export async function runMemoryTool(
   try {
     if (name === RECALL_TOOL.name) return await recall(db, input);
     if (name === REMEMBER_TOOL.name) return await remember(db, input, actor);
+    if (name === START_PROMOTION_TOOL.name) return await startPromotion(db, input, actor);
     return { ok: false, error: `Unknown tool: ${name}` };
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
@@ -146,4 +167,71 @@ async function remember(db: SupabaseClient, input: Record<string, unknown>, acto
       .eq("id", replaceId).eq("status", "active");
   }
   return { ok: true, data: { id: (made as { id: string }).id, remembered: title, ...(replaceId ? { replaced: replaceId } : {}) } };
+}
+
+/**
+ * The promotion path's conversational door (condition 5): the person
+ * said "make it standing", so a draft and its drafting run are born —
+ * nothing more. The run's start is the driver's act (it holds the
+ * person's JWT): this tool returns the run id as `promotionRunId`, and
+ * the conversation drivers start it the way they record a recall's
+ * uses. Reconcile rule 1 applies here as everywhere: an open draft for
+ * the same memory is joined, never duplicated.
+ */
+async function startPromotion(db: SupabaseClient, input: Record<string, unknown>, actor: BoardActor): Promise<ToolResult> {
+  if (!actor.userId) return { ok: false, error: "誰の求めか分からないため起草を始められません。" };
+  const memoryId = typeof input.memoryId === "string" && input.memoryId.trim() ? input.memoryId.trim() : null;
+  if (!memoryId) return { ok: false, error: "memoryId が必要です。" };
+  const { data: mem, error } = await db.from("memories")
+    .select("id, title, layer, kind, status, activity_space_id")
+    .eq("id", memoryId).maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!mem) return { ok: false, error: "その記憶は見つかりませんでした。" };
+  const m = mem as { id: string; title: string; layer: string; kind: string; status: string; activity_space_id: string | null };
+  if (m.layer !== "durable" || m.kind !== "procedure" || m.status !== "active") {
+    return { ok: false, error: "定常化の対象は、active な durable の手順だけです。" };
+  }
+  if (!m.activity_space_id) {
+    return { ok: false, error: "個人の記憶は、そのままでは定常化できません。先に Memory の設定から Space に共有してください。" };
+  }
+  const spaceId = m.activity_space_id;
+  const openFor = async () => {
+    const { data } = await db.from("promotion_drafts").select("id")
+      .eq("source_memory_id", m.id).in("status", [...PROMOTION_OPEN_STATUSES]).limit(1);
+    return ((data ?? []) as { id: string }[])[0] ?? null;
+  };
+  const existing = await openFor();
+  if (existing) return { ok: true, data: { draftId: existing.id, alreadyDrafting: true, memoryTitle: m.title } };
+  const { data: spaceOpen } = await db.from("promotion_drafts").select("id")
+    .eq("activity_space_id", spaceId).in("status", [...PROMOTION_OPEN_STATUSES])
+    .limit(MAX_OPEN_PROMOTION_DRAFTS_PER_SPACE + 1);
+  if ((spaceOpen ?? []).length >= MAX_OPEN_PROMOTION_DRAFTS_PER_SPACE) {
+    return { ok: false, error: "この Space の昇格ドラフトが上限に達しています。どれか決着してからにしてください。" };
+  }
+  const { data: mineOpen } = await db.from("promotion_drafts").select("id")
+    .eq("requester_id", actor.userId).in("status", [...PROMOTION_OPEN_STATUSES])
+    .limit(MAX_OPEN_PROMOTION_DRAFTS_PER_REQUESTER + 1);
+  if ((mineOpen ?? []).length >= MAX_OPEN_PROMOTION_DRAFTS_PER_REQUESTER) {
+    return { ok: false, error: "あなたの昇格ドラフトが上限に達しています。どれか決着してからにしてください。" };
+  }
+  const { data: draft, error: draftError } = await db.from("promotion_drafts").insert({
+    activity_space_id: spaceId, source_kind: "memory", source_memory_id: m.id,
+    status: "drafting", created_by: actor.userId, requester_id: actor.userId,
+  }).select("id").single();
+  if (draftError || !draft) {
+    // A unique-index race means someone else's click won: join theirs.
+    const joined = await openFor();
+    if (joined) return { ok: true, data: { draftId: joined.id, alreadyDrafting: true, memoryTitle: m.title } };
+    return { ok: false, error: draftError?.message ?? "下書きを作れませんでした。" };
+  }
+  const draftId = (draft as { id: string }).id;
+  const { data: run, error: runError } = await db.from("agent_runs").insert({
+    promotion_draft_id: draftId, activity_space_id: spaceId,
+    triggered_by: actor.userId, triggered_from: "conversation", mode: "promote", status: "queued",
+  }).select("id").single();
+  if (runError || !run) return { ok: false, error: runError?.message ?? "起草の実行を作れませんでした。" };
+  return {
+    ok: true,
+    data: { draftId, promotionRunId: (run as { id: string }).id, memoryTitle: m.title },
+  };
 }

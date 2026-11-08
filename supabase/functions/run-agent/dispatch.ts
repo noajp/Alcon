@@ -12,23 +12,25 @@ export interface RunSubject {
   strategy_id: string | null;
   ai_session_id: string | null;
   integration_draft_id?: string | null;
+  promotion_draft_id?: string | null;
   mode: string;
 }
 
 /**
  * One driver per subject: an Element's work, a Strategy conversation, a
- * Copilot chat, a connection draft. A run with no subject cannot exist
- * (the subject check sees to that); it would fall to execute, which
- * refuses it for having no Element. The one run with no subject column
- * at all is the heartbeat: its subject is the Space itself, carried in
- * activity_space_id, and its mode is its marker.
+ * Copilot chat, a connection draft, a promotion draft. A run with no
+ * subject cannot exist (the subject check sees to that); it would fall
+ * to execute, which refuses it for having no Element. The one run with
+ * no subject column at all is the heartbeat: its subject is the Space
+ * itself, carried in activity_space_id, and its mode is its marker.
  */
-export type DriverKind = "execute" | "converse" | "chat" | "draft" | "heartbeat";
+export type DriverKind = "execute" | "converse" | "chat" | "draft" | "promote" | "heartbeat";
 
 export function driverForRun(run: RunSubject): DriverKind {
   if (run.element_id) return "execute";
   if (run.strategy_id) return "converse";
   if (run.integration_draft_id) return "draft";
+  if (run.promotion_draft_id) return "promote";
   if (run.ai_session_id || run.mode === "copilot") return "chat";
   if (run.mode === "heartbeat") return "heartbeat";
   return "execute";
@@ -52,10 +54,11 @@ export function entryForBody(body: {
 
 /** Pure. A person's words may be posted to a conversation — a Strategy's,
  *  the Copilot's chat, or a draft (the answer to its question, or "fix
- *  this" after a test) — never to a work run, whose words are its
- *  Element's record. */
+ *  this" after a test), whether the draft is drafting a connection or a
+ *  promotion — never to a work run, whose words are its Element's
+ *  record. */
 export function messageAllowed(driver: DriverKind): boolean {
-  return driver === "converse" || driver === "chat" || driver === "draft";
+  return driver === "converse" || driver === "chat" || driver === "draft" || driver === "promote";
 }
 
 export interface ClaimRule {
