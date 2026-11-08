@@ -1,15 +1,15 @@
 // What the Copilot's kept conversation (ai_sessions.messages) and its
-// approvals share between the two writers that touch them: alcon-copilot,
-// which starts a turn and persists the approval it stops for, and
-// run-agent's resume driver, which answers the paused turn once the person
-// decides and appends what the turn went on to say. Pure — no I/O, so the
-// shapes are pinned by tests.
+// approvals share: the shapes Athena's chat driver writes as it drives a
+// turn — appending the person's message, persisting the approval it
+// stops for, answering the paused turn once the person decides — and
+// the automations tick reads when an approval lapses. Pure — no I/O,
+// so the shapes are pinned by tests.
 //
 // The roles are fixed (the parity design): the display's truth is
-// ai_sessions.messages, the model's context is the anchor run's
+// ai_sessions.messages, the model's context is the session run's
 // transcript, the audit trail is the run's steps.
 
-import type { ToolResult } from "./agentLoop.ts";
+import type { Msg, ToolResult } from "./agentLoop.ts";
 
 /** How long a Copilot approval waits for its person before it lapses.
  *  An Element's approval waits as long as it takes — it blocks one task.
@@ -49,7 +49,7 @@ export interface PanelApproval {
   calls: unknown[];
   inputHash: string;
   status: string;
-  /** The anchor run and action a persisted approval is decided through;
+  /** The session's run and action a persisted approval is decided through;
    *  absent on a card kept before approvals were persisted. */
   runId?: string;
   actionId?: string;
@@ -98,4 +98,32 @@ export function resumedAssistantMessage(args: {
     ...(args.toolEvents?.length ? { toolEvents: args.toolEvents } : {}),
     ...(args.approval ? { approvals: [args.approval] } : {}),
   };
+}
+
+/**
+ * Pure. A transcript seeded from the kept conversation, for a session
+ * whose run carries none yet (kept before the chat driver, or whose
+ * run never rested a transcript). The panel's messages map the way
+ * the panel itself used to send them: the person's turns as text, the
+ * assistant's as a text block. Tool steps are not reconstructed — the
+ * kept conversation holds their results, not their call ids — so a
+ * seeded context is words only, exactly what the model saw when the
+ * panel still carried the history. A transcript opens with the person:
+ * leading assistant turns (an answer kept without its question) drop.
+ */
+export function seedMessagesFromPanel(messages: PanelMessage[]): Msg[] {
+  const seeded: Msg[] = [];
+  for (const m of messages) {
+    if (m.role === "user") {
+      const names = (Array.isArray(m.attachments) ? m.attachments : [])
+        .map((f) => (f as { name?: unknown } | null)?.name)
+        .filter((n): n is string => typeof n === "string" && !!n);
+      const text = m.content || (names.length ? `添付ファイル: ${names.join("、")}` : "");
+      if (text) seeded.push({ role: "user", content: text });
+    } else if (m.role === "assistant") {
+      if (m.content?.trim()) seeded.push({ role: "assistant", content: [{ type: "text", text: m.content }] });
+    }
+  }
+  while (seeded.length && seeded[0].role === "assistant") seeded.shift();
+  return seeded;
 }

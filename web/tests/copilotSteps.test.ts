@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest';
+import { liveTurnFromSteps, type CopilotStepRow } from '@/AIP/ai/copilotSteps';
+import { toKeptMessages, type CopilotMessage } from '@/AIP/ai/useAlconCopilot';
+
+// The panel's live turn, mapped from a chat run's steps while Athena
+// works (copilotSteps.ts), and the kept shape a cut-back writes
+// (useAlconCopilot.ts) — the client half of the unification's display
+// contract.
+const step = (type: string, title: string, detail: string | null = null): CopilotStepRow => ({ type, title, detail });
+
+describe('liveTurnFromSteps', () => {
+  it('reads only the turn after the latest message', () => {
+    const live = liveTurnFromSteps([
+      step('message', '前の質問', '前の質問'),
+      step('reply', '前の答え', '前の答え'),
+      step('message', '今の質問', '今の質問'),
+      step('draft', '応答を書いています', '育っている答え'),
+    ]);
+    expect(live.content).toBe('育っている答え');
+    expect(live.toolEvents).toEqual([]);
+  });
+
+  it('joins finished stretches and the growing draft', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('reply', 'まず調べます', 'まず調べます'),
+      step('draft', '応答を書いています', '結果は…'),
+    ]);
+    expect(live.content).toBe('まず調べます\n\n結果は…');
+  });
+
+  it('maps tool steps to events with their input and outcome', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('action', 'listElements', JSON.stringify({ input: { status: 'todo' }, rows: 12 })),
+      step('write', 'updateElement', JSON.stringify({ input: { id: 'e1' } })),
+      step('error', 'ext__send', JSON.stringify({ input: { to: 'a@example.com' }, error: '認証が必要です' })),
+    ]);
+    expect(live.toolEvents).toEqual([
+      { name: 'listElements', input: { status: 'todo' }, result: { ok: true, rows: 12 } },
+      { name: 'updateElement', input: { id: 'e1' }, result: { ok: true } },
+      { name: 'ext__send', input: { to: 'a@example.com' }, result: { ok: false, error: '認証が必要です' } },
+    ]);
+  });
+
+  it('a step whose detail is not the driver’s JSON still shows', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('error', 'readFile', 'ファイルが見つかりません'),
+      step('action', 'listFiles', null),
+      step('status', '停止しました'),
+      step('approval', '承認待ち'),
+    ]);
+    expect(live.toolEvents).toEqual([
+      { name: 'readFile', result: { ok: false, error: 'ファイルが見つかりません' } },
+      { name: 'listFiles', result: { ok: true } },
+    ]);
+    expect(live.content).toBe('');
+  });
+
+  it('no steps yet reads as an empty turn', () => {
+    expect(liveTurnFromSteps([])).toEqual({ content: '', toolEvents: [] });
+  });
+});
+
+describe('toKeptMessages', () => {
+  it('keeps the record and drops the panel’s bookkeeping and file contents', () => {
+    const shown: CopilotMessage[] = [
+      { role: 'user', content: '読んで', at: 123, attachments: [{ name: '請求書.pdf', mediaType: 'application/pdf', data: 'QUJD' }] },
+      {
+        role: 'assistant', content: '読みました', done: true, at: 124,
+        toolEvents: [{ name: 'readFile', result: { ok: true } }],
+        approvals: [{ calls: [], inputHash: 'h', status: 'pending', runId: 'r', actionId: 'a' }],
+      },
+      { role: 'assistant', content: '', done: false },
+    ];
+    expect(toKeptMessages(shown)).toEqual([
+      { role: 'user', content: '読んで', attachments: [{ name: '請求書.pdf', mediaType: 'application/pdf' }] },
+      {
+        role: 'assistant', content: '読みました',
+        toolEvents: [{ name: 'readFile', result: { ok: true } }],
+        approvals: [{ calls: [], inputHash: 'h', status: 'pending', runId: 'r', actionId: 'a' }],
+      },
+      { role: 'assistant', content: '' },
+    ]);
+  });
+});

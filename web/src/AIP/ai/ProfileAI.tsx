@@ -9,11 +9,13 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export function ProfileAI({ activeDomainId }: { activeDomainId?: string | null }) {
   const { t } = useI18n();
-  const { messages, streaming, error, send, cancel, reset } = useAlconCopilot();
+  const { messages, streaming, error, send, cancel, detach, reset } = useAlconCopilot();
   const [input, setInput] = useState('');
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => { list.current?.scrollTo({ top: list.current.scrollHeight }); }, [messages]);
-  useEffect(() => cancel, [cancel]);
+  // Leaving the screen stops following the turn, not the turn itself:
+  // it finishes on its run and lands in the kept conversation.
+  useEffect(() => detach, [detach]);
   const submit = () => {
     if (!input.trim() || streaming) return;
     void send(input, { context: { domainId: activeDomainId ?? undefined, viewLabel: 'Profile' } });

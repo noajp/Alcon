@@ -146,14 +146,14 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
  * A Copilot approval left undecided past its expiry lapses: the action is
  * expired (claimed atomically, so two ticks never seal it twice), the
  * paused turn is answered with the expiry — its transcript stays sendable
- * for the person's next message — the anchor rests, the kept card is
+ * for the person's next message — the run rests, the kept card is
  * marked, and the starter is told. Only a Copilot session's approvals
  * carry an expiry; an Element's approval blocks one task and waits.
  */
 async function expireCopilotApproval(env: Env, actionId: string, runId: string): Promise<boolean> {
   const { data: run } = await env.admin.from("agent_runs").select("id, mode, ai_session_id, triggered_by, transcript")
     .eq("id", runId).maybeSingle();
-  // A Copilot anchor — its conversation may have been deleted since
+  // A Copilot session's run — its conversation may have been deleted since
   // (the run stays, unlinked); its approval lapses all the same.
   if (!run || (!run.ai_session_id && run.mode !== "copilot")) return false;
   const { data: claimed } = await env.admin.from("agent_actions").update({ status: "expired" })

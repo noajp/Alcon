@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-// The Copilot anchor's shared pieces: the kept conversation's shapes
-// (copilotSession.ts, pure) and the decision path both drivers share
-// (run-agent/decision.ts, exercised against a fake service-role client).
+// The Copilot session's shared pieces: the kept conversation's shapes
+// (copilotSession.ts, pure) and the decision path Athena's chat driver
+// shares with the Element paths (run-agent/decision.ts, exercised
+// against a fake service-role client).
 const session = await import(new URL('../../supabase/functions/_shared/copilotSession.ts', import.meta.url).pathname);
 const decision = await import(new URL('../../supabase/functions/run-agent/decision.ts', import.meta.url).pathname);
 const anchorMod = await import(new URL('../../supabase/functions/_shared/copilotAnchor.ts', import.meta.url).pathname);
 const turnMod = await import(new URL('../../supabase/functions/_shared/copilotTurn.ts', import.meta.url).pathname);
 
-describe('copilot turn assembly (shared by the panel and the resume driver)', () => {
+describe("copilot turn assembly (Athena's chat driver)", () => {
   it('builds the prompt with the context hint and no toolset outside a Space', async () => {
     const turn = await turnMod.buildCopilotTurn({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

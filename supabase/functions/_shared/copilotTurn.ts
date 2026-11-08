@@ -1,13 +1,11 @@
-// One Copilot turn's assembly, shared by the two places that drive it:
-// alcon-copilot (the panel's streaming request) and run-agent's resume
-// driver (the turn an approval paused, continued once its person decides).
-// The system prompt, the context block, the toolset — Alcon's own tools
-// from the one catalog under the panel's policy, plus the current Space's
-// connected integrations from _shared/integrationTools.ts — and the loop's
-// kind / approval / execute adapters are built here once, so a manifest
-// and the approval policy mean the same thing however the turn is driven.
-// What differs stays with the caller: how the model is called (streamed
-// or not), and what happens to the outcome.
+// One Copilot turn's assembly, for Athena's chat driver in run-agent —
+// the one place a panel turn is driven. The system prompt, the context
+// block, the toolset — Alcon's own tools from the one catalog under the
+// panel's policy, plus the current Space's connected integrations from
+// _shared/integrationTools.ts — and the loop's kind / approval / execute
+// adapters are built here once, so a manifest and the approval policy
+// mean one thing. What the assembly does not decide stays with the
+// driver: how the model is called, and what happens to the outcome.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { BoardActor } from "./boardTools.ts";
@@ -81,6 +79,23 @@ export interface CopilotTurn {
   kindOf(name: string): ToolKind;
   needsApproval(call: ToolCall): boolean;
   execute(call: ToolCall): Promise<{ content: string; is_error?: boolean }>;
+}
+
+/**
+ * Pure. The context a chat turn runs under. The newest context the
+ * client sent with its message wins whole — it is a snapshot of where
+ * the person is, not a patch. A decision or a continuation carries
+ * none, so the context the transcript kept stands. A context naming no
+ * Space falls back to the run's own (its session's), the assumption the
+ * chat driver always made.
+ */
+export function foldCopilotContext(
+  kept: CopilotContextLike | undefined,
+  incoming: CopilotContextLike | undefined,
+  runSpaceId: string | null | undefined,
+): CopilotContextLike {
+  const base = incoming ?? kept ?? {};
+  return base.spaceId || !runSpaceId ? base : { ...base, spaceId: runSpaceId };
 }
 
 /** Pure. The context block a Copilot turn opens with: where the person is. */
