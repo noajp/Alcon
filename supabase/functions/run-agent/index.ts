@@ -99,10 +99,15 @@ import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { offeredCommands, parseManifest, requestFor, ruleFromCalls, withRule, type Manifest } from "../_shared/connectorManifest.ts";
 import {
-  approvalModeOf, liftOf, verdictWithAutonomy, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
+  approvalModeOf, approvalVerdict, liftOf, verdictWithAutonomy, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
 } from "../_shared/approvalPolicy.ts";
 import { grantFactFor, loadAutonomyGrantFacts, revokeAutonomyForIncident } from "../_shared/autonomy.ts";
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
+import {
+  capturePlanExpected, checkPlanDrift, expectedNote, matchPlanCall, planApplyNotice, planCallKey, planHashOf,
+  PLAN_TASK_NOTICE, readPlanCalls, readRunPlan, recordPlanApproval, settlePlanApproval,
+  type PlanCall, type PlanExpectedEffect, type RunPlan,
+} from "../_shared/planMode.ts";
 import { buildRunVerdict, parseRunVerdict, type RunVerdict, type VerdictInputs } from "../_shared/runVerdict.ts";
 import {
   correctionEnvelopeOf, correctionExhaustedSignals, elementInputsCanonical, formatCorrectionEnvelope,
@@ -219,12 +224,24 @@ type Transcript = {
   /** The definition a rehearsal run is trying, carried here rather
    *  than in a definitions row: nothing is born before activation. */
   rehearsalDefinition?: { name: string; body: string };
+  /** A plan run's accumulating plan (B8): every intended write with its
+   *  exact arguments, recorded while the run walks the work. */
+  planDraft?: PlanCall[];
+  /** The plan this run sealed (a plan run) — the whole ordered sequence
+   *  the person is asked to approve as ONE unit, bound by its hash. */
+  plan?: RunPlan;
+  /** The plan this run is applying (an apply run): the approved plan,
+   *  copied over on approval; consumption is marked on it as covered
+   *  calls execute. */
+  approvedPlan?: RunPlan;
 };
 type Run = {
   id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; promotion_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
   /** A run trying a definition with its writes blocked (the rehearsal substrate). */
   rehearsal: boolean;
+  /** A plan run (B8): writes recorded as a plan instead of executed. */
+  plan_mode: boolean;
   transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
   continuation_count: number; continuation_token: string | null;
@@ -329,13 +346,18 @@ Deno.serve(async (req: Request) => {
   if (run.triggered_by !== user.id) return json({ error: "この実行を動かせるのは、実行を始めた人だけです。" }, 403);
 
   // A decision is checked before the run is touched: a stale or mismatched
-  // decision is refused and the run keeps waiting for the right one.
+  // decision is refused and the run keeps waiting for the right one. The
+  // calls the decision is about live in the transcript: a parked batch
+  // (pending) normally — or, for a plan run (B8), the sealed plan itself,
+  // whose calls' hash must equal the approval unit's input_hash.
   if (body.decision) {
     const d = body.decision;
     const { data: action } = await admin.from("agent_actions").select("id, status, input_hash").eq("id", d.actionId ?? "").eq("run_id", runId).maybeSingle();
-    if (!action || action.status !== "pending" || !run.transcript?.pending) return json({ error: "この承認依頼はもう処理されています。" }, 409);
+    const plan = readRunPlan(run.transcript?.plan);
+    const decidedCalls = run.transcript?.pending?.calls ?? (plan ? plan.calls.map((p) => p.call) : undefined);
+    if (!action || action.status !== "pending" || !decidedCalls) return json({ error: "この承認依頼はもう処理されています。" }, 409);
     // Bound to what is about to run, not only to what the row says.
-    const runningHash = await sha256(canonicalCalls(run.transcript.pending.calls));
+    const runningHash = await sha256(canonicalCalls(decidedCalls));
     if (d.inputHash !== action.input_hash || runningHash !== action.input_hash) return json({ error: "承認の内容が提示したものと一致しません。画面を更新してやり直してください。" }, 409);
   }
 
@@ -537,6 +559,14 @@ async function execute(a: ExecArgs): Promise<void> {
   stepBase.delete(a.run.id);
   stepNext.delete(a.run.id);
   const { run, admin, userDb, user } = a;
+
+  // A decision on a sealed plan (B8) is not a loop turn: approval starts the
+  // apply run, rejection ends the matter with the plan preserved. serve()
+  // has already verified the decision against the plan's hash.
+  if (run.plan_mode && a.body.decision && readRunPlan(run.transcript?.plan)) {
+    await decidePlan(a);
+    return;
+  }
 
   // ── Agent profile ───────────────────────────────────────────────────────
   // An AI Worker's profile (its instructions above all) loads only when that
@@ -1607,11 +1637,136 @@ async function execute(a: ExecArgs): Promise<void> {
     return await executeCall(call);
   };
 
+  // ── B8: a plan run's gate ──────────────────────────────────────────────
+  // The rehearsal gate's recording sibling. Reads run live; every intended
+  // write is recorded as a PlanCall with its exact arguments and the display
+  // the approval machinery would show for it, and nothing is executed. The
+  // differences from a rehearsal are the point of the piece: the record
+  // keeps the ARGUMENTS (the plan is approvable as one unit), a call policy
+  // would deny is marked denied at plan time (an approval cannot cover
+  // it), a verify-declared write captures its expected post-state and its
+  // pre-state baseline for the apply run's drift check, and runner actions
+  // that would change the person's browser (open / click / type / back)
+  // are planned rather than performed — a dry run does not drive the real
+  // browser; pc_read still reads live.
+  const planGate = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; finish?: FinishPayload }> => {
+    const planDisplay = (problem: string | null, denied: boolean, expected: PlanExpectedEffect | null): ApprovalDisplay => {
+      const d = approvalDisplayFor(call);
+      const fields = [...d.fields];
+      if (expected) fields.push({ label: "読み戻し確認", value: expectedNote(expected) });
+      if (denied) fields.push({ label: "ポリシー", value: "この引数では拒否されています。承認しても実行されません" });
+      if (problem) fields.push({ label: "組み立て", value: problem });
+      // A plan is approved as a whole; a per-call "remember" has no meaning.
+      return { ...d, fields, rememberable: false };
+    };
+    const record = async (label: string, opts: {
+      problem?: string | null; denied?: boolean; expected?: PlanExpectedEffect | null;
+      critical?: PlanCall["critical"]; display?: ApprovalDisplay;
+    } = {}): Promise<{ content: string }> => {
+      const problem = opts.problem ?? null;
+      const denied = opts.denied === true;
+      const entry: PlanCall = {
+        call, key: await planCallKey(call), label,
+        display: opts.display ?? planDisplay(problem, denied, opts.expected ?? null),
+        critical: opts.critical ?? null, denied, problem,
+        expected: opts.expected ?? null,
+      };
+      planDraft.push(entry);
+      await addStep(admin, run.id, "plan", `計画: 書き込み — ${label}`,
+        denied ? "ポリシーで拒否される引数のため、承認しても実行されません。計画に記録しました（実行はしません）。"
+          : problem ? `組み立てに問題があります: ${problem}（計画に記録しました。実行はしません）`
+          : "実行はしません。計画に記録しました。");
+      return {
+        content: denied ? "計画のため、この書き込みは実行しません。なお、この引数ではポリシーで拒否されるため、承認されても実行されません。"
+          : problem ? `計画のため、この書き込みは実行しません。なお組み立てに問題があります: ${problem}`
+          : "計画のため、この書き込みは実行しません。計画に記録しました。手順を続けてください。",
+      };
+    };
+    switch (call.name) {
+      case "record_plan": case "log_progress": case "record_round": case "finish": case "save_artifact":
+        return await executeCall(call);
+      case "read_records": return await executeCall(call);
+    }
+    if (call.name === "save_records") {
+      const problem = !recordScope
+        ? "この Element は Strategy に属していないので、表は使えません"
+        : typeof call.input.table !== "string" || !call.input.table
+          || typeof call.input.key !== "string" || !call.input.key
+          || !Array.isArray(call.input.records)
+          ? "table / key / records の形が要ります"
+          : null;
+      return await record(`表に保存: ${String(call.input.table ?? "")}`, { problem });
+    }
+    if (call.name === "complete_subelement") {
+      const ok = subelementIds.has(String(call.input.subelement_id ?? ""));
+      return await record("サブ要素を完了", { problem: ok ? null : "この Element のサブ要素ではありません" });
+    }
+    if (call.name === SIGN_IN_TOOL) {
+      const resolved = runner && run.activity_space_id ? await resolveSignInTarget(call).catch(() => null) : null;
+      return await record("PC: サインイン", {
+        display: resolved ? { ...signInDisplayFor(call, resolved.target), rememberable: false } : undefined,
+      });
+    }
+    if (isRunnerTool(call.name)) {
+      if (call.name === "pc_read") return await executeCall(call);
+      return await record(`PC: ${runnerOperation(call.name)}`, {});
+    }
+    if (isMachineTool(call.name)) {
+      if (call.name === "vm_read_file") return await executeCall(call);
+      return await record(call.name === "vm_write_file" ? `ファイルに書く: ${String(call.input.path ?? "")}` : "コマンドを実行", {});
+    }
+    const pit = integrationTools.get(call.name);
+    if (pit) {
+      const label = `${pit.integration.name}: ${operationOf(pit, call.input)}`;
+      if (integrationCallIsRead(pit, call)) return await executeCall(call);
+      let problem: string | null = null;
+      if (pit.command) {
+        const req = requestFor(pit.command, call.input);
+        if ("error" in req) problem = req.error;
+      } else if (pit.remote) {
+        const def = tools.find((t) => t.name === call.name);
+        const required = ((def?.input_schema as { required?: unknown } | undefined)?.required ?? []) as string[];
+        const missing = required.filter((f) => call.input[f] === undefined || call.input[f] === null || call.input[f] === "");
+        if (missing.length) problem = `${missing.join("、")} が必要です`;
+      }
+      // Denied at plan time, on the policy's own verdict — the mode never
+      // enters it: the plan approval is the consent being gathered, and a
+      // denied call is shown as uncoverable rather than silently dropped.
+      const denied = approvalVerdict(integrationApprovalFacts(pit, call, true)) === "deny";
+      const expected = !problem && pit.command?.verify ? await capturePlanExpected(pit, call) : null;
+      return await record(label, { problem, denied, expected, critical: criticalOfTool(pit) });
+    }
+    if (isCatalogTool(call.name)) {
+      const tool = catalogTool(call.name)!;
+      const label = `Alcon: ${catalogOperation(call.name, call.input)}`;
+      if (effectOfCall(tool, call.input) === "read") return await executeCall(call);
+      const decision = decideCall("element", tool, call.input);
+      return await record(label, {
+        problem: decision === "deny" ? catalogDenyRefusal(call.name, call.input) : null,
+        denied: decision === "deny",
+      });
+    }
+    return await executeCall(call);
+  };
+
   // The measures this run may report readings for: those of the Strategies
   // its Element serves — the same set the verifier judges the finish
   // against. Loaded once: the task context lists them for the agent, and
   // finishRun gates the finish's proposals by them.
   const boundMeasures = await loadBoundMeasures(userDb, run.element_id);
+
+  // B8 plan mode, both sides of the approval. A plan run accumulates its
+  // plan here (the draft rides the transcript across slices, like the
+  // rehearsal report); an apply run carries the approved plan it is
+  // executing under, with consumption marked on the entries as covered
+  // calls execute — also transcript-riding, so a slice boundary never
+  // re-spends an approval on the same entry twice. Declared before the
+  // run's state: the opening text already speaks of the plan.
+  const planRun = run.plan_mode === true;
+  const planDraft: PlanCall[] = planRun ? readPlanCalls(run.transcript?.planDraft) : [];
+  const approvedPlan: RunPlan | null = !planRun ? readRunPlan(run.transcript?.approvedPlan) : null;
+  const planMatches = new Map<string, PlanCall>();
+  let sealedPlan: RunPlan | null = null;
 
   // ── State ───────────────────────────────────────────────────────────────
   const deadline = Date.now() + SLICE_MS;
@@ -1649,7 +1804,11 @@ async function execute(a: ExecArgs): Promise<void> {
         : `# Strategy の定義「${definition.name}」（この Strategy 全体の方針。依頼した人が定めたもので、従う。成果物の型とループはこの Element には課されない）\n${effectiveBody.slice(0, 40_000)}`
       : null;
     const opening = defText ? `${task}\n\n${defText}` : task;
-    state = { messages: [{ role: "user", content: run.rehearsal ? `${opening}\n\n${REHEARSAL_TASK_NOTICE}` : opening }], turns: 0, nudges: 0 };
+    const openingText = run.rehearsal ? `${opening}\n\n${REHEARSAL_TASK_NOTICE}`
+      : planRun ? `${opening}\n\n${PLAN_TASK_NOTICE}`
+      : approvedPlan ? `${opening}\n\n${planApplyNotice(approvedPlan)}`
+      : opening;
+    state = { messages: [{ role: "user", content: openingText }], turns: 0, nudges: 0 };
     turnBudget = maxTotalTurns;
     await addStep(admin, run.id, "status", run.mode === "reply" ? "依頼を受けて実行を開始" : "任務の実行を開始", `${agentName} / ${config.modelLabel}${config.routedBy ? `（重さ: ${WEIGHT_LABEL[config.routedBy]}）` : ""}`);
   }
@@ -1677,6 +1836,9 @@ async function execute(a: ExecArgs): Promise<void> {
         rehearsal: rehearsalReport,
         ...(run.transcript?.rehearsalDefinition ? { rehearsalDefinition: run.transcript.rehearsalDefinition } : {}),
       } : {}),
+      // The sealed plan supersedes the draft that produced it.
+      ...(planRun ? (sealedPlan ? { plan: sealedPlan } : { planDraft }) : {}),
+      ...(approvedPlan ? { approvedPlan } : {}),
     };
     // jsonb refuses NUL; tool output can carry it.
     const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
@@ -1891,6 +2053,27 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   };
 
+  // B8: plan coverage at apply time. A call is covered when its canonical
+  // argument key matches an unconsumed, coverable entry of the approved
+  // plan — and, for every call but a sign-in, policy's own verdict is not
+  // deny (a denied call is never covered, whatever the plan says: the
+  // plan gate already marked it, and this is the second wall). The claim
+  // happens in the gate (needsApproval), before anything in the turn
+  // executes, and consumption is marked on the plan itself, which
+  // saveTranscript persists — so across slices an entry covers exactly
+  // one execution. A call whose arguments drifted from the plan simply
+  // finds no entry and asks on its own.
+  const claimPlanCover = async (call: ToolCall): Promise<PlanCall | null> => {
+    if (!approvedPlan) return null;
+    if (call.name !== SIGN_IN_TOOL && verdictForCall(call).base === "deny") return null;
+    const key = await planCallKey(call);
+    const entry = matchPlanCall(approvedPlan, key);
+    if (!entry) return null;
+    entry.consumed = true;
+    planMatches.set(call.id, entry);
+    return entry;
+  };
+
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
       if (external) {
@@ -1938,9 +2121,13 @@ async function execute(a: ExecArgs): Promise<void> {
     },
     kindOf,
     // A rehearsal never asks: its writes are blocked, not approved, so
-    // nothing waits for a person mid-trial.
+    // nothing waits for a person mid-trial. A plan run never asks either:
+    // its writes are recorded, not approved, and the plan as a whole is
+    // the approval the person gives. An apply run asks for anything the
+    // approved plan does not cover (claimPlanCover).
     needsApproval: async (call) => {
-      if (run.rehearsal) return false;
+      if (run.rehearsal || planRun) return false;
+      if (approvedPlan && (await claimPlanCover(call))) return false;
       if (call.name === SIGN_IN_TOOL) {
         // D6: only the ask mode ever holds a sign-in, and only a
         // stored credential's first-ever use. The verdict machinery's
@@ -1965,6 +2152,44 @@ async function execute(a: ExecArgs): Promise<void> {
       // a rehearsal run can only ever read, plan, or keep the run's own
       // books — the approval composition below is never reached.
       if (run.rehearsal) return await rehearsalGate(call);
+      // The plan gate, likewise: a plan run's writes are recorded, never
+      // executed, and the approval composition is never reached.
+      if (planRun) return await planGate(call);
+      // B8: a call the approved plan covers. Its premise is re-checked
+      // first where the plan recorded one: the verify pre-state is
+      // re-read, and a drifted premise fails the call closed with the
+      // diff on the record — the plan was approved against the state it
+      // saw. The execution itself is recorded as a plan approval (the
+      // policy-approval discipline: the only code that lifts an ask
+      // writes its row first), settled with the call's outcome.
+      const covered = planMatches.get(call.id);
+      if (covered) {
+        const cit = integrationTools.get(call.name);
+        if (cit && covered.expected) {
+          const drift = await checkPlanDrift(cit, call, covered.expected);
+          if (drift && drift.length) {
+            const text = `計画の前提が変わっています（${verifyDiffText(drift)}）。計画は計画時の状態に対して承認されたため、この呼び出しは実行しません。現在の状態を確認し、必要なら計画を立て直してください。`;
+            const driftActionId = await recordPlanApproval(admin, {
+              runId: run.id, elementId: run.element_id, call, display: covered.display,
+              planActionId: approvedPlan?.actionId ?? null,
+              integrationId: cit.integration.id, decidedBy: run.triggered_by,
+            });
+            if (driftActionId) await settlePlanApproval(admin, driftActionId, false, { drift });
+            await addStep(admin, run.id, "approval", `計画の前提が変化: ${covered.label}`, text);
+            return { content: text, is_error: true };
+          }
+        }
+        const planActionId = await recordPlanApproval(admin, {
+          runId: run.id, elementId: run.element_id, call, display: covered.display,
+          planActionId: approvedPlan?.actionId ?? null,
+          integrationId: cit?.integration.id ?? null, decidedBy: run.triggered_by,
+        });
+        await addStep(admin, run.id, "approval", `計画により自動実行: ${covered.label}`,
+          "承認済みの計画に挙がった呼び出し（引数が一致）のため、承認を求めずに実行しました。");
+        const r = await executeCall(call);
+        if (planActionId) await settlePlanApproval(admin, planActionId, !r.is_error, { verify: r.verify });
+        return r;
+      }
       const v = verdicts.get(call.id);
       // A deny verdict is refused here, by the policy itself: the call is
       // never dispatched, so no executor path can grow around the
@@ -2034,9 +2259,9 @@ async function execute(a: ExecArgs): Promise<void> {
       return r;
     },
     onUsage: recordUsage,
-    verify: run.mode === "reply" || external ? undefined : verifyFinish,
-    mechanicalCheck: run.mode === "reply" || external ? undefined : mechanicalCheck,
-    revisionMessage: run.mode === "reply" || external ? undefined : revisionMessage,
+    verify: run.mode === "reply" || external || planRun ? undefined : verifyFinish,
+    mechanicalCheck: run.mode === "reply" || external || planRun ? undefined : mechanicalCheck,
+    revisionMessage: run.mode === "reply" || external || planRun ? undefined : revisionMessage,
     afterTurn: async () => { await flushLifted(); await saveTranscript(); },
     budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= runCap,
     cancelled: async () => {
@@ -2049,6 +2274,40 @@ async function execute(a: ExecArgs): Promise<void> {
   switch (outcome.kind) {
     case "finished": {
       await flushLifted();
+      // B8: a plan run that recorded writes seals its plan as ONE approval
+      // unit and waits for the person's decision on the whole — the plan
+      // is the deliverable, so there is no verdict and no Element move.
+      // An empty plan (the work needed no writes) settles as a normal
+      // finish below, with a null verdict like a reply run's.
+      if (planRun && planDraft.length) {
+        const displays = planDraft.map((p) => p.display);
+        const summary = `計画: ${approvalSummary(displays)}`;
+        const hash = await planHashOf(planDraft.map((p) => p.call));
+        const { data: planAction, error: planErr } = await admin.from("agent_actions").insert({
+          run_id: run.id, element_id: run.element_id, tool_use_id: "plan", tool: "plan",
+          input: { calls: planDraft.map((p) => p.call), display: displays, plan: true },
+          input_hash: hash, summary,
+          integration_id: planDraft.map((p) => integrationTools.get(p.call.name)?.integration.id).find((x) => x) ?? null,
+        }).select("id").single();
+        if (planErr || !planAction) throw new Error(`計画を保存できませんでした: ${planErr?.message ?? "unknown"}`);
+        sealedPlan = { v: 1, planRunId: run.id, actionId: (planAction as { id: string }).id, hash, calls: planDraft };
+        await saveTranscript();
+        const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval", summary: "計画の承認待ち" }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+        if (!waiting) return; // cancelled meanwhile
+        await addStep(admin, run.id, "approval", `計画の承認待ち: ${approvalSummary(displays)}`,
+          planDraft.map((p, i) => `${i + 1}. ${p.label}${p.denied ? "（ポリシーで拒否 — 承認しても実行されません）" : ""}${p.problem ? `（組み立ての問題: ${p.problem}）` : ""}`).join("\n"));
+        await admin.from("element_comments").insert({
+          element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+          content: `**計画の承認待ち** — ${approvalSummary(displays)}。計画全体を確認して、承認すれば計画どおりに適用します。`,
+        });
+        if (run.triggered_by) {
+          await admin.from("notifications").insert({
+            recipient_id: run.triggered_by, actor_name: agentName, kind: "approval_requested", element_id: run.element_id,
+            title: `${agentName} が計画の承認を求めています`, body: summary,
+          }).then(() => {}, () => {});
+        }
+        return;
+      }
       await saveTranscript();
       // A reply run's finish is a reply, not checked work: its verdict stays
       // null. Any other run's record is built from the verifier's holder —
@@ -2068,7 +2327,7 @@ async function execute(a: ExecArgs): Promise<void> {
           }));
         }
       }
-      const verdict = run.mode === "reply" ? null : buildRunVerdict({
+      const verdict = run.mode === "reply" || planRun ? null : buildRunVerdict({
         lastCheck, checkAttempted, revisions: state.revisions ?? 0, finish: outcome.finish, external,
         claimCheck: checkClaimsOf(outcome.finish),
         verifyTally,
@@ -2083,7 +2342,9 @@ async function execute(a: ExecArgs): Promise<void> {
       // distillation calls are Anthropic-shaped). A rehearsal run is
       // skipped too: a trial's finish is evidence about a definition,
       // not work the person did, and its report is the record it leaves.
-      if (sealed && !run.rehearsal) {
+      // A plan run is skipped for the same reason: its finish is a plan
+      // awaiting a decision, not completed work.
+      if (sealed && !run.rehearsal && !planRun) {
         const { data: el } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
         await captureMemories({
           admin, userId: user.id,
@@ -4819,6 +5080,104 @@ async function elementDelegation(userDb: SupabaseClient, elementId: string): Pro
 }
 
 const OPEN_RUN = ["queued", "running", "awaiting_approval", "paused"];
+
+/**
+ * B8: a person's decision on a sealed plan. serve() has already verified
+ * the decision against the plan's hash; the run was claimed from
+ * awaiting_approval into running for this drive.
+ *
+ * Rejection ends the matter: the action is marked rejected, the run
+ * failed with the reason, and the plan itself stays on the record (the
+ * action row and the transcript) — nothing in it runs, ever.
+ *
+ * Approval starts the apply run: a fresh run on the same Element, as the
+ * approver, carrying the approved plan in its transcript. The plan
+ * action names the apply run in its result, so the audit reads
+ * plan -> decision -> apply run in one hop. If the apply run cannot be
+ * created, the approval is NOT settled — the plan goes back to waiting
+ * and the failure is on the trace, rather than an approval whose apply
+ * silently never happened. If the hand-off fetch fails after creation,
+ * the apply run stays queued for its starter to drive (an approved plan
+ * is never cancelled by a transport failure).
+ */
+async function decidePlan(a: ExecArgs): Promise<void> {
+  const { run, admin, userDb, user } = a;
+  const decision = a.body.decision!;
+  const plan = readRunPlan(run.transcript?.plan);
+  const { data: action } = await admin.from("agent_actions").select("id, status, summary").eq("id", decision.actionId ?? "").eq("run_id", run.id).maybeSingle();
+  if (!plan || !action || action.status !== "pending") return; // settled meanwhile; serve() refused mismatches
+  const summary = typeof action.summary === "string" ? action.summary : "計画";
+  const note = decision.note?.trim() ? decision.note.trim() : null;
+
+  if (!decision.approve) {
+    await admin.from("agent_actions").update({
+      status: "rejected", decided_by: user.id, decided_at: new Date().toISOString(), decision_note: note,
+    }).eq("id", action.id);
+    await addStep(admin, run.id, "approval", "計画が却下されました", note);
+    await admin.from("element_comments").insert({
+      element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
+      content: `**計画が却下されました** — ${summary}${note ? `\n\n${note}` : ""}`,
+    });
+    // The plan run ends failed: the work was not done and the Element does
+    // not move. finishRun is deliberately not used — it moves Elements.
+    await admin.from("agent_runs").update({
+      status: "failed", error: `計画が却下されました${note ? `: ${note}` : ""}`, summary: "計画が却下されました",
+      finished_at: new Date().toISOString(), continuation_token: null,
+    }).eq("id", run.id).eq("status", "running");
+    if (run.triggered_by) {
+      await admin.from("notifications").insert({
+        recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
+        title: "計画が却下されました", body: summary,
+      }).then(() => {}, () => {});
+    }
+    return;
+  }
+
+  const { data: next, error } = await userDb.from("agent_runs").insert({
+    element_id: run.element_id, domain_id: run.domain_id, worker_id: run.worker_id,
+    triggered_from: "plan", triggered_by: user.id, status: "queued", mode: run.mode,
+    prompt: run.prompt,
+  }).select("id").single();
+  if (error || !next) {
+    await addStep(admin, run.id, "error", "適用 run を開始できませんでした", error?.message ?? null);
+    await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running");
+    return;
+  }
+  const applyRunId = (next as { id: string }).id;
+  // The approved plan rides the apply run's transcript from its first
+  // drive — written before the run is handed over, so the run can never
+  // start without its coverage record in place.
+  await admin.from("agent_runs").update({
+    transcript: { messages: [], turns: 0, nudges: 0, approvedPlan: { ...plan, actionId: action.id as string } },
+  }).eq("id", applyRunId);
+  await admin.from("agent_actions").update({
+    status: "approved", decided_by: user.id, decided_at: new Date().toISOString(), decision_note: note,
+    result: { apply_run_id: applyRunId },
+  }).eq("id", action.id);
+  await addStep(admin, run.id, "approval", "計画が承認されました — 適用を開始します", summary);
+  await admin.from("agent_runs").update({
+    status: "completed", summary: "計画が承認され、適用を開始しました",
+    result: `${summary}（承認済み — 適用 run が計画の書き込みを実行します）`,
+    finished_at: new Date().toISOString(), continuation_token: null,
+  }).eq("id", run.id).eq("status", "running");
+  await admin.from("element_comments").insert({
+    element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
+    content: `**計画が承認されました** — ${summary}。適用 run が計画どおりに実行します。`,
+  });
+  // Drive the apply run as the approver (advanceFrom's pattern).
+  await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+    body: JSON.stringify({ runId: applyRunId }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      await res.body?.cancel();
+      await addStep(admin, run.id, "error", "適用 run の開始に失敗しました（実行パネルから再開できます）", `HTTP ${res.status}`);
+    }
+  }).catch(async (e) => {
+    await addStep(admin, run.id, "error", "適用 run の開始に失敗しました（実行パネルから再開できます）", errorMessage(e));
+  });
+}
 
 /**
  * Starts the AI Elements that `doneId` unblocks, as the same person, each as

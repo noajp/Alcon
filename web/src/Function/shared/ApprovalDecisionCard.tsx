@@ -57,6 +57,12 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
   );
   const anyCritical = rows.some((r) => r.critical);
   const integrations = [...new Set(rows.map((r) => r.integration))];
+  // A plan approval (B8): the action is the whole plan from a plan run —
+  // one decision over the listed sequence, critical calls included. Its
+  // wording differs from a single ask's on purpose: approving DOES cover
+  // the listed critical calls (hash-bound to exactly these), and denying
+  // ends the plan rather than sending the agent back to propose again.
+  const isPlan = action.tool === 'plan';
 
   // The note and the remember selection belong to one request: a new
   // request starts empty; a decision that fails and comes back keeps
@@ -89,6 +95,11 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
             {rows.length > 1 ? `${t('Approving runs all {n} operations', { n: rows.length })} · ` : ''}
             {integrations.length === 1 ? integrations[0] : t('{n} destinations', { n: integrations.length })}
           </div>
+          {isPlan && (
+            <div className="text-[12px] text-muted-foreground">
+              {t('This is a plan: the agent worked through the task without writing anything. Approving applies exactly the calls listed here.')}
+            </div>
+          )}
           {pending && action.expires_at && (
             <div className="text-[12px] text-muted-foreground">
               {t('Waiting for a decision until {time}', { time: new Date(action.expires_at).toLocaleString(locale) })}
@@ -102,7 +113,9 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
 
       {anyCritical && (
         <div className="mx-1 mt-2 rounded-md border border-[var(--status-danger)]/40 bg-[var(--status-danger)]/10 px-2 py-1.5 text-[12px] text-[var(--status-danger)]">
-          {t('This includes a critical operation. It asks every time: full delegation and saved conditions do not apply, and it cannot be remembered.')}
+          {isPlan
+            ? t('This plan includes a critical operation. Approving the plan covers exactly the calls listed here — nothing beyond them.')
+            : t('This includes a critical operation. It asks every time: full delegation and saved conditions do not apply, and it cannot be remembered.')}
         </div>
       )}
 
@@ -110,7 +123,7 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
           already say it, its labeled fields, its content, why it asks. */}
       <div className="mt-2 space-y-2 px-1">
         {rows.map((r) => (
-          <CallSection key={r.id} row={r} t={t}
+          <CallSection key={r.id} row={r} t={t} isPlan={isPlan}
             showTitle={rows.length > 1 || headline !== `${r.integration} · ${r.title}`}
             rawOpen={openRaw === r.id}
             onToggleRaw={() => setOpenRaw((o) => (o === r.id ? null : r.id))} />
@@ -146,7 +159,7 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
           )}
           <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={2000}
             placeholder={t('Note to the agent (optional)')} aria-label={t('Note to the agent (optional)')} className="text-[13px]" />
-          <div className="mt-1 text-[12px] text-muted-foreground">{t('Denying with a note tells the agent what to change; it will propose again.')}</div>
+          <div className="mt-1 text-[12px] text-muted-foreground">{isPlan ? t('Denying ends this plan. The plan stays in the record; nothing in it runs.') : t('Denying with a note tells the agent what to change; it will propose again.')}</div>
           <div className="mt-2 flex items-center justify-end gap-1.5">
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => decide(false)}>{t('Deny')}</Button>
             <Button variant="primary" size="sm" disabled={busy} onClick={() => decide(true)}>
@@ -174,7 +187,7 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
         </div>
       )}
       {surface !== 'inbox' && status === 'rejected' && (
-        <div className="mt-2 px-1 text-[12px] text-muted-foreground">{t('You denied this operation. It was not run.')}</div>
+        <div className="mt-2 px-1 text-[12px] text-muted-foreground">{isPlan ? t('You denied this plan. Nothing in it was run.') : t('You denied this operation. It was not run.')}</div>
       )}
       {surface !== 'inbox' && status === 'expired' && (
         <div className="mt-2 px-1 text-[12px] text-muted-foreground">{t('This approval expired undecided. It was not run.')}</div>
@@ -203,13 +216,21 @@ export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, su
   );
 }
 
-function CallSection({ row, t, showTitle, rawOpen, onToggleRaw }: {
+function CallSection({ row, t, showTitle, rawOpen, onToggleRaw, isPlan }: {
   row: ApprovalRow;
   t: (key: string, vars?: Record<string, string | number>) => string;
   showTitle: boolean;
   rawOpen: boolean;
   onToggleRaw: () => void;
+  /** In a plan, a listed critical call is covered by the plan's approval —
+   *  the chip names the class without the "always asks" claim. */
+  isPlan?: boolean;
 }) {
+  const criticalChip = row.critical
+    ? isPlan
+      ? t('Critical · {class}', { class: t(CRITICAL_CLASS_LABELS[row.critical]) })
+      : t('Critical · {class} — always asks', { class: t(CRITICAL_CLASS_LABELS[row.critical]) })
+    : '';
   return (
     <div className="rounded-md bg-muted/50 px-2 py-1.5">
       {showTitle && (
@@ -218,7 +239,7 @@ function CallSection({ row, t, showTitle, rawOpen, onToggleRaw }: {
           <span className="text-[10.5px] text-muted-foreground">{row.effect === 'read' ? t('read') : t('write')}</span>
           {row.critical && (
             <span className="rounded border border-[var(--status-danger)]/40 px-1 py-px text-[10.5px] text-[var(--status-danger)]">
-              {t('Critical · {class} — always asks', { class: t(CRITICAL_CLASS_LABELS[row.critical]) })}
+              {criticalChip}
             </span>
           )}
         </div>
@@ -226,7 +247,7 @@ function CallSection({ row, t, showTitle, rawOpen, onToggleRaw }: {
       {!showTitle && row.critical && (
         <div className="flex">
           <span className="rounded border border-[var(--status-danger)]/40 px-1 py-px text-[10.5px] text-[var(--status-danger)]">
-            {t('Critical · {class} — always asks', { class: t(CRITICAL_CLASS_LABELS[row.critical]) })}
+            {criticalChip}
           </span>
         </div>
       )}

@@ -731,7 +731,7 @@ function ElementDetailBody({
                 defaultWorkerId={rerunWorkerId(agent.run?.worker_id)}
                 defaultPrompt={previousPrompt}
                 busy={agentBusy} starting={agent.starting} error={agent.error ?? null}
-                onStart={({ workerId, prompt }) => agent.start({ workerId, prompt, triggeredFrom: 'detail', domainId })}
+                onStart={({ workerId, prompt, planMode }) => agent.start({ workerId, prompt, planMode, triggeredFrom: 'detail', domainId })}
                 onViewRun={() => setDelegateOpen(false)}
                 onStarted={() => setDelegateOpen(false)} />
             </DialogContent>

@@ -57,7 +57,7 @@ const STUCK_QUEUED_MS = 30_000;
 // the continuation token, which stay with the Edge Function (they can hold
 // data read with the starter's permissions).
 const AGENT_RUN_COLUMNS =
-  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count, verdict, proposed_readings';
+  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count, verdict, proposed_readings, plan_mode';
 
 /** A run row at the fetch boundary: its verdict / readings jsonb is narrowed
  *  to the parsed shapes here, so raw Json never reaches a component. */
@@ -161,6 +161,8 @@ interface StartOptions {
   mode?: AgentRunMode;
   prompt?: string | null;
   replyTo?: string | null;
+  /** Start as a plan run (B8): writes are recorded as one approvable plan. */
+  planMode?: boolean;
 }
 
 async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run: ParsedAgentRun; existing: boolean }> {
@@ -195,6 +197,7 @@ async function startAgentRun(opts: StartOptions, retried = false): Promise<{ run
       mode: opts.mode ?? 'execute',
       prompt: opts.prompt?.trim() || null,
       reply_to: opts.replyTo ?? null,
+      ...(opts.planMode ? { plan_mode: true } : {}),
     })
     .select(AGENT_RUN_COLUMNS)
     .single();
@@ -595,6 +598,7 @@ export function useAgentRun(
       mode?: AgentRunMode;
       prompt?: string | null;
       replyTo?: string | null;
+      planMode?: boolean;
     }): Promise<AgentStartOutcome> => {
       if (!elementId) return 'failed';
       if (startingRef.current) return 'busy';

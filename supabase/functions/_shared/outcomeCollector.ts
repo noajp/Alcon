@@ -113,12 +113,14 @@ export function driverKindOf(run: Pick<OutcomeRunRow, "element_id" | "strategy_i
   return "execute";
 }
 
-/** Whether an action was decided by a standing policy rather than a
- *  person: the Space's free mode ('policy') or an earned track-record
- *  grant ('track-record', B7). Both are counted as policy, never as a
- *  person's ask or approval — the distinction between them lives on
- *  the row, not in these counts. */
-const isPolicyDecision = (source: string | null): boolean => source === "policy" || source === "track-record";
+/** Whether an action was decided by a standing decision rather than a
+ *  person at the moment of the call: the Space's free mode ('policy'), an
+ *  earned track-record grant ('track-record', B7), or an approved plan
+ *  covering the call ('plan', B8). All are counted as policy, never as a
+ *  person's ask or approval — the distinction between them lives on the
+ *  row, not in these counts. (The plan's own approval unit carries a null
+ *  decision_source: that one IS the person's asked/approved decision.) */
+const isPolicyDecision = (source: string | null): boolean => source === "policy" || source === "track-record" || source === "plan";
 
 /** Pure. The approval counts of one run, from its agent_actions rows.
  *  Asked / approved / rejected count a person's proposals only; a policy
