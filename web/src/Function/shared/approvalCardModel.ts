@@ -160,6 +160,22 @@ export function approvalHeadline(rows: ApprovalRow[], summary: string): string {
 }
 
 /**
+ * Pure. The compensation marker on an action (B9): this approval is
+ * a FAILED run's rollback batch, not a turn's new work — approving
+ * runs undo operations, and denying leaves the failed run's writes
+ * standing. Read from the action's input exactly as the engine
+ * wrote it; null for ordinary asks.
+ */
+export function compensationMarkerOf(action: Pick<AgentAction, 'input'>): { setSize: number; failureSummary: string } | null {
+  const input = action.input as { compensation?: unknown } | null;
+  const c = input?.compensation;
+  if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+  const m = c as { setSize?: unknown; failureSummary?: unknown };
+  if (typeof m.setSize !== 'number' || typeof m.failureSummary !== 'string') return null;
+  return { setSize: m.setSize, failureSummary: m.failureSummary };
+}
+
+/**
  * Pure. What a standing approval could be bound to: when every call is the
  * same operation, the short plain values they all share (an owner, a repo, a
  * recipient). Mirrors ruleFromCalls in the engine, which has the last word.

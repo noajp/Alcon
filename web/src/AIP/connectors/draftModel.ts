@@ -210,6 +210,8 @@ async function sha256Hex(text: string): Promise<string> {
 
 interface TwinVerify { command: string; expect: Record<string, unknown>; delayMs: number }
 
+interface TwinUndo { command: string; input: Record<string, unknown> }
+
 interface TwinCommand {
   name: string; action: string; effect: 'read' | 'write'; permission: 'allow' | 'ask' | 'deny';
   http: { method: string; path: string; query: string[]; body: string[] } | null;
@@ -219,6 +221,7 @@ interface TwinCommand {
   verify: TwinVerify | null;
   reversibility: 'contained' | 'wide' | 'none' | null;
   quota: { writesPerHour: number } | null;
+  undo: TwinUndo | null;
 }
 
 const NAME_RE = /^[a-z][a-z0-9_]{0,47}$/;
@@ -267,6 +270,28 @@ function parseQuotaTwin(raw: unknown): { writesPerHour: number } | null | undefi
   return { writesPerHour: n };
 }
 
+/** A command's undo declaration, read as the server's parseUndo reads
+ *  it (B9): undefined when absent, null when malformed, the declaration
+ *  otherwise — an input map of at most 16 scalar values, because an
+ *  undo is enforcement: a promise about recovery that cannot be read
+ *  must not survive as one that merely never fires. */
+function parseUndoTwin(raw: unknown): TwinUndo | null | undefined {
+  if (raw === undefined) return undefined;
+  const x = obj(raw);
+  if (!x) return null;
+  if (typeof x.command !== 'string' || !NAME_RE.test(x.command)) return null;
+  const inputRaw = obj(x.input);
+  if (!inputRaw) return null;
+  const entries = Object.entries(inputRaw);
+  if (entries.length > 16) return null;
+  for (const [k, v] of entries) {
+    if (!FIELD_RE.test(k)) return null;
+    if (v !== null && typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean') return null;
+    try { if (JSON.stringify(v)?.length > 500) return null; } catch { return null; }
+  }
+  return { command: x.command, input: { ...inputRaw } };
+}
+
 /** A stored manifest read the way the server's parseManifest reads it —
  *  for manifests that were validated when drafted, so the loose cases
  *  here only mirror the server's refusals. */
@@ -301,6 +326,11 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
     if (verify === null) continue;
     const quota = parseQuotaTwin(x.quota);
     if (quota === null) continue;
+    // A read's undo is discarded unread, as the server's parser
+    // discards it; a write's malformed undo costs the command its
+    // place, as the server's does.
+    const undo = effect === 'write' ? parseUndoTwin(x.undo) : undefined;
+    if (undo === null) continue;
     seen.add(name);
     const rules = (Array.isArray(x.rules) ? x.rules : []).flatMap((r): TwinCommand['rules'] => {
       const y = obj(r);
@@ -319,12 +349,17 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
       verify: verify ?? null,
       reversibility: typeof x.reversibility === 'string' && REVERSIBILITIES.has(x.reversibility) ? x.reversibility as TwinCommand['reversibility'] : null,
       quota: quota ?? null,
+      undo: undo ?? null,
     });
   }
   // The server's second pass, mirrored: a verify must sit on a write and
-  // name a read command of the same manifest, or the command is out.
+  // name a read command of the same manifest, or the command is out;
+  // an undo must name a write command of the same manifest, never the
+  // command itself, or the command is out.
   const effectByName = new Map(commands.map((c) => [c.name, c.effect]));
-  const kept = commands.filter((c) => !c.verify || (c.effect === 'write' && effectByName.get(c.verify.command) === 'read'));
+  const kept = commands.filter((c) =>
+    (!c.verify || (c.effect === 'write' && effectByName.get(c.verify.command) === 'read'))
+    && (!c.undo || (c.undo.command !== c.name && effectByName.get(c.undo.command) === 'write')));
   const aliases: Record<string, string> = {};
   for (const [k, v] of Object.entries(obj(m.aliases) ?? {})) if (typeof v === 'string') aliases[k] = v;
   return { commands: kept, aliases, defaults };
@@ -345,7 +380,7 @@ export function draftStructureOfWeb(c: DraftContentLike): unknown {
   return {
     name: c.name, endpoint: c.endpoint, auth_type: c.auth_type, auth_header: c.auth_header, guide: c.guide,
     commands: commands
-      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota }))
+      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota, undo: cmd.undo }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases,
   };

@@ -10,12 +10,14 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   appendDecisionResults, canonicalCalls,
-  type LoopState, type PendingApproval, type ToolCall, type ToolResult,
+  type FinishPayload, type LoopState, type PendingApproval, type ToolCall, type ToolResult,
 } from "../_shared/agentLoop.ts";
 import { approvalSummary, criticalOfTool, type ApprovalDisplay, type IntegrationTool } from "../_shared/integrationTools.ts";
 import { ruleFromCalls, withRule } from "../_shared/connectorManifest.ts";
 import { errorMessage } from "../_shared/boardTools.ts";
 import type { VerifyCheck } from "../_shared/verifyReads.ts";
+import type { RunVerdict } from "../_shared/runVerdict.ts";
+import type { CompensationReportData } from "../_shared/compensation.ts";
 
 /** A turn's writes waiting for a person, as a transcript carries them. */
 export type SavedPending = PendingApproval & {
@@ -25,6 +27,24 @@ export type SavedPending = PendingApproval & {
    *  beside the results so the batch's settle can seal each call's
    *  own outcome (decision.ts, the B7 record). */
   perCall?: { id: string; ok: boolean; verify?: VerifyCheck }[];
+  /**
+   * The compensation rest (B9): this pending is not a turn's writes
+   * but a FAILED run's rollback, offered as one batch. The failure
+   * it interrupted is carried with it — the finish (with the verdict
+   * already computed from the run's own facts) or the refusal's
+   * message — because the person's decision finalizes that settle
+   * instead of resuming the loop: there is no live turn to answer.
+   * `entries` pairs each offered call with the payload row it
+   * compensates; `report` is the failure report as the rest left it,
+   * merged with the batch's outcomes at finalize.
+   */
+  compensation?: {
+    failure:
+      | { kind: "finish"; finish: FinishPayload; verdict: RunVerdict | null }
+      | { kind: "fail"; message: string };
+    entries: { callId: string; rowId: string }[];
+    report: CompensationReportData;
+  };
 };
 
 export interface Decision {

@@ -7,7 +7,7 @@
 // user message that follows it.
 
 import type { ModelUsage } from "./aiPricing.ts";
-import type { FinishClaim } from "./finishClaims.ts";
+import type { CompensationSummary, FinishClaim } from "./finishClaims.ts";
 
 export type Block = { type: string; id?: string; name?: string; input?: unknown; text?: string; [k: string]: unknown };
 export type Msg = { role: "user" | "assistant"; content: string | Block[] };
@@ -39,6 +39,11 @@ export interface FinishPayload {
    * the list and the Reviews filter finds the run by it.
    */
   unconfirmed?: string[];
+  /** The compensation outcome of this finish's failure settle (B9):
+   *  computed by the driver from the run's records after the
+   *  compensation pass — never a model argument (the finish tool's
+   *  own input cannot set it). Sealed by finishDetailOf. */
+  compensation?: CompensationSummary;
 }
 
 /**

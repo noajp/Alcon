@@ -612,6 +612,21 @@ export interface FinishDetail {
   /** What the agent could not confirm — a mark on the finish, never a
    *  failure of it. The run list's 未確認あり filter is these, found. */
   unconfirmed: string[];
+  /** The compensation outcome of this finish's failure settle (B9),
+   *  present only when the settle ran a compensation pass: what the
+   *  rollback did, counted, and the names of the writes that stand
+   *  uncompensated. */
+  compensation?: CompensationSummary;
+}
+
+/** A failed run's compensation outcome, as finish_detail keeps it (B9):
+ *  the server twin lives in supabase/functions/_shared/finishClaims.ts;
+ *  the two parsers are pinned equal by tests/finishClaims.test.ts. */
+export interface CompensationSummary {
+  compensated: number;
+  compensationFailed: number;
+  declined: number;
+  uncompensated: string[];
 }
 
 /** Strict narrowing of the jsonb, mirroring the server's parseFinishDetail
@@ -630,7 +645,21 @@ export function parseFinishDetail(raw: unknown): FinishDetail | null {
     if (!nullable(c.source) || !nullable(c.retrievedAt) || !nullable(c.type)) return null;
     claims.push({ text: c.text, source: c.source as string | null, retrievedAt: c.retrievedAt as string | null, type: c.type as string | null });
   }
-  return { claims, unconfirmed: [...(r.unconfirmed as string[])] };
+  // The compensation outcome (B9), when the settle sealed one — the
+  // server parser's strict rule, mirrored.
+  let compensation: CompensationSummary | undefined;
+  if (r.compensation !== undefined) {
+    const c = r.compensation as Record<string, unknown> | null;
+    const count = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+    if (!c || typeof c !== 'object' || Array.isArray(c)
+      || !count(c.compensated) || !count(c.compensationFailed) || !count(c.declined)
+      || !Array.isArray(c.uncompensated) || !c.uncompensated.every((x) => typeof x === 'string')) return null;
+    compensation = {
+      compensated: c.compensated as number, compensationFailed: c.compensationFailed as number,
+      declined: c.declined as number, uncompensated: [...(c.uncompensated as string[])],
+    };
+  }
+  return { claims, unconfirmed: [...(r.unconfirmed as string[])], ...(compensation ? { compensation } : {}) };
 }
 
 /** Whether a sealed finish named things it could not confirm. */

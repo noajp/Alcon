@@ -115,4 +115,21 @@ describe('ApprovalDecisionCard', () => {
     });
     expect(screen.getByText(/PR #42 opened/)).toBeTruthy();
   });
+
+  it('labels a compensation batch as a failed run’s rollback, with its own deny wording (B9)', () => {
+    const compAction = action();
+    (compAction.input as unknown as { compensation: unknown }).compensation = {
+      setSize: 1, failureSummary: 'The run failed midway',
+    };
+    renderCard({ action: compAction });
+    expect(screen.getByText('Compensation for a failed run: approving runs these undo operations to roll back what the failed run wrote.')).toBeTruthy();
+    expect(screen.getByText('Denying leaves the failed run\'s writes as they are; nothing is rolled back.')).toBeTruthy();
+
+    cleanup();
+    renderCard({ action: action({
+      status: 'rejected',
+      input: { ...compAction.input } as AgentAction['input'],
+    }) });
+    expect(screen.getByText('You denied this compensation. The failed run\'s writes were not rolled back.')).toBeTruthy();
+  });
 });
