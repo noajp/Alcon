@@ -26,6 +26,12 @@
 //                                               words, where they are, and
 //                                               any files; Athena's chat
 //                                               driver answers on the run
+//   { runId } / { runId, message }              a connection draft (G4; its
+//                                               run's subject is the draft):
+//                                               Athena drafts the manifest
+//                                               from the official spec; a
+//                                               message answers its question
+//                                               or asks it to fix a test
 //   { runId, continue: true }                   internal: the next slice of a
 //                                               long run (self-invoked)
 //   { advance: elementId }                      a person finished an Element:
@@ -65,7 +71,7 @@ import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "..
 import { catalogIndex, catalogOperation, catalogTool, decideCall, isCatalogTool, mayNeedApproval, runCatalogTool } from "../_shared/catalog.ts";
 import { systemPrompt, taskMessage, type TaskContext } from "./context.ts";
 import { conversationKindOf, conversationOpening, conversationSystemPrompt, conversationTools, PLANNER_TOOL, START_TOOL, ANSWER_TOOL, CONNECT_TOOL, type ConversationContext } from "./conversation.ts";
-import { missingConnectorNames } from "../_shared/connectorNeeds.ts";
+import { CONNECTOR_PRESET_NAMES, foldConnectorName, missingConnectorNames } from "../_shared/connectorNeeds.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
 import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
@@ -91,6 +97,14 @@ import {
   type PanelMessage, type PanelToolEvent,
 } from "../_shared/copilotSession.ts";
 import { claimFor, driverForRun, entryForBody, messageAllowed } from "./dispatch.ts";
+import { ASK_TOOL, FINISH_TOOL, PROPOSE_TOOL, draftKindOf, draftOpening, draftSystemPrompt, draftTools } from "./drafter.ts";
+import {
+  AI_DRAFTED_PRESET, reconcileDraft, unaccountedDrops, validateDraftCandidate,
+  type DraftCandidate, type DraftDrop,
+} from "../_shared/connectorDraft.ts";
+import { applyCandidate, askDraft, loadDraft, transitionDraft, type DraftRow } from "../_shared/integrationDrafts.ts";
+import { draftRounds, materializeDraft, runDraftTestRound, summarizeRound } from "../_shared/draftTest.ts";
+import { REGISTRY_URL, entriesOf } from "../_shared/connectorDirectory.ts";
 import { draftDue } from "./draft.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
 import { requestContent, type Attachment } from "../_shared/attachments.ts";
@@ -137,7 +151,7 @@ type Transcript = {
   context?: CopilotContextLike;
 };
 type Run = {
-  id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
+  id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
   transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
@@ -282,7 +296,7 @@ Deno.serve(async (req: Request) => {
   if (!claimed) return json({ error: `この実行は今その操作を受け付けません（${run.status}）。` }, 409);
 
   const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl };
-  const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : execute(args))
+  const work = (driver === "converse" ? converse(args, said) : driver === "chat" ? chat(args, said) : driver === "draft" ? draft(args, said) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
       await pauseOnError(admin, run, errorMessage(e));
@@ -1448,6 +1462,420 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
       return;
     case "refusal":
       await wait("モデルがこの依頼を断りました", outcome.detail.slice(0, 300));
+      return;
+  }
+}
+
+// ── Athena's draft driver: a connection drafted from its official spec ──
+// The run's subject is an integration_drafts row (G4). Before any model
+// call, the reconcile (§4.7) runs on the server: a service that already
+// has a route — connected, a preset, a Registry server, an existing row
+// to update, an open draft to join — is never drafted. The drafter's
+// proposals are validated server-side (connectorDraft) before they are
+// stored; its questions rest the draft in awaiting_input and the run
+// with it, and a person's message resumes both. Tests and activation
+// are later stages of the same draft (draftTest.ts / the owner's RPC);
+// this driver ends when the drafting itself is done, one way or another.
+
+/** The reconcile's presets: the built-ins a name can resolve to. Custom
+ *  kinds and the drafted provenance are not routes to anywhere. */
+const DRAFT_PRESETS = Object.entries(CONNECTOR_PRESET_NAMES)
+  .filter(([id]) => !id.startsWith("custom-") && id !== AI_DRAFTED_PRESET)
+  .map(([id, name]) => ({ id, name }));
+
+/** One bounded Registry page for the reconcile: a server whose title (or
+ *  its name's last part) folds to the requested name. A registry that
+ *  cannot be reached is "no hit", never a blocker — drafting proceeds
+ *  and the sources show what was actually used. */
+async function registryHitFor(name: string): Promise<{ title: string; endpoint: string } | null> {
+  try {
+    const target = new URL(REGISTRY_URL);
+    target.searchParams.set("version", "latest");
+    target.searchParams.set("limit", "60");
+    target.searchParams.set("search", name.slice(0, 100));
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 10_000);
+    try {
+      const res = await fetch(target, { headers: { accept: "application/json" }, signal: ctl.signal });
+      if (!res.ok) return null;
+      const { entries } = entriesOf(await res.json());
+      const key = foldConnectorName(name);
+      return entries.find((e) => foldConnectorName(e.title) === key) ?? null;
+    } finally {
+      clearTimeout(t);
+    }
+  } catch {
+    return null;
+  }
+}
+
+interface ReconcileResult {
+  /** Set when the draft closes without drafting. */
+  close?: { status: "rerouted" | "superseded"; summary: string };
+  /** The opening's account of the reconcile when drafting proceeds. */
+  note: string;
+}
+
+async function reconcileForDraft(a: ExecArgs, d: DraftRow): Promise<ReconcileResult> {
+  const { admin, userDb } = a;
+  const spaceId = d.activity_space_id;
+  const [{ data: rowData }, { data: draftData }] = await Promise.all([
+    userDb.from("integrations").select("id, name, preset, enabled, endpoint").eq("activity_space_id", spaceId).in("kind", ["mcp", "http"]),
+    admin.from("integration_drafts").select("id, name_key, status").eq("activity_space_id", spaceId)
+      .in("status", ["drafting", "awaiting_input", "testing", "awaiting_review"]),
+  ]);
+  const rows = (rowData ?? []) as { id: string; name: string; preset: string | null; enabled: boolean; endpoint: string }[];
+  const context = (d.request_context ?? {}) as { docsUrl?: string | null };
+  const knownHost = (() => {
+    try { return context.docsUrl ? new URL(context.docsUrl).hostname : null; } catch { return null; }
+  })();
+  // The registry outranks the update and join legs, so it is always asked.
+  const registryHit = await registryHitFor(d.name);
+  const outcome = reconcileDraft({
+    name: d.name, rows, presets: DRAFT_PRESETS, registryHit,
+    drafts: (draftData ?? []) as { id: string; name_key: string; status: string }[],
+    selfDraftId: d.id, knownHost,
+  });
+  switch (outcome.kind) {
+    case "connected":
+      return { close: { status: "rerouted", summary: `「${d.name}」はすでに接続されています。起草は不要でした。` }, note: "" };
+    case "preset":
+      return { close: { status: "rerouted", summary: `「${d.name}」には組み込みの接続（プリセット）があります。設定の接続ダイアログから接続してください。起草はしません。` }, note: "" };
+    case "registry":
+      return { close: { status: "rerouted", summary: `「${d.name}」は MCP Registry にサーバがあります（${outcome.entry.title}: ${outcome.entry.endpoint}）。Registry 経由の接続を使ってください。起草はしません。` }, note: "" };
+    case "join":
+      return { close: { status: "superseded", summary: "同じサービスの起草がすでに進んでいます。そちらのドラフトに合流しました。" }, note: "" };
+    case "update": {
+      const target = rows.find((r) => r.id === outcome.rowId);
+      if (d.target_integration_id !== outcome.rowId) {
+        await admin.from("integration_drafts").update({ target_integration_id: outcome.rowId, updated_at: new Date().toISOString() }).eq("id", d.id);
+        d.target_integration_id = outcome.rowId;
+      }
+      return { note: `既存の接続「${target?.name ?? d.name}」への定義の更新として起草します。テストは複製行で行い、有効化のときに原本へ反映されます。既存の接続は止めません。` };
+    }
+    case "create":
+      return { note: "既存の経路（接続・プリセット・Registry・進行中の起草）はありません。新規の接続として起草します。" };
+  }
+}
+
+/** The host a candidate's endpoint must agree with: the person's own
+ *  documentation URL when they gave one, else the first cited source's. */
+function officialHostFor(d: DraftRow, candidate: DraftCandidate): string | null {
+  const context = (d.request_context ?? {}) as { docsUrl?: string | null };
+  const from = context.docsUrl ?? candidate.sources[0] ?? null;
+  try { return from ? new URL(from).hostname : null; } catch { return null; }
+}
+
+async function draft(a: ExecArgs, said: string): Promise<void> {
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
+  const { run, admin, user } = a;
+  const draftId = run.integration_draft_id!;
+  let d = await loadDraft(admin, draftId);
+  if (!d) { await failRun(admin, run, "起草の対象が見つかりません。"); return; }
+  // The draft names its run (the review screen links to it; the run's
+  // steps are the drafting's audit record). The creator cannot always
+  // write the draft row, so the driver stamps it.
+  if (d.draft_run_id !== run.id) {
+    await admin.from("integration_drafts").update({ draft_run_id: run.id, updated_at: new Date().toISOString() }).eq("id", d.id);
+    d.draft_run_id = run.id;
+  }
+
+  const config = resolveAgentConfig(null, null, null, run.transcript?.messages?.length ? run.model : null);
+  const { agentName, model } = config;
+  if (!a.anthropicKey) { await failRun(admin, run, "ANTHROPIC_API_KEY が設定されていません。"); return; }
+  const modelClient = new Anthropic({ apiKey: a.anthropicKey });
+  await admin.from("agent_runs").update({ model }).eq("id", run.id);
+
+  const { budget, spentBefore } = await loadRunBudget(admin, run, user.id);
+  let usage = { input: run.input_tokens, output: run.output_tokens, cost: Number(run.cost_usd || 0) };
+
+  const complete = async (summary: string) => {
+    await admin.from("agent_runs").update({
+      status: "completed", summary: summary.slice(0, 300), error: null,
+      finished_at: new Date().toISOString(), continuation_token: null,
+    }).eq("id", run.id).eq("status", "running");
+  };
+  const rest = async (summary: string, error: string | null = null, status = "awaiting_input") => {
+    await admin.from("agent_runs").update({ status, summary: summary.slice(0, 300), error, continuation_token: null })
+      .eq("id", run.id).eq("status", "running");
+  };
+
+  // A draft that already ended has no drafting left in it.
+  if (d.status === "active" || d.status === "rejected" || d.status === "failed" ||
+      d.status === "expired" || d.status === "superseded" || d.status === "rerouted") {
+    await complete(`この起草はすでに終わっています（状態: ${d.status}）。`);
+    return;
+  }
+
+  const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : draftTools();
+  let state: LoopState;
+  let finished: { kind: "ready" | "rerouted" | "failed" | "testing_wait"; reason: string } | null = null;
+
+  if (run.transcript?.messages?.length) {
+    state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: 0, revisions: 0 };
+    // Test rounds the conversation has not seen yet enter it once, so a
+    // "fix this" is answered against the evidence, not from memory.
+    const rounds = draftRounds(d);
+    const seen = state.messages.filter((m) => typeof m.content === "string" && m.content.includes("【テスト結果】")).length;
+    if (rounds.length > seen) {
+      state.messages.push({ role: "user", content: `【テスト結果】\n${summarizeRound(rounds[rounds.length - 1])}` });
+    }
+    if (said) state.messages.push({ role: "user", content: said });
+    // A person's answer reopens the draft; a "fix this" after a test
+    // round reopens it for revision (the round itself stays recorded).
+    if (d.status === "awaiting_input") {
+      await transitionDraft(admin, d, "drafting", { awaiting_question: null });
+    } else if (d.status === "testing" && d.test_results) {
+      await transitionDraft(admin, d, "drafting", {});
+    }
+  } else {
+    const rec = await reconcileForDraft(a, d);
+    if (rec.close) {
+      await transitionDraft(admin, d, rec.close.status, {});
+      await addStep(admin, run.id, "status", "照合で起草を閉じました", rec.close.summary);
+      await complete(rec.close.summary);
+      return;
+    }
+    const context = (d.request_context ?? {}) as { entry?: string; waitingFor?: string; purpose?: string; docsUrl?: string };
+    const manifest = d.manifest as { commands?: { name?: unknown }[] } | null;
+    state = {
+      messages: [{
+        role: "user",
+        content: draftOpening({
+          name: d.name,
+          entry: context.entry ?? null,
+          waitingFor: context.waitingFor ?? null,
+          purpose: context.purpose ?? null,
+          docsUrl: context.docsUrl ?? null,
+          reconcileNote: rec.note,
+          candidate: d.endpoint
+            ? { endpoint: d.endpoint, commands: (manifest?.commands ?? []).map((c) => String(c?.name ?? "")).filter(Boolean) }
+            : null,
+          answeredQuestion: d.status === "awaiting_input" ? d.awaiting_question : null,
+          lastTestRound: null,
+          today: new Date().toISOString().slice(0, 10),
+        }, said),
+      }],
+      turns: 0, nudges: 0,
+    };
+    await addStep(admin, run.id, "status", "起草を開始", `${agentName} / ${config.modelLabel}`);
+  }
+  const turnBudget = state.turns + config.maxTotalTurns;
+  if (said) await addStep(admin, run.id, "message", said.split("\n")[0].slice(0, 200), said);
+
+  const saveTranscript = async () => {
+    const transcript: Transcript = { messages: state.messages, turns: state.turns, nudges: 0, revisions: 0, turnBudget, tools };
+    const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
+    const { error } = await admin.from("agent_runs").update({ transcript: clean }).eq("id", run.id);
+    if (error) throw new Error(`経過を保存できませんでした: ${error.message}`);
+  };
+  await saveTranscript();
+
+  const executeCall = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (call.name === PROPOSE_TOOL.name) {
+      const input = (call.input ?? {}) as Record<string, unknown>;
+      const candidate: DraftCandidate = {
+        name: d.name,
+        endpoint: String(input.endpoint ?? ""),
+        authType: String(input.authType ?? ""),
+        authHeader: typeof input.authHeader === "string" && input.authHeader.trim() ? input.authHeader.trim() : null,
+        manifest: input.manifest ?? null,
+        guide: typeof input.guide === "string" ? input.guide : null,
+        testInputs: (input.testInputs && typeof input.testInputs === "object" && !Array.isArray(input.testInputs)
+          ? input.testInputs : {}) as Record<string, Record<string, unknown>>,
+        sources: Array.isArray(input.sources) ? input.sources.filter((s): s is string => typeof s === "string") : [],
+      };
+      const { errors, manifest } = validateDraftCandidate(candidate, { officialHost: officialHostFor(d, candidate) });
+      if (errors.length || !manifest) {
+        await addStep(admin, run.id, "error", "候補が検証に通りませんでした", errors.join("\n"));
+        return { content: `検証で落ちました。直して出し直してください:\n- ${errors.join("\n- ")}`, is_error: true };
+      }
+      const dropsIn: DraftDrop[] = (Array.isArray(input.drops) ? input.drops : [])
+        .map((x) => {
+          const o = (x ?? {}) as Record<string, unknown>;
+          return { name: String(o.name ?? ""), reason: String(o.reason ?? "") };
+        })
+        .filter((x) => x.name);
+      const drops = [...d.dropped_commands];
+      for (const drop of dropsIn) if (!drops.some((x) => x.name === drop.name)) drops.push(drop);
+      const unaccounted = unaccountedDrops(d.required_commands, manifest, drops);
+      if (unaccounted.length) {
+        return {
+          content: `必須の command が理由なく外れています: ${unaccounted.join("、")}。候補に戻すか、drops に { name, reason } で理由を書いてください（理由は審査画面に出ます）。`,
+          is_error: true,
+        };
+      }
+      const stored: DraftCandidate = { ...candidate, manifest: JSON.parse(JSON.stringify(manifest)) as unknown };
+      if (!await applyCandidate(admin, d, stored, drops)) {
+        return { content: "候補を保存できませんでした（ドラフトの状態が変わっています）。", is_error: true };
+      }
+      d = (await loadDraft(admin, draftId)) ?? d;
+      const names = manifest.commands.map((c) => c.name);
+      await addStep(admin, run.id, "action", "接続の候補を提出しました", `${candidate.endpoint}\ncommands: ${names.join("、")}`);
+      return { content: "候補を受け付けました。テストへ進める形なら finish_draft(outcome=ready) で終えてください。実在する ID 等が分からない command があれば、推測で埋めず ask_person で聞いてください。" };
+    }
+    if (call.name === ASK_TOOL.name) {
+      const question = String(call.input.question ?? "").trim();
+      if (!question) return { content: "question が要ります。", is_error: true };
+      if (!await askDraft(admin, d, question)) return { content: "質問を記録できませんでした（ドラフトの状態が変わっています）。", is_error: true };
+      await addStep(admin, run.id, "status", "人に確認しています", question);
+      return { content: "質問を記録しました。人に短く伝えて、このターンを終えてください。人が答えると起草が再開します。" };
+    }
+    if (call.name === FINISH_TOOL.name) {
+      const outcomeIn = String(call.input.outcome ?? "");
+      const reason = String(call.input.reason ?? "").trim().slice(0, 500);
+      if (outcomeIn === "ready") {
+        if (!d.endpoint || !d.manifest) return { content: "候補がまだ提出されていません。propose_manifest を先に通してください。", is_error: true };
+        // Materialise the candidate as a disabled row (a clone, for an
+        // update) and test it. A credential the owner has not entered
+        // yet rests the draft in testing and this run with it; the test
+        // then runs from the review screen.
+        if (d.status === "drafting") await transitionDraft(admin, d, "testing", {});
+        const mat = await materializeDraft(admin, d);
+        if ("error" in mat) return { content: `素材化できませんでした: ${mat.error}`, is_error: true };
+        const needsSecret = (d.auth_type ?? "none") !== "none" && !mat.row.secret_id;
+        if (needsSecret) {
+          finished = { kind: "testing_wait", reason: "認証情報の入力を待っています。審査画面で owner が入力するとテストが進みます。" };
+          await addStep(admin, run.id, "status", "認証情報の入力を待っています", "候補を素材化しました。テストは認証情報の入力後に審査画面から実行されます。");
+          return { content: "候補を素材化しました。認証情報がまだ入力されていないため、テストは審査画面で owner が認証情報を入れてから行われます。短く伝えて終えてください。" };
+        }
+        const tested = await runDraftTestRound(admin, d);
+        if ("error" in tested) return { content: `テストを実行できませんでした: ${tested.error}`, is_error: true };
+        const round = tested.round;
+        await addStep(admin, run.id, round.outcome === "passed" ? "status" : "error", "接続テストを実行しました", summarizeRound(round));
+        if (round.outcome === "passed") {
+          finished = { kind: "ready", reason: reason || "テストが通り、審査待ちになりました。" };
+          return { content: "テストが通り、審査待ちになりました。何を起草し、どう確かめたか短く報告して終えてください。" };
+        }
+        if (d.status === "failed") {
+          finished = { kind: "failed", reason: "テストの往復上限に達しました。" };
+          return { content: "テストの往復上限に達し、起草は失敗として記録されました。試したことと結果を短く伝えて終えてください。" };
+        }
+        if (round.outcome === "auth_unverified" || round.outcome === "unverifiable") {
+          finished = { kind: "testing_wait", reason: "テストの証跡は揃いました。審査へ進めるかの判断を owner が行います。" };
+          return { content: `${summarizeRound(round)}\n証跡は揃いましたが、審査へ進めるかの判断は owner が行います。短く伝えて終えてください。` };
+        }
+        // A failed round, back in drafting: the loop revises against it.
+        return {
+          content: `テストで落ちました。分類に沿って候補を直し、propose_manifest → finish_draft をもう一度行ってください。\n${summarizeRound(round)}`,
+          is_error: true,
+        };
+      }
+      if (outcomeIn === "rerouted" || outcomeIn === "failed") {
+        if (!reason) return { content: "reason（理由・案内）が要ります。", is_error: true };
+        if (outcomeIn === "rerouted") await transitionDraft(admin, d, "rerouted", {});
+        else await transitionDraft(admin, d, "failed", { failure_class: null });
+        finished = { kind: outcomeIn, reason };
+        await addStep(admin, run.id, "status", outcomeIn === "rerouted" ? "既存の経路へ案内して閉じました" : "起草を諦めました", reason);
+        return { content: "記録しました。理由を短く伝えて終えてください。" };
+      }
+      return { content: "outcome は ready / rerouted / failed のいずれかです。", is_error: true };
+    }
+    return { content: `この起草では使えない道具です: ${call.name}`, is_error: true };
+  };
+
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costAt(config.price, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  const cache = { cache_control: { type: "ephemeral" as const } };
+  const system = [{ type: "text" as const, text: draftSystemPrompt(agentName), ...cache }];
+  const toolParams = toolParamsFor(tools, cache, false);
+  const serverTools = [...webTools(model)];
+  const deadline = Date.now() + SLICE_MS;
+  const sliceSignal = () => AbortSignal.timeout(Math.max(deadline - Date.now(), 1));
+
+  const outcome = await runLoop(state, {
+    callModel: async (messages) => {
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.beta.messages.create({
+        model,
+        max_tokens: 16000,
+        system,
+        // deno-lint-ignore no-explicit-any
+        tools: [...serverTools, ...toolParams] as any,
+        // deno-lint-ignore no-explicit-any
+        messages: messages as any,
+        output_config: { effort: "low" },
+      // deno-lint-ignore no-explicit-any
+      } as any, { signal: sliceSignal() });
+      const blocks = (res.content ?? []) as { type: string; text?: string }[];
+      const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
+      if (words && blocks.some((b) => b.type === "tool_use")) await addStep(admin, run.id, "reply", words.split("\n")[0].slice(0, 200), words);
+      for (const line of webSteps(res.content ?? [])) await addStep(admin, run.id, "action", line);
+      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
+    },
+    kindOf: draftKindOf,
+    needsApproval: () => false,
+    execute: (call) => executeCall(call),
+    onUsage: recordUsage,
+    afterTurn: () => saveTranscript(),
+    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
+    cancelled: async () => {
+      const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
+      return data?.status === "cancelled";
+    },
+  }, { maxTurnsThisCall: MAX_TURNS_PER_SLICE, maxTotalTurns: turnBudget, deadline });
+
+  await saveTranscript();
+  switch (outcome.kind) {
+    case "finished": {
+      if (finished?.kind === "ready") {
+        await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+        await complete(finished.reason || "起草がまとまりました。テストと審査に進めます。");
+        return;
+      }
+      if (finished?.kind === "testing_wait") {
+        await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+        await rest(finished.reason);
+        return;
+      }
+      if (finished) {
+        await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+        await complete(finished.reason);
+        return;
+      }
+      await rest(outcome.finish.summary);
+      await addStep(admin, run.id, "reply", outcome.finish.summary, outcome.finish.message);
+      return;
+    }
+    case "yield": {
+      const token = crypto.randomUUID();
+      const { data: armed } = await admin.from("agent_runs").update({ continuation_token: token, continuation_count: run.continuation_count + 1 })
+        .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+      if (!armed) return;
+      await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+        body: JSON.stringify({ runId: run.id, continue: true, token }),
+      }).catch(async (e) => rest("続きを開始できませんでした", errorMessage(e), "paused"));
+      return;
+    }
+    case "approval":
+      await rest("承認が要る操作は起草ではできません", "承認が要る操作は起草ではできません", "paused");
+      return;
+    case "limit":
+      await rest("この発言への作業が上限に達しました。続けるには、もう一度話しかけてください。");
+      return;
+    case "budget": {
+      const why = usage.cost >= MAX_RUN_COST_USD
+        ? `この起草の上限（$${MAX_RUN_COST_USD}）に達しました。`
+        : run.activity_space_id ? "この Space の今月の AI 予算の上限に達しました。" : "今月の AI 予算（個人）の上限に達しました。";
+      await rest("予算の上限に達しました", why, "paused");
+      await addStep(admin, run.id, "error", "予算の上限に達しました", why);
+      return;
+    }
+    case "cancelled":
+      await addStep(admin, run.id, "status", "停止しました");
+      return;
+    case "refusal":
+      await rest("モデルがこの依頼を断りました", outcome.detail.slice(0, 300));
       return;
   }
 }

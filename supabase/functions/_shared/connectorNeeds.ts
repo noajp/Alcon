@@ -9,6 +9,10 @@
 export const CONNECTOR_PRESET_NAMES: Record<string, string> = {
   linear: "Linear", asana: "Asana", "google-drive": "Google Drive", github: "GitHub", slack: "Slack",
   deepseek: "DeepSeek", kimi: "Kimi", "custom-mcp": "Custom MCP", "custom-http": "Custom API", "custom-model": "Custom model API",
+  // A connection the AI drafted and a person activated (G4): the preset
+  // marks its provenance, so settings, reconcile and audits can tell it
+  // from one a person built by hand.
+  "ai-drafted": "AI drafted",
 };
 
 /** The fold connector names are matched by (the same fold as checkHarness and the web's installFlow). */

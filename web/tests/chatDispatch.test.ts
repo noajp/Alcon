@@ -30,6 +30,12 @@ describe('driverForRun (one driver per subject)', () => {
     expect(dispatch.driverForRun(subject({ ai_session_id: 's1', mode: 'copilot' }))).toBe('chat');
     expect(dispatch.driverForRun(subject({ mode: 'copilot' }))).toBe('chat');
   });
+
+  it('a draft’s run is the drafting driver (G4)', () => {
+    expect(dispatch.driverForRun(subject({ integration_draft_id: 'd1', mode: 'draft' }))).toBe('draft');
+    // The Element still outranks every other subject.
+    expect(dispatch.driverForRun(subject({ element_id: 'e1', integration_draft_id: 'd1', mode: 'draft' }))).toBe('execute');
+  });
 });
 
 describe('entryForBody and the claim table', () => {
@@ -54,6 +60,8 @@ describe('entryForBody and the claim table', () => {
     expect(dispatch.messageAllowed('converse')).toBe(true);
     expect(dispatch.messageAllowed('chat')).toBe(true);
     expect(dispatch.messageAllowed('execute')).toBe(false);
+    // A draft takes the person's answer to its question, and "fix this".
+    expect(dispatch.messageAllowed('draft')).toBe(true);
   });
 });
 

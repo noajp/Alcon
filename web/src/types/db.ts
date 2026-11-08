@@ -28,6 +28,7 @@ import type {
   MeasureReadingSource, MemberRole, NotificationKind, ObjectTabType, PersonalAccessTokenAccess,
   PhaseStatus, StrategyDelegation, StrategyScope, StrategyStatus, WorkerAvailabilityKind, WorkerSkillLevel,
   Element, ElementComment, IssuedPersonalAccessToken,
+  IntegrationDraftStatus, DraftRequestContext, DraftDrop, DraftChangeEvent,
 } from './database'
 import type { ElementImportResult, ElementImportRow } from '@/Function/shared/element/intakeModel'
 import type { DeploymentGrant, GrantOperation } from '@/Function/audit/auditModel'
@@ -107,6 +108,17 @@ interface ColumnOverrides {
     kind: 'mcp' | 'http' | 'model'
     auth_type: 'none' | 'bearer' | 'header' | 'oauth'
     delegation: 'approve_each' | 'full_delegation'
+  }
+  integration_drafts: {
+    kind: 'http'
+    status: IntegrationDraftStatus
+    auth_type: 'none' | 'bearer' | 'header' | 'oauth'
+    request_context: DraftRequestContext
+    test_inputs: Record<string, Record<string, unknown>>
+    sources: string[]
+    required_commands: string[]
+    dropped_commands: DraftDrop[]
+    change_events: DraftChangeEvent[]
   }
   code_changes: { provider: 'github'; state: CodeChangeState; linked_via: 'manual' | 'agent' }
   code_change_reviews: { verdict: 'comment' | 'matches' | 'needs_changes' }

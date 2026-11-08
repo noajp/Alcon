@@ -11,20 +11,22 @@ export interface RunSubject {
   element_id: string | null;
   strategy_id: string | null;
   ai_session_id: string | null;
+  integration_draft_id?: string | null;
   mode: string;
 }
 
 /**
  * One driver per subject: an Element's work, a Strategy conversation, a
- * Copilot chat. A run with no subject cannot exist (the subject check
- * sees to that); it would fall to execute, which refuses it for having
- * no Element.
+ * Copilot chat, a connection draft. A run with no subject cannot exist
+ * (the subject check sees to that); it would fall to execute, which
+ * refuses it for having no Element.
  */
-export type DriverKind = "execute" | "converse" | "chat";
+export type DriverKind = "execute" | "converse" | "chat" | "draft";
 
 export function driverForRun(run: RunSubject): DriverKind {
   if (run.element_id) return "execute";
   if (run.strategy_id) return "converse";
+  if (run.integration_draft_id) return "draft";
   if (run.ai_session_id || run.mode === "copilot") return "chat";
   return "execute";
 }
@@ -45,11 +47,12 @@ export function entryForBody(body: {
   return "start";
 }
 
-/** Pure. A person's words may be posted to a conversation — a Strategy's
- *  or the Copilot's chat — never to a work run, whose words are its
+/** Pure. A person's words may be posted to a conversation — a Strategy's,
+ *  the Copilot's chat, or a draft (the answer to its question, or "fix
+ *  this" after a test) — never to a work run, whose words are its
  *  Element's record. */
 export function messageAllowed(driver: DriverKind): boolean {
-  return driver === "converse" || driver === "chat";
+  return driver === "converse" || driver === "chat" || driver === "draft";
 }
 
 export interface ClaimRule {
