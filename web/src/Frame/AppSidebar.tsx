@@ -145,6 +145,7 @@ export function AppSidebar({
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
+  const { label: aiLabel, icon: AiIcon } = MODE_META.ai;
   const [draggingDomain, setDraggingDomain] = useState<Domain | null>(null);
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return SIDEBAR_MIN_WIDTH;
@@ -368,10 +369,15 @@ export function AppSidebar({
               a list in the main island where their nesting shows), then
               Execution (the Domains, where
               the work is done). */}
-          {/* The fixed top of every sidebar: Strategy, then the tools. What
-              sits under it is the open surface's own list — the Domains for
-              the Workspace, the tables for Table, and so on. */}
+          {/* The fixed top of every sidebar: the AI, then Strategy, then
+              the tools. What sits under it is the open surface's own
+              list — the Domains for the Workspace, the tables for Table,
+              and so on. */}
           <div className="mt-5">
+            {viewInScope('ai', spaceScope) && (
+              <SidebarRow active={activeView === 'ai'} icon={<AiIcon size={16} />} label={t(aiLabel)}
+                onClick={() => onViewChange('ai')} />
+            )}
             {viewInScope('strategy', spaceScope) && (
               <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
                 onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />

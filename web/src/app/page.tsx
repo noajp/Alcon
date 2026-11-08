@@ -14,6 +14,7 @@ import { CreateView, type CreateType, type CreateResult } from '@/Frame/CreateVi
 import { CommandPalette } from '@/Frame/CommandPalette';
 import { QuickAddElementLauncher } from '@/Frame/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
+import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
 import { CopilotProvider } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
 import { mergeNavigation, navigationAfterDomainChange, navigationForView } from '@/Frame/navigationState';
@@ -386,15 +387,31 @@ function WorkspaceContent({
   // until someone asks for it. On Slides it is the open deck's assistant.
   const [copilotOpen, handleCopilotOpenChange] = useState(false);
   const onSlides = activeTab.activeView === 'slides';
-  // The copilot's subject: the open deck on Slides, the open Strategy on
-  // its view — context for its next send, never powers.
-  const openStrategyId = activeTab.activeView === 'strategy' ? activeTab.navigation.strategyId ?? null : null;
   // The pop-up's expand button opens the AI screen; the screen's shrink
   // button goes back to where the person was, with the pop-up open.
   const lastViewRef = useRef('home');
   useEffect(() => {
     if (activeTab.activeView !== 'ai') lastViewRef.current = activeTab.activeView;
   }, [activeTab.activeView]);
+  // The last Strategy the person had open. The AI screen keeps it as
+  // the conversation's subject, so a send there speaks about the
+  // Strategy they came from — the subject the pop-up would have
+  // carried. State, adjusted during render (MainContent's notebook
+  // pattern): the subject below reads it while rendering, which a ref
+  // cannot do.
+  const [lastStrategyId, setLastStrategyId] = useState<string | null>(null);
+  if (activeTab.activeView === 'strategy' && activeTab.navigation.strategyId
+      && activeTab.navigation.strategyId !== lastStrategyId) {
+    setLastStrategyId(activeTab.navigation.strategyId);
+  }
+  // The copilot's subject — context for its next send, never powers.
+  // Both windows onto the conversation (pop-up and AI screen) get the
+  // same one.
+  const subject = copilotSubjectFor({
+    activeView: activeTab.activeView,
+    strategyId: activeTab.navigation.strategyId ?? null,
+    lastStrategyId,
+  });
   const handleExpandAi = () => {
     handleCopilotOpenChange(false);
     setActiveView('ai');
@@ -642,6 +659,7 @@ function WorkspaceContent({
                       onNewNoteHandled={() => setPendingNewNote(0)}
                       activeDomainId={activeDomainId}
                       onMinimizeAi={handleMinimizeAi}
+                      aiSubject={subject}
                     />
                   </div>
                 );
@@ -651,7 +669,7 @@ function WorkspaceContent({
           </div>
           {!aiScreen && (
             <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange}
-              subject={onSlides ? { kind: 'slides' } : openStrategyId ? { kind: 'strategy', id: openStrategyId } : null}
+              subject={subject}
               variant="floating" onExpand={onSlides ? undefined : handleExpandAi} />
           )}
         </div>
