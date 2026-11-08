@@ -308,7 +308,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
             <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done}
               onRetry={!streaming && m.role === 'assistant' && i === messages.length - 1 ? () => retry({ context: contextNow() }) : undefined}
               onEdit={!streaming && i === lastUser ? editLast : undefined}
-              onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve) => void decideApproval(a, approve, contextNow().spaceId) : undefined} />
+              onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve) => void decideApproval(a, approve) : undefined} />
           ))}
           {error && (
             <div role="alert" className="text-[11.5px] text-[var(--status-danger)]">

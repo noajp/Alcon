@@ -273,6 +273,88 @@ async function decideAgentAction(opts: {
   });
 }
 
+// ── Copilot approvals ─────────────────────────────────────────────────────
+// A Copilot session's anchor run holds its approvals as agent_actions like
+// any run's; the panel and the Inbox decide them through the same engine
+// path, identified by the action's id and the hash of what was shown.
+
+/** One agent action by id — the Inbox's approval card reads its own. */
+export async function fetchAgentActionById(actionId: string): Promise<AgentAction | null> {
+  const { data, error } = await supabase
+    .from('agent_actions')
+    .select('*')
+    .eq('id', actionId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as AgentAction) ?? null;
+}
+
+/** A run's status, for following a decision's resume to its rest. */
+export async function fetchAgentRunStatus(runId: string): Promise<AgentRunStatus | null> {
+  const { data, error } = await supabase
+    .from('agent_runs')
+    .select('status')
+    .eq('id', runId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.status as AgentRunStatus) ?? null;
+}
+
+/** Decide a Copilot approval through the engine, by id and shown hash. */
+export async function decideAgentActionById(opts: {
+  runId: string;
+  actionId: string;
+  inputHash: string;
+  approve: boolean;
+  note?: string;
+}): Promise<void> {
+  await invokeEngine({
+    runId: opts.runId,
+    decision: {
+      actionId: opts.actionId, approve: opts.approve, inputHash: opts.inputHash, note: opts.note?.trim() || undefined,
+    },
+  });
+}
+
+/** An action and the run it waits on, for a surface that decides it (the
+ *  Inbox). Only the run's starter may decide — the engine refuses anyone
+ *  else; `canDecide` lets the card say so instead of offering buttons. */
+export function useAgentAction(actionId: string | null) {
+  const [action, setAction] = useState<AgentAction | null>(null);
+  const [run, setRun] = useState<{ id: string; status: AgentRunStatus; triggered_by: string | null; ai_session_id: string | null } | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!actionId) { setAction(null); setRun(null); return; }
+    setLoading(true);
+    try {
+      const [a, uid] = await Promise.all([fetchAgentActionById(actionId), getCurrentUserId()]);
+      setMe(uid ?? null);
+      setAction(a);
+      if (a) {
+        const { data } = await supabase.from('agent_runs')
+          .select('id, status, triggered_by, ai_session_id').eq('id', a.run_id).maybeSingle();
+        setRun((data as typeof run) ?? null);
+      } else setRun(null);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [actionId]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the server when the card's action changes
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  return {
+    action, run, loading, error, refresh,
+    canDecide: !!action && action.status === 'pending' && !!run && !!me && run.triggered_by === me,
+  };
+}
+
 // Runtime check for settings screens — the engine reports whether its
 // model key is configured.
 export async function pingAgentRuntime(): Promise<{

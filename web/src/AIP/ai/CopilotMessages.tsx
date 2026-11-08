@@ -75,9 +75,10 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
  * chat: the same contract as a run's approval card — the operations and
  * where they go, a critical warning, the calls bound to exactly this
  * input — at the panel's size. Approving runs exactly these calls with
- * exactly this input; denying (or leaving the chat) runs nothing. The
- * decision is the person at the keyboard's, here and now: unlike a run's
- * approval, this one is not a queue someone else can pick up later.
+ * exactly this input; denying runs nothing. A persisted card (one with a
+ * run and an action) is a run's approval like any other: it waits in the
+ * Inbox too, for the person who started the conversation, and lapses
+ * after seven days undecided.
  */
 function ApprovalCard({ approval, onDecide }: {
   approval: CopilotApproval;
@@ -151,6 +152,9 @@ function ApprovalCard({ approval, onDecide }: {
       {status === 'executing' && <div className="mt-2"><Working label="Working" /></div>}
       {status === 'denied' && (
         <div className="mt-2 text-[11.5px] text-muted-foreground">{t('You denied this operation. It was not run.')}</div>
+      )}
+      {status === 'expired' && (
+        <div className="mt-2 text-[11.5px] text-muted-foreground">{t('This approval expired undecided. It was not run.')}</div>
       )}
       {(status === 'executed' || status === 'failed') && approval.results && (
         <ul className="mt-2 space-y-0.5">

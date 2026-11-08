@@ -6,7 +6,11 @@
 //                                      picks up runs that stopped: automation
 //                                      runs paused for a session or never
 //                                      handed over, and any run left running
-//                                      with no step written for a long while
+//                                      with no step written for a long while.
+//                                      The same tick lapses Copilot
+//                                      approvals left undecided past their
+//                                      seven days (Element approvals never
+//                                      expire).
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -22,6 +26,9 @@ import { nextCronRun } from "../_shared/cron.ts";
 import { sessionFor } from "../_shared/actAs.ts";
 import { checkHarness, parseDefinition } from "../_shared/definition.ts";
 import { usableDefinition } from "../_shared/definitionResolution.ts";
+import { appendDecisionResults, type LoopState, type Msg, type PendingApproval } from "../_shared/agentLoop.ts";
+import { expiredApprovalResults, withApprovalDecision } from "../_shared/copilotSession.ts";
+import { COPILOT_AGENT_NAME, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,9 +142,48 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
   }
 }
 
+/**
+ * A Copilot approval left undecided past its expiry lapses: the action is
+ * expired (claimed atomically, so two ticks never seal it twice), the
+ * paused turn is answered with the expiry — its transcript stays sendable
+ * for the person's next message — the anchor rests, the kept card is
+ * marked, and the starter is told. Only a Copilot session's approvals
+ * carry an expiry; an Element's approval blocks one task and waits.
+ */
+async function expireCopilotApproval(env: Env, actionId: string, runId: string): Promise<boolean> {
+  const { data: run } = await env.admin.from("agent_runs").select("id, ai_session_id, triggered_by, transcript")
+    .eq("id", runId).maybeSingle();
+  if (!run?.ai_session_id) return false;
+  const { data: claimed } = await env.admin.from("agent_actions").update({ status: "expired" })
+    .eq("id", actionId).eq("status", "pending").select("id").maybeSingle();
+  if (!claimed) return false;
+  const transcript = run.transcript as { messages?: Msg[]; turns?: number; nudges?: number; pending?: PendingApproval } | null;
+  if (transcript?.pending) {
+    const state: LoopState = {
+      messages: transcript.messages ?? [], turns: transcript.turns ?? 0,
+      nudges: transcript.nudges ?? 0, revisions: 0,
+    };
+    appendDecisionResults(state, transcript.pending, expiredApprovalResults(transcript.pending.calls));
+    const clean = JSON.parse(JSON.stringify({ messages: state.messages, turns: state.turns, nudges: state.nudges }).replace(/\\u0000/g, ""));
+    await env.admin.from("agent_runs").update({ transcript: clean }).eq("id", runId);
+  }
+  await env.admin.from("agent_runs").update({ status: "paused", summary: "承認の期限が切れました" })
+    .eq("id", runId).eq("status", "awaiting_approval");
+  await updateCopilotSessionMessages(env.admin, run.ai_session_id as string, (messages) =>
+    withApprovalDecision(messages, actionId, { status: "expired" }));
+  if (run.triggered_by) {
+    await env.admin.from("notifications").insert({
+      recipient_id: run.triggered_by, actor_name: COPILOT_AGENT_NAME, kind: "status_change",
+      agent_action_id: actionId, title: "承認の期限が切れました",
+      body: "7日間判断されなかったため、この操作は実行されませんでした。",
+    }).then(() => {}, () => {});
+  }
+  return true;
+}
+
 async function tick(env: Env): Promise<Record<string, number>> {
   const now = new Date();
-  let fired = 0, scheduled = 0, resumed = 0;
+  let fired = 0, scheduled = 0, resumed = 0, expired = 0;
 
   // A schedule with no next time yet (made outside the screen, or its cron fixed).
   const { data: unset } = await env.admin.from("automations").select("id, cron, timezone")
@@ -201,7 +247,16 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: could not revive", r.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed };
+
+  // Copilot approvals whose seven days ran out undecided.
+  const { data: lapsing } = await env.admin.from("agent_actions").select("id, run_id")
+    .eq("status", "pending").not("expires_at", "is", null).lt("expires_at", now.toISOString())
+    .limit(20);
+  for (const a of lapsing ?? []) {
+    try { if (await expireCopilotApproval(env, a.id as string, a.run_id as string)) expired += 1; }
+    catch (e) { console.error("automations: could not expire", a.id, e instanceof Error ? e.message : e); }
+  }
+  return { fired, scheduled, resumed, expired };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

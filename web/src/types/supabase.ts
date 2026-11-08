@@ -96,7 +96,8 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           decision_note: string | null
-          element_id: string
+          element_id: string | null
+          expires_at: string | null
           id: string
           input: Json
           input_hash: string
@@ -113,7 +114,8 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
-          element_id: string
+          element_id?: string | null
+          expires_at?: string | null
           id?: string
           input?: Json
           input_hash: string
@@ -130,7 +132,8 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
-          element_id?: string
+          element_id?: string | null
+          expires_at?: string | null
           id?: string
           input?: Json
           input_hash?: string
@@ -254,6 +257,7 @@ export type Database = {
       agent_runs: {
         Row: {
           activity_space_id: string | null
+          ai_session_id: string | null
           continuation_count: number
           continuation_token: string | null
           cost_usd: number
@@ -284,6 +288,7 @@ export type Database = {
         }
         Insert: {
           activity_space_id?: string | null
+          ai_session_id?: string | null
           continuation_count?: number
           continuation_token?: string | null
           cost_usd?: number
@@ -314,6 +319,7 @@ export type Database = {
         }
         Update: {
           activity_space_id?: string | null
+          ai_session_id?: string | null
           continuation_count?: number
           continuation_token?: string | null
           cost_usd?: number
@@ -3567,6 +3573,7 @@ export type Database = {
         Row: {
           actor_id: string | null
           actor_name: string | null
+          agent_action_id: string | null
           body: string | null
           comment_id: string | null
           created_at: string
@@ -3587,6 +3594,7 @@ export type Database = {
         Insert: {
           actor_id?: string | null
           actor_name?: string | null
+          agent_action_id?: string | null
           body?: string | null
           comment_id?: string | null
           created_at?: string
@@ -3607,6 +3615,7 @@ export type Database = {
         Update: {
           actor_id?: string | null
           actor_name?: string | null
+          agent_action_id?: string | null
           body?: string | null
           comment_id?: string | null
           created_at?: string

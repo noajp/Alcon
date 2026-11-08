@@ -8,6 +8,7 @@ import type { ToolKind } from "../_shared/agentLoop.ts";
 // because the run's own modules (and the engine tests) import them from here.
 import { INTEGRATION_SEPARATOR, integrationPrefix, uniqueToolName } from "../_shared/integrationTools.ts";
 export { INTEGRATION_SEPARATOR, integrationPrefix, uniqueToolName };
+export { approvalSummary } from "../_shared/integrationTools.ts";
 
 // What an Element-executing agent can do. Alcon's own operations come from the
 // one catalog under the Element policy (reads and writes, nothing that
@@ -148,14 +149,4 @@ export function baseKindOf(name: string): ToolKind | null {
   if (INTERNAL.has(name)) return "internal";
   if (isCatalogTool(name)) return "board";
   return null;
-}
-
-/** Pure. "Echo Test · POST /notify × 3、Linear · create_issue" — one line for a batch of writes. */
-export function approvalSummary(display: { integration: string; operation: string }[]): string {
-  const groups = new Map<string, number>();
-  for (const d of display) {
-    const key = `${d.integration} · ${d.operation || "書き込み"}`;
-    groups.set(key, (groups.get(key) ?? 0) + 1);
-  }
-  return [...groups.entries()].map(([k, n]) => (n > 1 ? `${k} × ${n}` : k)).join("、");
 }

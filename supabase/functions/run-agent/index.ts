@@ -40,7 +40,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import Anthropic from "npm:@anthropic-ai/sdk@0.110.0";
 import { runBoardTool, errorMessage, type BoardActor, type ToolDef } from "../_shared/boardTools.ts";
 import { runStrategyTool } from "../_shared/strategyTools.ts";
-import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, type ModelUsage } from "../_shared/aiPricing.ts";
+import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, costOf, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
   McpSession, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow,
 } from "../_shared/integrationClient.ts";
@@ -72,9 +72,17 @@ import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateP
 import { checkHarness, checkOutput, checksDue, definitionPrompt, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, type RunnerRow } from "./runnerTools.ts";
 import {
-  runLoop, appendDecisionResults, canonicalCalls,
-  type LoopState, type ToolCall, type ToolKind, type ToolResult, type PendingApproval, type FinishPayload, type Msg,
+  runLoop, canonicalCalls,
+  type LoopState, type ToolCall, type ToolKind, type FinishPayload, type Msg,
+  type PendingApproval,
 } from "../_shared/agentLoop.ts";
+import { applyDecision, makeRememberApproval, restorePendingApproval, type SavedPending } from "./decision.ts";
+import { buildCopilotTurn, type CopilotTurn } from "../_shared/copilotTurn.ts";
+import { COPILOT_AGENT_NAME, persistCopilotApproval, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
+import {
+  copilotApprovalExpiresAt, resumedAssistantMessage, withApprovalDecision,
+  type PanelMessage, type PanelToolEvent,
+} from "../_shared/copilotSession.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,7 +115,6 @@ async function sha256(text: string): Promise<string> {
 }
 
 
-type SavedPending = PendingApproval & { approved?: boolean; results?: ToolResult[] };
 type Transcript = {
   messages: Msg[]; turns: number; nudges: number;
   /** Times the verifier sent a finish back. */
@@ -119,7 +126,7 @@ type Transcript = {
   pending?: SavedPending;
 };
 type Run = {
-  id: string; element_id: string; strategy_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
+  id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
   transcript: Transcript | null; step_count: number; model: string | null;
   input_tokens: number; output_tokens: number; cost_usd: number; activity_space_id: string | null;
@@ -223,6 +230,9 @@ Deno.serve(async (req: Request) => {
 
   // A conversation goes on with the person's next message.
   const conversation = !!run.strategy_id && !run.element_id;
+  // A Copilot session's anchor run: driven only by decisions on the
+  // approval it holds (and the continuations those set in motion).
+  const copilotRun = !!run.ai_session_id && !run.element_id && !run.strategy_id;
   const said = typeof body.message === "string" ? body.message.trim() : "";
   if (body.message !== undefined) {
     if (!conversation) return json({ error: "この実行は会話ではありません。" }, 400);
@@ -251,7 +261,7 @@ Deno.serve(async (req: Request) => {
   if (!claimed) return json({ error: `この実行は今その操作を受け付けません（${run.status}）。` }, 409);
 
   const args: ExecArgs = { req, run, user: { id: user.id, email: user.email ?? null }, jwt, admin, userDb, anthropicKey: anthropicKey ?? null, body, supabaseUrl };
-  const work = (conversation ? converse(args, said) : execute(args))
+  const work = (conversation ? converse(args, said) : copilotRun ? resumeCopilot(args) : execute(args))
     .catch(async (e) => {
       console.error("run-agent error", e);
       await pauseOnError(admin, run, errorMessage(e));
@@ -887,99 +897,30 @@ async function execute(a: ExecArgs): Promise<void> {
   // slice cut off before it stopped) goes back to waiting for it — sending
   // the transcript on with an unanswered tool_use would fail every time.
   if (pending && !pending.approved && !a.body.decision) {
-    const { data: open } = await admin.from("agent_actions").select("id").eq("run_id", run.id).eq("status", "pending").maybeSingle();
-    if (!open) {
-      const display = pending.calls.map((c) => approvalDisplayFor(c));
-      await admin.from("agent_actions").insert({
-        run_id: run.id, element_id: run.element_id, tool_use_id: pending.calls[0].id, tool: pending.calls.length === 1 ? pending.calls[0].name : "batch",
-        input: { calls: pending.calls, display }, input_hash: await sha256(canonicalCalls(pending.calls)), summary: approvalSummary(display),
-      });
-    }
-    await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running");
-    await addStep(admin, run.id, "approval", "承認待ちに戻しました");
+    await restorePendingApproval({
+      admin, runId: run.id, elementId: run.element_id, pending,
+      displays: pending.calls.map((c) => approvalDisplayFor(c)),
+      sha256, addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
+    });
     return;
   }
 
-  // A standing approval: the command these calls are, with the chosen
-  // fields' values, runs without asking from now on. Written through the
-  // starter's session, so only a Space owner can add one (the integration's
-  // own RLS). It never fails the decision it rides on.
-  const rememberApproval = async (calls: ToolCall[], fields: string[]) => {
-    const its = calls.map((c) => integrationTools.get(c.name));
-    const first = its[0];
-    const command = first?.command;
-    // A critical operation asks every time; it never becomes a standing rule.
-    if (its.some((it) => criticalOfTool(it))) {
-      await addStep(admin, run.id, "approval", "重要な操作は、今後の自動実行の条件にできません");
-      return;
-    }
-    if (!first || !command || its.some((it) => it?.integration.id !== first.integration.id || it?.command?.name !== command.name)) {
-      await addStep(admin, run.id, "approval", first && !command
-        ? "以後の承認は保存できませんでした: 条件を結び付けるコマンドがこの連携にありません"
-        : "以後の承認は保存できませんでした: 同じコマンドの呼び出しだけを条件にできます");
-      return;
-    }
-    const rule = ruleFromCalls(calls.map((c) => c.input), fields);
-    if ("error" in rule) { await addStep(admin, run.id, "approval", `以後の承認は保存できませんでした: ${rule.error}`); return; }
-    const { data: row } = await userDb.from("integrations").select("manifest").eq("id", first.integration.id).maybeSingle();
-    const manifest = withRule(row?.manifest, command.name, rule);
-    const { data: saved } = manifest
-      ? await userDb.from("integrations").update({ manifest, updated_at: new Date().toISOString() }).eq("id", first.integration.id).select("id")
-      : { data: null };
-    const condition = Object.entries(rule.when).map(([k, v]) => `${k} = ${v}`).join(", ");
-    await addStep(admin, run.id, "approval", saved?.length
-      ? `以後、${command.name}（${condition}）は確認なしで実行します`
-      : "以後の承認は保存できませんでした: 連携のルールを変えられるのは Space のオーナーだけです");
-  };
+  // A standing approval, written when a decision asks to remember it
+  // (decision.ts; the Copilot's resume driver shares the same writer).
+  const rememberApproval = makeRememberApproval({
+    userDb, tools: integrationTools,
+    addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
+  });
 
-  // ── A decision answers the paused turn first ────────────────────────────
-  if (a.body.decision && pending) {
-    const d = a.body.decision;
-    const { data: action } = await admin.from("agent_actions").select("*").eq("id", d.actionId ?? "").eq("run_id", run.id).maybeSingle();
-    if (!action || action.status !== "pending") throw new Error("この承認依頼はもう処理されています。");
-    if (d.approve) {
-      await admin.from("agent_actions").update({ status: "approved", decided_by: user.id, decided_at: new Date().toISOString(), decision_note: d.note ?? null }).eq("id", action.id);
-      await addStep(admin, run.id, "approval", "承認されました", d.note ?? null);
-      if (d.remember?.length) await rememberApproval(pending.calls, d.remember);
-      pending = { ...pending, approved: true, results: [] };
-      await saveTranscript(pending);
-    } else {
-      await admin.from("agent_actions").update({ status: "rejected", decided_by: user.id, decided_at: new Date().toISOString(), decision_note: d.note ?? null }).eq("id", action.id);
-      await addStep(admin, run.id, "approval", "却下されました", d.note ?? null);
-      const rejected: ToolResult[] = pending.calls.map((call) => ({
-        type: "tool_result", tool_use_id: call.id, is_error: true,
-        content: `実行を始めた人が却下しました。${d.note ? `理由・指示: ${d.note}` : ""} 実行していません。指示に沿って案を直すか、finish してください。`,
-      }));
-      appendDecisionResults(state, pending, rejected);
-      pending = undefined;
-      await saveTranscript();
-    }
-  }
-
-  // An approved batch runs to the end, its progress saved as it goes; if the
-  // slice runs out of time mid-batch, the next slice picks up where it left.
-  if (pending?.approved) {
-    const results = pending.results ?? [];
-    const done = new Set(results.map((r) => r.tool_use_id));
-    for (const call of pending.calls) {
-      if (done.has(call.id)) continue;
-      if (Date.now() >= deadline) {
-        await saveTranscript({ ...pending, results });
-        await scheduleContinuation();
-        return;
-      }
-      let r: { content: string; is_error?: boolean };
-      try { r = await executeCall(call, true); } catch (e) { r = { content: `Error: ${errorMessage(e)}`, is_error: true }; }
-      results.push({ type: "tool_result", tool_use_id: call.id, content: r.content, ...(r.is_error ? { is_error: true } : {}) });
-      await saveTranscript({ ...pending, results });
-    }
-    const failed = results.filter((r) => r.is_error).length;
-    await admin.from("agent_actions").update({ status: failed === pending.calls.length ? "failed" : "executed", result: { failed, total: pending.calls.length } })
-      .eq("run_id", run.id).eq("status", "approved");
-    appendDecisionResults(state, pending, results);
-    pending = undefined;
-    await saveTranscript();
-  }
+  // ── A decision answers the paused turn first (decision.ts) ─────────────
+  const decisionOutcome = await applyDecision(state, pending, a.body.decision, {
+    admin, runId: run.id, userId: user.id,
+    addStep: (type, title, detail) => addStep(admin, run.id, type, title, detail),
+    saveTranscript, executeApproved: (call) => executeCall(call, true),
+    rememberApproval, scheduleContinuation, deadline,
+  });
+  if (decisionOutcome.continued) return;
+  pending = decisionOutcome.pending;
 
   // ── Model ───────────────────────────────────────────────────────────────
   // Another provider gets the plain Messages API: no betas, no cache marks.
@@ -1419,6 +1360,263 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     case "refusal":
       await wait("モデルがこの依頼を断りました", outcome.detail.slice(0, 300));
       return;
+  }
+}
+
+// ── The Copilot's anchor: a decision resumes the paused chat turn ────────
+// serve() claimed the run (status running) — because the person decided
+// (the pre-check verified the decision against the action and the saved
+// pending), or because a continuation carries the turn on. The work
+// mirrors a run's own: the approved batch runs through the shared decision
+// path (decision.ts), the turn continues with the Copilot's own tools, and
+// what it says is written back into the kept conversation
+// (ai_sessions.messages), which is the display's truth. The anchor ends
+// paused either way — it belongs to a session, not to a task that finishes.
+async function resumeCopilot(a: ExecArgs): Promise<void> {
+  stepBase.delete(a.run.id);
+  stepNext.delete(a.run.id);
+  const { run, admin, userDb, user } = a;
+  const sessionId = run.ai_session_id!;
+  const bound = (type: string, title: string, detail?: string | null) => addStep(admin, run.id, type, title, detail);
+  const deadline = Date.now() + SLICE_MS;
+
+  const state: LoopState = {
+    messages: run.transcript?.messages ?? [],
+    turns: run.transcript?.turns ?? 0,
+    nudges: run.transcript?.nudges ?? 0,
+    revisions: 0,
+  };
+  let pending = run.transcript?.pending as SavedPending | undefined;
+  const hadWork = !!pending;
+
+  // The turn's tools, rebuilt for this slice by the same assembly the chat
+  // used; its steps land on the anchor as tool events for the kept message.
+  const toolEvents: PanelToolEvent[] = [];
+  const turn: CopilotTurn = await buildCopilotTurn({
+    userDb, admin,
+    context: { spaceId: run.activity_space_id ?? undefined, today: new Date().toISOString().slice(0, 10) },
+    supabaseUrl: a.supabaseUrl,
+    actor: { agent: COPILOT_AGENT_NAME, userId: user.id },
+    events: {
+      onToolResult: (r) => {
+        toolEvents.push({
+          name: r.name,
+          result: r.ok
+            ? { ok: true, ...(r.rows !== undefined ? { rows: r.rows } : {}) }
+            : { ok: false, ...(r.error ? { error: r.error } : {}) },
+        });
+      },
+    },
+  });
+  const displaysFor = (calls: ToolCall[]) => calls.map((c) => approvalDisplayForCall(turn.toolset?.tools ?? new Map(), c));
+
+  const saveTranscript = async (p: SavedPending | undefined = pending) => {
+    const transcript: Transcript = {
+      messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: 0,
+      ...(p ? { pending: p } : {}),
+    };
+    const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
+    const { error } = await admin.from("agent_runs").update({ transcript: clean }).eq("id", run.id);
+    if (error) throw new Error(`経過を保存できませんでした: ${error.message}`);
+  };
+
+  const scheduleContinuation = async () => {
+    const token = crypto.randomUUID();
+    const { data: armed } = await admin.from("agent_runs").update({ continuation_token: token, continuation_count: run.continuation_count + 1 })
+      .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+    if (!armed) return;
+    await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+      body: JSON.stringify({ runId: run.id, continue: true, token }),
+    }).catch(() => {});
+  };
+
+  const pause = async (summary: string) => {
+    await admin.from("agent_runs").update({ status: "paused", summary: summary.slice(0, 300), continuation_token: null })
+      .eq("id", run.id).eq("status", "running");
+  };
+
+  // A claim with nothing to answer (a stale continue): the unanswered
+  // proposal goes back to waiting, as in execute().
+  if (pending && !pending.approved && !a.body.decision) {
+    await restorePendingApproval({
+      admin, runId: run.id, elementId: null, pending,
+      displays: displaysFor(pending.calls),
+      integrationId: turn.toolset?.tools.get(pending.calls[0].name)?.integration.id ?? null,
+      expiresAt: copilotApprovalExpiresAt(new Date()),
+      sha256, addStep: bound,
+    });
+    return;
+  }
+
+  // The pending's action row, for settling its card afterwards: a fresh
+  // decision names it, a batch continuation finds it by its first call.
+  let pendingActionId: string | null = a.body.decision?.actionId ?? null;
+  const decidedCalls = pending?.calls ?? [];
+  if (pending && !pendingActionId) {
+    const { data: act } = await admin.from("agent_actions").select("id")
+      .eq("run_id", run.id).eq("tool_use_id", pending.calls[0].id).maybeSingle();
+    pendingActionId = (act?.id as string | undefined) ?? null;
+  }
+
+  const rememberApproval = makeRememberApproval({ userDb, tools: turn.toolset?.tools ?? new Map(), addStep: bound });
+  const decisionOutcome = await applyDecision(state, pending, a.body.decision, {
+    admin, runId: run.id, userId: user.id, addStep: bound,
+    saveTranscript, executeApproved: turn.execute, rememberApproval, scheduleContinuation, deadline,
+  });
+  if (decisionOutcome.continued) return;
+  pending = decisionOutcome.pending;
+  const decided = decisionOutcome.decided;
+
+  // The decided card settles in the kept conversation before the turn goes
+  // on: its status, and what each of its calls answered.
+  if (decided && pendingActionId) {
+    const results = decided.results.map((r) => {
+      const call = decidedCalls.find((c) => c.id === r.tool_use_id);
+      return { name: call?.name ?? "tool", ok: !r.is_error, content: r.content.slice(0, 300) };
+    });
+    const status = !decided.approved ? "denied"
+      : decided.results.length > 0 && decided.results.every((r) => r.is_error) ? "failed" : "executed";
+    await updateCopilotSessionMessages(admin, sessionId, (messages) =>
+      withApprovalDecision(messages, pendingActionId!, { status, results }));
+  }
+
+  // A plain claim on a paused anchor with nothing pending has no turn to
+  // continue; hand the anchor back to rest.
+  if (!hadWork) { await pause(run.summary ?? "承認待ち"); return; }
+
+  const notifyDone = async (summary: string) => {
+    if (!run.triggered_by || !decided || !pendingActionId) return;
+    await admin.from("notifications").insert({
+      recipient_id: run.triggered_by, actor_name: COPILOT_AGENT_NAME, kind: "status_change",
+      agent_action_id: pendingActionId, title: "承認の続きが終わりました", body: summary.slice(0, 300),
+    }).then(() => {}, () => {});
+  };
+
+  if (!a.anthropicKey) {
+    // The decision above stands; only the continuation cannot run. The
+    // anchor pauses rather than fails — failing would end the session's
+    // anchor and strand the transcript it carries.
+    await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
+      resumedAssistantMessage({ text: "承認の結果は記録しましたが、続きを実行できませんでした（ANTHROPIC_API_KEY が設定されていません）。", toolEvents })]);
+    await pause("続きを実行できませんでした");
+    await notifyDone("承認の結果は記録しましたが、続きを実行できませんでした");
+    return;
+  }
+  const modelClient = new Anthropic({ apiKey: a.anthropicKey });
+
+  // ── Budget: the anchor's spend counts toward the Space's month ────────
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+  let budget = USER_MONTHLY_BUDGET_USD;
+  let spentQuery = admin.from("agent_runs").select("cost_usd").gte("created_at", monthStart.toISOString()).neq("id", run.id);
+  if (run.activity_space_id) {
+    const { data: space } = await admin.from("activity_spaces").select("ai_monthly_budget_usd").eq("id", run.activity_space_id).maybeSingle();
+    budget = Number(space?.ai_monthly_budget_usd ?? 20);
+    spentQuery = spentQuery.eq("activity_space_id", run.activity_space_id);
+  } else {
+    spentQuery = spentQuery.is("activity_space_id", null).eq("triggered_by", user.id);
+  }
+  const { data: spent } = await spentQuery;
+  const spentBefore = (spent ?? []).reduce((s: number, r: { cost_usd: number | string }) => s + Number(r.cost_usd || 0), 0);
+  let usage = { input: run.input_tokens, output: run.output_tokens, cost: Number(run.cost_usd || 0) };
+  const recordUsage = async (u: ModelUsage) => {
+    usage = {
+      input: usage.input + (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+      output: usage.output + (u.output_tokens ?? 0),
+      cost: Math.round((usage.cost + costOf(DEFAULT_AGENT_MODEL, u)) * 1_000_000) / 1_000_000,
+    };
+    await admin.from("agent_runs").update({ input_tokens: usage.input, output_tokens: usage.output, cost_usd: usage.cost }).eq("id", run.id);
+  };
+
+  const lastWords = (): string => {
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const m = state.messages[i];
+      if (m.role !== "assistant" || !Array.isArray(m.content)) continue;
+      const text = (m.content as { type: string; text?: string }[])
+        .filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
+      if (text) return text;
+    }
+    return "";
+  };
+
+  const outcome = await runLoop(state, {
+    callModel: async (messages) => {
+      // deno-lint-ignore no-explicit-any
+      const res: any = await modelClient.messages.create({
+        model: DEFAULT_AGENT_MODEL,
+        max_tokens: 16000,
+        system: turn.system,
+        // deno-lint-ignore no-explicit-any
+        tools: turn.toolParams as any,
+        // deno-lint-ignore no-explicit-any
+        messages: messages as any,
+      // deno-lint-ignore no-explicit-any
+      } as any, { signal: AbortSignal.timeout(Math.max(deadline - Date.now(), 1)) });
+      return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
+    },
+    kindOf: turn.kindOf,
+    needsApproval: turn.needsApproval,
+    execute: turn.execute,
+    onUsage: recordUsage,
+    afterTurn: () => saveTranscript(),
+    budgetExceeded: () => spentBefore + usage.cost >= budget || usage.cost >= MAX_RUN_COST_USD,
+    cancelled: async () => {
+      const { data } = await admin.from("agent_runs").select("status").eq("id", run.id).maybeSingle();
+      return data?.status === "cancelled";
+    },
+  }, { maxTurnsThisCall: MAX_TURNS_PER_SLICE, maxTotalTurns: state.turns + 24, deadline });
+
+  switch (outcome.kind) {
+    case "finished": {
+      await saveTranscript();
+      const text = outcome.finish.message || outcome.finish.summary;
+      await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
+        resumedAssistantMessage({ text, toolEvents })]);
+      await bound("reply", outcome.finish.summary, outcome.finish.message);
+      await pause(outcome.finish.summary);
+      await notifyDone(outcome.finish.summary);
+      return;
+    }
+    case "approval": {
+      // The continued turn stops for approval again: the same persistence
+      // as the first stop, and a fresh card in the kept conversation.
+      const p = outcome.pending;
+      const persisted = await persistCopilotApproval({
+        admin, run, pending: p, messages: state.messages, turns: state.turns, nudges: state.nudges,
+        displays: displaysFor(p.calls),
+        integrationId: turn.toolset?.tools.get(p.calls[0].name)?.integration.id ?? null,
+      });
+      await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
+        resumedAssistantMessage({
+          text: lastWords(), toolEvents,
+          approval: { calls: p.calls, inputHash: persisted.inputHash, status: "pending", runId: run.id, actionId: persisted.actionId },
+        })]);
+      await bound("approval", "承認待ち", persisted.summary);
+      return;
+    }
+    case "yield":
+      await saveTranscript();
+      await scheduleContinuation();
+      return;
+    case "cancelled":
+      await saveTranscript();
+      await bound("status", "停止しました");
+      return;
+    default: {
+      // limit / budget / refusal: the turn stops here; the kept
+      // conversation says so, and the anchor rests for the next message.
+      await saveTranscript();
+      const note = outcome.kind === "budget" ? "予算の上限に達したため、続きは止まりました。"
+        : outcome.kind === "refusal" ? "モデルがこの依頼を断ったため、続きは止まりました。"
+        : "作業の上限に達したため、続きは止まりました。チャットで話しかけると続けられます。";
+      await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
+        resumedAssistantMessage({ text: note, toolEvents })]);
+      if (outcome.kind === "budget") await bound("error", "予算の上限に達しました", note);
+      await pause(note);
+      await notifyDone(note);
+      return;
+    }
   }
 }
 

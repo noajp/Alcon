@@ -28,26 +28,52 @@ const titleOf = (messages: CopilotMessage[]) => {
 };
 
 export function CopilotProvider({ children }: { children: ReactNode }) {
-  const conversation = useAlconCopilot();
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  // The hook reads the session through refs: it is created before the
+  // library exists, and its callbacks must see the current session, not
+  // the one from the render that created them.
+  const sessionIdRef = useRef<string | null>(null);
+  const loadRef = useRef<((kept: CopilotMessage[]) => void) | null>(null);
+  const loadMessagesRef = useRef<((id: string) => Promise<unknown[] | null>) | null>(null);
+  const adoptSession = useCallback((id: string | null) => {
+    sessionIdRef.current = id;
+    setSessionId(id);
+  }, []);
+  const conversation = useAlconCopilot({
+    getSessionId: () => sessionIdRef.current,
+    // A turn's first event: the function anchored it on this session (it
+    // creates the row on a first turn), so the kept conversation the
+    // provider saves at the end is that row, not a second one.
+    onSessionId: adoptSession,
+    reloadSession: async () => {
+      const id = sessionIdRef.current;
+      if (!id || !loadMessagesRef.current || !loadRef.current) return false;
+      const kept = await loadMessagesRef.current(id);
+      if (!kept) return false;
+      loadRef.current(kept as CopilotMessage[]);
+      return true;
+    },
+  });
   const spaceId = useActiveSpaceId();
   const library = useAiConversations(spaceId);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const folderForNew = useRef<string | null>(null);
   const { messages, streaming, reset, load } = conversation;
   const { saveSession, loadMessages } = library;
+  useEffect(() => { loadRef.current = load; }, [load]);
+  useEffect(() => { loadMessagesRef.current = loadMessages; }, [loadMessages]);
 
   const newConversation = useCallback((folderId: string | null = null) => {
     reset();
     folderForNew.current = folderId;
-    setSessionId(null);
-  }, [reset]);
+    adoptSession(null);
+  }, [reset, adoptSession]);
 
   const openSession = useCallback(async (id: string) => {
     const kept = await loadMessages(id);
     if (!kept) return;
     load(kept as CopilotMessage[]);
-    setSessionId(id);
-  }, [loadMessages, load]);
+    adoptSession(id);
+  }, [loadMessages, load, adoptSession]);
 
   // Another Space has its own conversations.
   // eslint-disable-next-line react-hooks/set-state-in-effect -- the Space is an outside store; its change starts afresh
@@ -61,7 +87,8 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     if (!finished || messages.length === 0) return;
     // A file's contents are not kept, only its name. An approval card is
     // kept whole: a batch left pending can still be decided when the
-    // conversation is reopened (its calls and hash are the whole record).
+    // conversation is reopened — a persisted card through its run and
+    // action, an unanchored one through its calls and hash.
     const kept = messages.map(({ role, content, toolEvents, attachments, approvals }) => ({
       role, content,
       ...(toolEvents?.length ? { toolEvents } : {}),
@@ -69,8 +96,8 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
       ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
     }));
     void saveSession(sessionId, { title: titleOf(messages), folder_id: folderForNew.current, messages: kept })
-      .then((id) => { if (id && id !== sessionId) setSessionId(id); });
-  }, [streaming, messages, sessionId, saveSession]);
+      .then((id) => { if (id && id !== sessionId) adoptSession(id); });
+  }, [streaming, messages, sessionId, saveSession, adoptSession]);
 
   return (
     <CopilotContext.Provider value={{ ...conversation, library, sessionId, openSession, newConversation }}>

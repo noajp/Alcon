@@ -1114,6 +1114,8 @@ export interface Notification {
   invitation_id?: string | null
   /** The gateway's approval request an 'approval_requested' notification is about. */
   workflow_approval_id?: string | null
+  /** The agent approval an 'approval_requested' notification is about, when it has no Element (a Copilot session's). */
+  agent_action_id?: string | null
   title: string
   body: string | null
   is_read: boolean
@@ -1163,7 +1165,7 @@ export type AgentRunStatus =
   | 'failed'
   | 'cancelled'
 
-export type AgentRunMode = 'execute' | 'reply' | 'converse'
+export type AgentRunMode = 'execute' | 'reply' | 'converse' | 'copilot'
 
 export type AgentRunStepType =
   | 'plan'
@@ -1194,6 +1196,8 @@ export interface AgentRun {
   element_id: string | null
   /** The Strategy a conversation run is about; null for an Element's run. */
   strategy_id: string | null
+  /** The Copilot session an anchor run belongs to; null for every other run. */
+  ai_session_id: string | null
   domain_id: string | null
   worker_id: string | null
   status: AgentRunStatus
@@ -1409,13 +1413,14 @@ export interface IssuedPersonalAccessToken {
   token: string
 }
 
-export type AgentActionStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'failed'
+export type AgentActionStatus = 'pending' | 'approved' | 'rejected' | 'executed' | 'failed' | 'expired'
 
 /** One proposal waiting for (or decided by) a person — an external write, or a batch of them. */
 export interface AgentAction {
   id: string
   run_id: string
-  element_id: string
+  /** The Element whose run waits; null when the run's subject is not an Element (a Copilot session). */
+  element_id: string | null
   tool: string
   input: { calls?: { id: string; name: string; input: Record<string, unknown> }[] }
   input_hash: string
@@ -1426,6 +1431,8 @@ export interface AgentAction {
   decided_at: string | null
   decision_note: string | null
   result: Record<string, unknown> | null
+  /** When an undecided proposal lapses; only a Copilot session's approvals carry one. */
+  expires_at: string | null
   created_at: string
 }
 

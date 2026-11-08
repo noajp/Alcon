@@ -128,6 +128,17 @@ export function approvalDisplayForCall(tools: Map<string, IntegrationTool>, c: T
   };
 }
 
+/** Pure. One line naming what a batch of calls will do, grouping the
+ *  same operation: "GitHub · create_issue × 3、Slack · post_message". */
+export function approvalSummary(display: { integration: string; operation: string }[]): string {
+  const groups = new Map<string, number>();
+  for (const d of display) {
+    const key = `${d.integration} · ${d.operation || "書き込み"}`;
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  return [...groups.entries()].map(([k, n]) => (n > 1 ? `${k} × ${n}` : k)).join("、");
+}
+
 /**
  * The facts needsApprovalFor judges for one integration call, gathered the
  * one way every caller gathers them: a manifest command is decided by its

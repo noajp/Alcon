@@ -64,9 +64,23 @@ export function useAiConversations(spaceId: string | null) {
     if (!spaceId) return null;
     const updated_at = new Date().toISOString();
     if (id) {
-      const { error: e } = await supabase.from('ai_sessions').update({ messages: patch.messages, updated_at }).eq('id', id);
+      // A session the function created for its anchor starts untitled and
+      // loose: the first save fills its title in (only while it is still
+      // empty — a rename is never overwritten) and files it in the folder
+      // the conversation was started in, when one was chosen.
+      const { data: cur } = await supabase.from('ai_sessions').select('title').eq('id', id).maybeSingle();
+      const fillTitle = cur && !cur.title && patch.title ? patch.title : null;
+      const { error: e } = await supabase.from('ai_sessions').update({
+        messages: patch.messages, updated_at,
+        ...(fillTitle ? { title: fillTitle } : {}),
+        ...(patch.folder_id != null ? { folder_id: patch.folder_id } : {}),
+      }).eq('id', id);
       if (e) { setError(e.message); return id; }
-      setSessions((prev) => [...prev.filter((s) => s.id !== id), ...prev.filter((s) => s.id === id).map((s) => ({ ...s, updated_at }))]
+      setSessions((prev) => [...prev.filter((s) => s.id !== id), ...prev.filter((s) => s.id === id).map((s) => ({
+        ...s, updated_at,
+        ...(fillTitle ? { title: fillTitle } : {}),
+        ...(patch.folder_id != null ? { folder_id: patch.folder_id } : {}),
+      }))]
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
       return id;
     }
