@@ -29,22 +29,23 @@ import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { Chip } from './BoardColumn';
 
 // The Element card: every Execution Chain draws the same one.
-// Top to bottom: past its due date, said first; the chips — the verb it asks
-// for, its priority, and what the Status cannot say (waiting on a person, an
-// AI run); the Status mark (it opens the status menu) and the title across
-// the card's width; "↳" the Object it belongs to, when the host names it;
-// then, under a rule, the assignee and AI control at the left and the due
-// date and comments at the right — one date only: when the work last moved
-// is the Activity signal's tooltip, not a second date on the card.
+// Top to bottom: the headline — the Status mark (it opens the status menu),
+// the title on one line, and the priority mark at the right; "↳" the Object
+// it belongs to, when the host names it; the chips — the verb it asks for,
+// what the Status cannot say (waiting on a person, an AI run), and its days
+// past due when it is overdue; then, under a rule, the assignee and AI
+// control at the left and the due date and comments at the right — one date
+// only: when the work last moved is the Activity signal's tooltip, not a
+// second date on the card.
 // Title, due date, priority and assignee are edited on the card; the card
 // drags with the Element's id ('text/id'), and the host decides what a drop
 // means.
 
-// A card title reads at most two lines — beyond that it ellipsises (the
-// whole title lives on the Element's own view), and the inline rename box
-// grows to the same two lines before it scrolls. Both numbers are the
+// A card title reads on one line — beyond that it ellipsises (the whole
+// title lives on the Element's own view, and in the title's tooltip), and
+// the inline rename box is the same one line. The number is the
 // `leading-[22px]` line box, so the box never jumps on click.
-const TITLE_MAX_LINES = 2;
+const TITLE_MAX_LINES = 1;
 const TITLE_LINE_HEIGHT = 22;
 
 interface ElementCardProps {
@@ -56,7 +57,8 @@ interface ElementCardProps {
   /** Before the title, at the left. Defaults to the Status mark, which opens
    *  the status menu; a host passes its own to act on a change. */
   lead?: React.ReactNode;
-  /** Beside the title, after the verb chip — what the status cannot say (an AI run). */
+  /** In the chips row under the headline, after the verb chip — what the
+   *  status cannot say (an AI run). */
   badge?: React.ReactNode;
   /** The Object the Element belongs to, shown as a chip under the title. */
   object?: { name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
@@ -92,8 +94,9 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
   // A title changed elsewhere replaces the draft, during render.
   const [titleFor, setTitleFor] = useState(element.title);
   if (titleFor !== element.title) { setTitleFor(element.title); setTitleDraft(element.title); }
-  // The rename box is a textarea sized to its own content: a fixed rows={1}
-  // collapsed a wrapped title to a single line the moment it was clicked.
+  // The rename box is a textarea sized to its own content, capped at the
+  // title's one line: a fixed rows={1} alone would let it grow past the
+  // line box the resting title reads in.
   const titleRef = React.useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     const el = titleRef.current;
@@ -168,53 +171,10 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
       className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
     >
       <div className="px-3.5 py-3.5">
-        {/* Past its due date and still open: said first, across the top. */}
-        {overdueDays > 0 && (
-          <p className="mb-1.5 text-[11px] font-medium" style={{ color: 'var(--status-danger)' }}>
-            {t('{n} days past due', { n: overdueDays })}
-          </p>
-        )}
-        {/* The chips: what it asks for, how urgent, and what the Status
-            cannot say (waiting on a person, an AI run). */}
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {isElementAction(element.action) && <Chip><ActionTag action={element.action} /></Chip>}
-          {/* Medium is the default — an unset priority reads as medium
-              everywhere else in the app — so a medium chip on every card is
-              noise. Like unset, it stays out of the resting card and
-              appears on hover, where it can still be changed. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" onPointerDown={stop} onClick={stop}
-                className={cn('rounded-md transition-colors', priority && priority !== 'medium' ? 'inline-flex' : 'hidden group-hover/card:inline-flex group-focus-within/card:inline-flex data-[state=open]:inline-flex')}>
-                <Chip className="hover:bg-muted">
-                  {priority ? <><PriorityMark priority={priority} /><span>{t(PRIORITY[priority]?.label ?? priority)}</span></> : <span>{t('Priority')}</span>}
-                </Chip>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[140px]" onPointerDown={stop}>
-              {PRIORITY_ORDER.map((p) => (
-                <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
-                  <PriorityMark priority={p} />
-                  <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>
-                  {priority === p && <Check size={12} className="text-muted-foreground" />}
-                </DropdownMenuItem>
-              ))}
-              {priority && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => savePriority(null)} className="text-[12px] text-muted-foreground">
-                    {t('Clear')}
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {badge}
-        </div>
-
-        {/* The Status mark, then the title across the card's width. */}
-        <div className="mt-2 flex items-start gap-2">
-          {/* The mark sits on the title's first line: its box is the line box. */}
+        {/* The headline: the Status mark, the title on one line, and the
+            priority at the row's right end. */}
+        <div className="flex items-start gap-2">
+          {/* The mark sits on the title's line: its box is the line box. */}
           <div className="flex h-[22px] shrink-0 items-center">
             {lead ?? (
               <span onPointerDown={stop} onClick={stop} className="flex">
@@ -223,33 +183,65 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
             )}
           </div>
           <div className="min-w-0 flex-1">
-            {editingTitle ? (
-              <textarea
-                autoFocus
-                ref={titleRef}
-                rows={1}
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onBlur={saveTitle}
-                onKeyDown={(e) => {
-                  // Enter (not an IME conversion) and Escape both end the rename
-                  // and save, like the detail page's title.
-                  if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
-                }}
-                onPointerDown={stop}
-                onClick={stop}
-                className="w-full text-[14px] font-medium text-foreground leading-[22px] bg-transparent border-none resize-none overflow-y-auto"
-              />
-            ) : (
-              <p
-                className="text-[14px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text line-clamp-2 break-words"
-                title={t('Click to rename')}
-                onPointerDown={stop}
-                onClick={(e) => { stop(e); setEditingTitle(true); }}
-              >
-                {element.title}
-              </p>
-            )}
+            <div className="flex items-center gap-1.5">
+              {editingTitle ? (
+                <textarea
+                  autoFocus
+                  ref={titleRef}
+                  rows={1}
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={saveTitle}
+                  onKeyDown={(e) => {
+                    // Enter (not an IME conversion) and Escape both end the rename
+                    // and save, like the detail page's title.
+                    if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
+                  }}
+                  onPointerDown={stop}
+                  onClick={stop}
+                  className="min-w-0 flex-1 text-[14px] font-medium text-foreground leading-[22px] bg-transparent border-none resize-none overflow-y-auto"
+                />
+              ) : (
+                <p
+                  className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
+                  title={element.title}
+                  onPointerDown={stop}
+                  onClick={(e) => { stop(e); setEditingTitle(true); }}
+                >
+                  {element.title}
+                </p>
+              )}
+              {/* The priority: the mark alone, always on the card — the slot
+                  never appears or vanishes, and unset reads as the muted
+                  mark. The menu keeps the words. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" onPointerDown={stop} onClick={stop}
+                    title={priority ? t(PRIORITY[priority]?.label ?? priority) : t('Priority')}
+                    aria-label={priority ? t(PRIORITY[priority]?.label ?? priority) : t('Priority')}
+                    className="inline-flex shrink-0 items-center justify-center rounded-md p-0.5 transition-colors hover:bg-muted">
+                    <PriorityMark priority={priority} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[140px]" onPointerDown={stop}>
+                  {PRIORITY_ORDER.map((p) => (
+                    <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
+                      <PriorityMark priority={p} />
+                      <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>
+                      {priority === p && <Check size={12} className="text-muted-foreground" />}
+                    </DropdownMenuItem>
+                  ))}
+                  {priority && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => savePriority(null)} className="text-[12px] text-muted-foreground">
+                        {t('Clear')}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             {/* Where it belongs. */}
             {object && (
               <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/80" title={object.name}>
@@ -261,6 +253,21 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
             )}
           </div>
         </div>
+        {/* The chips: past due first when it is, then what it asks for and
+            what the Status cannot say (waiting on a person, an AI run).
+            The row renders only when it has something to say. */}
+        {(overdueDays > 0 || isElementAction(element.action) || badge) && (
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+            {overdueDays > 0 && (
+              <Chip className="border-transparent"
+                style={{ color: 'var(--status-danger)', background: 'color-mix(in srgb, var(--status-danger) 14%, transparent)' }}>
+                {t('{n} days past due', { n: overdueDays })}
+              </Chip>
+            )}
+            {isElementAction(element.action) && <Chip><ActionTag action={element.action} /></Chip>}
+            {badge}
+          </div>
+        )}
         {extra}
 
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
