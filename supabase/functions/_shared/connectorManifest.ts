@@ -44,6 +44,13 @@
 //     blast-radius lane input B7's graduated autonomy reads. Absent is
 //     derived (reversibilityOf): a critical class → "none", any other
 //     write → "wide", a read → none of the lanes.
+//   quota (B11): on a write command — { "writes_per_hour": n }, the
+//     most writes to one target the command may settle within an hour
+//     before the circuit breaker holds the next one for a person. It
+//     is the breaker's same-target check with the manifest's own
+//     number (_shared/breakers.ts), so like verify it is enforcement:
+//     a malformed quota is a parse error and the command is left out,
+//     never read as "no limit".
 
 export type Effect = "read" | "write";
 export type Permission = "allow" | "ask" | "deny";
@@ -66,6 +73,17 @@ export interface VerifyDeclaration {
   command: string;
   expect: Record<string, unknown>;
   delayMs: number;
+}
+
+/**
+ * A write command's quota (manifest v2, back-half B11): the most writes
+ * to one target this command may settle within an hour before the
+ * circuit breaker holds the next one for a person. It overrides the
+ * breaker's standing same-target default for this command — the quota
+ * is the same check with the manifest's own number (design §B11).
+ */
+export interface CommandQuota {
+  writesPerHour: number;
 }
 
 export interface HttpMapping {
@@ -119,6 +137,9 @@ export interface ManifestCommand {
   verify: VerifyDeclaration | null;
   /** The declared blast radius, when the manifest says; null derives it. */
   reversibility: Reversibility | null;
+  /** The declared write quota (B11), when the manifest says; null
+   *  leaves the breaker's standing same-target default in force. */
+  quota: CommandQuota | null;
 }
 
 export interface Manifest {
@@ -210,6 +231,25 @@ export function parseVerify(raw: unknown): VerifyDeclaration | null | undefined 
  *  so a typo falls back to it rather than inventing a fourth lane). */
 export function parseReversibility(raw: unknown): Reversibility | null {
   return typeof raw === "string" && REVERSIBILITIES.has(raw) ? raw as Reversibility : null;
+}
+
+export const MAX_QUOTA_WRITES_PER_HOUR = 100_000;
+
+/**
+ * Pure. A command's quota declaration: undefined when it carries none,
+ * null when what it carries is malformed, the declaration otherwise.
+ * Malformed is distinct from absent for the same reason as verify: a
+ * quota is enforcement, so a writes_per_hour that is not a whole
+ * number in [1, MAX] is a parse error at the caller, never a limit
+ * that silently reads as none.
+ */
+export function parseQuota(raw: unknown): CommandQuota | null | undefined {
+  if (raw === undefined) return undefined;
+  const x = obj(raw);
+  if (!x) return null;
+  const n = x.writes_per_hour;
+  if (typeof n !== "number" || !Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > MAX_QUOTA_WRITES_PER_HOUR) return null;
+  return { writesPerHour: n };
 }
 
 /** Pure. The rules stored on a command; one that cannot be read is left out. */
@@ -339,6 +379,8 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
     if (!http && !mcp) { errors.push(`${name}: http か mcp のどちらかが必要です`); continue; }
     const verify = parseVerify(x.verify);
     if (verify === null) { errors.push(`${name}: verify の形が読めません（command と expect が必要です）`); continue; }
+    const quota = parseQuota(x.quota);
+    if (quota === null) { errors.push(`${name}: quota の形が読めません（writes_per_hour は 1 以上の整数にしてください）`); continue; }
     seen.add(name);
     commands.push({
       name, effect, permission, http, mcp,
@@ -350,6 +392,7 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       present: parsePresent(x.present),
       verify: verify ?? null,
       reversibility: parseReversibility(x.reversibility),
+      quota: quota ?? null,
     });
   }
   // A verify is only as real as its target: it must sit on a write and
@@ -533,6 +576,7 @@ export function manifestFromTools(tools: { name: string; description?: string; r
       ...(obj(before?.present) ? { present: before!.present } : {}),
       ...(obj(before?.verify) ? { verify: before!.verify } : {}),
       ...(parseReversibility(before?.reversibility) ? { reversibility: before!.reversibility } : {}),
+      ...(obj(before?.quota) ? { quota: before!.quota } : {}),
       description: (t.description ?? "").slice(0, 1000),
       mcp: t.name,
     });

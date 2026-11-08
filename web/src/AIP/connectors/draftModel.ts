@@ -218,6 +218,7 @@ interface TwinCommand {
   rules: { when: Record<string, string>; permission: 'allow' | 'ask' | 'deny' }[];
   verify: TwinVerify | null;
   reversibility: 'contained' | 'wide' | 'none' | null;
+  quota: { writesPerHour: number } | null;
 }
 
 const NAME_RE = /^[a-z][a-z0-9_]{0,47}$/;
@@ -253,6 +254,19 @@ function parseVerifyTwin(raw: unknown): TwinVerify | null | undefined {
   return { command: x.command, expect: { ...expectRaw }, delayMs };
 }
 
+/** A command's quota declaration, read as the server's parseQuota reads
+ *  it (B11): undefined when absent, null when malformed, the declaration
+ *  otherwise — a writes_per_hour that is not a whole number in
+ *  [1, 100000] is malformed, because a quota is enforcement. */
+function parseQuotaTwin(raw: unknown): { writesPerHour: number } | null | undefined {
+  if (raw === undefined) return undefined;
+  const x = obj(raw);
+  if (!x) return null;
+  const n = x.writes_per_hour;
+  if (typeof n !== 'number' || !Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > 100_000) return null;
+  return { writesPerHour: n };
+}
+
 /** A stored manifest read the way the server's parseManifest reads it —
  *  for manifests that were validated when drafted, so the loose cases
  *  here only mirror the server's refusals. */
@@ -285,6 +299,8 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
     if (!http && !mcp) continue;
     const verify = parseVerifyTwin(x.verify);
     if (verify === null) continue;
+    const quota = parseQuotaTwin(x.quota);
+    if (quota === null) continue;
     seen.add(name);
     const rules = (Array.isArray(x.rules) ? x.rules : []).flatMap((r): TwinCommand['rules'] => {
       const y = obj(r);
@@ -302,6 +318,7 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
       required: strings(x.required),
       verify: verify ?? null,
       reversibility: typeof x.reversibility === 'string' && REVERSIBILITIES.has(x.reversibility) ? x.reversibility as TwinCommand['reversibility'] : null,
+      quota: quota ?? null,
     });
   }
   // The server's second pass, mirrored: a verify must sit on a write and
@@ -328,7 +345,7 @@ export function draftStructureOfWeb(c: DraftContentLike): unknown {
   return {
     name: c.name, endpoint: c.endpoint, auth_type: c.auth_type, auth_header: c.auth_header, guide: c.guide,
     commands: commands
-      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility }))
+      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases,
   };

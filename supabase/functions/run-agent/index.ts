@@ -102,6 +102,9 @@ import {
   approvalModeOf, approvalVerdict, liftOf, verdictWithAutonomy, type ApprovalFacts, type ApprovalMode, type ApprovalVerdict,
 } from "../_shared/approvalPolicy.ts";
 import { grantFactFor, loadAutonomyGrantFacts, revokeAutonomyForIncident } from "../_shared/autonomy.ts";
+import {
+  evaluateBreakers, loadBreakerCounts, recordIntegrationCall, targetKeyOf, type BreakerTrip,
+} from "../_shared/breakers.ts";
 import { displaysUnderMode, recordPolicyApproval, settlePolicyApproval } from "../_shared/policyApproval.ts";
 import {
   capturePlanExpected, checkPlanDrift, expectedNote, matchPlanCall, planApplyNotice, planCallKey, planHashOf,
@@ -1077,6 +1080,20 @@ async function execute(a: ExecArgs): Promise<void> {
     // the GitHub pulls it opened to this run's Element stays the run's own
     // post-step.
     const r = await executeIntegrationTool(it, call);
+    // The record stage (B11): every dispatched manifest-command call
+    // settles one row in the circuit breaker's evidence log — reads
+    // and writes, landed or failed — before any later gate reads it
+    // back. Verify read-backs never pass through here (they recurse
+    // inside the executor), so a declared write counts once, as
+    // itself. Best effort by construction (recordIntegrationCall
+    // swallows its failures): the record is evidence, not the act.
+    if (it.command && run.activity_space_id) {
+      await recordIntegrationCall(admin, {
+        runId: run.id, spaceId: run.activity_space_id, integrationId: it.integration.id,
+        commandName: it.command.name, isWrite: it.command.effect === "write", ok: !r.isError,
+        targetKey: it.command.effect === "write" ? targetKeyOf(it.command, call.input) : null,
+      });
+    }
     if (r.isError && isAuthFailure(r.text)) {
       // A credential refused at call time is the connection's state,
       // not just this call's: record it on the row (assembly does the
@@ -1919,6 +1936,16 @@ async function execute(a: ExecArgs): Promise<void> {
     // offered it.
     rememberApproval: mode === "ask" ? undefined : rememberApproval, scheduleContinuation, deadline,
   });
+  if (decisionOutcome.decided) {
+    // A decision answers any circuit-breaker hold this run rested on
+    // (B11): the trip is acknowledged by the answer itself — approved
+    // or rejected, a person has now seen what tripped and judged it.
+    // Nothing else acknowledges a trip, and nothing auto-resumes one:
+    // this update only follows a person's recorded decision.
+    await admin.from("breaker_trips").update({
+      status: "acknowledged", acknowledged_by: user.id, acknowledged_at: new Date().toISOString(),
+    }).eq("run_id", run.id).eq("status", "open").then(() => {}, () => {});
+  }
   if (decisionOutcome.continued) return;
   pending = decisionOutcome.pending;
 
@@ -2074,6 +2101,39 @@ async function execute(a: ExecArgs): Promise<void> {
     return entry;
   };
 
+  // Circuit breakers (B11): the pre-write check the loop consults
+  // before the approval gate — §6's ordering, after manifest deny and
+  // before the approval composition (plan cover, sign-in, verdicts).
+  // Only manifest-command writes are judged: they are the calls with
+  // a target, a quota and a record. The check reads settled call
+  // records only (the log callIntegration settles at the record
+  // stage), and no verdict fact is consulted — not the mode, not a
+  // delegation, not a standing rule, not a track record — so none of
+  // them can lift a trip. A rehearsal plans its writes and a plan run
+  // records them; neither dispatches, so neither can trip.
+  const breakerTripsByCallId = new Map<string, BreakerTrip>();
+  const breakerHold = async (call: ToolCall): Promise<{ reason: string } | null> => {
+    if (run.rehearsal || planRun || !run.activity_space_id) return null;
+    const it = integrationTools.get(call.name);
+    if (!it?.command || it.command.effect !== "write") return null;
+    // A denied call is the policy's refusal, never the breaker's
+    // question: deny stands earlier in §6's ordering and the executor
+    // answers it as a refusal.
+    if (verdictForCall(call).base === "deny") return null;
+    const targetKey = targetKeyOf(it.command, call.input);
+    const counts = await loadBreakerCounts(admin, {
+      spaceId: run.activity_space_id, runId: run.id, integrationId: it.integration.id,
+      targetKey, now: new Date(),
+    });
+    const trip = evaluateBreakers(
+      { integrationId: it.integration.id, integrationName: it.integration.name, command: it.command, targetKey },
+      counts,
+    );
+    if (!trip) return null;
+    breakerTripsByCallId.set(call.id, trip);
+    return { reason: trip.reason };
+  };
+
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
       if (external) {
@@ -2120,6 +2180,7 @@ async function execute(a: ExecArgs): Promise<void> {
       return { content: res.content, stop_reason: res.stop_reason, usage: res.usage };
     },
     kindOf,
+    breakerHold,
     // A rehearsal never asks: its writes are blocked, not approved, so
     // nothing waits for a person mid-trial. A plan run never asks either:
     // its writes are recorded, not approved, and the plan as a whole is
@@ -2370,15 +2431,56 @@ async function execute(a: ExecArgs): Promise<void> {
       await flushLifted();
       await saveTranscript(outcome.pending);
       const calls = outcome.pending.calls;
+      // A circuit-breaker trip rests exactly like an approval wait —
+      // the same pending decision, the same answer path — but what the
+      // person is told is the trip: its reason is the action's summary
+      // and the run's one line, one breaker_trips row records it for
+      // audit, and the marker rides the action's input so every
+      // surface (and the heartbeat, which skips these actions in
+      // favour of the trip signal) knows this wait is a breaker hold.
+      const breakerTrip = outcome.breaker ? breakerTripsByCallId.get(outcome.breaker.call.id) ?? null : null;
       const display = displaysUnderMode(calls.map((c) => approvalDisplayFor(c)), mode);
-      const summary = approvalSummary(display);
+      const summary = breakerTrip ? breakerTrip.reason : approvalSummary(display);
       const inputHash = await sha256(canonicalCalls(calls));
-      const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+      const { data: waiting } = await admin.from("agent_runs").update(
+        breakerTrip ? { status: "awaiting_approval", summary } : { status: "awaiting_approval" },
+      ).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
       if (!waiting) return; // cancelled meanwhile
-      await admin.from("agent_actions").insert({
+      const actionRow = {
         run_id: run.id, element_id: run.element_id, tool_use_id: calls[0].id, tool: calls.length === 1 ? calls[0].name : "batch",
-        input: { calls, display }, input_hash: inputHash, summary, integration_id: integrationTools.get(calls[0].name)?.integration.id ?? null,
-      });
+        input: breakerTrip
+          ? { calls, display, breaker: { rule: breakerTrip.rule, target: breakerTrip.targetKey, evidence: breakerTrip.evidence } }
+          : { calls, display },
+        input_hash: inputHash, summary, integration_id: integrationTools.get(calls[0].name)?.integration.id ?? null,
+      };
+      let actionId: string | null = null;
+      if (breakerTrip) {
+        const { data: inserted } = await admin.from("agent_actions").insert(actionRow).select("id").single();
+        actionId = (inserted as { id: string } | null)?.id ?? null;
+        // The trip's audit row. Best effort like the notification
+        // below: the wait itself already stands, and a missing row
+        // loses the drill-down, never the pause.
+        await admin.from("breaker_trips").insert({
+          run_id: run.id, element_id: run.element_id, activity_space_id: run.activity_space_id,
+          action_id: actionId, rule: breakerTrip.rule, integration_id: breakerTrip.integrationId,
+          integration_name: breakerTrip.integrationName, command_name: breakerTrip.commandName,
+          target_key: breakerTrip.targetKey, evidence: breakerTrip.evidence, reason: breakerTrip.reason,
+        }).then(() => {}, () => {});
+        await addStep(admin, run.id, "approval", summary,
+          "承認すれば、このターンの書き込みをそのまま続行します。却下すれば、このターンの書き込みは実行されません。");
+        await admin.from("element_comments").insert({
+          element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+          content: `**サーキットブレーカーで停止** — ${summary}。内容を確認して、承認すれば続行、却下すれば停止します。`,
+        });
+        if (run.triggered_by) {
+          await admin.from("notifications").insert({
+            recipient_id: run.triggered_by, actor_name: agentName, kind: "approval_requested", element_id: run.element_id,
+            agent_action_id: actionId, title: `${agentName} がサーキットブレーカーで停止しました`, body: summary,
+          }).then(() => {}, () => {});
+        }
+        return;
+      }
+      await admin.from("agent_actions").insert(actionRow);
       await addStep(admin, run.id, "approval", `承認待ち: ${summary}`);
       // One line on the thread; the details live in the approval card.
       await admin.from("element_comments").insert({
@@ -3717,12 +3819,18 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
 
   // ── Approvals waiting (Element's, and the Copilot's expiring ones) ──
   const actions = await guard(
-    userDb.from("agent_actions").select("id, element_id, summary, created_at, expires_at")
+    userDb.from("agent_actions").select("id, element_id, summary, created_at, expires_at, input")
       .eq("status", "pending").order("created_at", { ascending: true }).limit(40),
-    [] as { id: string; element_id: string | null; summary: string; created_at: string; expires_at: string | null }[],
+    [] as { id: string; element_id: string | null; summary: string; created_at: string; expires_at: string | null; input: unknown }[],
   );
   const actionTitles = await titleOf(actions.map((x) => x.element_id));
   for (const x of actions) {
+    // A circuit-breaker hold (B11) waits as a pending action too, but
+    // it speaks through its own signal below — the one that carries
+    // the trip's reason — never as a plain approval wait as well.
+    const heldInput = x.input && typeof x.input === "object" && !Array.isArray(x.input)
+      ? (x.input as Record<string, unknown>) : null;
+    if (heldInput?.breaker) continue;
     const label = (x.element_id ? actionTitles.get(x.element_id) : null) ?? x.summary;
     if (x.expires_at) {
       signals.push({ kind: "approval_copilot", id: x.id, since: x.created_at, expiresAt: x.expires_at, label, place: "Copilot の会話で判断できます" });
@@ -3950,6 +4058,31 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
       createdAt: d.created_at,
       expiresAt: d.expires_at,
     }))));
+  }
+
+  // ── Circuit-breaker holds (B11) ──
+  // A trip rests its run on a pending decision; the wait that matters
+  // is the trip itself, whose reason line carries the rule, the target
+  // and the count. Only trips whose run still rests are signals — a
+  // trip a person already answered is acknowledged on its row, and a
+  // run that was cancelled out from under its hold no longer waits.
+  const tripRows = await guard(
+    userDb.from("breaker_trips").select("id, run_id, reason, created_at")
+      .eq("activity_space_id", spaceId).eq("status", "open")
+      .order("created_at", { ascending: true }).limit(20),
+    [] as { id: string; run_id: string; reason: string; created_at: string }[],
+  );
+  if (tripRows.length) {
+    const resting = await guard(
+      userDb.from("agent_runs").select("id").eq("activity_space_id", spaceId).eq("status", "awaiting_approval")
+        .in("id", tripRows.map((t) => t.run_id)),
+      [] as { id: string }[],
+    );
+    const restingIds = new Set(resting.map((r) => r.id));
+    for (const t of tripRows) {
+      if (!restingIds.has(t.run_id)) continue;
+      signals.push({ kind: "breaker_trip", id: t.id, since: t.created_at, label: t.reason, place: "Element の実行パネルで承認か却下を判断できます" });
+    }
   }
 
   return signals;

@@ -68,6 +68,18 @@ export interface LoopDeps {
    * them; drivers keep the answer cheap for the common call.
    */
   needsApproval(call: ToolCall): boolean | Promise<boolean>;
+  /**
+   * The circuit breaker's pre-write check (back-half B11), consulted
+   * for a turn's write-kind calls before needsApproval is asked about
+   * any of them (§6's ordering: the breaker stands before the approval
+   * composition). A non-null answer is a trip: the loop holds ALL of
+   * the turn's write-kind calls as one pending decision — a tripped
+   * run performs no further writes until a person answers — and the
+   * outcome carries the hold, so the driver can record what tripped.
+   * The verdict machinery is never consulted about a trip: no mode,
+   * delegation, standing rule or track record can lift one.
+   */
+  breakerHold?(call: ToolCall): Promise<{ reason: string } | null>;
   execute(call: ToolCall): Promise<ExecResult>;
   /** Called with every response's usage; record cost here. */
   onUsage(usage: ModelUsage): Promise<void>;
@@ -133,7 +145,14 @@ export interface PendingApproval {
 
 export type LoopOutcome =
   | { kind: "finished"; finish: FinishPayload }
-  | { kind: "approval"; pending: PendingApproval }
+  | {
+      kind: "approval"; pending: PendingApproval;
+      /** Set when the wait is a circuit-breaker trip (B11), not an
+       *  approval composition's ask: the call that tripped and the
+       *  one-line reason the run rests on. The pending is decided the
+       *  same way — approve continues the batch, reject stops it. */
+      breaker?: { call: ToolCall; reason: string };
+    }
   | { kind: "yield" }
   | { kind: "limit" }
   | { kind: "budget" }
@@ -202,9 +221,25 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       continue;
     }
 
+    const writeCalls = calls.filter((c) => deps.kindOf(c.name) === "write");
+    // The breaker is consulted before the approval gate (§6's
+    // ordering), and before anything in the turn executes: one trip
+    // holds the turn's writes as a unit, including any the gate would
+    // have let run unasked — a tripped run performs no further writes
+    // until a person answers.
+    let breaker: { call: ToolCall; reason: string } | null = null;
+    if (deps.breakerHold) {
+      for (const c of writeCalls) {
+        const hold = await deps.breakerHold(c);
+        if (hold) { breaker = { call: c, reason: hold.reason }; break; }
+      }
+    }
     const writes: ToolCall[] = [];
-    for (const c of calls) {
-      if (deps.kindOf(c.name) === "write" && await deps.needsApproval(c)) writes.push(c);
+    if (breaker) writes.push(...writeCalls);
+    else {
+      for (const c of writeCalls) {
+        if (await deps.needsApproval(c)) writes.push(c);
+      }
     }
     const finishCall = calls.find((c) => deps.kindOf(c.name) === "finish");
     const immediate = calls.filter((c) => !writes.includes(c) && c !== finishCall);
@@ -226,7 +261,7 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       if (finishCall) {
         results.push({ type: "tool_result", tool_use_id: finishCall.id, content: "承認待ちの操作があるため、まだ完了できません。承認の結果を受け取ってから finish してください。", is_error: true });
       }
-      return { kind: "approval", pending: { calls: writes, partial: results } };
+      return { kind: "approval", pending: { calls: writes, partial: results }, ...(breaker ? { breaker } : {}) };
     }
 
     if (finishCall) {
