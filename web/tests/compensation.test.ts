@@ -16,7 +16,7 @@ const {
 const cmd = (over: Partial<ManifestCommand> & { name: string }): ManifestCommand => ({
   action: over.name, effect: 'write', permission: 'allow', description: '',
   input: {}, required: [], http: null, mcp: null, rules: [], present: null,
-  verify: null, reversibility: null, quota: null, undo: null, ...over,
+  verify: null, reversibility: null, quota: null, undo: null, transform: null, ...over,
 });
 
 const closeIssue = cmd({

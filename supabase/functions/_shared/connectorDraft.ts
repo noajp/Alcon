@@ -242,11 +242,12 @@ export function validateGuide(guide: string | null, endpointHost: string | null)
  * stay read=allow / write=ask, a write's permission is exactly ask with
  * no allow rule anywhere on it, a read's name must not carry a writing
  * verb, the endpoint must pass the same guard every request passes, the
- * auth is a key-shaped one (OAuth cannot be drafted), the guide obeys
- * validateGuide, and — when the person's own host is known — the
- * endpoint must sit in that host's registrable domain. Errors are
- * Japanese, in parseManifest's voice, because they go straight back to
- * the drafting model as its feedback.
+ * auth is a key-shaped one (OAuth cannot be drafted), no command may
+ * name a response transform (a code reference is first-party only),
+ * the guide obeys validateGuide, and — when the person's own host is
+ * known — the endpoint must sit in that host's registrable domain.
+ * Errors are Japanese, in parseManifest's voice, because they go
+ * straight back to the drafting model as its feedback.
  */
 export function validateDraftCandidate(
   c: DraftCandidate,
@@ -289,6 +290,11 @@ export function validateDraftCandidate(
     errors.push(`command は1ドラフト ${MAX_DRAFT_COMMANDS} 件までです（仕事に近いものを優先してください）`);
   }
   for (const cmd of manifest.commands) {
+    // A named transform is a code reference, and code references are
+    // first-party equipment: the drafting model does not get to point
+    // a command at one (design §3.4). An unknown name has already
+    // failed in parseManifest; a known one fails here.
+    if (cmd.transform) errors.push(`${cmd.name}: transform（名前付きのレスポンス整形）は起草では使えません（第一者のマニフェスト専用です）`);
     if (cmd.effect === "write") {
       if (cmd.permission !== "ask") errors.push(`${cmd.name}: 書き込みの permission は ask にしてください（起草では allow にも deny にもできません）`);
       if (cmd.rules.some((r) => r.permission === "allow")) errors.push(`${cmd.name}: 書き込みに allow の rule は付けられません（永続許可は人が後から設定します）`);
@@ -374,7 +380,11 @@ export async function draftContentHash(c: DraftContent): Promise<string> {
  *  raw manifest whole.) The undo declaration rides here as well (B9):
  *  how a write is cleaned up after is part of what the command is,
  *  not of who may run it, so it moves the structure hash and never
- *  the permission hash. */
+ *  the permission hash. A command's transform reference rides here
+ *  too (P1T), on the same reasoning: how an answer is shaped is what
+ *  the command is. (A draft itself may never carry one —
+ *  validateDraftCandidate refuses; the projection still reads it, so
+ *  a first-party manifest's structure is hashed the same way.) */
 export function draftStructureOf(c: DraftContent): unknown {
   const { manifest } = parseManifest(c.manifest);
   return {
@@ -384,6 +394,7 @@ export function draftStructureOf(c: DraftContent): unknown {
         name: cmd.name, action: cmd.action, effect: cmd.effect,
         http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required,
         verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota, undo: cmd.undo,
+        transform: cmd.transform,
       }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases: manifest.aliases,
