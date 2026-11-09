@@ -1,5 +1,6 @@
 'use client';
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useState } from 'react';
 import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from '@/ui/icons';
 import type { Notification } from '@/hooks/useSupabase';
@@ -48,9 +49,12 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
   const rows = visible.slice(0, renderLimit);
 
   return (
-    <section aria-label={t('Notifications')} className="mt-3">
-      <header className="flex h-6 items-center gap-1 px-2">
-        <h2 className="text-[12px] font-medium text-muted-foreground/80">{t('Inbox')}</h2>
+    <section aria-label={t('Notifications')}>
+      {/* The page's title row: Inbox heads the list, level with the other
+          pages' 50px headers (the island beside it shows the open one). */}
+      <header className="sticky -top-1 z-10 -mx-1.5 -mt-1 mb-1 flex h-[50px] items-center gap-1.5 border-b border-border/60 bg-card px-3">
+        <SidebarReveal />
+        <h2 className="text-[13px] font-medium text-foreground">{t('Inbox')}</h2>
         {inbox.unreadCount > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">{inbox.unreadCount}</span>}
         <div className="flex-1" />
         <ButtonAppearanceProvider appearance="navigation">
