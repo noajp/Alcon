@@ -21,7 +21,6 @@ import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
-import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { ActionTag } from '@/Function/shared/elementAction';
 import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
@@ -29,9 +28,9 @@ import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { Chip } from './BoardColumn';
 
 // The Element card: every Execution Chain draws the same one.
-// Top to bottom: the headline — the Status mark (it opens the status menu),
-// the title on one line, and the priority mark at the right; "↳" the Object
-// it belongs to, when the host names it; the chips — the verb it asks for,
+// Top to bottom: the headline — the title on one line, and the priority
+// mark at the right; the Object it belongs to as a chip under the title,
+// when the host names it; the chips — the verb it asks for,
 // what the Status cannot say (waiting on a person, an AI run), and its days
 // past due when it is overdue; then, under a rule, the assignee and AI
 // control at the left and the due date and comments at the right — one date
@@ -54,9 +53,6 @@ interface ElementCardProps {
   /** A plain click on the card (not a drag, not one of its inline controls)
    *  opens the Element — the same gesture every other list surface has. */
   onOpen?: (element: ElementWithDetails) => void;
-  /** Before the title, at the left. Defaults to the Status mark, which opens
-   *  the status menu; a host passes its own to act on a change. */
-  lead?: React.ReactNode;
   /** In the chips row under the headline, after the verb chip — what the
    *  status cannot say (an AI run). */
   badge?: React.ReactNode;
@@ -66,7 +62,7 @@ interface ElementCardProps {
   extra?: React.ReactNode;
 }
 
-export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, extra }: ElementCardProps) {
+export function ElementCard({ element, onRefresh, onOpen, badge, object, extra }: ElementCardProps) {
   const { t } = useI18n();
   // Who can be assigned to THIS Element, read when the assignee menu opens;
   // the people already on it stay listed so they can be removed.
@@ -90,6 +86,9 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
   // pick). Inner controls stop pointer/click propagation so they don't kick
   // off a card drag, and the card stops being draggable while the title edits.
   const [editingTitle, setEditingTitle] = useState(false);
+  // The due-date calendar is a controlled popover: picking a day settles
+  // the date, so the calendar closes with the pick.
+  const [dateOpen, setDateOpen] = useState(false);
   const [titleDraft, setTitleDraft] = useState(element.title);
   // A title changed elsewhere replaces the draft, during render.
   const [titleFor, setTitleFor] = useState(element.title);
@@ -168,20 +167,13 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
       }}
       // Hover tints the card as a list row is tinted (the foreground at 6%,
       // laid over the card's own ground as an image so the ground stays).
-      className="group/card rounded-lg border border-[var(--border-subtle)] bg-card dark:bg-muted shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
+      className="group/card rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
     >
       <div className="px-3.5 py-3.5">
-        {/* The headline: the Status mark, the title on one line, and the
-            priority at the row's right end. */}
+        {/* The headline: the title on one line, and the priority at the
+            row's right end. No Status on the card — the column it stands
+            in says where the work stands. */}
         <div className="flex items-start gap-2">
-          {/* The mark sits on the title's line: its box is the line box. */}
-          <div className="flex h-[22px] shrink-0 items-center">
-            {lead ?? (
-              <span onPointerDown={stop} onClick={stop} className="flex">
-                <StatusPicker element={element} onChanged={() => onRefresh?.()} />
-              </span>
-            )}
-          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               {editingTitle ? (
@@ -242,14 +234,17 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            {/* Where it belongs. */}
+            {/* Where it belongs: a chip in the Label chips' own form —
+                the Object's icon and name inside the pill, never a bare
+                text line. */}
             {object && (
-              <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground/80" title={object.name}>
-                <span aria-hidden className="shrink-0">↳</span>
-                <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
-                <span className="truncate">{object.name}</span>
-                {object.isNew && <span className="shrink-0 text-muted-foreground/70">· {t('new')}</span>}
-              </p>
+              <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+                <Chip title={object.name} className="max-w-full">
+                  <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
+                  <span className="truncate">{object.name}</span>
+                  {object.isNew && <span className="shrink-0 text-muted-foreground/70">· {t('new')}</span>}
+                </Chip>
+              </div>
             )}
           </div>
         </div>
@@ -312,7 +307,7 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
           <div className="flex shrink-0 items-center gap-2.5 text-[12px] text-muted-foreground">
             {/* Due date — click to pick / change. Unset, it appears only while
                 the card is hovered or has keyboard focus inside it. */}
-            <Popover>
+            <Popover open={dateOpen} onOpenChange={setDateOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
@@ -332,7 +327,7 @@ export function ElementCard({ element, onRefresh, onOpen, lead, badge, object, e
                 <CalendarPicker
                   mode="single"
                   selected={dueDate ?? undefined}
-                  onSelect={(d) => saveDate(d ?? undefined)}
+                  onSelect={(d) => { void saveDate(d ?? undefined); setDateOpen(false); }}
                   autoFocus
                   weekStartsOn={weekStartsOn}
                 />

@@ -9,10 +9,10 @@ import { useElementChainRows } from '@/hooks/initiativeMissionData';
 import { useRunRounds } from '@/hooks/definitionData';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
-import { AddElementMenu, ChainCard, ChainSummary } from '@/ActivitySpace/execution/chain/ChainCard';
+import { AddElementMenu, ChainCard } from '@/ActivitySpace/execution/chain/ChainCard';
 import { waitingReason, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import {
-  fleetCard, fleetCardContext, handOverLabels, latestRuns, missionElementRow, missionSummary, orderFleetCards,
+  fleetCard, fleetCardContext, handOverLabels, latestRuns, missionElementRow, orderFleetCards,
   type FleetElement, type FleetObjectRow,
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 
@@ -20,9 +20,8 @@ import {
 // component, the same cards, the same fleet readings — over the Domain's
 // Elements and their runs, with no Strategy around them. What a Strategy
 // adds and a Domain has no meaning for is left out, not faked: there are
-// no measures to serve and no cost to total, so the strip keeps the
-// counts that do apply (progress, waiting on you, blocked, failed) as
-// readouts, and the cards' serves lines stay empty.
+// no measures to serve and no cost to total, and the cards' serves lines
+// stay empty.
 //
 // A drop takes the Strategy chain's path — write the Status, let
 // acceptance land when the work closes (advanceFromElement on done /
@@ -77,12 +76,6 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
     }
     return out;
   }, [cards, latest]);
-  const waitingOnYou = useMemo(() => [...reasonMap.values()].filter((r) => r?.needsPerson).length, [reasonMap]);
-  const summary = useMemo(
-    () => missionSummary({ elements: rows, measures: [], runs, artifacts: [] }),
-    [rows, runs],
-  );
-
   const objectRows = useMemo<FleetObjectRow[]>(
     () => objects.map((o) => ({ id: o.id, name: o.name, domain_id: domainId, icon: o.icon ?? null, color: o.color ?? null })),
     [objects, domainId],
@@ -135,7 +128,6 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
       node: (
         <ChainCard element={c} detail={detail}
           object={object ? { name: object.name, icon: object.icon ?? null, color: object.color ?? null } : null}
-          canEdit={canEdit}
           busy={busy !== null && busy === c.elementId}
           reason={reasonMap.get(c.elementId) ?? null}
           rounds={rounds.get(c.elementId)}
@@ -152,11 +144,6 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
     <div className="flex h-full min-h-0 flex-col gap-3 px-4 pb-4 pt-3">
       {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
       <div className="flex items-start gap-2">
-        {elements.length > 0 && (
-          <div className="min-w-0 flex-1">
-            <ChainSummary summary={summary} waitingOnYou={waitingOnYou} outcomes={false} />
-          </div>
-        )}
         <BoardOrientationToggle orientation={orientation} onChange={setOrientation} className="ml-auto" />
       </div>
       <ExecutionChain orientation={orientation}

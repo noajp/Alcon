@@ -6,7 +6,6 @@ import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
-import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { advanceFromElement, startElementRun } from '@/AIP/ai/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
@@ -16,18 +15,18 @@ import { createIntent } from '@/hooks/strategyData';
 import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
-import { AddElementMenu, ChainCard, ChainLines, ChainSummary } from '@/ActivitySpace/execution/chain/ChainCard';
+import { AddElementMenu, ChainCard, ChainLines } from '@/ActivitySpace/execution/chain/ChainCard';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import { CARD_FLAT } from '@/shared/designTokens';
 import { Chip } from '@/ActivitySpace/execution/element/board/BoardColumn';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { ActionTag } from '@/Function/shared/elementAction';
 import {
-  answeredQuestions, buildFleet, chainCardMatches, draftFleet, handOverLabels, latestRuns, missionSummary, normalizePlan, normalizeQuestions, plannerSources,
+  answeredQuestions, buildFleet, draftFleet, handOverLabels, latestRuns, normalizePlan, normalizeQuestions, plannerSources,
   startableTasks, UNPLACED,
-  type ChainFilter, type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlannerSource, type PlanQuestion,
+  type FleetElement, type FleetObject, type FleetObjectRow, type PlanDraft, type PlannerSource, type PlanQuestion,
 } from './missionModel';
-import { stateColor, type MissionContext } from './MissionPanels';
+import { type MissionContext } from './MissionPanels';
 import { listenForPlanRequests } from './plannerRequest';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useDefinitions, useRunRounds } from '@/hooks/definitionData';
@@ -76,42 +75,6 @@ function DraftCard({ element, object }: { element: FleetElement; object: FleetOb
 }
 
 
-/** One row per Object under the strip: where it stands, how much of it is
- *  done, its checked outcomes and its cost. A click reads the chain
- *  through that Object alone. Shown when the Strategy has more than one
- *  Object, or when a single Object carries verdicts worth saying. */
-function ChainObjectIndex({ fleet, filter, onFilter }: {
-  fleet: FleetObject[];
-  filter: ChainFilter;
-  onFilter: (next: ChainFilter) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className={cn(CARD_FLAT, 'divide-y divide-border/60 px-3')}>
-      {fleet.map((o) => {
-        const active = filter?.kind === 'object' && filter.objectKey === o.key;
-        return (
-          <button key={o.key} type="button" aria-pressed={active}
-            onClick={() => onFilter(active ? null : { kind: 'object', objectKey: o.key })}
-            className={cn('flex w-full min-w-0 items-center gap-3 py-1.5 text-left text-[12px]', active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground')}>
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: stateColor(o.state) }} />
-            <span className="min-w-0 flex-1 truncate text-foreground/90">{o.name}</span>
-            <span className="tabular-nums">{o.tally.done}/{o.tally.total}</span>
-            {o.verdicts.pass + o.verdicts.fail > 0 && (
-              <span className="flex shrink-0 items-baseline gap-1.5">
-                {o.verdicts.pass > 0 && <span className="text-[var(--status-success)]">✓ {t('passed {n}', { n: o.verdicts.pass })}</span>}
-                {o.verdicts.fail > 0 && <span className="text-[var(--status-danger)]">{t('not passed {n}', { n: o.verdicts.fail })}</span>}
-              </span>
-            )}
-            <span className="tabular-nums">${o.costUsd.toFixed(2)}</span>
-            {active && <span aria-hidden className="shrink-0">✕</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot, orientation }: {
   ctx: MissionContext;
   /** The board's orientation, from the page's tabs-row toggle. */
@@ -141,7 +104,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [chainFilter, setChainFilter] = useState<ChainFilter>(null);
   const [aiWorkerId, setAiWorkerId] = useState('');
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
@@ -156,16 +118,9 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   }), [objects, ctx.elements, ctx.measures, ctx.bindings, ctx.mission.edges, ctx.mission.runs]);
   const fleet = useMemo(() => (draft ? draftFleet(current, ctx.measures, draft, personName) : current), [draft, current, ctx.measures, personName]);
   const latestRunRows = useMemo(() => latestRuns(ctx.mission.runs), [ctx.mission.runs]);
-  // The strip and the filter read the same two computations the cards do:
-  // the mission summary, and each written Element's waiting reason.
-  const summary = useMemo(() => missionSummary({
-    elements: ctx.elements, measures: ctx.measures, runs: ctx.mission.runs, artifacts: ctx.mission.artifacts,
-  }), [ctx.elements, ctx.measures, ctx.mission.runs, ctx.mission.artifacts]);
+  // Each written Element's waiting reason — the cards' chips read it.
   const reasonMap = useMemo(() => waitingReasonsByElement(current, ctx.mission.runs), [current, ctx.mission.runs]);
-  const waitingOnYou = useMemo(() => [...reasonMap.values()].filter((r) => r?.needsPerson).length, [reasonMap]);
 
-  // Before the dependencies are read every AI Element would look ready.
-  const ready = ctx.missionLoaded ? current.flatMap((o) => o.elements.filter((e) => e.ready)) : [];
   const handable = current.flatMap((o) => o.elements.filter((e) => e.handable));
   const rounds = useRunRounds(ctx.elements.map((e) => e.id));
   const definitions = useDefinitions(ctx.spaceId);
@@ -264,15 +219,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   };
 
 
-  const runReady = async () => {
-    if (!await appDialog.confirm(t('Start AI runs for {n} actions? Each run spends from this Space\'s AI budget.', { n: ready.length }))) return;
-    setBusy('all'); setNotice(null);
-    const failed = await start(ready.map((e) => e.elementId!));
-    setBusy(null);
-    if (failed) setNotice(t('{n} runs could not start.', { n: failed }));
-    ctx.refetch();
-  };
-
   const handOver = async (ids: string[]) => {
     setBusy(ids.length === 1 ? ids[0] : 'all'); setNotice(null);
     let failed = 0;
@@ -315,33 +261,28 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   // Where each action stands: a written Element by its Status, its action and
   // its latest AI run, as on a Domain's Flow board; a draft task is not
   // created yet, so it waits in the first column. Why a card waits comes
-  // from the same waitingReason map the strip counts. A filter is a
-  // written-work lens: while one is on, the Planner's draft overlay is
-  // suspended; clearing the filter restores it.
+  // from the same waitingReason map its chip reads.
   const chain = useMemo(() => {
-    const source = chainFilter ? current : fleet;
     const columns = emptyChain<{ element: FleetElement; object: FleetObject; reason: WaitingReason | null }>();
-    for (const o of source) {
+    for (const o of fleet) {
       for (const e of o.elements) {
         const written = e.elementId ? details.get(e.elementId) : undefined;
         // A written Element by its Status, as on the Board; a draft task is not created yet.
         const column: ChainStatus | null = written ? chainStatusOf(written.status) : e.draft ? 'todo' : null;
         if (!column) continue;
         const reason = e.elementId ? reasonMap.get(e.elementId) ?? null : null;
-        if (!chainCardMatches(e, o.key, reason, chainFilter)) continue;
         columns[column].push({ element: e, object: o, reason });
       }
     }
     // The draft's tasks first in their column: they are what is new.
     columns.todo.sort((a, b) => Number(b.element.draft) - Number(a.element.draft));
     return columns;
-  }, [fleet, current, chainFilter, details, reasonMap]);
+  }, [fleet, details, reasonMap]);
 
   const cardFor = (e: FleetElement, o: FleetObject, reason: WaitingReason | null = null) => (
     e.elementId && details.get(e.elementId) ? (
       <ChainCard element={e} detail={details.get(e.elementId)!}
         object={{ name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft }}
-        canEdit={ctx.canEdit}
         busy={busy !== null && (busy === 'all' || busy === e.elementId)}
         reason={reason}
         rounds={rounds.get(e.elementId)}
@@ -369,22 +310,16 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     // through the tab's h-full wrapper instead of a page that grows.
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        {/* The work ready to go, started from here. Breaking the Strategy
-            down is the conversation's work — the Planner's requests land
-            here as the questions and the draft below. */}
-        {!draft && (handable.length > 0 || ready.length > 0) && (
+        {/* Work a person can hand to Claude Code, handed over from here.
+            Breaking the Strategy down is the conversation's work — the
+            Planner's requests land here as the questions and the draft
+            below. */}
+        {!draft && handable.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="ml-auto flex items-center gap-2">
-              {handable.length > 0 && (
-                <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
-                  {t('Hand {n} to Claude Code', { n: handable.length })}
-                </Button>
-              )}
-              {ready.length > 0 && (
-                <Button variant="primary" size="sm" onClick={() => void runReady()} disabled={busy !== null}>
-                  {t('Run {n} ready with AI', { n: ready.length })}
-                </Button>
-              )}
+              <Button variant="secondary" size="sm" onClick={() => void handOver(handable.map((e) => e.elementId!))} disabled={busy !== null}>
+                {t('Hand {n} to Claude Code', { n: handable.length })}
+              </Button>
             </span>
           </div>
         )}
@@ -475,17 +410,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
 
         {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
-
-        {/* Where things stand: the summary strip and the Object index,
-            whose counts are the chain's filters. Hidden under a Planner draft —
-            the fleet is hypothetical then, and the draft panel explains
-            itself. The per-Object verdict tallies live in the index rows. */}
-        {!draft && current.length > 0 && (
-          <ChainSummary summary={summary} waitingOnYou={waitingOnYou} filter={chainFilter} onFilter={setChainFilter} />
-        )}
-        {!draft && (current.length >= 2 || current.some((o) => o.verdicts.pass + o.verdicts.fail > 0)) && (
-          <ChainObjectIndex fleet={current} filter={chainFilter} onFilter={setChainFilter} />
-        )}
 
         {/* The chain: every action in the column for where it stands, left
             to right. The draft's actions wait, dashed, in the first. With

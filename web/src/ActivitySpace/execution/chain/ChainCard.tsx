@@ -7,25 +7,22 @@ import { cn } from '@/lib/utils';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { advanceFromElement } from '@/AIP/ai/agentData';
 import { ElementCard } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { WaitingChip } from '@/ActivitySpace/execution/element/board/BoardColumn';
-import { StatusPicker } from '@/Function/shared/StatusPicker';
-import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { traceHeadline, traceStatusWord, VERDICT_FAIL_WORD } from '@/Function/shared/workTrace';
-import { CARD_FLAT, FONT, STATUS } from '@/shared/designTokens';
+import { STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 import type { RoundSummary } from '@/hooks/definitionData';
 import type { ChainStatus } from './ExecutionChain';
 import type { WaitingReason } from './waiting';
 import {
-  type ActionState, type ChainFilter, type FleetElement, type FleetObjectRow, type MissionRunRow, type MissionSummary,
+  type ActionState, type FleetElement, type FleetObjectRow, type MissionRunRow,
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import { STATE_LABEL, stateColor } from '@/ActivitySpace/strategy/initiative/mission/MissionPanels';
 
 // The Execution Chain's card, shared by every host of the chain — a
 // Strategy's and a Domain's alike: the shared Element card with the
-// chain's lead, badge and lines, so a card reads the same wherever the
+// chain's badge and lines, so a card reads the same wherever the
 // chain is drawn. The lines under the title are the work's own account:
 // the latest run's one line (the shared trace headline), what it
 // delivers, the work it waits on, a loop's progress, and a hand-off to
@@ -126,17 +123,16 @@ export function ChainLines({ element, busy, onHandOver, rounds, onOpenElement, l
   );
 }
 
-/** A written Element's chain card. The Element's Status leads, as every
- *  list shows it: the mark opens the status menu, so work an agent left
- *  for review is approved (Done) right from its card. Beside the verb,
- *  why it waits (when it waits) and only what the Status cannot say: an
- *  AI run going, waiting or failed. */
-export function ChainCard({ element, object, detail, canEdit, busy = false, reason = null, rounds, latestRun, onRefresh, onOpen, onOpenElement, onHandOver }: {
+/** A written Element's chain card. No Status on it: the column it
+ *  stands in says where the work stands, and a Status change is a drag
+ *  to another column or a pick on the Element's own view. Beside the
+ *  verb, why it waits (when it waits) and only what the Status cannot
+ *  say: an AI run going, waiting or failed. */
+export function ChainCard({ element, object, detail, busy = false, reason = null, rounds, latestRun, onRefresh, onOpen, onOpenElement, onHandOver }: {
   element: FleetElement;
   /** The Object the card names; null for an Element that sits in none. */
   object: { name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
   detail: ElementWithDetails;
-  canEdit: boolean;
   busy?: boolean;
   reason?: WaitingReason | null;
   rounds?: RoundSummary;
@@ -150,14 +146,6 @@ export function ChainCard({ element, object, detail, canEdit, busy = false, reas
 }) {
   return (
     <ElementCard element={detail} onRefresh={onRefresh} object={object} onOpen={onOpen}
-      lead={canEdit ? (
-        <span onPointerDown={(ev) => ev.stopPropagation()} onClick={(ev) => ev.stopPropagation()} className="flex">
-          <StatusPicker element={detail}
-            onChanged={(s) => { if (s === 'done' || s === 'cancelled') void advanceFromElement(element.elementId!).then(() => onRefresh?.()); else onRefresh?.(); }} />
-        </span>
-      ) : (
-        <ElementProgressMark status={detail.status} progress={getElementProgress(detail)} size={16} />
-      )}
       badge={reason || runOnlyState(element.state, detail.status) ? (
         <span className="flex shrink-0 items-center gap-1">
           {reason && <WaitingChip reason={reason} />}
@@ -200,81 +188,3 @@ export function AddElementMenu({ status, objects, onAdd }: {
   );
 }
 
-/** The chain's orientation: one quiet row over the board — how far along,
- *  what waits on a person, what is stuck, what failed. Every count comes
- *  from the same helpers the cards' chips read, so the two agree. With a
- *  filter handler the counts are lenses (a Strategy's chain); without
- *  one they are readouts (a Domain's). The outcome segments — checks not
- *  passed, measures, cost — are a Strategy's: it is held to them, and a
- *  Domain's chain leaves them out rather than inventing them. */
-export function ChainSummary({ summary, waitingOnYou, filter = null, onFilter, outcomes = true }: {
-  summary: MissionSummary;
-  /** Elements whose waitingReason needs a person — the strip's own count,
-   *  not missionSummary.waiting (which counts states, not the queue). */
-  waitingOnYou: number;
-  filter?: ChainFilter;
-  onFilter?: (next: ChainFilter) => void;
-  /** The outcome segments (checks, measures, cost). */
-  outcomes?: boolean;
-}) {
-  const { t } = useI18n();
-  const seg = (target: NonNullable<ChainFilter>, label: string, n: number) => {
-    if (!onFilter) {
-      return (
-        <span key={target.kind} className="flex items-baseline gap-1.5">
-          <span className={FONT.label}>{label}</span>
-          <span className="tabular-nums text-foreground">{n}</span>
-        </span>
-      );
-    }
-    const active = filter?.kind === target.kind;
-    if (n === 0 && !active) {
-      return (
-        <span key={target.kind} className="flex items-baseline gap-1.5 text-muted-foreground/60">
-          <span className={FONT.label}>{label}</span>
-          <span className="tabular-nums">{n}</span>
-        </span>
-      );
-    }
-    return (
-      <button key={target.kind} type="button" aria-pressed={active}
-        onClick={() => onFilter(active ? null : target)}
-        className={cn('flex items-baseline gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5',
-          active ? 'bg-[var(--accent-default)]/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}>
-        <span className={FONT.label}>{label}</span>
-        <span className="tabular-nums text-foreground">{n}</span>
-      </button>
-    );
-  };
-  return (
-    <div className={cn(CARD_FLAT, 'flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-2 text-[12px]')}>
-      <span className="flex items-baseline gap-1.5">
-        <span className={FONT.label}>{t('Progress')}</span>
-        <span className="tabular-nums text-foreground">{summary.done}/{summary.actions}</span>
-        <span className="tabular-nums text-muted-foreground">{summary.progress}%</span>
-      </span>
-      {seg({ kind: 'waiting' }, t('Waiting on you'), waitingOnYou)}
-      {seg({ kind: 'blocked' }, t('Blocked'), summary.blocked)}
-      {seg({ kind: 'failed' }, t('Failed'), summary.failed)}
-      {outcomes && seg({ kind: 'verdict-fail' }, t('Checks not passed'), summary.verdicts.fail)}
-      {outcomes && (
-        <span className="flex items-baseline gap-1.5">
-          <span className={FONT.label}>{t('Measures')}</span>
-          <span className="tabular-nums text-foreground">{summary.measuresMet}/{summary.measures}</span>
-          {summary.measuresStale > 0 && <span className="text-muted-foreground">· {t('{n} unrefreshed', { n: summary.measuresStale })}</span>}
-        </span>
-      )}
-      {outcomes && (
-        <span className="flex items-baseline gap-1.5">
-          <span className={FONT.label}>{t('Cost')}</span>
-          <span className="tabular-nums text-foreground">${summary.costUsd.toFixed(2)}</span>
-        </span>
-      )}
-      {onFilter && filter && (
-        <button type="button" onClick={() => onFilter(null)} className="ml-auto text-muted-foreground hover:text-foreground">
-          ✕ {t('Clear filter')}
-        </button>
-      )}
-    </div>
-  );
-}
