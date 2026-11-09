@@ -1,6 +1,5 @@
 'use client';
 
-import { PanelLeft } from '@/ui/icons';
 import { MODE_META, railModeOf, type RailMode } from '@/Frame/railApps';
 import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -9,7 +8,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // The strip along the foot of the window, as in VS Code. Notebooks and slides
 // live in Artifacts, and the person at the foot of the sidebar; the right holds what stays at hand from any
-// screen — the sidebar's toggle, the inbox, the AI and the calendar.
+// screen — the inbox, the AI and the calendar. (The sidebar's toggle lives
+// in the top strip now, beside the history buttons.)
 
 const btn = (active: boolean) =>
   `h-5 gap-1 rounded px-1 text-[11px] font-normal ${active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`;
@@ -17,13 +17,10 @@ const btn = (active: boolean) =>
 export function StatusBar({
   activeView,
   onViewChange,
-  sidebar,
   ai,
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
-  /** Absent where the screen has no sidebar. */
-  sidebar?: { visible: boolean; onToggle: () => void };
   ai: { open: boolean; onToggle: () => void };
 }) {
   const { t } = useI18n();
@@ -54,13 +51,6 @@ export function StatusBar({
     <footer className="flex h-6 shrink-0 items-center gap-0.5 px-1.5">
 
       <div className="ml-auto flex items-center gap-0.5">
-        {sidebar && (
-          <Button variant="ghost" size="sm" onClick={sidebar.onToggle} aria-pressed={sidebar.visible}
-            title={t(sidebar.visible ? 'Hide sidebar' : 'Show sidebar')} aria-label={t(sidebar.visible ? 'Hide sidebar' : 'Show sidebar')}
-            className={btn(false)}>
-            <PanelLeft size={12} />
-          </Button>
-        )}
         {modeButton('inbox', false, unreadCount)}
         <Button variant="ghost" size="sm" onClick={ai.onToggle} aria-pressed={ai.open}
           title={`${t(ai.open ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(ai.open ? 'Hide AI' : 'Show AI')}

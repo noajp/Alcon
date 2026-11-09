@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
+import { ArrowLeft, ArrowRight, FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
 import { ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { BAR_TOOLS, MODE_META, TOOL_MODES } from '@/Frame/railApps';
@@ -40,6 +40,10 @@ interface CommandPaletteProps {
    *  go back to. */
   canGoBack?: boolean;
   onGoBack?: () => void;
+  /** The shell's Forward, offered as a command when there is a screen
+   *  to go forward to. */
+  canGoForward?: boolean;
+  onGoForward?: () => void;
 }
 
 // Action-phrased labels here are intentionally distinct from the sidebar
@@ -75,7 +79,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSettings, canGoBack, onGoBack }: CommandPaletteProps) {
+export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSettings, canGoBack, onGoBack, canGoForward, onGoForward }: CommandPaletteProps) {
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
@@ -332,6 +336,15 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSetti
             >
               <ArrowLeft />
               <span>{t('Go back')}</span>
+            </CommandItem>
+          )}
+          {canGoForward && onGoForward && (
+            <CommandItem
+              value={`nav-go-forward ${t('Go forward')}`}
+              onSelect={() => { close(); onGoForward(); }}
+            >
+              <ArrowRight />
+              <span>{t('Go forward')}</span>
             </CommandItem>
           )}
           {navCommands.map(c => (

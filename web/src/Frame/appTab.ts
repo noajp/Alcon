@@ -11,4 +11,7 @@ export interface AppTab {
   /** Screens this tab left, most recent last — the shell's Back stack.
    *  In-memory only (historyState.ts); a reload starts it empty. */
   back: ScreenSnapshot[];
+  /** Screens this tab stepped back from, most recent last — where
+   *  Forward returns to. Any fresh navigation in the tab clears it. */
+  forward: ScreenSnapshot[];
 }

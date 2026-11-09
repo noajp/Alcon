@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { popBack, recordNavigation, routeKeyOf, type ScreenSnapshot } from '@/Frame/historyState';
+import {
+  forwardAfterNavigation,
+  popBack,
+  recordNavigation,
+  routeKeyOf,
+  stepBack,
+  stepForward,
+  type HistoryStep,
+  type ScreenSnapshot,
+} from '@/Frame/historyState';
 import type { NavigationState } from '@/types/navigation';
 
 const screen = (view: string, navigation: Partial<NavigationState> = {}): ScreenSnapshot => ({
   view,
   navigation: { objectId: null, ...navigation },
 });
+
+const mustStep = (step: HistoryStep | null): HistoryStep => {
+  if (!step) throw new Error('expected a history step');
+  return step;
+};
 
 describe('what counts as a different screen', () => {
   it('keys on the view and the deep selections', () => {
@@ -113,5 +127,72 @@ describe('closes pop instead of pushing', () => {
     let stack = recordNavigation([], inbox, object);
     stack = recordNavigation(stack, object, strategy);
     expect(recordNavigation(stack, strategy, objectAgain)).toEqual([inbox, object, strategy]);
+  });
+});
+
+describe('going forward again', () => {
+  const inbox = screen('inbox');
+  const list = screen('objects');
+  const object = screen('objects', { objectId: 'o1', objectDomainId: 'd1' });
+
+  it('a step back can be undone: the round trip restores both screens and both stacks', () => {
+    const back = mustStep(stepBack(object, [inbox, list], []));
+    expect(back).toEqual({ screen: list, back: [inbox], forward: [object] });
+    const forward = mustStep(stepForward(back.screen, back.back, back.forward));
+    expect(forward).toEqual({ screen: object, back: [inbox, list], forward: [] });
+  });
+
+  it('a whole journey: record forward, step back twice, step forward twice', () => {
+    let backStack = recordNavigation([], inbox, list);
+    backStack = recordNavigation(backStack, list, object);
+    expect(backStack).toEqual([inbox, list]);
+    const b1 = mustStep(stepBack(object, backStack, []));
+    expect(b1.screen).toEqual(list);
+    const b2 = mustStep(stepBack(b1.screen, b1.back, b1.forward));
+    expect(b2.screen).toEqual(inbox);
+    expect(b2.back).toEqual([]);
+    expect(b2.forward).toEqual([object, list]);
+    const f1 = mustStep(stepForward(b2.screen, b2.back, b2.forward));
+    expect(f1.screen).toEqual(list);
+    const f2 = mustStep(stepForward(f1.screen, f1.back, f1.forward));
+    expect(f2).toEqual({ screen: object, back: [inbox, list], forward: [] });
+  });
+
+  it('steps stop at the ends of the stacks', () => {
+    expect(stepBack(object, [], [])).toBeNull();
+    expect(stepForward(object, [], [])).toBeNull();
+    expect(stepForward(object, [inbox], [])).toBeNull();
+  });
+
+  it('Settings is never a step: its own return owns leaving it', () => {
+    const settings = screen('settings');
+    expect(stepBack(settings, [inbox], [])).toBeNull();
+    expect(stepForward(settings, [], [object])).toBeNull();
+  });
+
+  it('a fresh navigation after going back empties the Forward stack', () => {
+    const strategy = screen('strategy', { strategyId: 's1' });
+    expect(forwardAfterNavigation([object], list, strategy)).toEqual([]);
+    // A retreat records a move too, so it also kills Forward.
+    expect(forwardAfterNavigation([object], object, list)).toEqual([]);
+  });
+
+  it('a same-route-key write leaves the Forward stack standing', () => {
+    const forward = [object];
+    const before = screen('note', { noteId: 'n1', noteFolderId: 'f1' });
+    const after = screen('note', { noteId: 'n1', noteFolderId: 'f2' });
+    expect(forwardAfterNavigation(forward, before, after)).toEqual(forward);
+  });
+
+  it('the Settings detour does not clear Forward in either direction', () => {
+    const settings = screen('settings');
+    expect(forwardAfterNavigation([object], list, settings)).toEqual([object]);
+    expect(forwardAfterNavigation([object], settings, list)).toEqual([object]);
+  });
+
+  it("one tab's steps never touch another tab's stacks", () => {
+    const other = { back: [inbox], forward: [object] };
+    mustStep(stepBack(object, [inbox, list], []));
+    expect(other).toEqual({ back: [inbox], forward: [object] });
   });
 });
