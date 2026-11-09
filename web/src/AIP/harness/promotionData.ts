@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { PromotionDraft, PromotionDraftStatus } from '@/types/database';
+import type { PromotionDraft, PromotionDraftEvent, PromotionDraftStatus } from '@/types/database';
 
 // Promotion drafts: the records of one-off work becoming standing
 // harnesses. Members read every draft (a draft holds no secret, ever);
@@ -216,6 +216,44 @@ export function usePromotionDraft(draftId: string | null) {
     },
   });
   return { data: query.data ?? null, loading: query.isPending && !!draftId };
+}
+
+/** The owner's revision of a reviewed draft (Sim P4, design §5.3):
+ *  the body edited on the review canvas comes back for a new
+ *  rehearsal. The write is the one the table's own rules already
+ *  sanction — the UPDATE policy is owner-only, and the status guard
+ *  in the WHERE clause does what transitionPromotionDraft's
+ *  optimistic check does server-side: the move lands only from
+ *  awaiting_review, the one status whose tested hashes mean anything.
+ *  Body, the return to drafting and the clearing of everything the
+ *  rehearsal proved (tested hashes, the report, the expiry) move in
+ *  ONE update, so the freeze invariant the activation RPC trusts —
+ *  "the tested text is the text on the row" — is never half-broken:
+ *  there is no moment where the row holds edited text under tested
+ *  hashes. A 'revised' event marks the move; the drafting run reads
+ *  it and takes the edited body as its package, unchanged. */
+export async function revisePromotionDraftBody(draft: PromotionDraft, body: string): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) throw new Error('Not signed in');
+  if (!body.trim()) throw new Error('本文が空です');
+  const now = new Date().toISOString();
+  const events: PromotionDraftEvent[] = [...draft.events, { at: now, kind: 'revised', by: userId }];
+  const { data, error } = await supabase.from('promotion_drafts').update({
+    body,
+    status: 'drafting',
+    tested_structure_hash: null,
+    tested_binding_hash: null,
+    rehearsal_report: null,
+    rehearsal_run_id: null,
+    failure_class: null,
+    awaiting_question: null,
+    expires_at: null,
+    events,
+    updated_at: now,
+  }).eq('id', draft.id).eq('status', 'awaiting_review').select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('ドラフトの状態が変わっていました。開き直して確認してください');
 }
 
 // ── The owner's decisions (the RPCs are the only route) ────────────────

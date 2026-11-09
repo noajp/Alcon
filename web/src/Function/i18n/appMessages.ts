@@ -864,6 +864,16 @@ const APP_MESSAGES: Record<string, Row> = {
   'How work is assigned': ['担当の決め方', '담당 결정 방식', 'Attribution du travail', 'Cómo se asigna el trabajo'],
   'Dashed lines are conditions written in the definition text — declared intent, not fixed routes. The engine reads the text; it does not follow the drawing.': ['破線は定義の文章に書かれた条件です。宣言された意図であって、固定の経路ではありません。エンジンは文章を読んで動きます — 図のとおりに動くわけではありません。', '점선은 정의 본문에 적힌 조건입니다. 선언된 의도일 뿐 고정된 경로가 아닙니다. 엔진은 본문을 읽고 움직입니다 — 그림을 따라 움직이지 않습니다.', 'Les lignes en pointillés sont des conditions écrites dans le texte de la définition — une intention déclarée, pas des routes fixes. Le moteur lit le texte ; il ne suit pas le dessin.', 'Las líneas discontinuas son condiciones escritas en el texto de la definición: intención declarada, no rutas fijas. El motor lee el texto; no sigue el dibujo.'],
   'No flow to draw — this definition has no procedure written yet.': ['描くフローがありません — この定義にはまだ進め方が書かれていません。', '그릴 흐름이 없습니다 — 이 정의에는 아직 절차가 적혀 있지 않습니다.', 'Aucun flux à dessiner — cette définition n’a pas encore de procédure écrite.', 'No hay flujo que dibujar: esta definición aún no tiene un procedimiento escrito.'],
+  // Canvas editing on the promotion review (Sim P4): the step
+  // operations and the save/revision notices around them.
+  'Move step up': ['ステップを上へ', '단계를 위로', 'Monter l’étape', 'Subir el paso'],
+  'Move step down': ['ステップを下へ', '단계를 아래로', 'Descendre l’étape', 'Bajar el paso'],
+  'Edit step': ['ステップを編集', '단계 편집', 'Modifier l’étape', 'Editar el paso'],
+  'Delete step': ['ステップを削除', '단계 삭제', 'Supprimer l’étape', 'Eliminar el paso'],
+  'Save edits': ['編集を保存', '편집 저장', 'Enregistrer les modifications', 'Guardar los cambios'],
+  'Discard edits': ['編集を破棄', '편집 취소', 'Abandonner les modifications', 'Descartar los cambios'],
+  'Edited on the canvas — not saved yet. Saving clears the tested record, so the draft goes back through rehearsal before it can be activated.': ['キャンバスで編集中です（未保存）。保存すると試走の記録は消え、有効化の前に再試走が必要になります。', '캔버스에서 편집 중입니다(아직 저장되지 않음). 저장하면 테스트 기록이 지워지고, 활성화 전에 리허설을 다시 거쳐야 합니다.', 'Modifié sur le canevas — pas encore enregistré. L’enregistrement efface le relevé testé ; le brouillon repassera en répétition avant de pouvoir être activé.', 'Editado en el lienzo: aún no guardado. Al guardar se borra el registro probado, así que el borrador volverá a pasar por el ensayo antes de poder activarse.'],
+  'Your edits were saved and the tested record was cleared. Send this draft back through rehearsal — the drafter takes the edited text exactly as it stands.': ['編集を保存し、試走の記録を消しました。再試走に戻してください — 起草者は編集された本文をそのまま使います。', '편집이 저장되고 테스트 기록이 지워졌습니다. 리허설로 다시 보내 주세요 — 작성자는 편집된 본문을 그대로 사용합니다.', 'Vos modifications sont enregistrées et le relevé testé est effacé. Renvoyez ce brouillon en répétition — le rédacteur reprend le texte modifié tel quel.', 'Tus cambios se guardaron y el registro probado se borró. Devuelve este borrador al ensayo: el redactor toma el texto editado tal como está.'],
   'Written by a person': ['人が書いた', '사람이 작성', 'Écrit par une personne', 'Escrito por una persona'],
   'Distilled from a conversation': ['会話からの蒸留', '대화에서 증류', 'Distillé d’une conversation', 'Destilado de una conversación'],
   'Distilled from a run': ['実行からの蒸留', '실행에서 증류', 'Distillé d’une exécution', 'Destilado de una ejecución'],

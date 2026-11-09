@@ -4519,6 +4519,25 @@ async function promote(a: ExecArgs, said: string): Promise<void> {
         });
       }
     }
+    // A reviewer's canvas edits (P4, design §5.3) the conversation
+    // has not seen enter it once: the current body, verbatim, with
+    // the one instruction that matters — propose THIS text, do not
+    // rewrite it — so the freeze and the new rehearsal re-test
+    // exactly what the person approved on the canvas.
+    if (d.status === "drafting" && d.body) {
+      const revised = [...(Array.isArray(d.events) ? d.events : [])].reverse()
+        .find((e) => e && e.kind === "revised");
+      if (revised?.at) {
+        const marker = `【レビューでの編集 ${revised.at}】`;
+        const seen = state.messages.some((m) => typeof m.content === "string" && m.content.includes(marker));
+        if (!seen) {
+          state.messages.push({
+            role: "user",
+            content: `${marker}\n審査のキャンバスで定義本文が編集されました。現在の本文は次のとおりです。内容を変えず、この本文をそのまま propose_package で提案し、finish_promotion（ready）で試走に進めてください。\n\n${d.body}`,
+          });
+        }
+      }
+    }
   } else {
     // The reconcile (§4.5 rules 1–2): an update target — named at
     // creation, or found through the draft this source already
