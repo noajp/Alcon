@@ -12,6 +12,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Go back': ['前に戻る', '뒤로 가기', 'Revenir en arrière', 'Volver atrás'],
   'Forward': ['次へ', '앞으로', 'En avant', 'Adelante'],
   'Go forward': ['次に進む', '앞으로 가기', 'Aller en avant', 'Ir adelante'],
+  'New tab': ['新しいタブ', '새 탭', 'Nouvel onglet', 'Nueva pestaña'],
+  'Close tab': ['タブを閉じる', '탭 닫기', 'Fermer l’onglet', 'Cerrar pestaña'],
   'Show more': ['さらに表示', '더 보기', 'Afficher plus', 'Mostrar más'],
   'Unread': ['未読', '읽지 않음', 'Non lu', 'No leído'],
   'Notification actions': ['通知の操作', '알림 작업', 'Actions de la notification', 'Acciones de la notificación'],

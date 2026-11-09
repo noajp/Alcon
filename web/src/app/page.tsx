@@ -19,6 +19,7 @@ import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
 import { CopilotProvider } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
 import { forwardAfterNavigation, recordNavigation, stepBack, stepForward, type HistoryStep } from '@/Frame/historyState';
+import { closeTab, isItemScreen, newTab, openScreen, reorderTabs, switchTab } from '@/Frame/tabState';
 import { mergeNavigation, navigationAfterDomainChange, navigationForView } from '@/Frame/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
@@ -290,10 +291,12 @@ function WorkspaceContent({
   onActiveDomainChange: (id: string) => void;
 }) {
   const { t } = useI18n();
-  // The shell's view + navigation. Kept as a list of tabs so a surface's
-  // internal state (Domain tab selection, expand state, scroll position …)
-  // survives while another view is shown; the page shows one at a time and
-  // has no tab strip — this is a browser tab already.
+  // The shell's view + navigation, as a list of tabs shown in the top
+  // strip. Every tab's surface stays mounted, so its internal state
+  // (Domain tab selection, expand state, scroll position …) survives
+  // while another tab is shown. The tab list itself is a session
+  // working set: a reload restores only the active tab's screen
+  // (openScreen.ts), with empty history stacks.
   // A reload opens the screen this browser tab had open in this Space;
   // otherwise Settings > Preferences > "Default home view" — honoured at launch.
   const [restored] = useState<OpenScreen | null>(() => {
@@ -303,7 +306,7 @@ function WorkspaceContent({
   });
   const [initialTab] = useState<AppTab>(() => (restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTab]);
-  const activeTabId = initialTab.id;
+  const [activeTabId, setActiveTabId] = useState(initialTab.id);
 
   const storedTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
   const activeTab = storedTab;
@@ -404,17 +407,61 @@ function WorkspaceContent({
     return () => window.removeEventListener('keydown', handler);
   });
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => readSidebarCollapsedChoice()
+      ?? (typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH),
+  );
+  // When collapsed, the sidebar can still be peeked as a floating overlay
+  // (via the strip's reveal button) instead of pinning it back into flow.
+  const [sidebarOverlay, setSidebarOverlay] = useState(false);
+
   // Active-tab convenience writers (for sidebar + command palette which target
   // the visible tab).
   const setActiveView = (view: string) => updateTab(activeTab.id, { activeView: view });
   const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
 
+  // Item opens get a tab of their own (tabState.ts): a followed Object,
+  // a searched Element, an Automation's Strategy — the tab already
+  // showing the item is focused, a new one is opened otherwise, and the
+  // tab the item was opened from keeps its place and its history. The
+  // new tab's navigation starts clean (the item, not the source tab's
+  // leftovers), merged the way updateTabNavigation merges — an Object
+  // in another Domain switches the Domain, as it does there.
+  const openItem = (view: string, nav?: Partial<NavigationState>) => {
+    if (nav?.objectDomainId && nav.objectDomainId !== activeDomainId) {
+      onActiveDomainChange(nav.objectDomainId);
+      setActiveDomainId(nav.objectDomainId);
+    }
+    const navigation = navigationForView(mergeNavigation({ objectId: null }, nav ?? {}, activeDomainId), view);
+    const next = openScreen({ tabs, activeTabId }, { view, navigation }, (s) => makeNewTab(s.view, s.navigation));
+    setTabs(next.tabs);
+    setActiveTabId(next.activeTabId);
+    setSidebarOverlay(false);
+  };
+  // The strip's and palette's tab operations — the pure transitions in
+  // tabState.ts, applied. A fresh tab opens at the home view.
+  const applyTabState = (next: { tabs: AppTab[]; activeTabId: string }) => {
+    setTabs(next.tabs);
+    setActiveTabId(next.activeTabId);
+  };
+  const handleSelectTab = (tabId: string) => applyTabState(switchTab({ tabs, activeTabId }, tabId));
+  const handleCloseTab = (tabId: string) => applyTabState(closeTab({ tabs, activeTabId }, tabId, () => makeNewTab(getCachedHomeViewId())));
+  const handleNewTab = () => applyTabState(newTab({ tabs, activeTabId }, () => makeNewTab(getCachedHomeViewId())));
+  const handleReorderTabs = (tabIds: string[]) => applyTabState(reorderTabs({ tabs, activeTabId }, tabIds));
+
   // A page asked for another screen (an Element's "Open in" → its Note, a new
-  // deck): switch this tab's view, and its route when one is given.
-  // Re-subscribed each render, so it always writes to the tab active now.
+  // deck): an item (a deep selection naming a thing) opens in a tab of
+  // its own; a plain view switch (a new deck) reuses this tab, and its
+  // route when one is given. Re-subscribed each render, so it always
+  // writes to the tab active now.
   useEffect(() => {
     const onOpen = (e: Event) => {
       const { view, nav } = (e as CustomEvent<OpenInAppDetail>).detail;
+      const navigation = navigationForView(mergeNavigation({ objectId: null }, nav ?? {}, activeDomainId), view);
+      if (isItemScreen({ view, navigation })) {
+        openItem(view, nav);
+        return;
+      }
       if (nav) setActiveNavigation(nav);
       setActiveView(view);
     };
@@ -466,13 +513,6 @@ function WorkspaceContent({
     setSettingsReturnView(null);
   };
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => readSidebarCollapsedChoice()
-      ?? (typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH),
-  );
-  // When collapsed, the sidebar can still be peeked as a floating overlay
-  // (via the strip's reveal button) instead of pinning it back into flow.
-  const [sidebarOverlay, setSidebarOverlay] = useState(false);
   // Every screen keeps the sidebar: it is the only way between surfaces.
   const aiScreen = activeTab.activeView === 'ai';
   const [discoverOpen, setDiscoverOpen] = useState(false);
@@ -697,6 +737,7 @@ function WorkspaceContent({
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onOpenItem={openItem}
           onOpenSettings={handleOpenSettings}
           onCloseSettings={handleCloseSettings}
           onRefresh={refetch}
@@ -717,9 +758,9 @@ function WorkspaceContent({
         )}
 
         <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5`}>
-        {/* The top strip: the shell's history (‹ ›) and the sidebar's
-            toggle, over the whole content column. Item tabs join it in a
-            later change. */}
+        {/* The top strip: the shell's history (‹ ›), the sidebar's
+            toggle and the open screens as tabs, over the whole content
+            column. */}
         <ShellTabStrip
           canGoBack={canGoBack}
           canGoForward={canGoForward}
@@ -727,6 +768,12 @@ function WorkspaceContent({
           onGoForward={goForward}
           sidebarVisible={!sidebarCollapsed || sidebarOverlay}
           onToggleSidebar={handleSidebarToggle}
+          tabs={tabs}
+          activeTabId={activeTab.id}
+          onSelectTab={handleSelectTab}
+          onCloseTab={handleCloseTab}
+          onNewTab={handleNewTab}
+          onReorderTabs={handleReorderTabs}
         />
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
@@ -765,6 +812,7 @@ function WorkspaceContent({
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
                       onViewChange={(view) => updateTab(tab.id, { activeView: view })}
+                      onOpenItem={openItem}
                       onRefresh={refetch}
                       pendingNewNote={isActive ? pendingNewNote : 0}
                       onNewNoteHandled={() => setPendingNewNote(0)}
@@ -793,7 +841,7 @@ function WorkspaceContent({
       />
 
       {/* Global ⌘K command palette */}
-      <CommandPalette returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} canGoBack={canGoBack} onGoBack={goBack} canGoForward={canGoForward} onGoForward={goForward} />
+      <CommandPalette returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenItem={openItem} onNewTab={handleNewTab} onOpenSettings={handleOpenSettings} canGoBack={canGoBack} onGoBack={goBack} canGoForward={canGoForward} onGoForward={goForward} />
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
 
       {/* Global C → quick-add Element popup. Context Object = the one open in

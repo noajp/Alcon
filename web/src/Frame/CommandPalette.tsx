@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, ArrowRight, FileText, Inbox, Home, ListTodo, Settings } from '@/ui/icons';
+import { ArrowLeft, ArrowRight, FileText, Inbox, Home, ListTodo, Plus, Settings } from '@/ui/icons';
 import { ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { BAR_TOOLS, MODE_META, TOOL_MODES } from '@/Frame/railApps';
@@ -33,6 +33,11 @@ interface CommandPaletteProps {
   returnTo: ElementReturn;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
+  /** Item picks (a searched Element, Object or Note) open in a shell
+   *  tab of their own; without it they navigate the active tab. */
+  onOpenItem?: (view: string, nav?: Partial<NavigationState>) => void;
+  /** The shell's New tab (the strip's "+"), offered as a command. */
+  onNewTab?: () => void;
   /** Settings opens in its own tab rather than overwriting the active
    *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
   onOpenSettings: () => void;
@@ -79,7 +84,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSettings, canGoBack, onGoBack, canGoForward, onGoForward }: CommandPaletteProps) {
+export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenItem, onNewTab, onOpenSettings, canGoBack, onGoBack, canGoForward, onGoForward }: CommandPaletteProps) {
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
@@ -131,6 +136,17 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSetti
       if (nav) onNavigate(nav);
     }
     close();
+  };
+
+  // A picked item (a searched Element, Object or Note) gets a shell
+  // tab of its own — the place the person was stays one click away.
+  const handleItem = (view: string, nav?: Partial<NavigationState>) => {
+    if (onOpenItem) {
+      onOpenItem(view, nav);
+      close();
+    } else {
+      handleNav(view, nav);
+    }
   };
 
   // "New Strategy" is the one Create command that can't reach an existing
@@ -229,7 +245,7 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSetti
                   value={`element-${r.displayId ?? ''} ${r.title}`}
                   // Opens the Element itself over its Domain's Elements,
                   // switching to that Domain first; Back returns here.
-                  onSelect={() => handleNav('domain-elements', {
+                  onSelect={() => handleItem('domain-elements', {
                     elementId: r.id,
                     elementReturn: returnTo,
                     objectId: r.objectId ?? null,
@@ -266,7 +282,7 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSetti
                   <CommandItem
                     key={`object-${r.id}`}
                     value={`object-${r.title}`}
-                    onSelect={() => handleNav('objects', r.domainId ? { objectId: r.id, objectDomainId: r.domainId } : { objectId: r.id })}
+                    onSelect={() => handleItem('objects', r.domainId ? { objectId: r.id, objectDomainId: r.domainId } : { objectId: r.id })}
                   >
                     <Icon />
                     <div className="flex-1 min-w-0">
@@ -295,7 +311,7 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSetti
                   <CommandItem
                     key={`note-${r.id}`}
                     value={`note-${r.title}`}
-                    onSelect={() => handleNav('note', { noteId: r.id, noteSectionId: null })}
+                    onSelect={() => handleItem('note', { noteId: r.id, noteSectionId: null })}
                   >
                     <Icon />
                     <span className="truncate">{r.title}</span>
@@ -345,6 +361,15 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSetti
             >
               <ArrowRight />
               <span>{t('Go forward')}</span>
+            </CommandItem>
+          )}
+          {onNewTab && (
+            <CommandItem
+              value={`nav-new-tab ${t('New tab')}`}
+              onSelect={() => { close(); onNewTab(); }}
+            >
+              <Plus />
+              <span>{t('New tab')}</span>
             </CommandItem>
           )}
           {navCommands.map(c => (

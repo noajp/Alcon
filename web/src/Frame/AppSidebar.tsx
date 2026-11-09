@@ -64,6 +64,9 @@ interface AppSidebarProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   activeView: string;
   onViewChange: (view: string) => void;
+  /** A followed item opens in a shell tab of its own; without it, it
+   *  navigates the active tab in place. */
+  onOpenItem?: (view: string, nav?: Partial<NavigationState>) => void;
   /** Settings opens in place; Back returns to the view it came from — see
    *  page.tsx's handleOpenSettings / handleCloseSettings. */
   onOpenSettings: () => void;
@@ -100,6 +103,7 @@ export function AppSidebar({
   onNavigate,
   activeView,
   onViewChange,
+  onOpenItem,
   onOpenSettings,
   onCloseSettings,
   collapsed,
@@ -389,8 +393,9 @@ export function AppSidebar({
           <FollowSection activeObjectId={navigation.objectId ?? null} onOpen={(f) => {
             if (f.domainId) setActiveDomainId(f.domainId);
             if (f.kind === 'element') requestElementDetail(f.id); else requestObjectPage();
-            onNavigate({ objectId: f.objectId, objectDomainId: f.domainId ?? undefined });
-            onViewChange('objects');
+            const nav = { objectId: f.objectId, objectDomainId: f.domainId ?? undefined };
+            if (onOpenItem) onOpenItem('objects', nav);
+            else { onNavigate(nav); onViewChange('objects'); }
           }} />
 
           <SidebarFold id="execution-domains" label={t('Your Execution')}>
