@@ -32,10 +32,23 @@ const OWNER_SCHEMA = {
 export const FILE_TOOLS: ToolDef[] = [
   {
     name: "listFiles",
-    description: "ファイルの一覧（最新版だけ）。ownerKind と ownerId で、Element・Object・Strategy・Artifacts のフォルダに付いたものを返す。query だけを渡すと、見られるファイルを名前で探す。",
+    description: "ファイルの一覧（最新版だけ）。ownerKind と ownerId で、Element・Object・Strategy・Artifacts のフォルダに付いたものを返す。query だけを渡すと、見られるファイルを名前で探す（中身は見ない。中身や付いているもので探すときは searchFiles）。",
     input_schema: {
       type: "object",
       properties: { ...OWNER_SCHEMA, query: { type: "string", description: "ファイル名の一部" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "searchFiles",
+    description: "ファイルを見つける。名前だけでなく、取り出した中身の言葉や、付いているもの（Element・Object・Strategy など）の名前でも探せる。今いる Space が対象（文脈に Space が無いときは、参加している Space 全部）。結果には、ファイルが何に付いているかも付く。中身で探せるのは、文字が取り出されているファイルだけ。",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "探す言葉（ファイル名・中身・付いているものの名前）" },
+        limit: { type: "integer", minimum: 1, maximum: 50, description: "最大件数（既定 20）" },
+      },
+      required: ["query"],
       additionalProperties: false,
     },
   },
@@ -102,6 +115,132 @@ export function latestOnly<T extends { id: string; previous_id: string | null }>
   return rows.filter((r) => !replaced.has(r.id));
 }
 
+/** The context an entry hands the file tools: the Space it is working in,
+ *  when it knows one (the panel's context, a run's Space). File search is
+ *  Space-scoped like a person's own search; the model never supplies it. */
+export interface FileToolContext {
+  spaceId?: string | null;
+}
+
+/** One row of the search_attachments RPC — the one matching engine, shared
+ *  with the Files view and ⌘K. Athena's search calls it; no second matching
+ *  implementation exists beside it. */
+export interface AttachmentSearchRow {
+  id: string;
+  name: string;
+  mime_type: string | null;
+  element_id: string | null;
+  object_id: string | null;
+  strategy_id: string | null;
+  portfolio_id?: string | null;
+  deal_id?: string | null;
+  company_id?: string | null;
+  folder_id: string | null;
+  owner_label: string | null;
+  element_object_id: string | null;
+  domain_id: string | null;
+  snippet: string | null;
+}
+
+export type SearchHostKind = FileOwnerKind | "portfolio" | "deal" | "company";
+
+/** Pure. The host a search hit hangs on: whichever owner column the row sets. */
+export function searchHostOf(row: AttachmentSearchRow): { kind: SearchHostKind; label: string | null } | null {
+  const kind: SearchHostKind | null = row.element_id ? "element"
+    : row.object_id ? "object"
+    : row.strategy_id ? "strategy"
+    : row.folder_id ? "folder"
+    : row.portfolio_id ? "portfolio"
+    : row.deal_id ? "deal"
+    : row.company_id ? "company"
+    : null;
+  return kind ? { kind, label: row.owner_label } : null;
+}
+
+/** Pure. What the query matched, in the RPC's own precedence: the file's
+ *  name first (those hits rank first), then its extracted text (a snippet
+ *  exists only where the text matched), else the host's name. */
+export function searchMatchedOf(row: AttachmentSearchRow, query: string): "name" | "contents" | "owner" {
+  if (row.name.toLowerCase().includes(query.toLowerCase())) return "name";
+  if (row.snippet) return "contents";
+  return "owner";
+}
+
+export interface SearchHit {
+  id: string;
+  name: string;
+  mime_type: string | null;
+  host: { kind: SearchHostKind; label: string | null } | null;
+  element_object_id: string | null;
+  domain_id: string | null;
+  snippet: string | null;
+  matched: "name" | "contents" | "owner";
+}
+
+/** Pure. One RPC row in the shape the tool returns: the file, and the host
+ *  context the person-side result carries — where it hangs is part of the
+ *  answer, not a second lookup. */
+export function searchHitOf(row: AttachmentSearchRow, query: string): SearchHit {
+  return {
+    id: row.id,
+    name: row.name,
+    mime_type: row.mime_type,
+    host: searchHostOf(row),
+    element_object_id: row.element_object_id,
+    domain_id: row.domain_id,
+    snippet: row.snippet,
+    matched: searchMatchedOf(row, query),
+  };
+}
+
+/** Pure. The no-ambient-Space merge: hits from several Spaces, newest first
+ *  by the files' created_at, capped at the limit. A hit whose stamp is
+ *  unknown sorts as oldest. */
+export function mergeSearchHits(lists: { hit: SearchHit; createdAt: string }[][], limit: number): SearchHit[] {
+  return lists.flat()
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+    .slice(0, Math.max(0, limit))
+    .map((x) => x.hit);
+}
+
+const SEARCH_LIMIT_MAX = 50;
+
+/**
+ * searchFiles: the same search_attachments RPC the Files view and ⌘K run,
+ * with the caller's JWT — Athena sees exactly what the asking person sees.
+ * The ambient Space comes from the entry's context, never from the model;
+ * without one, the caller's own Spaces (the activity_spaces RLS lets them
+ * see) are each searched and the hits merged newest-first.
+ */
+async function searchFiles(db: SupabaseClient, input: Record<string, unknown>, ctx?: FileToolContext): Promise<ToolResult> {
+  const query = (typeof input.query === "string" ? input.query : "").normalize("NFKC").trim();
+  if (!query) return { ok: false, error: "query を渡してください（ファイル名・中身・付いているものの名前の言葉）" };
+  const limit = typeof input.limit === "number" && input.limit > 0 ? Math.min(Math.floor(input.limit), SEARCH_LIMIT_MAX) : 20;
+  let spaceIds: string[] = ctx?.spaceId ? [ctx.spaceId] : [];
+  if (!spaceIds.length) {
+    const { data, error } = await db.from("activity_spaces").select("id");
+    if (error) throw error;
+    spaceIds = ((data ?? []) as { id: string }[]).map((s) => s.id);
+  }
+  if (!spaceIds.length) return { ok: true, data: [], meta: { rows: 0 } };
+  const perSpace: SearchHit[][] = [];
+  for (const spaceId of spaceIds) {
+    const { data, error } = await db.rpc("search_attachments", { p_space: spaceId, p_query: query, p_limit: limit });
+    if (error) throw error;
+    perSpace.push(((data ?? []) as AttachmentSearchRow[]).map((r) => searchHitOf(r, query)));
+  }
+  if (spaceIds.length === 1) {
+    const hits = perSpace[0];
+    return { ok: true, data: hits, meta: { rows: hits.length } };
+  }
+  // The RPC returns no created_at; the merge orders by the files' own stamps.
+  const ids = perSpace.flat().map((h) => h.id);
+  const { data: stamps } = await db.from("attachments").select("id, created_at").in("id", ids);
+  const createdAt = new Map(((stamps ?? []) as { id: string; created_at: string }[]).map((s) => [s.id, s.created_at]));
+  const hits = mergeSearchHits(perSpace.map((list) => list.map((hit) => ({ hit, createdAt: createdAt.get(hit.id) ?? "" }))), limit);
+  return { ok: true, data: hits, meta: { rows: hits.length } };
+}
+
 /** Writes text as the owner's file, or the next version of the file of that name. */
 export async function saveTextFile(
   db: SupabaseClient, owner: { kind: FileOwnerKind; id: string }, name: string, mime: string, content: string,
@@ -130,9 +269,11 @@ export async function saveTextFile(
   return { id: data.id as string, version: list.length + 1 };
 }
 
-export async function runFileTool(db: SupabaseClient, name: string, input: Record<string, unknown>): Promise<ToolResult> {
+export async function runFileTool(db: SupabaseClient, name: string, input: Record<string, unknown>, ctx?: FileToolContext): Promise<ToolResult> {
   try {
     switch (name) {
+      case "searchFiles":
+        return await searchFiles(db, input, ctx);
       case "listFiles": {
         const cols = "id, name, size, mime_type, created_at, previous_id, element_id, object_id, strategy_id, folder_id";
         if (input.ownerKind !== undefined || input.ownerId !== undefined) {
@@ -164,8 +305,17 @@ export async function runFileTool(db: SupabaseClient, name: string, input: Recor
           text = new TextDecoder("utf-8").decode(await blob.arrayBuffer());
         } else {
           const { data: stored } = await db.from("attachment_texts").select("body").eq("attachment_id", id).maybeSingle();
-          text = (stored as { body: string } | null)?.body ?? null;
-          if (!text) return { ok: false, error: `${file.name} からは文字を取り出せていません。アプリで一度開くと文字が取り出されます。` };
+          if (!stored) {
+            // No row yet: extraction has not reached this file. It runs
+            // when the Files view or search next visits the Space —
+            // opening the file extracts nothing, and this message must
+            // not promise that it does.
+            return { ok: false, error: `${file.name} の文字はまだ取り出されていません。Files 画面か検索がこの Space を訪れたときに取り出されます。急ぐ場合は、ファイルをメッセージに直接添付してもらえれば、その場で読めます。` };
+          }
+          text = (stored as { body: string }).body;
+          if (!text) {
+            return { ok: false, error: `${file.name} には読み取れる文字が入っていません（スキャンされた PDF や画像など、文字のないファイルです）。` };
+          }
         }
         const page = pageOf(text, offset);
         return { ok: true, data: { id, name: file.name, ...page } };
