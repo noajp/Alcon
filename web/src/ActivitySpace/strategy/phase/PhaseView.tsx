@@ -1,5 +1,6 @@
 'use client';
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from '@/ui/icons';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
@@ -171,6 +172,7 @@ export function PhaseView({
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
+        <SidebarReveal />
         <span className="px-1.5 py-0.5 text-[13px] font-semibold text-foreground">{t('Phase')}</span>
         <div className="flex-1" />
         <button
@@ -440,6 +442,7 @@ function PhaseDetailView({
     <div className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       {/* Drawn as the shared IslandHeader is (Function/shared/MainIsland). */}
       <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
+        <SidebarReveal />
         <button
           type="button"
           onClick={onBack}

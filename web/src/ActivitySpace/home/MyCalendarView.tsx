@@ -1,5 +1,6 @@
 'use client';
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -73,6 +74,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
     <ElementDrilldown label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange}>
       {openElement => <div className="flex min-h-0 flex-1 flex-col bg-card">
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+        <SidebarReveal />
         <NavCalendarIcon size={14} />
         <span className="text-[13px] font-medium text-foreground">{t('Calendar')}</span>
         <div className="flex-1" />

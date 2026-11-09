@@ -41,7 +41,7 @@ import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { PanelLeft } from '@/ui/icons';
+import { SidebarRevealContext } from '@/Function/shared/SidebarReveal';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNavigation';
 
@@ -754,6 +754,7 @@ function WorkspaceContent({
   return (
     <ExplorerDataProvider value={explorerData}>
     <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup} onOpenCreateNotebook={openNotebookPopup}>
+    <SidebarRevealContext.Provider value={{ hidden: sidebarCollapsed && !sidebarOverlay, show: handleSidebarToggle }}>
     <CopilotProvider>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
@@ -795,15 +796,9 @@ function WorkspaceContent({
         )}
 
         <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5`}>
-        {/* No strip above the content: back / forward are ⌘[ / ⌘], and the
-            sidebar shows and hides from its own header (⌘\\). With the
-            sidebar hidden, one quiet button brings it back. */}
-        {sidebarCollapsed && !sidebarOverlay && (
-          <button type="button" onClick={handleSidebarToggle} title={t('Show sidebar')} aria-label={t('Show sidebar')}
-            className="absolute left-1.5 top-2.5 z-30 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <PanelLeft size={15} />
-          </button>
-        )}
+        {/* No strip above the content: back / forward are the browser's
+            arrows (and ⌘[ / ⌘]). The sidebar closes by dragging the island
+            over it; each page's title row then offers it back (⌘\\). */}
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -913,6 +908,7 @@ function WorkspaceContent({
       />
     </div>
     </CopilotProvider>
+    </SidebarRevealContext.Provider>
     </WorkspaceActionsProvider>
     </ExplorerDataProvider>
   );

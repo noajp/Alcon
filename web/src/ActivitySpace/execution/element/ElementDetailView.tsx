@@ -1,5 +1,6 @@
 'use client';
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
 import { handOverLabels } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import { markElementCommentsRead } from '@/hooks/notificationData';
@@ -692,6 +693,7 @@ function ElementDetailBody({
       {/* pl-6 + the crumb's px-1.5: the path starts 30px in, as on every
           island, and the page below starts under it. */}
       <div className="h-[50px] flex items-center gap-1 pl-6 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+        <SidebarReveal />
         <div className="flex items-center gap-1 min-w-0 text-[13px] font-medium">
           {rootSegment}
           <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
