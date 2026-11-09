@@ -6,20 +6,18 @@ import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/Frame/WorkspaceActionsContext';
 import { AppSidebar } from '@/Frame/AppSidebar';
 import { ModePanel } from '@/Frame/ModePanel';
-import { StatusBar } from '@/Frame/StatusBar';
 import { useUserPreferences } from '@/Function/settings/useUserPreferences';
 import { DiscoverModal } from '@/Frame/DiscoverModal';
 import { MainContent } from '@/Frame/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/Frame/CreateView';
 import { CommandPalette } from '@/Frame/CommandPalette';
-import { ShellTabStrip } from '@/Frame/ShellTabStrip';
 import { QuickAddElementLauncher } from '@/Frame/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
 import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
 import { CopilotProvider } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
-import { forwardAfterNavigation, recordNavigation, stepBack, stepForward, type HistoryStep } from '@/Frame/historyState';
-import { closeTab, isItemScreen, newTab, openScreen, reorderTabs, switchTab } from '@/Frame/tabState';
+import { forwardAfterNavigation, recordNavigation, routeKeyOf, stepBack, stepForward, type HistoryStep } from '@/Frame/historyState';
+import { isItemScreen, newTab, openScreen } from '@/Frame/tabState';
 import { mergeNavigation, navigationAfterDomainChange, navigationForView } from '@/Frame/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
@@ -43,6 +41,7 @@ import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { Domain } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { PanelLeft } from '@/ui/icons';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNavigation';
 
@@ -390,6 +389,33 @@ function WorkspaceContent({
   const canGoBack = storedTab.activeView !== 'settings' && storedTab.back.length > 0;
   const canGoForward = storedTab.activeView !== 'settings' && storedTab.forward.length > 0;
 
+  // The browser's back and forward walk this history too. Each screen change
+  // is pushed as a browser history entry carrying how deep the app's own
+  // back stack is; the browser's arrows (and ⌘[ / ⌘]) move through those
+  // entries, and the depth they land on says whether that was a step back or
+  // forward here. A change made by such a step is not pushed again.
+  const screenKey = `${storedTab.id}|${routeKeyOf({ view: storedTab.activeView, navigation: storedTab.navigation })}`;
+  const fromBrowser = useRef(false);
+  const lastScreen = useRef<string | null>(null);
+  useEffect(() => {
+    const depth = storedTab.back.length;
+    if (lastScreen.current === null) window.history.replaceState({ ...window.history.state, alconBack: depth }, '');
+    else if (lastScreen.current !== screenKey && !fromBrowser.current) window.history.pushState({ alconBack: depth }, '');
+    fromBrowser.current = false;
+    lastScreen.current = screenKey;
+  }, [screenKey, storedTab.back.length]);
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const target = (e.state as { alconBack?: number } | null)?.alconBack;
+      if (typeof target !== 'number') return;
+      const depth = storedTab.back.length;
+      if (target < depth) { fromBrowser.current = true; goBack(); }
+      else if (target > depth) { fromBrowser.current = true; goForward(); }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  });
+
   // ⌘[ / Alt+← go back and ⌘] / Alt+→ go forward, like a browser. Ignored
   // while typing — the guard the app's other global keys use.
   // Re-subscribed each render so the steps always read the tab active now.
@@ -401,7 +427,9 @@ function WorkspaceContent({
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
       e.preventDefault();
-      if (back) goBack(); else goForward();
+      // Through the browser's own history, so Chrome's arrows and these keys
+      // walk the same steps.
+      if (back) { if (canGoBack) window.history.back(); } else if (canGoForward) window.history.forward();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -444,10 +472,7 @@ function WorkspaceContent({
     setTabs(next.tabs);
     setActiveTabId(next.activeTabId);
   };
-  const handleSelectTab = (tabId: string) => applyTabState(switchTab({ tabs, activeTabId }, tabId));
-  const handleCloseTab = (tabId: string) => applyTabState(closeTab({ tabs, activeTabId }, tabId, () => makeNewTab(getCachedHomeViewId())));
   const handleNewTab = () => applyTabState(newTab({ tabs, activeTabId }, () => makeNewTab(getCachedHomeViewId())));
-  const handleReorderTabs = (tabIds: string[]) => applyTabState(reorderTabs({ tabs, activeTabId }, tabIds));
 
   // A page asked for another screen (an Element's "Open in" → its Note, a new
   // deck): an item (a deep selection naming a thing) opens in a tab of
@@ -679,6 +704,17 @@ function WorkspaceContent({
       storeSidebarCollapsedChoice(false);
     }
   };
+
+  // ⌘\ shows and hides the sidebar (its header button hides it too).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== '\\') return;
+      e.preventDefault();
+      handleSidebarToggle();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
   // Choosing anything from the sidebar dismisses the overlay, so the tap
   // lands straight on the chosen screen (a no-op while the sidebar is pinned).
   const handleSidebarViewChange = (view: string) => {
@@ -733,6 +769,7 @@ function WorkspaceContent({
             (absolute, measured from the row) escapes its clipping. */}
         <div className="mt-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
         <AppSidebar
+          onToggleSidebar={handleSidebarToggle}
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
@@ -758,23 +795,15 @@ function WorkspaceContent({
         )}
 
         <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5`}>
-        {/* The top strip: the shell's history (‹ ›), the sidebar's
-            toggle and the open screens as tabs, over the whole content
-            column. */}
-        <ShellTabStrip
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          onGoBack={goBack}
-          onGoForward={goForward}
-          sidebarVisible={!sidebarCollapsed || sidebarOverlay}
-          onToggleSidebar={handleSidebarToggle}
-          tabs={tabs}
-          activeTabId={activeTab.id}
-          onSelectTab={handleSelectTab}
-          onCloseTab={handleCloseTab}
-          onNewTab={handleNewTab}
-          onReorderTabs={handleReorderTabs}
-        />
+        {/* No strip above the content: back / forward are ⌘[ / ⌘], and the
+            sidebar shows and hides from its own header (⌘\\). With the
+            sidebar hidden, one quiet button brings it back. */}
+        {sidebarCollapsed && !sidebarOverlay && (
+          <button type="button" onClick={handleSidebarToggle} title={t('Show sidebar')} aria-label={t('Show sidebar')}
+            className="absolute left-1.5 top-2.5 z-30 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <PanelLeft size={15} />
+          </button>
+        )}
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -834,11 +863,6 @@ function WorkspaceContent({
         </div>
         </div>
       </div>
-      <StatusBar
-        activeView={activeTab.activeView}
-        onViewChange={handleSidebarViewChange}
-        ai={{ open: copilotOpen || aiScreen, onToggle: aiScreen ? handleMinimizeAi : () => handleCopilotOpenChange(!copilotOpen) }}
-      />
 
       {/* Global ⌘K command palette */}
       <CommandPalette returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenItem={openItem} onNewTab={handleNewTab} onOpenSettings={handleOpenSettings} canGoBack={canGoBack} onGoBack={goBack} canGoForward={canGoForward} onGoForward={goForward} />
