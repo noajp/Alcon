@@ -1,9 +1,11 @@
-// integration-oauth — a Space owner connects Google Drive by signing in with
-// Google (ADR 0035), or GitHub by signing in with GitHub. Deployed with
+// integration-oauth — a Space owner connects a Google service by signing in
+// with Google (ADR 0035), or GitHub by signing in with GitHub. Deployed with
 // --no-verify-jwt: /go and /callback are browser navigations without a
 // Supabase JWT; /start, /finish and /revoke check the caller's JWT themselves.
-// The provider is the integration row's: google-drive → Google, github →
-// GitHub; every step below is the same for both.
+// The provider is the integration row's: a row a Google profile claims
+// (google-drive, gmail) → Google, github → GitHub; every step below is the
+// same for both. What differs per Google service — scopes, the account
+// check — is the profile's (googleOAuth.ts).
 //
 //   GET  /status                 { google: boolean, github: boolean } —
 //                                whether each sign-in is configured (client +
@@ -20,9 +22,9 @@
 //   GET  /callback?code&state    Claims the state (single use), checks
 //                                expiry (10 minutes) and the cookie nonce,
 //                                exchanges the code with the verifier,
-//                                requires the scope (drive.file / repo) and
-//                                reads the account (Google email / GitHub
-//                                login). Stores NOTHING on the integration: the
+//                                requires the scopes (the Google profile's /
+//                                repo) and reads the account (Google email /
+//                                GitHub login). Stores NOTHING on the integration: the
 //                                token set is held in Vault against a one-time
 //                                completion handle (10 minutes), and the
 //                                browser goes back to where it started
@@ -55,9 +57,10 @@ import {
   isGithubOAuthRow, parseGithubSecret, type GithubClientConfig,
 } from "../_shared/githubOAuth.ts";
 import {
-  GOOGLE_ABOUT_URL, GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, NONCE_COOKIE, STATE_TTL_MS, TICKET_TTL_MS,
-  appOrigin, appReturnUrl, buildAuthorizeUrl, returnOrigin, clearNonceCookie, finishDecision, hasScope, isExpired, isGoogleDriveRow,
+  GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, NONCE_COOKIE, STATE_TTL_MS, TICKET_TTL_MS,
+  appOrigin, appReturnUrl, buildAuthorizeUrl, returnOrigin, clearNonceCookie, finishDecision, googleProfileOf, grantsRequiredScopes, isExpired,
   nonceCookie, parseOAuthSecret, randomToken, readCookie, redirectUriFor, s256Challenge, secretFromTokenResponse, sha256Hex,
+  type GoogleProviderProfile,
 } from "../_shared/googleOAuth.ts";
 
 const corsHeaders = {
@@ -74,8 +77,8 @@ type Row = IntegrationRow & { activity_space_id: string };
 type Provider = "google" | "github";
 
 /** Which sign-in a row uses, or null when it signs in with none. */
-function providerOf(row: Parameters<typeof isGoogleDriveRow>[0]): Provider | null {
-  return isGoogleDriveRow(row) ? "google" : isGithubOAuthRow(row) ? "github" : null;
+function providerOf(row: Parameters<typeof googleProfileOf>[0]): Provider | null {
+  return googleProfileOf(row) ? "google" : isGithubOAuthRow(row) ? "github" : null;
 }
 
 const PROVIDER_NAME: Record<Provider, string> = { google: "Google", github: "GitHub" };
@@ -244,15 +247,16 @@ async function githubLogin(accessToken: string): Promise<string | null> {
   }
 }
 
-async function googleEmail(accessToken: string): Promise<string | null> {
+/** Who signed in, asked at the profile's account check (Drive's about,
+ *  Gmail's profile). The address, or null when it cannot be read. */
+async function googleAccountEmail(accessToken: string, profile: GoogleProviderProfile): Promise<string | null> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 20_000);
   try {
-    const res = await fetch(GOOGLE_ABOUT_URL, { headers: { Authorization: `Bearer ${accessToken}`, accept: "application/json" }, signal: ctl.signal, redirect: "manual" });
+    const res = await fetch(profile.accountCheck.url, { headers: { Authorization: `Bearer ${accessToken}`, accept: "application/json" }, signal: ctl.signal, redirect: "manual" });
     if (!res.ok) return null;
-    const body = JSON.parse(await readCapped(res, 100_000)) as { user?: { emailAddress?: unknown } };
-    const email = body.user?.emailAddress;
-    return typeof email === "string" && email.length <= 320 ? email : null;
+    const body: unknown = JSON.parse(await readCapped(res, 100_000));
+    return profile.accountCheck.emailOf(body);
   } catch {
     return null;
   } finally {
@@ -286,9 +290,14 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET") return text(origin ? `${what} is not set up yet.` : NO_APP_ORIGIN, 503);
     return json({ error: origin ? `${what} is not set up yet` : `${what} is not set up yet (APP_ORIGIN is missing)`, code: "not_configured" }, 503);
   };
+  /** The integration a sign-in belongs to. */
+  const rowOfIntegration = async (integrationId: string): Promise<Row | null> => {
+    const { data: row } = await admin.from("integrations").select(ROW_COLUMNS).eq("id", integrationId).maybeSingle();
+    return (row as Row | null) ?? null;
+  };
   /** The provider of the integration a sign-in belongs to. */
   const providerOfIntegration = async (integrationId: string): Promise<Provider | null> => {
-    const { data: row } = await admin.from("integrations").select(ROW_COLUMNS).eq("id", integrationId).maybeSingle();
+    const row = await rowOfIntegration(integrationId);
     return row ? providerOf(row) : null;
   };
   // /finish needs APP_ORIGIN like every step; /revoke works whatever the
@@ -342,7 +351,8 @@ Deno.serve(async (req: Request) => {
       .select("integration_id, code_verifier")
       .maybeSingle();
     if (!row) return backToApp("error", null);
-    const provider = await providerOfIntegration(row.integration_id as string);
+    const integration = await rowOfIntegration(row.integration_id as string);
+    const provider = integration ? providerOf(integration) : null;
     const refused = notConfigured(provider);
     if (refused) return refused;
     const authorize = {
@@ -351,7 +361,9 @@ Deno.serve(async (req: Request) => {
       state,
       codeChallenge: await s256Challenge(row.code_verifier as string),
     };
-    const location = provider === "github" ? buildGithubAuthorizeUrl(authorize) : buildAuthorizeUrl(authorize);
+    const location = provider === "github"
+      ? buildGithubAuthorizeUrl(authorize)
+      : buildAuthorizeUrl({ ...authorize, profile: googleProfileOf(integration) ?? undefined });
     return new Response(null, { status: 302, headers: { location, "set-cookie": nonceCookie(nonce), "cache-control": "no-store" } });
   }
 
@@ -401,8 +413,9 @@ Deno.serve(async (req: Request) => {
       held = { secret: JSON.stringify(secret), account: await githubLogin(secret.access_token) };
     } else {
       const secret = secretFromTokenResponse(token.body, Date.now());
-      if (!secret || !hasScope(secret.scope)) return await fail();
-      held = { secret: JSON.stringify(secret), account: await googleEmail(secret.access_token) };
+      const profile = googleProfileOf(await rowOfIntegration(integrationId));
+      if (!secret || !profile || !grantsRequiredScopes(secret.scope, profile)) return await fail();
+      held = { secret: JSON.stringify(secret), account: await googleAccountEmail(secret.access_token, profile) };
     }
 
     // Held, not stored: only /finish, under the starter's own JWT, stores it.

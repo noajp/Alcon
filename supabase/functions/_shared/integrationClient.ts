@@ -17,7 +17,7 @@
 // link-local hosts, and an http_request path can never leave its base URL.
 
 import {
-  GOOGLE_TOKEN_URL, isGoogleDriveRow, needsRefresh, parseOAuthSecret, secretFromTokenResponse, sha256Hex,
+  GOOGLE_TOKEN_URL, isGoogleOAuthRow, needsRefresh, parseOAuthSecret, secretFromTokenResponse, sha256Hex,
 } from "./googleOAuth.ts";
 import { isGithubOAuthRow, parseGithubSecret } from "./githubOAuth.ts";
 
@@ -448,7 +448,8 @@ function envGet(key: string): string | undefined {
  * The credential to send for `row`, given the raw Vault value.
  *   none / bearer / header   the raw value as stored.
  *   oauth (github)           the access token as stored (it does not expire).
- *   oauth (google-drive)     the access token, refreshed through Google when
+ *   oauth (google)           a row a Google profile claims (googleOAuth.ts):
+ *                            the access token, refreshed through Google when
  *                            it expires within two minutes; the new token set
  *                            is saved with store_integration_oauth_token,
  *                            only if the stored refresh token is still the
@@ -467,7 +468,7 @@ export async function resolveCredential(
 ): Promise<string | null> {
   if (row.auth_type !== "oauth") return raw && raw.length > 0 ? raw : null;
   if (isGithubOAuthRow(row)) return parseGithubSecret(raw)?.access_token ?? null;
-  if (!isGoogleDriveRow(row)) return null;
+  if (!isGoogleOAuthRow(row)) return null;
   const secret = parseOAuthSecret(raw);
   if (!secret) return null;
   const now = opts.now ?? Date.now();
