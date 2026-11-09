@@ -5486,6 +5486,54 @@ export type Database = {
           },
         ]
       }
+      space_exception_installs: {
+        Row: {
+          activity_space_id: string
+          catalog_item_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          installed_by: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          activity_space_id: string
+          catalog_item_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          installed_by?: string | null
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          activity_space_id?: string
+          catalog_item_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          installed_by?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_exception_installs_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "space_exception_installs_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategies: {
         Row: {
           activity_space_id: string | null
@@ -7048,6 +7096,10 @@ export type Database = {
         }
         Returns: Json
       }
+      install_catalog_exception: {
+        Args: { p_item_id: string; p_space_id: string }
+        Returns: string
+      }
       intent_measure_format: {
         Args: { p_unit: string; p_value: number }
         Returns: string
@@ -7297,6 +7349,10 @@ export type Database = {
           user_id: string | null
         }[]
       }
+      set_catalog_exception_enabled: {
+        Args: { p_enabled: boolean; p_item_id: string; p_space_id: string }
+        Returns: boolean
+      }
       set_domain_member_role: {
         Args: { p_domain: string; p_role: string; p_user: string }
         Returns: string
@@ -7430,6 +7486,10 @@ export type Database = {
       touch_asset: {
         Args: { p_asset_id: string; p_manifest: Json; p_observed: Json }
         Returns: undefined
+      }
+      uninstall_catalog_exception: {
+        Args: { p_item_id: string; p_space_id: string }
+        Returns: boolean
       }
       user_can_decide_approval: {
         Args: { p_element: string }

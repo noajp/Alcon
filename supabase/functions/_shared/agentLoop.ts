@@ -98,6 +98,13 @@ export interface LoopDeps {
    * delegation, standing rule or track record can lift one.
    */
   breakerHold?(call: ToolCall): Promise<{ reason: string } | null>;
+  /**
+   * The run's declared patience for a failure class ran out
+   * (failure definitions, B13): the loop stops and the driver
+   * settles the run as failed with that class. Checked after
+   * cancelled(), before budget — a give-up is a failure, not a pause.
+   */
+  giveUp?(): { failureClass: string; detail: string } | null;
   execute(call: ToolCall): Promise<ExecResult>;
   /** Called with every response's usage; record cost here. */
   onUsage(usage: ModelUsage): Promise<void>;
@@ -185,6 +192,7 @@ export type LoopOutcome =
   | { kind: "limit" }
   | { kind: "budget" }
   | { kind: "cancelled" }
+  | { kind: "giveup"; failureClass: string; detail: string }
   | { kind: "refusal"; detail: string };
 
 export function toolCalls(content: Block[]): ToolCall[] {
@@ -214,6 +222,11 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
   let turnsThisCall = 0;
   while (true) {
     if (await deps.cancelled()) return { kind: "cancelled" };
+    // A give-up (B13) is checked before the budget: the run's failure
+    // contract ran out, which is a failure to settle — never a pause
+    // a resume could mistake for patience left.
+    const giveUp = deps.giveUp?.();
+    if (giveUp) return { kind: "giveup", failureClass: giveUp.failureClass, detail: giveUp.detail };
     if (deps.budgetExceeded()) return { kind: "budget" };
     if (state.turns >= limits.maxTotalTurns) return { kind: "limit" };
     if (turnsThisCall >= limits.maxTurnsThisCall || Date.now() >= limits.deadline) return { kind: "yield" };

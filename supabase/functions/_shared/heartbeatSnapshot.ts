@@ -14,6 +14,7 @@ export type HeartbeatSignalKind =
   | "approval_element" | "approval_copilot"
   | "run_answer" | "run_review" | "element_review" | "readings"
   | "run_paused" | "run_failed"
+  | "failure_escalation"
   | "correction_exhausted"
   | "draft_review" | "draft_input"
   | "promotion_review" | "promotion_input"
@@ -85,6 +86,7 @@ export const HEARTBEAT_KIND_LABEL: Record<HeartbeatSignalKind, string> = {
   readings: "測定値の受入待ち",
   run_paused: "エラーで停止した実行",
   run_failed: "失敗した実行",
+  failure_escalation: "失敗のエスカレーション",
   correction_exhausted: "修正が上限に達した実行",
   draft_review: "接続ドラフトの審査待ち",
   draft_input: "起草の回答待ち",
@@ -110,6 +112,7 @@ const FINGERPRINT_BASE: Record<HeartbeatSignalKind, string> = {
   readings: "readings",
   run_paused: "run_paused",
   run_failed: "run_failed",
+  failure_escalation: "failure_escalation",
   correction_exhausted: "correction_exhausted",
   draft_review: "draft_review",
   draft_input: "draft_input",

@@ -592,3 +592,44 @@ describe('compensationMarkerOf', () => {
     expect(compensationMarkerOf({ input: null } as never)).toBeNull();
   });
 });
+
+// ── The B13 seam supply (§11): the pass asks failurePolicySource ────
+// The B9 tests above pin the pass against its own sources; these pin
+// the adapter B13 hands it: a definition row's compensate word comes
+// back per class, an installed entry speaks under the row, and with
+// neither, the answer is COMPENSATION_DEFAULT — B9's behaviour whole.
+describe('the failure-policy seam supply (B13)', () => {
+  it('a definition row’s compensate returns per class; silence is the default', async () => {
+    const fp = await import(new URL('../../supabase/functions/_shared/failurePolicy.ts', import.meta.url).pathname);
+    const def = await import(new URL('../../supabase/functions/_shared/definition.ts', import.meta.url).pathname);
+    const definition = def.parseDefinition([
+      '# 失敗時の扱い',
+      '- read_failed: compensate auto, escalate inbox',
+      '- write_failed: compensate never, escalate owner',
+    ].join('\n'));
+    const source = fp.failurePolicySource({ definition, entries: [] });
+    expect(source.policyFor({ runId: 'r', definitionId: 'd', failureClass: 'read_failed' })).toBe('auto');
+    expect(source.policyFor({ runId: 'r', definitionId: 'd', failureClass: 'write_failed' })).toBe('never');
+    expect(source.policyFor({ runId: 'r', definitionId: 'd', failureClass: 'auth_failed' })).toBe(COMPENSATION_DEFAULT);
+    expect(engineCompensationPolicy.policyFor({ runId: 'r', definitionId: null, failureClass: 'run_failure' })).toBe(COMPENSATION_DEFAULT);
+  });
+
+  it('an installed entry speaks under the definition row, per field', async () => {
+    const fp = await import(new URL('../../supabase/functions/_shared/failurePolicy.ts', import.meta.url).pathname);
+    const def = await import(new URL('../../supabase/functions/_shared/definition.ts', import.meta.url).pathname);
+    const definition = def.parseDefinition('# 失敗時の扱い\n- read_failed: compensate auto, escalate inbox');
+    const entries = [{
+      id: 'exc.test', name: 'test', version: 1,
+      match: { errorClass: null, destinationPattern: null, tool: null },
+      rows: [
+        { class: 'read_failed', retry: null, compensate: 'never', escalate: 'inbox', giveUpAfter: null },
+        { class: 'unavailable', retry: null, compensate: 'never', escalate: 'inbox', giveUpAfter: null },
+      ],
+    }];
+    const source = fp.failurePolicySource({ definition, entries });
+    // the row wins for its class; the entry governs the class the row
+    // never named
+    expect(source.policyFor({ runId: 'r', definitionId: 'd', failureClass: 'read_failed' })).toBe('auto');
+    expect(source.policyFor({ runId: 'r', definitionId: 'd', failureClass: 'unavailable' })).toBe('never');
+  });
+});

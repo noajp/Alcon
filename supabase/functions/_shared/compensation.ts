@@ -47,13 +47,16 @@ import { approvalSummary, type ApprovalDisplay } from "./integrationTools.ts";
 import type { ApprovalVerdict } from "./approvalPolicy.ts";
 import type { VerifyCheck } from "./verifyReads.ts";
 import type { CompensationSummary } from "./finishClaims.ts";
+import type { CompensatePolicy } from "./definition.ts";
 
 // ── The policy seam ────────────────────────────────────────────────
 
 /** What a failure's compensation set does: run it now (auto), hold
  *  it as one pending batch for a person (ask), or only report it
- *  (never). */
-export type CompensatePolicy = "auto" | "ask" | "never";
+ *  (never). The type itself is defined with the definition's own
+ *  vocabulary (definition.ts — the failure rows speak it) and
+ *  re-exported here, where the seam's readers already look. */
+export type { CompensatePolicy };
 
 /** The engine default until a definition's failure rows speak (B13):
  *  ask — the rollback waits for one tap in the Inbox. An undo is

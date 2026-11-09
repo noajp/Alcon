@@ -133,6 +133,84 @@ describe('checking a harness', () => {
   });
 });
 
+describe('failure rows (B13)', () => {
+  const codes = (body: string, ctx?: unknown) => def.checkHarness(def.parseDefinition(body), ctx).map((d: { code: string }) => d.code);
+
+  it('reads a Japanese failure row field by field', () => {
+    const d = def.parseDefinition('# 目的\nx\n\n# 失敗時の扱い\n- read_failed: 再試行 2回、補償は確認、エスカレーション: オーナー、3回で諦める\n');
+    expect(d.failure).toEqual([{ class: 'read_failed', retry: 2, compensate: 'ask', escalate: 'owner', giveUpAfter: 3 }]);
+    expect(d.failureProblems).toEqual([]);
+  });
+
+  it('reads the English form under an English heading', () => {
+    const d = def.parseDefinition('# Goal\nx\n\n# Failure\n- auth_failed: retry never, compensate never, escalate strategy, give up after 10\n');
+    expect(d.failure).toEqual([{ class: 'auth_failed', retry: 0, compensate: 'never', escalate: 'strategy', giveUpAfter: 10 }]);
+  });
+
+  it('names classes by their Japanese labels', () => {
+    const d = def.parseDefinition('# 目的\nx\n\n# 失敗の扱い\n- 認証失敗: 再試行なし、補償は自動、通知先: Inbox\n- 出典が古い: 補償は確認、エスカレーション: Strategy のオーナー\n');
+    expect(d.failure).toEqual([
+      { class: 'auth_failed', retry: 0, compensate: 'auto', escalate: 'inbox', giveUpAfter: null },
+      { class: 'stale_claims', retry: null, compensate: 'ask', escalate: 'strategy', giveUpAfter: null },
+    ]);
+  });
+
+  it('refuses a row with no escalation target (F001): silence is not declarable', () => {
+    const body = '# 目的\nx\n\n# 失敗時の扱い\n- read_failed: 再試行 2回、補償は確認\n';
+    const d = def.parseDefinition(body);
+    expect(d.failure).toEqual([]);
+    expect(d.failureProblems.map((p: { code: string }) => p.code)).toEqual(['F001']);
+    expect(codes(body)).toContain('F001');
+    expect(def.checkHarness(d).find((x: { code: string }) => x.code === 'F001')?.severity).toBe('error');
+  });
+
+  it('refuses a row whose class cannot be named (F002) and one with an out-of-grammar field (F003)', () => {
+    const body = '# 目的\nx\n\n# 失敗時の扱い\n- something_else: 再試行 1回、エスカレーション: オーナー\n- read_failed: 再試行 9回、エスカレーション: オーナー\n- write_failed: 補償はたぶん、エスカレーション: オーナー\n- not_found: 再試行 1回、補償は確認、エスカレーション: オーナー、99回で諦める\n';
+    const d = def.parseDefinition(body);
+    expect(d.failure).toEqual([]);
+    expect(d.failureProblems.map((p: { code: string }) => p.code)).toEqual(['F002', 'F003', 'F003', 'F003']);
+  });
+
+  it('refuses a second row for the same class (F004) and keeps the first', () => {
+    const body = '# 目的\nx\n\n# 失敗時の扱い\n- read_failed: 再試行 1回、エスカレーション: オーナー\n- 読み取り失敗: 再試行 2回、エスカレーション: Inbox\n';
+    const d = def.parseDefinition(body);
+    expect(d.failure).toHaveLength(1);
+    expect(d.failure[0].retry).toBe(1);
+    expect(d.failureProblems.map((p: { code: string }) => p.code)).toEqual(['F004']);
+  });
+
+  it('reads the exceptions section by catalog id, split like connectors', () => {
+    const d = def.parseDefinition('# 目的\nx\n\n# 例外カタログ\n- exc.partial-outage（相手先の一部障害）\n- exc.rate-limited: レート制限\n');
+    expect(d.exceptions).toEqual(['exc.partial-outage', 'exc.rate-limited']);
+    expect(def.parseDefinition('# Goal\nx\n\n# Exceptions\n- exc.stale-source\n').exceptions).toEqual(['exc.stale-source']);
+  });
+
+  it('warns on exceptions the Space has not installed (F005) or the catalog does not hold (F006), only with context', () => {
+    const body = '# 目的\nx\n\n# 例外カタログ\n- exc.partial-outage\n- exc.nope\n';
+    expect(codes(body)).not.toContain('F005');
+    expect(codes(body)).not.toContain('F006');
+    const withCtx = codes(body, { exceptions: { catalog: ['exc.partial-outage'], installed: [] } });
+    expect(withCtx).toContain('F005');
+    expect(withCtx).toContain('F006');
+    expect(codes(body, { exceptions: { catalog: ['exc.partial-outage', 'exc.nope'], installed: ['exc.partial-outage', 'exc.nope'] } })).not.toContain('F005');
+  });
+
+  it('leaves a definition without the sections exactly as before', () => {
+    const d = def.parseDefinition(ISUCON);
+    expect(d.failure).toEqual([]);
+    expect(d.failureProblems).toEqual([]);
+    expect(d.exceptions).toEqual([]);
+  });
+
+  it('reads the rows back in definitionReading, and never as missing', () => {
+    const d = def.parseDefinition('# 目的\nx\n\n# 失敗時の扱い\n- read_failed: 再試行 2回、補償は確認、エスカレーション: オーナー、3回で諦める\n\n# 例外カタログ\n- exc.partial-outage\n- exc.rate-limited\n- exc.stale-source\n');
+    const reading = def.definitionReading(d);
+    expect(reading.reads).toContain('失敗時の扱い: read_failed は再試行 2 回まで・補償は確認・エスカレーションはオーナー・3 回で諦める');
+    expect(reading.reads).toContain('例外カタログ: 「exc.partial-outage」ほか 2 件を採用');
+    expect(reading.missing.some((m: string) => m.includes('失敗'))).toBe(false);
+  });
+});
+
 describe('the web copy of the harness reader', () => {
   it('is the same file run-agent and the Planner use', async () => {
     const { readFileSync } = await import('node:fs');

@@ -25,6 +25,13 @@
 //   # 制約 / Constraints       standing lessons folded into the body by hand —
 //                              distinct from activated constraint drafts (B6),
 //                              which land as a projection and never rewrite this text
+//   # 失敗時の扱い / Failure    one row per failure class (B13): how many
+//                              retries, how the landed writes are compensated,
+//                              who hears about it, when the run gives up —
+//                              the rows failurePolicy.ts resolves at the seams
+//   # 例外カタログ / Exceptions the exception-catalog entries this work
+//                              adopts; when the section is written it narrows
+//                              the Space's installed set to the named ones
 
 export type OutputFormat = "markdown" | "html" | "csv" | "json";
 
@@ -32,6 +39,69 @@ export interface DefinitionMetric { name: string; direction: "max" | "min"; sour
 export interface DefinitionStop { target: number | null; budgetUsd: number | null; maxRounds: number | null; text: string }
 export interface DefinitionChecks { every: number | null; items: string[] }
 export interface DefinitionOutput { format: OutputFormat; body: string }
+
+// ── Failure handling (B13) ─────────────────────────────────────────
+// What a failure's compensation set does — B9's vocabulary
+// (compensation.ts re-exports this type; it is defined here because
+// this file is the mirrored, import-free home of the definition's
+// own vocabulary).
+export type CompensatePolicy = "auto" | "ask" | "never";
+
+/** Who hears about a failure when a row or an entry says so. */
+export type EscalateTarget = "owner" | "strategy" | "inbox";
+
+/**
+ * The failure classes a definition row, a catalog entry or the
+ * engine's settle can name. The first seven are judged at the call
+ * (failurePolicy.ts' classifyCallFailure); the rest only exist at a
+ * run's settle (its derivation is failurePolicy.ts' settle rules).
+ */
+export type FailureClass =
+  | "verify_mismatch" | "auth_failed" | "rate_limited" | "not_found"
+  | "unavailable" | "read_failed" | "write_failed"
+  | "revisions_exhausted" | "stale_claims" | "breaker_tripped"
+  | "model_refusal" | "run_failure";
+
+export const FAILURE_CLASSES: readonly FailureClass[] = [
+  "verify_mismatch", "auth_failed", "rate_limited", "not_found",
+  "unavailable", "read_failed", "write_failed",
+  "revisions_exhausted", "stale_claims", "breaker_tripped",
+  "model_refusal", "run_failure",
+];
+
+/** Pure. Whether a string names a failure class. */
+export function isFailureClass(value: unknown): value is FailureClass {
+  return typeof value === "string" && (FAILURE_CLASSES as readonly string[]).includes(value);
+}
+
+/** The most retries a failure row or catalog entry may declare. */
+export const MAX_DECLARED_RETRY = 5;
+/** The highest give-up count a failure row or catalog entry may declare. */
+export const MAX_DECLARED_GIVE_UP = 50;
+
+/**
+ * One failure row: what the work's contract says about one class of
+ * failure. A null field is a field the row does not speak about —
+ * resolution (failurePolicy.ts) falls through per field, to the
+ * catalog and then to the engine defaults. Rows the parser accepts
+ * always carry an escalate target: a row that claims authority over
+ * a failure must say where the failure goes (F001).
+ */
+export interface FailureRow {
+  class: FailureClass;
+  retry: number | null;
+  compensate: CompensatePolicy | null;
+  escalate: EscalateTarget | null;
+  giveUpAfter: number | null;
+}
+
+/** A failure row the parser refused, kept with its stable code so
+ *  checkHarness can say what is wrong (F001–F004; F005/F006 are
+ *  computed against the catalog context in checkHarness itself). */
+export interface FailureRowProblem {
+  code: "F001" | "F002" | "F003" | "F004";
+  line: string;
+}
 
 export interface ParsedDefinition {
   sections: Record<SectionKey, string>;
@@ -51,12 +121,29 @@ export interface ParsedDefinition {
    *  computed from the table, so rolling one back never rewrites what
    *  a person wrote. */
   constraints: string[];
+  /** The failure section's accepted rows, at most one per class
+   *  (a duplicate is refused as F004, never silently ordered). */
+  failure: FailureRow[];
+  /** The failure rows the parser refused, with their codes. A refused
+   *  row applies nothing at all — a half-read failure policy is worse
+   *  than none, so the row drops whole and the check says why. */
+  failureProblems: FailureRowProblem[];
+  /** The exception-catalog entries this work adopts, by catalog id.
+   *  A written section narrows the consulted set to the named
+   *  entries ∩ installed (B13 §3.4); an unwritten one consults the
+   *  Space's whole installed set. */
+  exceptions: string[];
+  /** Whether an exceptions section was written at all — the
+   *  narrowing is restrictive when present, so a written-but-empty
+   *  section (which names nothing) consults nothing, and only the
+   *  absence of the section consults everything. */
+  exceptionsDeclared: boolean;
 }
 
 /** How old a fact of a data type may be, in ms, before a claim to it is stale. */
 export type FreshnessTable = Record<string, number>;
 
-export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown" | "assignment" | "constraints";
+export type SectionKey = "goal" | "conditions" | "metric" | "procedure" | "stop" | "checks" | "output" | "connectors" | "breakdown" | "assignment" | "constraints" | "failure" | "exceptions";
 
 const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["goal", /^(目的|ゴール|goal|purpose)/i],
@@ -70,6 +157,8 @@ const SECTION_NAMES: [SectionKey, RegExp][] = [
   ["breakdown", /^(分け方|分解の仕方|分解|breakdown|decomposition)/i],
   ["assignment", /^(担当の決め方|担当|assignment)/i],
   ["constraints", /^(制約|守ること|constraints?)/i],
+  ["failure", /^(失敗|failure|failures|on failure)/i],
+  ["exceptions", /^(例外|exceptions?)/i],
 ];
 
 /** Pure. The section a heading names, or null for a heading of the author's own. */
@@ -90,7 +179,7 @@ function num(raw: string): number | null {
 }
 
 export function parseDefinition(body: string): ParsedDefinition {
-  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "", assignment: "", constraints: "" } as Record<SectionKey, string>;
+  const sections = { goal: "", conditions: "", metric: "", procedure: "", stop: "", checks: "", output: "", connectors: "", breakdown: "", assignment: "", constraints: "", failure: "", exceptions: "" } as Record<SectionKey, string>;
   let current: SectionKey | null = null;
   let checksHeading = "";
   let inFence = false;
@@ -136,7 +225,131 @@ export function parseDefinition(body: string): ParsedDefinition {
   }
   const connectors = [...new Set(bullets(sections.connectors).map((c) => c.split(/[（(:：]/)[0].trim()).filter(Boolean))];
   const freshness = parseFreshness(sections.conditions);
-  return { sections, metric, stop, checks, output, connectors, freshness, constraints: bullets(sections.constraints) };
+  const failureParsed = parseFailureRows(sections.failure);
+  const exceptions = [...new Set(bullets(sections.exceptions).map((c) => c.split(/[（(:：]/)[0].trim()).filter(Boolean))];
+  return {
+    sections, metric, stop, checks, output, connectors, freshness, constraints: bullets(sections.constraints),
+    failure: failureParsed.rows, failureProblems: failureParsed.problems, exceptions,
+    exceptionsDeclared: sections.exceptions.trim().length > 0,
+  };
+}
+
+// ── Failure rows: what this work does when a call or the run fails ─────
+// One bullet per failure class, a few fields, readable at a glance
+// (the program design's §7.1 discipline). English and Japanese field
+// forms are both read, the way freshness declarations are. A row is
+// read whole or not at all: a class the parser cannot name (F002), a
+// field outside the grammar (F003), a second row for a class already
+// named (F004), or a row with nowhere for the failure to go (F001 —
+// silence is not declarable) refuses the row and keeps the problem.
+
+const FAILURE_CLASS_LABELS: [FailureClass, string[]][] = [
+  ["read_failed", ["読み取り失敗"]],
+  ["write_failed", ["書き込み失敗"]],
+  ["auth_failed", ["認証失敗"]],
+  ["rate_limited", ["レート制限"]],
+  ["not_found", ["見つからない"]],
+  ["unavailable", ["応答なし", "利用不可"]],
+  ["verify_mismatch", ["読み戻し不一致"]],
+  ["revisions_exhausted", ["差し戻し枯渇"]],
+  ["stale_claims", ["出典が古い"]],
+  ["breaker_tripped", ["ブレーカー"]],
+  ["model_refusal", ["拒否"]],
+  ["run_failure", ["その他の失敗"]],
+];
+
+/** Pure. The failure class a row's leading token names — the English
+ *  class name itself, or one of its Japanese labels. */
+export function failureClassFor(token: string): FailureClass | null {
+  const t = token.trim();
+  if (isFailureClass(t.toLowerCase())) return t.toLowerCase() as FailureClass;
+  for (const [cls, labels] of FAILURE_CLASS_LABELS) {
+    for (const label of labels) if (t === label || t.startsWith(label)) return cls;
+  }
+  return null;
+}
+
+/** Pure. The escalation target a Japanese row value names, or null. */
+function escalateTargetFor(value: string): EscalateTarget | null {
+  if (/strategy/i.test(value)) return "strategy";
+  if (/^inbox$/i.test(value)) return "inbox";
+  if (value === "オーナー" || /^owner$/i.test(value)) return "owner";
+  return null;
+}
+
+/** Pure. One field chunk of a failure row, read into the row. False
+ *  when the chunk is outside the grammar — the row then refuses. */
+function parseFailureField(row: FailureRow, chunk: string): boolean {
+  let m: RegExpExecArray | null;
+  if ((m = /^retry\s+(never|\d+)$/i.exec(chunk))) {
+    const n = m[1].toLowerCase() === "never" ? 0 : Number(m[1]);
+    if (n > MAX_DECLARED_RETRY) return false;
+    row.retry = n;
+    return true;
+  }
+  if (/^再試行なし$/.test(chunk)) { row.retry = 0; return true; }
+  if ((m = /^再試行\s*(\d+)\s*回$/.exec(chunk))) {
+    const n = Number(m[1]);
+    if (n > MAX_DECLARED_RETRY) return false;
+    row.retry = n;
+    return true;
+  }
+  if ((m = /^compensate\s+(auto|ask|never)$/i.exec(chunk))) {
+    row.compensate = m[1].toLowerCase() as CompensatePolicy;
+    return true;
+  }
+  if (/^補償は自動$/.test(chunk)) { row.compensate = "auto"; return true; }
+  if (/^補償は確認$/.test(chunk)) { row.compensate = "ask"; return true; }
+  if (/^補償しない$/.test(chunk)) { row.compensate = "never"; return true; }
+  if ((m = /^escalate\s*[:：]?\s*(owner|strategy|inbox)$/i.exec(chunk))) {
+    row.escalate = m[1].toLowerCase() as EscalateTarget;
+    return true;
+  }
+  if ((m = /^(?:エスカレーション|通知先)\s*[:：]?\s*(.+)$/.exec(chunk))) {
+    const target = escalateTargetFor(m[1].trim());
+    if (!target) return false;
+    row.escalate = target;
+    return true;
+  }
+  if ((m = /^give\s+up\s+after\s+(\d+)$/i.exec(chunk))) {
+    const n = Number(m[1]);
+    if (n < 1 || n > MAX_DECLARED_GIVE_UP) return false;
+    row.giveUpAfter = n;
+    return true;
+  }
+  if ((m = /^(\d+)\s*回で諦める$/.exec(chunk)) || (m = /^諦め\s*(\d+)\s*回$/.exec(chunk))) {
+    const n = Number(m[1]);
+    if (n < 1 || n > MAX_DECLARED_GIVE_UP) return false;
+    row.giveUpAfter = n;
+    return true;
+  }
+  return false;
+}
+
+/** Pure. The failure section's rows: the accepted ones (at most one
+ *  per class) and the problems of the refused ones. */
+function parseFailureRows(section: string): { rows: FailureRow[]; problems: FailureRowProblem[] } {
+  const rows: FailureRow[] = [];
+  const problems: FailureRowProblem[] = [];
+  const seen = new Set<FailureClass>();
+  for (const line of bullets(section)) {
+    const m = /^([^:：,、]+)\s*[:：,、]?\s*(.*)$/.exec(line.trim());
+    const cls = failureClassFor(m?.[1] ?? "");
+    if (!cls) { problems.push({ code: "F002", line }); continue; }
+    if (seen.has(cls)) { problems.push({ code: "F004", line }); continue; }
+    const row: FailureRow = { class: cls, retry: null, compensate: null, escalate: null, giveUpAfter: null };
+    const rest = (m?.[2] ?? "").trim();
+    const chunks = rest ? rest.split(/[,、]/).map((c) => c.trim()).filter(Boolean) : [];
+    let refused = false;
+    for (const chunk of chunks) {
+      if (!parseFailureField(row, chunk)) { problems.push({ code: "F003", line }); refused = true; break; }
+    }
+    if (refused) continue;
+    if (row.escalate == null) { problems.push({ code: "F001", line }); continue; }
+    seen.add(cls);
+    rows.push(row);
+  }
+  return { rows, problems };
 }
 
 // ── Freshness: how old a fact may be before a claim to it is stale ─────────
@@ -229,6 +442,12 @@ export interface Diagnostic {
 /** What a harness is checked against: the Space's connections (name or preset), when known. */
 export interface HarnessContext {
   connected?: string[] | null;
+  /** The exception catalog, when the checking surface knows it: the
+   *  ids the catalog holds, and the ids this Space has installed.
+   *  Only then can the exceptions section's references be judged
+   *  (F005/F006) — the runtime gate passes no context and the
+   *  warnings stay the editor's to show. */
+  exceptions?: { catalog: string[]; installed: string[] } | null;
 }
 
 const fold = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
@@ -257,6 +476,32 @@ export function checkHarness(def: ParsedDefinition, ctx: HarnessContext = {}): D
     const have = new Set(ctx.connected.map(fold));
     for (const c of def.connectors) {
       if (!have.has(fold(c))) out.push({ code: "H005", severity: "warning", message: `コネクタ「${c}」がこの Space につながっていません。`, fix: "設定 › AI › コネクタでつなぐか、「# 使うコネクタ」から外してください。" });
+    }
+  }
+  // Failure rows the parser refused (B13): a row shape problem is an
+  // error, on the F001 principle widened to every row shape — a
+  // failure policy silently half-applied is more dangerous than a
+  // definition stopped, because the author believes it is in force.
+  for (const p of def.failureProblems) {
+    if (p.code === "F001") {
+      out.push({ code: "F001", severity: "error", message: `失敗時の扱いの行にエスカレーション先がありません: 「${p.line}」`, fix: "「エスカレーション: オーナー」のように、失敗の行き先を書いてください。行き先のない失敗は宣言できません。" });
+    } else if (p.code === "F002") {
+      out.push({ code: "F002", severity: "error", message: `失敗時の扱いの行のクラスが分かりません: 「${p.line}」`, fix: "行の先頭に失敗クラス（read_failed、認証失敗 など）を書いてください。" });
+    } else if (p.code === "F003") {
+      out.push({ code: "F003", severity: "error", message: `失敗時の扱いの行に、文法に合わないフィールドがあります: 「${p.line}」`, fix: "「再試行 2回」「補償は確認」「エスカレーション: オーナー」「3回で諦める」の形で書いてください。再試行は 5 回まで、諦める回数は 1〜50 です。" });
+    } else {
+      out.push({ code: "F004", severity: "error", message: `同じ失敗クラスの行が 2 つあります: 「${p.line}」`, fix: "同じクラスへの行は 1 行にまとめてください。どちらが効くか曖昧な宣言は、宣言ではありません。" });
+    }
+  }
+  if (ctx.exceptions) {
+    const catalog = new Set(ctx.exceptions.catalog.map(fold));
+    const installed = new Set(ctx.exceptions.installed.map(fold));
+    for (const id of def.exceptions) {
+      if (!catalog.has(fold(id))) {
+        out.push({ code: "F006", severity: "warning", message: `例外カタログに「${id}」がありません。`, fix: "「# 例外カタログ」の id を確かめてください。" });
+      } else if (!installed.has(fold(id))) {
+        out.push({ code: "F005", severity: "warning", message: `例外「${id}」はこの Space にインストールされていません。`, fix: "設定 › AI › ハーネスの例外カタログでインストールしてください。インストールされていない例外は発火しません。" });
+      }
     }
   }
   if (!def.output) {
@@ -365,5 +610,20 @@ export function definitionReading(def: ParsedDefinition): { reads: string[]; mis
   if (def.checks.items.length) reads.push(`点検: ${def.checks.items.length} 項目${def.checks.every ? `、${def.checks.every} 周ごと` : ""}`);
   if (def.output) reads.push(`成果物の型: ${def.output.format}${def.output.format === "markdown" ? `（見出し ${shapeHeadings(def.output.body).length} 個を保存時に確かめます）` : ""}`);
   else missing.push("成果物の型（# 成果物の型）がないため、保存時に型を確かめません");
+  // Failure handling (B13): the declared rows read back field by
+  // field, so the author can check the reading before a run lives
+  // under it. No section is NOT a gap — the engine defaults are the
+  // posture — so nothing lands in `missing` for its absence.
+  for (const row of def.failure) {
+    const parts: string[] = [];
+    if (row.retry != null) parts.push(row.retry === 0 ? "再試行なし" : `再試行 ${row.retry} 回まで`);
+    if (row.compensate != null) parts.push(row.compensate === "auto" ? "補償は自動" : row.compensate === "ask" ? "補償は確認" : "補償しない");
+    if (row.escalate != null) parts.push(`エスカレーションは${row.escalate === "owner" ? "オーナー" : row.escalate === "strategy" ? "Strategy のオーナー" : "Inbox"}`);
+    if (row.giveUpAfter != null) parts.push(`${row.giveUpAfter} 回で諦める`);
+    reads.push(`失敗時の扱い: ${row.class} は${parts.join("・")}`);
+  }
+  if (def.exceptions.length) {
+    reads.push(`例外カタログ: 「${def.exceptions[0]}」${def.exceptions.length > 1 ? `ほか ${def.exceptions.length - 1} 件` : ""}を採用`);
+  }
   return { reads, missing };
 }
