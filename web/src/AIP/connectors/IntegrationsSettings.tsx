@@ -3,21 +3,20 @@
 import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronDown, ExternalLink, LayoutGrid, List, Search } from '@/ui/icons';
+import { ExternalLink } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { CARD_FLAT, CARD_HOVER, FONT } from '@/shared/designTokens';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { Integration } from '@/types/database';
 import {
-  CATEGORY_LABELS, EMPTY_FILTER, INTEGRATION_PRESETS, INTEGRATION_STATUS_LABELS, KIND_LABELS, SOURCE_LABELS,
-  filterPresets, installedPresetIds, integrationStatus, presetById, readLastTest, testOutcomeLabel,
-  type CatalogFilter, type IntegrationPreset,
+  CONNECTION_METHOD_ORDER, INTEGRATION_PRESETS, INTEGRATION_STATUS_LABELS, KIND_LABELS, OAUTH_PROVIDER_NAMES,
+  catalogGroups, connectionMethodOf, installedPresetIds, integrationStatus, oauthProviderOf, presetById, readLastTest, testOutcomeLabel,
+  type CatalogCardState, type ConnectionMethod, type IntegrationPreset, type OAuthProvider,
 } from './catalog';
-import { useIntegrations, useIsSpaceOwner } from './data';
+import { useIntegrationOAuthStatus, useIntegrations, useIsSpaceOwner } from './data';
 import { setSpaceApprovalMode, useSpaceApprovalMode } from './approvalModeData';
 import { APPROVAL_MODE_DESCRIPTIONS, APPROVAL_MODE_LABELS, APPROVAL_MODE_ORDER, approvalModeOf, type ApprovalMode } from './approvalModeModel';
 import { createDraft, useIntegrationDrafts } from './draftData';
@@ -26,22 +25,22 @@ import { IntegrationDraftDialog } from './IntegrationDraftDialog';
 import { SiteCredentialsSection } from './SiteCredentialsSection';
 import { Textarea } from '@/ui/textarea';
 import type { IntegrationDraft } from '@/types/database';
-import { IntegrationIcon, SourceChip } from './IntegrationDetailDialog';
+import { IntegrationIcon } from './IntegrationDetailDialog';
 import { ConnectDialogHost, openedForIntegration, openedForPreset, openedForRegistryEntry, type OpenedConnection } from './ConnectDialogHost';
 import { AlconConnectPanel } from './AlconConnectPanel';
 import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
 import { HarnessesPanel } from '@/AIP/harness/HarnessesPanel';
 import { RegistrySection } from '@/AIP/harness/RegistrySection';
-import { YoursDiscover, type CustomizeMode } from '@/AIP/harness/YoursDiscover';
 import type { DirectoryEntry } from '@/hooks/customizeData';
 
 // Settings › AI: how the Space's AI works.
 //   definitions  harnesses — how a kind of work is carried out, the connectors
 //                it uses and where it stops (HarnessesPanel)
-//   external     connectors: Yours is the Space's connections; Discover is
-//                Alcon's catalog (modelled on Supabase's Integrations page)
-//                and the public MCP Registry (RegistrySection)
+//   external     connectors: one page — what the Space has (Connected,
+//                site logins, drafts), then what it can add, grouped by
+//                how a connection is made, and the public MCP Registry
+//                (RegistrySection)
 // Settings › API & access: the other direction.
 //   alcon        point an MCP client or script at Alcon
 //                with an OAuth sign-in or a personal access token
@@ -70,11 +69,12 @@ function ExternalServicesPanel() {
   const openedDraft = openedDraftId ? drafts.find((d) => d.id === openedDraftId) ?? null : null;
   const ownerRole = useIsSpaceOwner(spaceId);
   const isOwner = ownerRole === true;
-  const [filter, setFilter] = useState<CatalogFilter>(EMPTY_FILTER);
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [opened, setOpened] = useState<OpenedConnection | null>(null);
-  // Yours first: what the Space has, where a sign-in coming back lands too.
-  const [mode, setMode] = useState<CustomizeMode>('yours');
+  const [siteLoginAddOpen, setSiteLoginAddOpen] = useState(false);
+  // Sign-in readiness is the server's fact, shared with the detail
+  // dialog: both provider reads sit on the one status fetch.
+  const googleConfigured = useIntegrationOAuthStatus(true, 'google');
+  const githubConfigured = useIntegrationOAuthStatus(true, 'github');
   const oauthOutcome = useOAuthOutcome();
   const oauthReturnName = oauthOutcome?.integrationId ? integrations.find((i) => i.id === oauthOutcome.integrationId)?.name ?? null : null;
   // A confirmed sign-in changed the row (account, last test): read it again.
@@ -85,7 +85,14 @@ function ExternalServicesPanel() {
   }, [oauthStatus, queryClient]);
 
   const installed = useMemo(() => installedPresetIds(integrations), [integrations]);
-  const visible = useMemo(() => filterPresets(INTEGRATION_PRESETS, filter), [filter]);
+  const oauthConfigured = useMemo<Record<OAuthProvider, boolean | null>>(
+    () => ({ google: googleConfigured, github: githubConfigured }),
+    [googleConfigured, githubConfigured],
+  );
+  const groups = useMemo(
+    () => catalogGroups(INTEGRATION_PRESETS, installed, oauthConfigured),
+    [installed, oauthConfigured],
+  );
 
   const openPreset = (preset: IntegrationPreset) => setOpened(openedForPreset(preset, integrations));
   const openIntegration = (integration: Integration) => setOpened(openedForIntegration(integration));
@@ -98,7 +105,6 @@ function ExternalServicesPanel() {
         <div className="min-w-0">
           <h2 className={`${FONT.lg} text-foreground`}>{t('Connectors')}</h2>
         </div>
-        <YoursDiscover mode={mode} onChange={setMode} />
         <Button asChild variant="ghost" size="sm">
           <a href={DOCS_URL} target="_blank" rel="noreferrer">
             <ExternalLink size={14} aria-hidden="true" />
@@ -131,51 +137,8 @@ function ExternalServicesPanel() {
 
       {spaceId && <ApprovalModeSection spaceId={spaceId} isOwner={isOwner} />}
 
-      {mode === 'discover' && <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[180px] flex-1">
-            <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={filter.query} onChange={(e) => setFilter({ ...filter, query: e.target.value })}
-              placeholder={t('Search integrations...')} aria-label={t('Search integrations...')} className="h-7 pl-8 text-[12px] md:text-[12px]" />
-          </div>
-          <FilterMenu label={t('Category')} value={filter.category} options={CATEGORY_LABELS} onChange={(category) => setFilter({ ...filter, category })} />
-          <FilterMenu label={t('Type')} value={filter.kind} options={KIND_LABELS} onChange={(kind) => setFilter({ ...filter, kind })} />
-          <FilterMenu label={t('Source')} value={filter.source} options={SOURCE_LABELS} onChange={(source) => setFilter({ ...filter, source })} />
-          <div className="ml-auto flex gap-1" role="group" aria-label={t('Layout')}>
-            <Button shape="tab" size="icon-sm" variant={layout === 'grid' ? 'secondary' : 'ghost'} aria-pressed={layout === 'grid'}
-              aria-label={t('Grid')} onClick={() => setLayout('grid')}><LayoutGrid size={14} /></Button>
-            <Button shape="tab" size="icon-sm" variant={layout === 'list' ? 'secondary' : 'ghost'} aria-pressed={layout === 'list'}
-              aria-label={t('List')} onClick={() => setLayout('list')}><List size={14} /></Button>
-          </div>
-        </div>
-
-        {visible.length === 0 ? (
-          <p className="py-3 text-[13px] text-muted-foreground">{t('No integrations match.')}</p>
-        ) : layout === 'grid' ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((p) => <PresetCard key={p.id} preset={p} installed={installed.has(p.id)} onOpen={() => openPreset(p)} />)}
-          </div>
-        ) : (
-          <div>
-            {visible.map((p) => <PresetRow key={p.id} preset={p} installed={installed.has(p.id)} onOpen={() => openPreset(p)} />)}
-          </div>
-        )}
-      </section>}
-
-      {mode === 'discover' && <RegistrySection connectedEndpoints={connectedEndpoints} canAdd={isOwner} onAdd={addFromRegistry} />}
-
-      {mode === 'discover' && spaceId && (
-        <DraftCreateSection
-          spaceId={spaceId}
-          integrations={integrations}
-          drafts={drafts}
-          onCreated={(draft) => { void draftsQuery.refetch(); setOpenedDraftId(draft.id); }}
-          onOpenDraft={(draft) => setOpenedDraftId(draft.id)}
-        />
-      )}
-
-      {mode === 'yours' && <section className="space-y-3">
-        <h3 className={FONT.label}>{t('Installed connections')}</h3>
+      <section className="space-y-3">
+        <h3 className={FONT.label}>{t('Connected')}</h3>
         {error ? (
           <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
         ) : loading ? (
@@ -187,13 +150,14 @@ function ExternalServicesPanel() {
             {integrations.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
           </div>
         )}
-      </section>}
+      </section>
 
-      {mode === 'yours' && spaceId && (
-        <SiteCredentialsSection spaceId={spaceId} integrations={integrations} isOwner={isOwner} ownerKnown={ownerRole !== null} />
+      {spaceId && (
+        <SiteCredentialsSection spaceId={spaceId} integrations={integrations} isOwner={isOwner} ownerKnown={ownerRole !== null}
+          addOpen={siteLoginAddOpen} onAddOpenChange={setSiteLoginAddOpen} />
       )}
 
-      {mode === 'yours' && drafts.length > 0 && (
+      {drafts.length > 0 && (
         <section className="space-y-3">
           <h3 className={FONT.label}>{t('Drafted connections')}</h3>
           <div>
@@ -214,6 +178,40 @@ function ExternalServicesPanel() {
         </section>
       )}
 
+      {(groups.length > 0 || isOwner) && <section className="space-y-3">
+        <h3 className={FONT.label}>{t('Add a connection')}</h3>
+        <div className="space-y-6">
+          {CONNECTION_METHOD_ORDER.map((method) => {
+            const group = groups.find((g) => g.method === method);
+            const showSiteCard = method === 'sign-in' && isOwner;
+            if (!group && !showSiteCard) return null;
+            return (
+              <div key={method} className="space-y-3">
+                <h4 className={FONT.label}>{t(CONNECTION_METHOD_HEADINGS[method])}</h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {group?.cards.map(({ preset, state }) => (
+                    <PresetCard key={preset.id} preset={preset} state={state} onOpen={() => openPreset(preset)} />
+                  ))}
+                  {showSiteCard && <WebsiteSignInCard onOpen={() => setSiteLoginAddOpen(true)} />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>}
+
+      <RegistrySection connectedEndpoints={connectedEndpoints} canAdd={isOwner} onAdd={addFromRegistry} />
+
+      {spaceId && (
+        <DraftCreateSection
+          spaceId={spaceId}
+          integrations={integrations}
+          drafts={drafts}
+          onCreated={(draft) => { void draftsQuery.refetch(); setOpenedDraftId(draft.id); }}
+          onOpenDraft={(draft) => setOpenedDraftId(draft.id)}
+        />
+      )}
+
       {openedDraft && spaceId && (
         <IntegrationDraftDialog
           draft={openedDraft}
@@ -232,7 +230,7 @@ function ExternalServicesPanel() {
           integrations={integrations}
           canEdit={isOwner}
           onClose={() => setOpened(null)}
-          onCreated={(created) => { setMode('yours'); setOpened({ preset: opened.preset, integration: created }); }}
+          onCreated={(created) => setOpened({ preset: opened.preset, integration: created })}
         />
       )}
     </div>
@@ -314,79 +312,72 @@ function ApprovalModeSection({ spaceId, isOwner }: { spaceId: string; isOwner: b
   );
 }
 
-function FilterMenu<K extends string>({ label, value, options, onChange }: {
-  label: string; value: K | null; options: Record<K, string>; onChange: (v: K | null) => void;
+/** The method groups' headings: how the connection is made, in plain words. */
+const CONNECTION_METHOD_HEADINGS: Record<ConnectionMethod, string> = {
+  'sign-in': 'Connect by signing in',
+  'token': 'Connect with a token',
+  'custom': 'Set up a custom connection',
+};
+
+/** A catalog card whose bottom line is the next action — how this
+ *  connection is made — not provider metadata (Source and builder live
+ *  in the detail dialog, the drill-down). A sign-in preset whose
+ *  provider is not configured on the server reads as setup-needed,
+ *  never as a broken connect; it still opens the dialog, which carries
+ *  the full administrator copy. */
+function PresetCard({ preset, state, onOpen }: {
+  preset: IntegrationPreset; state: CatalogCardState; onOpen: () => void;
 }) {
   const { t } = useI18n();
-  const keys = Object.keys(options) as K[];
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant={value ? 'secondary' : 'ghost'} size="sm" align="start">
-          <span>{value ? `${label}: ${t(options[value])}` : label}</span>
-          <ChevronDown size={12} aria-hidden="true" className="opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[160px]">
-        <DropdownMenuItem onSelect={() => onChange(null)} className="gap-2 text-[12px]">
-          <span className="flex-1">{t('All')}</span>
-          {value === null && <Check size={12} />}
-        </DropdownMenuItem>
-        {keys.map((k) => (
-          <DropdownMenuItem key={k} onSelect={() => onChange(k)} className="gap-2 text-[12px]">
-            <span className="flex-1">{t(options[k])}</span>
-            {value === k && <Check size={12} />}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function InstalledBadge() {
-  const { t } = useI18n();
-  return (
-    <span className="inline-flex h-5 items-center rounded-full bg-[var(--status-success-subtle)] px-2 text-[11px] font-medium text-[var(--status-success)]">
-      {t('Installed')}
-    </span>
-  );
-}
-
-function PresetCard({ preset, installed, onOpen }: {
-  preset: IntegrationPreset; installed: boolean; onOpen: () => void;
-}) {
-  const { t } = useI18n();
+  const method = connectionMethodOf(preset);
+  const provider = oauthProviderOf(preset);
+  const action = state === 'setup-needed'
+    ? t('Needs setup')
+    : method === 'sign-in'
+      ? t('Sign in with {provider}', { provider: OAUTH_PROVIDER_NAMES[provider!] })
+      : method === 'token'
+        ? t('Paste a token')
+        : t('Set up');
   return (
     <button type="button" onClick={onOpen}
       className={cn(CARD_FLAT, CARD_HOVER, 'flex min-h-[156px] flex-col gap-3 p-4 text-left outline-none focus-visible:bg-[var(--surface-strong)]')}>
       <div className="flex items-start justify-between gap-2">
         <IntegrationIcon name={preset.name} icon={preset.icon} size={32} />
-        {installed && !preset.custom && <InstalledBadge />}
+        {state === 'setup-needed' && (
+          <span className="inline-flex h-5 items-center rounded-full bg-[var(--status-warning-subtle)] px-2 text-[11px] font-medium text-[var(--status-warning)]">
+            {t('Needs setup')}
+          </span>
+        )}
       </div>
       <div className="min-w-0">
         <div className="text-[13px] font-semibold text-foreground">{t(preset.name)}</div>
         <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{t(preset.description)}</p>
       </div>
-      <div className="mt-auto flex items-center justify-between gap-2">
-        <SourceChip source={preset.source} />
-        <span className="truncate text-[11px] text-muted-foreground">{t('Built by {name}', { name: t(preset.builtBy) })}</span>
+      <div className="mt-auto">
+        <div className="text-[12px] font-medium text-foreground">{action}</div>
+        {state === 'setup-needed' && (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{t('Sign-in is not set up on this server yet.')}</p>
+        )}
       </div>
     </button>
   );
 }
 
-function PresetRow({ preset, installed, onOpen }: { preset: IntegrationPreset; installed: boolean; onOpen: () => void }) {
+/** The website sign-in entry (secure login's browser route): not a
+ *  preset — it opens the Site logins section's add dialog, the one
+ *  route to a site credential. Shown to owners, like that section's
+ *  own add button. */
+function WebsiteSignInCard({ onOpen }: { onOpen: () => void }) {
   const { t } = useI18n();
   return (
     <button type="button" onClick={onOpen}
-      className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
-      <IntegrationIcon name={preset.name} icon={preset.icon} size={24} />
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-foreground">{t(preset.name)}</div>
-        <p className="truncate text-[12px] text-muted-foreground">{t(preset.description)}</p>
+      className={cn(CARD_FLAT, CARD_HOVER, 'flex min-h-[156px] flex-col gap-3 p-4 text-left outline-none focus-visible:bg-[var(--surface-strong)]')}>
+      <IntegrationIcon name={t('Website sign-in')} icon={null} size={32} />
+      <div className="min-w-0">
+        <div className="text-[13px] font-semibold text-foreground">{t('Website sign-in')}</div>
+        <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{t('For a website with no API: Athena signs in with a login you save.')}</p>
       </div>
-      {installed && !preset.custom && <InstalledBadge />}
-      <SourceChip source={preset.source} />
+      <div className="mt-auto text-[12px] font-medium text-foreground">{t('Add site login')}</div>
     </button>
   );
 }

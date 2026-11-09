@@ -1,6 +1,7 @@
 // The catalog of external services a Space can connect for its agents
 // (ADR 0027), and the pure rules around it: which presets exist, how the
-// catalog is filtered, what an `integrations` row looks like when created
+// catalog is grouped by the way a connection is made, what an
+// `integrations` row looks like when created
 // from a preset or a custom form, and how a stored `last_test` is read.
 //
 // A `model` connection is an AI model provider with a Messages API in
@@ -118,15 +119,6 @@ export function customPresetFor(kind: IntegrationKind): IntegrationPreset {
   return presetById(kind === 'mcp' ? 'custom-mcp' : kind === 'model' ? 'custom-model' : 'custom-http')!;
 }
 
-export const CATEGORY_LABELS: Record<IntegrationCategory, string> = {
-  project: 'Project management',
-  files: 'Files',
-  communication: 'Communication',
-  development: 'Development',
-  models: 'AI models',
-  custom: 'Custom',
-};
-
 export const KIND_LABELS: Record<IntegrationKind, string> = { mcp: 'MCP', http: 'API', model: 'AI model' };
 
 export const SOURCE_LABELS: Record<IntegrationSource, string> = {
@@ -163,28 +155,64 @@ export function oauthProviderOf(preset: IntegrationPreset): OAuthProvider | null
   return preset.id === 'github' ? 'github' : 'google';
 }
 
-// ── Filtering ──────────────────────────────────────────────────────────────
+/** The provider's proper name, for "Sign in with {provider}". */
+export const OAUTH_PROVIDER_NAMES: Record<OAuthProvider, string> = { google: 'Google', github: 'GitHub' };
 
-export interface CatalogFilter {
-  query: string;
-  category: IntegrationCategory | null;
-  kind: IntegrationKind | null;
-  source: IntegrationSource | null;
+// ── Connection method ──────────────────────────────────────────────────────
+//
+// How a connection is made, derived from what a preset already declares —
+// never stored. A custom preset is set up by the person (name, endpoint
+// and auth are typed); a sign-in preset connects by OAuth consent, which
+// Athena initiates; anything else takes a credential the person issues
+// at the service and pastes. Whether a sign-in can actually complete is
+// a state, not a method: it depends on the provider's OAuth client being
+// registered on the server (integration-oauth/status), checked per card
+// at render time.
+
+export type ConnectionMethod = 'sign-in' | 'token' | 'custom';
+
+export function connectionMethodOf(preset: IntegrationPreset): ConnectionMethod {
+  if (preset.custom) return 'custom';
+  if (signsInWithOAuth(preset)) return 'sign-in';
+  return 'token';
 }
 
-export const EMPTY_FILTER: CatalogFilter = { query: '', category: null, kind: null, source: null };
+export type CatalogCardState = 'ready' | 'setup-needed';
 
-/** Presets matching every set filter. The query matches name, description,
- *  builder and category label, case-insensitively. */
-export function filterPresets(presets: readonly IntegrationPreset[], filter: CatalogFilter): IntegrationPreset[] {
-  const q = filter.query.trim().toLowerCase();
-  return presets.filter((p) => {
-    if (filter.category && p.category !== filter.category) return false;
-    if (filter.kind && p.kind !== filter.kind) return false;
-    if (filter.source && p.source !== filter.source) return false;
-    if (!q) return true;
-    return [p.name, p.description, p.builtBy, CATEGORY_LABELS[p.category]].some((s) => s.toLowerCase().includes(q));
-  });
+export interface CatalogGroup {
+  method: ConnectionMethod;
+  cards: { preset: IntegrationPreset; state: CatalogCardState }[];
+}
+
+/** The method groups' fixed order on the catalog page. */
+export const CONNECTION_METHOD_ORDER: readonly ConnectionMethod[] = ['sign-in', 'token', 'custom'];
+
+/** The "Add a connection" groups over the presets offered: grouped by
+ *  connection method in the fixed order, installed presets excluded (a
+ *  custom preset is always offered — a Space can hold several custom
+ *  connections of a kind), empty groups omitted. A sign-in card whose
+ *  provider the server reports as not configured is 'setup-needed'; a
+ *  provider still loading (null) reads as ready — the dialog re-checks.
+ *  Which presets are offered is the caller's choice: this groups
+ *  whatever it is fed. */
+export function catalogGroups(
+  presets: readonly IntegrationPreset[],
+  installed: ReadonlySet<string>,
+  oauthConfigured: Record<OAuthProvider, boolean | null>,
+): CatalogGroup[] {
+  const byMethod = new Map<ConnectionMethod, { preset: IntegrationPreset; state: CatalogCardState }[]>();
+  for (const preset of presets) {
+    if (!preset.custom && installed.has(preset.id)) continue;
+    const method = connectionMethodOf(preset);
+    const provider = oauthProviderOf(preset);
+    const state: CatalogCardState = provider !== null && oauthConfigured[provider] === false ? 'setup-needed' : 'ready';
+    const cards = byMethod.get(method) ?? [];
+    cards.push({ preset, state });
+    byMethod.set(method, cards);
+  }
+  return CONNECTION_METHOD_ORDER
+    .filter((method) => byMethod.has(method))
+    .map((method) => ({ method, cards: byMethod.get(method)! }));
 }
 
 /** The preset ids this Space already has at least one connection for. */

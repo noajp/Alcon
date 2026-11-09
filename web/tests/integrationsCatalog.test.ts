@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, customPresetFor, darkIconFor, filterPresets, installedPresetIds,
-  integrationStatus, isSafeEndpoint, oauthProviderOf, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
+  INTEGRATION_PRESETS, buildIntegrationRow, catalogGroups, connectionMethodOf, customPresetFor, darkIconFor, installedPresetIds,
+  integrationStatus, isSafeEndpoint, oauthProviderOf, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel,
+  type ConnectionMethod, type IntegrationDraft, type OAuthProvider,
 } from '@/AIP/connectors/catalog';
 import { GMAIL_MANIFEST } from '@/AIP/connectors/gmailManifest';
 
@@ -60,21 +61,78 @@ describe('bundled manifests', () => {
   });
 });
 
-describe('filterPresets', () => {
-  it('returns everything for the empty filter', () => {
-    expect(filterPresets(INTEGRATION_PRESETS, EMPTY_FILTER)).toHaveLength(INTEGRATION_PRESETS.length);
+describe('connectionMethodOf', () => {
+  // Every preset's method is pinned by id: a preset added without a
+  // thought about how it connects fails here loudly.
+  const EXPECTED: Record<string, ConnectionMethod> = {
+    linear: 'token',
+    asana: 'token',
+    'google-drive': 'sign-in',
+    gmail: 'sign-in',
+    github: 'sign-in',
+    slack: 'token',
+    deepseek: 'token',
+    kimi: 'token',
+    'custom-mcp': 'custom',
+    'custom-http': 'custom',
+    'custom-model': 'custom',
+  };
+
+  it('pins the method of all current presets', () => {
+    expect(Object.keys(EXPECTED).sort()).toEqual(INTEGRATION_PRESETS.map((p) => p.id).sort());
+    for (const p of INTEGRATION_PRESETS) expect(connectionMethodOf(p), p.id).toBe(EXPECTED[p.id]);
+  });
+});
+
+describe('catalogGroups', () => {
+  const CONFIGURED: Record<OAuthProvider, boolean | null> = { google: true, github: true };
+  const NONE_INSTALLED: ReadonlySet<string> = new Set();
+  const ids = (groups: ReturnType<typeof catalogGroups>) =>
+    groups.map((g) => ({ method: g.method, ids: g.cards.map((c) => c.preset.id), states: g.cards.map((c) => c.state) }));
+
+  it('groups the whole catalog by method, in order, all ready', () => {
+    expect(ids(catalogGroups(INTEGRATION_PRESETS, NONE_INSTALLED, CONFIGURED))).toEqual([
+      { method: 'sign-in', ids: ['google-drive', 'gmail', 'github'], states: ['ready', 'ready', 'ready'] },
+      { method: 'token', ids: ['linear', 'asana', 'slack', 'deepseek', 'kimi'], states: ['ready', 'ready', 'ready', 'ready', 'ready'] },
+      { method: 'custom', ids: ['custom-mcp', 'custom-http', 'custom-model'], states: ['ready', 'ready', 'ready'] },
+    ]);
   });
 
-  it('combines query, category, kind and source', () => {
-    const ids = (f: Partial<typeof EMPTY_FILTER>) => filterPresets(INTEGRATION_PRESETS, { ...EMPTY_FILTER, ...f }).map((p) => p.id);
-    expect(ids({ query: 'LINEAR' })).toEqual(['linear']);
-    expect(ids({ query: 'project management' })).toEqual(['linear', 'asana']);
-    expect(ids({ category: 'project', kind: 'http' })).toEqual(['asana']);
-    expect(ids({ kind: 'mcp', source: 'official' })).toEqual(['linear', 'github']);
-    expect(ids({ source: 'custom' })).toEqual(['custom-mcp', 'custom-http', 'custom-model']);
-    expect(ids({ kind: 'model' })).toEqual(['deepseek', 'kimi', 'custom-model']);
-    expect(ids({ category: 'models' })).toEqual(['deepseek', 'kimi']);
-    expect(ids({ query: 'zzz' })).toEqual([]);
+  it('fed only the business presets, yields exactly the design groups', () => {
+    const business = INTEGRATION_PRESETS.filter((p) => p.kind !== 'model');
+    expect(ids(catalogGroups(business, NONE_INSTALLED, CONFIGURED))).toEqual([
+      { method: 'sign-in', ids: ['google-drive', 'gmail', 'github'], states: ['ready', 'ready', 'ready'] },
+      { method: 'token', ids: ['linear', 'asana', 'slack'], states: ['ready', 'ready', 'ready'] },
+      { method: 'custom', ids: ['custom-mcp', 'custom-http'], states: ['ready', 'ready'] },
+    ]);
+  });
+
+  it('a provider the server has not configured makes its cards setup-needed, per provider', () => {
+    const groups = catalogGroups(INTEGRATION_PRESETS, NONE_INSTALLED, { google: false, github: true });
+    const signIn = groups.find((g) => g.method === 'sign-in')!;
+    expect(signIn.cards.map((c) => [c.preset.id, c.state])).toEqual([
+      ['google-drive', 'setup-needed'],
+      ['gmail', 'setup-needed'],
+      ['github', 'ready'],
+    ]);
+  });
+
+  it('a provider still loading (null) reads as ready', () => {
+    const groups = catalogGroups(INTEGRATION_PRESETS, NONE_INSTALLED, { google: null, github: null });
+    for (const g of groups) for (const c of g.cards) expect(c.state).toBe('ready');
+  });
+
+  it('excludes installed presets and omits a group they empty', () => {
+    const installed = new Set(['google-drive', 'linear', 'asana', 'slack', 'deepseek', 'kimi']);
+    expect(ids(catalogGroups(INTEGRATION_PRESETS, installed, CONFIGURED))).toEqual([
+      { method: 'sign-in', ids: ['gmail', 'github'], states: ['ready', 'ready'] },
+      { method: 'custom', ids: ['custom-mcp', 'custom-http', 'custom-model'], states: ['ready', 'ready', 'ready'] },
+    ]);
+  });
+
+  it('a custom preset is offered even when a row already carries its id', () => {
+    const groups = catalogGroups(INTEGRATION_PRESETS, new Set(['custom-mcp']), CONFIGURED);
+    expect(groups.find((g) => g.method === 'custom')!.cards.map((c) => c.preset.id)).toContain('custom-mcp');
   });
 });
 
