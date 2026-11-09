@@ -22,11 +22,29 @@ import { liveTurnFromSteps } from './copilotSteps';
 //     the whole point of an explainable Copilot.
 // ──────────────────────────────────────────────────────────────────────────
 
+/** One entity a turn created in Alcon, as the server recorded it
+ *  (createdEntities.ts): a snapshot as created — title, and for an
+ *  Element its display_id and status at birth. The card reads the row
+ *  live by id; this is its fallback while that read loads, and its
+ *  text if the row has since been deleted. */
+export interface CreatedEntity {
+  kind: 'element' | 'object' | 'strategy';
+  id: string;
+  title: string;
+  displayId?: string;
+  status?: string;
+  objectId?: string;
+}
+
 export interface ToolEvent {
   name: string;
   input?: Record<string, unknown>;
   /** Filled in when the matching tool_result event arrives. */
   result?: { ok: boolean; rows?: number; error?: string };
+  /** What this call created in Alcon (creation tools only), drawn as
+   *  cards under the answer. Kept inside toolEvents, so the kept
+   *  conversation carries it whole with no extra whitelist entry. */
+  created?: CreatedEntity[];
 }
 
 /** One call on an approval card, as the function described it: the same

@@ -21,6 +21,7 @@ import {
   integrationPromptSection, manifestDenyRefusal, type SpaceIntegrationTools,
 } from "./integrationTools.ts";
 import { CONNECTION_PROPOSED_REPLY, PROPOSE_CONNECTION_TOOL, resolveConnectionProposal } from "./connectProposal.ts";
+import { createdOf, type CreatedEntity } from "./createdEntities.ts";
 import { createCredentialRequestsForNames, notifyCredentialRequestOwners } from "./credentialRequests.ts";
 import { recordWriteCompensation } from "./compensation.ts";
 import type { VerifyCheck } from "./verifyReads.ts";
@@ -77,6 +78,13 @@ export interface CopilotContextLike {
 export interface CopilotTurnEvents {
   onToolResult?(r: {
     name: string; ok: boolean; rows?: number; error?: string;
+    /** What the call created in Alcon (catalog create-family calls
+     *  only), read from the result by createdEntities' one extractor:
+     *  the driver keeps it on the turn's tool event and in the step's
+     *  detail, so the panel draws cards for what the turn made.
+     *  Integration tools create things in other systems, not Alcon
+     *  entities — they never carry this. */
+    created?: CreatedEntity[];
     /** A connection proposal the call made (propose_connection): the driver
      *  records it as a connection_request step and keeps it with the turn's
      *  message, so the panel renders the Connect card. */
@@ -354,7 +362,11 @@ export async function buildCopilotTurn(args: {
         return { content: CONNECTION_PROPOSED_REPLY };
       }
       const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "panel" });
-      events?.onToolResult?.({ name: call.name, ok: r.ok, rows: r.ok ? r.meta?.rows : undefined, error: r.ok ? undefined : r.error });
+      const created = r.ok ? createdOf(call.name, r.data) : undefined;
+      events?.onToolResult?.({
+        name: call.name, ok: r.ok, rows: r.ok ? r.meta?.rows : undefined, error: r.ok ? undefined : r.error,
+        ...(created ? { created } : {}),
+      });
       return r.ok ? { content: JSON.stringify(r.data).slice(0, 100_000) } : { content: JSON.stringify({ error: r.error }), is_error: true };
     },
   };

@@ -71,6 +71,7 @@ export {
   noticeElementSaveFailed,
   isElementSaveRefused,
   useElementBlockers,
+  useElementById,
   useParentElement,
   useSubElements,
   type SubElement,
