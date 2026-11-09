@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FileText, Pencil, Sparkles } from '@/ui/icons';
-import { Button } from '@/ui/button';
+import { FileText, Sparkles } from '@/ui/icons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
@@ -34,11 +33,13 @@ type ProfileTab = 'overview' | 'elements' | 'notes' | 'ai';
 // avatar and name, who they are in this Space, a line of facts (their local
 // time, handle, email) and their bio; under it, tabs — an Overview of what
 // matters about their work now, their Elements, their Notes and their AI.
-export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDomainId }: Props) {
+export function ProfileView({ onNavigate, onViewChange, activeDomainId }: Props) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const spaceId = useActiveSpaceId();
   const [tab, setTab] = useState<ProfileTab>('overview');
+  // My Elements' filter, display and add stand in the tab row.
+  const [controlsSlot, setControlsSlot] = useState<HTMLDivElement | null>(null);
   const spaces = useActivitySpaces().data;
   const spaceName = spaces.find((sp) => sp.id === spaceId)?.name ?? null;
   const role = useSpaceRole(spaceId);
@@ -70,11 +71,12 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
-      <IslandHeader crumbs={[{ id: 'profile', label: t('Profile') }]}
-        actions={<Button variant="ghost" size="sm" onClick={onOpenSettings}><Pencil size={14} />{t('Edit profile')}</Button>} />
+      {/* Settings is the gear beside you at the sidebar's foot. */}
+      <IslandHeader crumbs={[{ id: 'profile', label: t('Profile') }]} />
       {/* The views sit right under the title row, as on an Object; the
           person themselves opens the Overview, as an Object's title does. */}
-      <ViewTabs tabs={tabs.map(({ id, label }) => ({ id, label }))} active={tab} onSelect={setTab} label={t('Profile sections')} />
+      <ViewTabs tabs={tabs.map(({ id, label }) => ({ id, label }))} active={tab} onSelect={setTab} label={t('Profile sections')}
+        actions={<div ref={setControlsSlot} className={tab === 'elements' ? 'flex items-center' : 'hidden'} />} />
       <div className={tab === 'overview' ? 'min-h-0 flex-1 overflow-y-auto' : 'hidden'}>
         <PageLayout>
           <div className="space-y-4">
@@ -104,7 +106,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
           list), so its wrapper has to be a bounded flex column or the list
           is clipped instead of scrolling. */}
       <div className={tab === 'elements' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
-        <MyElementsView embedded onNavigate={onNavigate} onViewChange={onViewChange} />
+        <MyElementsView embedded controlsSlot={controlsSlot} onNavigate={onNavigate} onViewChange={onViewChange} />
       </div>
       <div className={tab === 'notes' ? 'min-h-0 flex-1 overflow-y-auto py-4 pl-[30px] pr-8' : 'hidden'}>
         {notesLoading ? <p role="status" className="text-[13px] text-muted-foreground">{t('Loading…')}</p>
