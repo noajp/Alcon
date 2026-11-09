@@ -60,6 +60,11 @@ export interface PanelMessage {
   role: string;
   content: string;
   done?: boolean;
+  /** The turn was stopped by its person: its words and steps stand as
+   *  they were when the stop landed, and the panel captions the turn
+   *  stopped. A field beside the words, never a sentence in them — the
+   *  model's words stay the model's, as with chartColors. */
+  stopped?: boolean;
   toolEvents?: PanelToolEvent[];
   approvals?: PanelApproval[];
   /** Connection proposals the turn made (propose_connection), kept with
@@ -89,6 +94,29 @@ export function withApprovalDecision(
       approvals: m.approvals.map((a) => (a.actionId === actionId ? { ...a, ...patch } : a)),
     };
   });
+}
+
+/** Pure. The assistant turn a stopped Copilot turn appends to the kept
+ *  conversation: the words it had written and the steps it had taken
+ *  when the stop landed, marked stopped. What the turn made before the
+ *  stop stays on the record — its tool events carry it — and no
+ *  sentence is put in the model's mouth: the mark is a field, and the
+ *  panel captions the turn from it. */
+export function stoppedAssistantMessage(args: {
+  text: string;
+  toolEvents?: PanelToolEvent[];
+  connections?: { names: string[]; waitingFor: string }[];
+  credentials?: { requestId: string; label: string; waitingFor: string }[];
+}): PanelMessage {
+  return {
+    role: "assistant",
+    content: args.text,
+    done: true,
+    stopped: true,
+    ...(args.toolEvents?.length ? { toolEvents: args.toolEvents } : {}),
+    ...(args.connections?.length ? { connections: args.connections } : {}),
+    ...(args.credentials?.length ? { credentials: args.credentials } : {}),
+  };
 }
 
 /** Pure. The assistant turn a resumed Copilot turn appends to the kept

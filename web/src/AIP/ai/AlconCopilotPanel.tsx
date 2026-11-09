@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Maximize2, Minimize2, Paperclip } from '@/ui/icons';
+import { X, Maximize2, Minimize2, Paperclip, Square } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { buildCopilotContext, type CopilotAttachment, type CopilotContext, type CopilotSubject } from './useAlconCopilot';
 import { useStrategies } from '@/hooks/strategyData';
@@ -380,8 +380,11 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               style={{ fontWeight: 400 }}
             />
             {streaming ? (
+              // One Stop face on every chat surface: the Square, as on
+              // ProfileAI — an X here read as "close the panel", which
+              // has its own X in the header.
               <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
-                <X size={14} />
+                <Square size={14} />
               </Button>
             ) : (
               // Same rectangular send as the Updates composer; mb-0.5 centres

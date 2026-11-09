@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronRight, ListChecks, Loader2, MessageSquare, Play,
+  ChevronRight, ListChecks, Loader2, MessageSquare, Play, Square,
 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
@@ -107,6 +107,9 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
   ];
   const empty = items.length === 0 && !talk.pendingText;
   const stopped = talk.run && (talk.run.status === 'paused' || talk.run.status === 'failed') ? talk.run.error : null;
+  // A person's stop: the run's error is null, so the line says the
+  // state itself, quietly — not an empty alert.
+  const cancelled = talk.run?.status === 'cancelled';
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,6 +142,9 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
         {(talk.error || stopped) && (
           <p role="alert" className="text-[12px] text-[var(--status-danger)]">{talk.error ?? stopped}</p>
         )}
+        {!talk.error && !stopped && cancelled && (
+          <p className="text-[12px] text-muted-foreground">{t('Stopped')}</p>
+        )}
       </div>
 
       <PlanCard objects={objects} onPlan={() => onPlan('')} />
@@ -166,9 +172,18 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
             {t('New conversation')}
           </Button>
         )}
-        <Button type="submit" variant="primary" size="xs" disabled={!input.trim() || talk.working} aria-label={t('Send')} className="mb-0.5 rounded-md px-2">
-          <SendIcon size={13} />
-        </Button>
+        {talk.working ? (
+          // While the engine answers, the composer's action is Stop —
+          // the Copilot panel's pattern (Square, the same word) — not
+          // a Send that merely sits disabled.
+          <Button type="button" variant="ghost" size="xs" onClick={() => void talk.stop()} title={t('Stop')} aria-label={t('Stop')} className="mb-0.5">
+            <Square size={13} />
+          </Button>
+        ) : (
+          <Button type="submit" variant="primary" size="xs" disabled={!input.trim()} aria-label={t('Send')} className="mb-0.5 rounded-md px-2">
+            <SendIcon size={13} />
+          </Button>
+        )}
       </form>
     </div>
   );

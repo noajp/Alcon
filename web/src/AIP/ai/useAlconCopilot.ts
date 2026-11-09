@@ -147,6 +147,11 @@ export interface CopilotMessage {
    *  An annotation on the kept message — never part of `content`, so
    *  what the AI wrote, and what the model later reads, is unchanged. */
   chartColors?: Record<number, Record<string, string>>;
+  /** The turn was stopped by its person: the words and steps stand as
+   *  they were when the stop landed, and the view captions the turn
+   *  stopped. A field beside the words, never part of `content`, so
+   *  what the AI wrote, and what the model later reads, is unchanged. */
+  stopped?: boolean;
   /** True once the turn for this assistant message has finished. */
   done?: boolean;
   /** When the turn was sent or began (ms). */
@@ -231,12 +236,15 @@ export function copilotTitleOf(messages: readonly CopilotMessage[]): string {
  *  panel's own, not the record's. Used when the person cuts a
  *  conversation back — the one write of messages that stays theirs. */
 export function toKeptMessages(messages: readonly CopilotMessage[]): CopilotMessage[] {
-  return messages.map(({ role, content, toolEvents, attachments, approvals, connections, credentials, chartColors }) => ({
+  return messages.map(({ role, content, toolEvents, attachments, approvals, connections, credentials, chartColors, stopped }) => ({
     role, content,
     ...(toolEvents?.length ? { toolEvents } : {}),
     ...(approvals?.length ? { approvals } : {}),
     ...(connections?.length ? { connections } : {}),
     ...(credentials?.length ? { credentials } : {}),
+    // A stopped turn's mark is part of its record, like its words:
+    // without this line the next edit/retry would silently un-stop it.
+    ...(stopped ? { stopped: true } : {}),
     // A person's chart colors are theirs like the cut itself: without
     // this line the next edit/retry would silently strip them.
     ...(chartColors && Object.keys(chartColors).length ? { chartColors } : {}),
@@ -514,10 +522,12 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
     }
     if (followGenRef.current !== gen) return;
     if (finalStatus === 'cancelled') {
-      // Stopped by its person: what the turn had written stays on
-      // screen, settled — the kept conversation carries no answer
-      // for a stopped turn.
-      settleLast();
+      // Stopped by its person: the kept conversation now carries the
+      // turn, marked stopped — prefer the server's record, so the
+      // panel and the record agree about what the stopped turn
+      // contains (its words may include a final stretch the panel
+      // never polled). The local settle is only the fallback.
+      if (!(await reloadKept(sessionId))) settleLast();
     } else if (!(await reloadKept(sessionId))) {
       settleLast();
     }

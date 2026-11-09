@@ -110,6 +110,25 @@ describe('toKeptMessages', () => {
     ]);
   });
 
+  it('carries a stopped turn’s mark through — a cut must not un-stop it', () => {
+    const shown: CopilotMessage[] = [
+      { role: 'user', content: 'たくさん作って' },
+      {
+        role: 'assistant', content: '途中まで作りました', done: true, at: 300, stopped: true,
+        toolEvents: [{ name: 'createElements', result: { ok: true, rows: 12 } }],
+      },
+      { role: 'assistant', content: '通常の答え', done: true },
+    ];
+    expect(toKeptMessages(shown)).toEqual([
+      { role: 'user', content: 'たくさん作って' },
+      {
+        role: 'assistant', content: '途中まで作りました', stopped: true,
+        toolEvents: [{ name: 'createElements', result: { ok: true, rows: 12 } }],
+      },
+      { role: 'assistant', content: '通常の答え' },
+    ]);
+  });
+
   it('carries a person’s chart colors through — the next cut must not strip them', () => {
     const shown: CopilotMessage[] = [
       {
