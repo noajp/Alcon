@@ -70,6 +70,15 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
       if (!id || !save) return;
       await save(id, { title: copilotTitleOf(kept), messages: toKeptMessages(kept) });
     },
+    // An annotation patch (a person's chart colors on one answer):
+    // the messages only, in kept shape — no title is passed, so the
+    // save never re-titles or re-files the conversation.
+    onPatchMessages: async (messages) => {
+      const id = sessionIdRef.current;
+      const save = saveSessionRef.current;
+      if (!id || !save) return;
+      await save(id, { messages: toKeptMessages(messages) });
+    },
   });
   const spaceId = useActiveSpaceId();
   const library = useAiConversations(spaceId);

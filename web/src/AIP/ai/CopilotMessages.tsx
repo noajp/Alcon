@@ -11,22 +11,27 @@ import type { AgentAction } from '@/types/database';
 import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotCredentialAsk, CopilotMessage, ToolEvent } from './useAlconCopilot';
 import { toolVerb } from './copilotFiles';
 import { splitAnswer } from './chartSpec';
+import { CHART_CARD_CLASS } from './chartColors';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
 import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
 import { missingConnectors } from '@/AIP/harness/installFlow';
 import { useIntegrations } from '@/AIP/connectors/data';
 
-const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: () => <div className="h-52 rounded-lg border border-border/60" /> });
+const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false, loading: () => <div className={`h-52 ${CHART_CARD_CLASS}`} /> });
 
 /** One turn of the conversation. The AI's answer is Markdown, rendered — no
  *  bare asterisks; its work shows as steps above it. Under each turn, as in
  *  Claude's chat: copy, and on the latest exchange retry (an answer) or edit
  *  (a question); the time shows beside them. */
-export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval, spaceId, onContinueConnection, onContinueCredential }: {
+export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDecideApproval, canRememberApproval, spaceId, onContinueConnection, onContinueCredential, onChartColors }: {
   message: CopilotMessage;
   streaming: boolean;
   /** Present on the latest answer once it is in. */
   onRetry?: () => void;
+  /** Records the person's chart colors on this answer (chart ordinal
+   *  → the chart's whole next override record). Offered to the charts
+   *  only once the message is settled. */
+  onChartColors?: (chartIndex: number, colors: Record<string, string>) => void;
   /** Present on the latest question while nothing is streaming. */
   onEdit?: () => void;
   /** Present when an approval card on this answer can be decided now. */
@@ -66,7 +71,8 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
     <div className="group space-y-1.5">
       {events.length > 0 && <ToolSteps events={events} live={streaming} answered={!!message.content} />}
       {message.content
-        ? <Answer content={message.content} />
+        ? <Answer content={message.content} chartColors={message.chartColors} settled={settled}
+            onChartColors={settled ? onChartColors : undefined} />
         : streaming && events.length === 0 && <Working label="Thinking" />}
       {message.approvals?.map((a) => (
         <ApprovalCard key={a.inputHash} approval={a} canRemember={canRememberApproval}
@@ -202,16 +208,32 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** The answer's prose as Markdown, with any chart blocks drawn as charts. */
-function Answer({ content }: { content: string }) {
+/** The answer's prose as Markdown, with any chart blocks drawn as charts.
+ *  Charts are counted as they are met: a chart's ordinal in the message
+ *  keys the person's colors on it (chartColors), the same index the
+ *  message is rendered by. */
+function Answer({ content, chartColors, settled, onChartColors }: {
+  content: string;
+  chartColors?: Record<number, Record<string, string>>;
+  /** The message is settled: its charts show their toolbars. */
+  settled?: boolean;
+  /** Present on a settled answer the person may recolor. */
+  onChartColors?: (chartIndex: number, colors: Record<string, string>) => void;
+}) {
   const parts = useMemo(() => splitAnswer(content), [content]);
+  // Each chart part's ordinal among the message's charts (-1 for prose).
+  const ordinals = useMemo(() => {
+    let n = 0;
+    return parts.map((p) => (p.kind === 'chart' ? n++ : -1));
+  }, [parts]);
   return (
     <div className="space-y-2">
       {parts.map((p, i) => p.kind === 'text'
         ? <MarkdownLite key={i} text={p.text} className="break-words text-foreground/95" />
         : p.kind === 'chart'
-          ? <ChatChart key={i} spec={p.spec} />
-          : <div key={i} className="h-52 rounded-lg border border-border/60 animate-pulse" />)}
+          ? <ChatChart key={i} spec={p.spec} colors={chartColors?.[ordinals[i]]} interactive={settled}
+              onColorsChange={onChartColors ? (next) => onChartColors(ordinals[i], next) : undefined} />
+          : <div key={i} className={`h-52 ${CHART_CARD_CLASS} animate-pulse`} />)}
     </div>
   );
 }

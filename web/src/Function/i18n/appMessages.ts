@@ -510,6 +510,13 @@ const APP_MESSAGES: Record<string, Row> = {
   'Could not run the approved operations. Try again.': ['承認済みの操作を実行できませんでした。もう一度お試しください。', '승인된 작업을 실행하지 못했습니다. 다시 시도해 주세요.', 'Impossible d’exécuter les opérations approuvées. Réessayez.', 'No se pudieron ejecutar las operaciones aprobadas. Inténtelo de nuevo.'],
   'Don’t ask again for {target} when these fields match exactly:': ['次の条件が完全一致するときは {target} を次回から確認しない：', '다음 필드가 정확히 일치하면 {target}을(를) 다시 묻지 않음:', 'Ne plus demander pour {target} quand ces champs correspondent exactement :', 'No volver a preguntar por {target} cuando estos campos coincidan exactamente:'],
   'Approving saves this condition on the connector; any other value, operation, or connector asks again.': ['承認するとこの条件がコネクタに保存されます；他の値・操作・コネクタでは再び確認します。', '승인하면 이 조건이 커넥터에 저장됩니다. 다른 값, 작업, 커넥터에서는 다시 묻습니다.', 'Approuver enregistre cette condition sur le connecteur ; toute autre valeur, opération ou connecteur demandera à nouveau.', 'Al aprobar se guarda esta condición en el conector; cualquier otro valor, operación o conector volverá a preguntar.'],
+  // Chart cards in a Copilot answer: recoloring and download.
+  'Download chart': ['グラフをダウンロード', '차트 다운로드', 'Télécharger le graphique', 'Descargar gráfico'],
+  'Chart colors': ['グラフの色', '차트 색상', 'Couleurs du graphique', 'Colores del gráfico'],
+  'Color for {name}': ['{name} の色', '{name} 색상', 'Couleur pour {name}', 'Color para {name}'],
+  'Custom color': ['カスタムカラー', '사용자 지정 색상', 'Couleur personnalisée', 'Color personalizado'],
+  'Theme colors': ['テーマの色', '테마 색상', 'Couleurs du thème', 'Colores del tema'],
+  'Reset all colors': ['すべての色をリセット', '모든 색상 초기화', 'Réinitialiser toutes les couleurs', 'Restablecer todos los colores'],
   // The harness install walk.
   'Skip': ['スキップ', '건너뛰기', 'Passer', 'Omitir'],
   'Retry': ['再試行', '다시 시도', 'Réessayer', 'Reintentar'],

@@ -90,7 +90,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDomainId, setActiveDomainId] = useState<string | null>(null);
-  const { messages, streaming, error, send, cancel, newConversation, retry, truncate, decideApproval } = useCopilotConversation();
+  const { messages, streaming, error, send, cancel, newConversation, retry, truncate, decideApproval, setChartColors } = useCopilotConversation();
   // A standing approval on an approval card is the Space owner's to give.
   const canRememberApproval = useIsSpaceOwner(useActiveSpaceId()) === true;
   const listRef = useRef<HTMLDivElement>(null);
@@ -321,6 +321,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               spaceId={getActiveSpaceId()}
               onContinueConnection={!streaming && m.role === 'assistant' ? (c) => send(`${c.waitingFor}を続けてください（${c.names.join('、')}を接続しました）`, { context: contextNow() }) : undefined}
               onContinueCredential={!streaming && m.role === 'assistant' ? (c) => send(`${c.waitingFor || '待っていた作業'}を続けてください（${c.label}の認証情報を入力しました）`, { context: contextNow() }) : undefined}
+              onChartColors={m.role === 'assistant' ? (chartIndex, colors) => setChartColors(i, chartIndex, colors) : undefined}
               onDecideApproval={!streaming && m.role === 'assistant' ? (a, approve, opts) => void decideApproval(a, approve, opts) : undefined} />
           ))}
           {error && (

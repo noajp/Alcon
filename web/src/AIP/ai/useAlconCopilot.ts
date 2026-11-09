@@ -142,6 +142,11 @@ export interface CopilotMessage {
   connections?: CopilotConnectionProposal[];
   /** Credential capture asks created on this turn — cards the person answers. */
   credentials?: CopilotCredentialAsk[];
+  /** Person-chosen chart colors on this answer, by chart ordinal within
+   *  the message, then by series key (pie: by row name). Hex strings.
+   *  An annotation on the kept message — never part of `content`, so
+   *  what the AI wrote, and what the model later reads, is unchanged. */
+  chartColors?: Record<number, Record<string, string>>;
   /** True once the turn for this assistant message has finished. */
   done?: boolean;
   /** When the turn was sent or began (ms). */
@@ -226,12 +231,15 @@ export function copilotTitleOf(messages: readonly CopilotMessage[]): string {
  *  panel's own, not the record's. Used when the person cuts a
  *  conversation back — the one write of messages that stays theirs. */
 export function toKeptMessages(messages: readonly CopilotMessage[]): CopilotMessage[] {
-  return messages.map(({ role, content, toolEvents, attachments, approvals, connections, credentials }) => ({
+  return messages.map(({ role, content, toolEvents, attachments, approvals, connections, credentials, chartColors }) => ({
     role, content,
     ...(toolEvents?.length ? { toolEvents } : {}),
     ...(approvals?.length ? { approvals } : {}),
     ...(connections?.length ? { connections } : {}),
     ...(credentials?.length ? { credentials } : {}),
+    // A person's chart colors are theirs like the cut itself: without
+    // this line the next edit/retry would silently strip them.
+    ...(chartColors && Object.keys(chartColors).length ? { chartColors } : {}),
     ...(attachments?.length ? { attachments: attachments.map(({ name, mediaType }) => ({ name, mediaType })) } : {}),
   }));
 }
@@ -262,6 +270,12 @@ export interface CopilotHookOptions {
    *  engine's to write. Without a provider the hook writes its own
    *  session's row. */
   onTruncate?: (kept: CopilotMessage[]) => Promise<void>;
+  /** Writes back the conversation with one message's annotation
+   *  patched (a person's chart colors) — the whole array, as the
+   *  record is one jsonb value; the implementer applies
+   *  toKeptMessages, as onTruncate's does. Without a provider the
+   *  hook writes its own session's row. */
+  onPatchMessages?: (messages: CopilotMessage[]) => Promise<void>;
 }
 
 const FOLLOW_EVERY_MS = 1500;
@@ -284,6 +298,11 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const optionsRef = useRef(options);
   useEffect(() => { optionsRef.current = options; });
+  /** The shown conversation, readable outside render — a chart-color
+   *  patch computes the next array from it (and updates it in step,
+   *  so two picks in quick succession compose). */
+  const messagesRef = useRef<CopilotMessage[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   /** The session this hook made itself, when no provider keeps it. */
   const ownSessionRef = useRef<string | null>(null);
   /** The run the current turn is on, for the stop button. */
@@ -571,6 +590,54 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
       [{ name: '', ok: false, content: translate('This approval can no longer be run. Ask again in the chat.') }]);
   }, []);
 
+  /** The pending chart-color write, coalesced (see setChartColors). */
+  const patchTimerRef = useRef<number | null>(null);
+
+  /**
+   * Records a person's chart colors on one settled answer: the whole
+   * per-chart record for chart `chartIndex` of the message at
+   * `messageIndex` (an empty record clears it). The display updates
+   * first; the kept conversation is then patched through the same
+   * two routes a cut-back takes (the provider's patch, or this
+   * hook's own session row), in kept shape, read from the latest
+   * array when it fires. Only offered on a settled message while
+   * nothing streams, so it cannot race a live turn's writes. The
+   * write is fire-and-forget and briefly coalesced — a color input
+   * fires per drag tick, and one write per tick would spam the
+   * session row; a failure leaves the color on screen and the next
+   * pick re-writes the whole record, so there is no error surface
+   * for a cosmetic field.
+   */
+  const setChartColors = useCallback((messageIndex: number, chartIndex: number, colors: Record<string, string>) => {
+    const prev = messagesRef.current;
+    const target = prev[messageIndex];
+    if (!target || target.role !== 'assistant') return;
+    const perChart = { ...(target.chartColors ?? {}) };
+    if (Object.keys(colors).length > 0) perChart[chartIndex] = colors;
+    else delete perChart[chartIndex];
+    const updated: CopilotMessage = { ...target };
+    if (Object.keys(perChart).length > 0) updated.chartColors = perChart;
+    else delete updated.chartColors;
+    const next = prev.slice();
+    next[messageIndex] = updated;
+    messagesRef.current = next;
+    setMessages(next);
+    if (patchTimerRef.current) window.clearTimeout(patchTimerRef.current);
+    patchTimerRef.current = window.setTimeout(() => {
+      patchTimerRef.current = null;
+      const sessionId = sessionIdNow();
+      if (!sessionId) return;
+      if (optionsRef.current.onPatchMessages) {
+        void optionsRef.current.onPatchMessages(messagesRef.current).catch(() => undefined);
+      } else {
+        void supabase.from('ai_sessions')
+          .update({ messages: toKeptMessages(messagesRef.current), updated_at: new Date().toISOString() })
+          .eq('id', sessionId)
+          .then(() => undefined, () => undefined);
+      }
+    }, 350);
+  }, [sessionIdNow]);
+
   /** Drops the turns from `index` on — editing a question starts over from it. */
   const truncate = useCallback((index: number) => {
     if (streaming) return;
@@ -591,5 +658,5 @@ export function useAlconCopilot(options: CopilotHookOptions = {}) {
     void send(question.content, { ...opts, attachments: (question.attachments ?? []).filter((a) => a.data) });
   }, [messages, streaming, cutBack, send]);
 
-  return { messages, streaming, error, send, cancel, detach, reset, load, truncate, retry, decideApproval };
+  return { messages, streaming, error, send, cancel, detach, reset, load, truncate, retry, decideApproval, setChartColors };
 }
