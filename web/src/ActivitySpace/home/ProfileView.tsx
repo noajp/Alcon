@@ -10,6 +10,8 @@ import { NavHomeIcon } from '@/Frame/sidebar/NavIcons';
 import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
 import { ProfileOverview } from '@/ActivitySpace/home/ProfileOverview';
 import { IslandHeader } from '@/Function/shared/MainIsland';
+import { ViewTabs } from '@/Function/shared/ViewTabs';
+import { PageLayout } from '@/Function/shared/PageHead';
 import { useActivitySpaces, useSpaceRole } from '@/Function/space/data';
 import { useNowMinute } from '@/Function/shared/useNow';
 import { ProfileAI } from '@/AIP/ai/ProfileAI';
@@ -70,39 +72,33 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
     <div className="flex h-full min-h-0 flex-col bg-card">
       <IslandHeader crumbs={[{ id: 'profile', label: t('Profile') }]}
         actions={<Button variant="ghost" size="sm" onClick={onOpenSettings}><Pencil size={14} />{t('Edit profile')}</Button>} />
-      <header className="shrink-0 border-b border-[var(--border-subtle)]">
-        <div className="mx-auto w-full max-w-3xl px-8 pt-8">
-          <div className="flex items-center gap-4">
-            <WorkerAvatar worker={{ name, avatar_url: profile?.avatar_url }} size={56} className="ring-0" />
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[20px] font-semibold leading-7 text-foreground">{name}</h1>
-              {spaceName && (
-                <p className="truncate text-[13px] text-muted-foreground">
-                  {t(role === 'owner' ? 'Owner at {space}' : 'Member at {space}', { space: spaceName })}
-                </p>
-              )}
-              {/* The facts, in one line: local time, handle, email. */}
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
-                <span>{t('{time} there', { time: localTime })} · {zone}</span>
-                {handle && <span className="rounded border border-[var(--border-default)] px-1.5 py-px text-[11px] text-foreground/80">@{handle}</span>}
-                {user?.email && <span className="rounded border border-[var(--border-default)] px-1.5 py-px text-[11px] text-foreground/80">{user.email}</span>}
-              </p>
-            </div>
-          </div>
-          {profile?.bio && <p className="mt-4 max-w-2xl whitespace-pre-wrap text-[13px] leading-6 text-muted-foreground">{profile.bio}</p>}
-          <nav className="mt-5 flex gap-1 pb-2" aria-label={t('Profile sections')}>
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <Button key={id} shape="tab" size="sm" variant={tab === id ? 'secondary' : 'ghost'} aria-pressed={tab === id} onClick={() => setTab(id)}>
-                <Icon size={14} />{t(label)}
-              </Button>
-            ))}
-          </nav>
-        </div>
-      </header>
+      {/* The views sit right under the title row, as on an Object; the
+          person themselves opens the Overview, as an Object's title does. */}
+      <ViewTabs tabs={tabs.map(({ id, label }) => ({ id, label }))} active={tab} onSelect={setTab} label={t('Profile sections')} />
       <div className={tab === 'overview' ? 'min-h-0 flex-1 overflow-y-auto' : 'hidden'}>
-        <div className="mx-auto w-full max-w-3xl px-6 py-6">
+        <PageLayout>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <WorkerAvatar worker={{ name, avatar_url: profile?.avatar_url }} size={56} className="ring-0" />
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-[20px] font-semibold leading-7 text-foreground">{name}</h1>
+                {spaceName && (
+                  <p className="truncate text-[13px] text-muted-foreground">
+                    {t(role === 'owner' ? 'Owner at {space}' : 'Member at {space}', { space: spaceName })}
+                  </p>
+                )}
+                {/* The facts, in one line: local time, handle, email. */}
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+                  <span>{t('{time} there', { time: localTime })} · {zone}</span>
+                  {handle && <span className="rounded border border-[var(--border-default)] px-1.5 py-px text-[11px] text-foreground/80">@{handle}</span>}
+                  {user?.email && <span className="rounded border border-[var(--border-default)] px-1.5 py-px text-[11px] text-foreground/80">{user.email}</span>}
+                </p>
+              </div>
+            </div>
+            {profile?.bio && <p className="max-w-2xl whitespace-pre-wrap text-[13px] leading-6 text-muted-foreground">{profile.bio}</p>}
+          </div>
           <ProfileOverview userId={user?.id ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />
-        </div>
+        </PageLayout>
       </div>
       {/* MyElementsView lays itself out as a flex child (header + scrolling
           list), so its wrapper has to be a bounded flex column or the list
@@ -110,7 +106,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
       <div className={tab === 'elements' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
         <MyElementsView embedded onNavigate={onNavigate} onViewChange={onViewChange} />
       </div>
-      <div className={tab === 'notes' ? 'mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto px-6 py-4' : 'hidden'}>
+      <div className={tab === 'notes' ? 'min-h-0 flex-1 overflow-y-auto py-4 pl-[30px] pr-8' : 'hidden'}>
         {notesLoading ? <p role="status" className="text-[13px] text-muted-foreground">{t('Loading…')}</p>
           : myNotes.length === 0 ? <p className="text-[13px] text-muted-foreground">{t('No notes yet.')}</p>
           : <ul className="space-y-0.5">
