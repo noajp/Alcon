@@ -117,9 +117,11 @@ export interface LoopDeps {
    * shape, source presence, freshness — everything code can evaluate alone.
    * Runs before verify; a finish it fails is sent back on its findings and
    * the verifier is never consulted for that finish. Null (or no findings)
-   * lets the finish through to the verifier.
+   * lets the finish through to the verifier. May answer asynchronously:
+   * a check that judges a finish against the run's own records (the
+   * coding gate's test evidence, codingLoop.ts) reads them first.
    */
-  mechanicalCheck?(finish: FinishPayload): { gaps: string[] } | null;
+  mechanicalCheck?(finish: FinishPayload): { gaps: string[] } | null | Promise<{ gaps: string[] } | null>;
   /**
    * A second reader's check of a "completed" finish against the task, before
    * the run may end on it. Null skips the check (no verifier, or it failed to
@@ -350,7 +352,7 @@ export async function runLoop(state: LoopState, deps: LoopDeps, limits: LoopLimi
       // read by the second reader, for the semantic remainder.
       if (r.finish?.outcome === "completed" && (state.revisions ?? 0) < MAX_REVISIONS && (deps.mechanicalCheck || deps.verify)) {
         let verdict: Verdict | null = null;
-        const mechanical = deps.mechanicalCheck?.(r.finish);
+        const mechanical = await deps.mechanicalCheck?.(r.finish);
         if (mechanical && mechanical.gaps.length) verdict = { pass: false, gaps: mechanical.gaps };
         else if (deps.verify) verdict = await deps.verify(r.finish);
         if (verdict && !verdict.pass) {
