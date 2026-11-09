@@ -15,10 +15,10 @@
 //     http  a preset with a credential check (VERIFY) → connected or
 //           auth_failed. Any other API: GET on the base URL; a response
 //           below 500 other than 401 / 403 is only "reachable".
-//     oauth Google Drive: the stored token (refreshed when due, through
-//           resolveCredential) reads the signed-in user from Drive's about
-//           endpoint → connected. No token → oauth_required; a refresh token
-//           Google refuses → oauth_expired.
+//     oauth Google: the stored token (refreshed when due, through
+//           resolveCredential) answers the profile's account check (Drive's
+//           about, Gmail's profile) → connected. No token → oauth_required;
+//           a refresh token Google refuses → oauth_expired.
 //           GitHub: the signed-in token opens the MCP server as above.
 //     model a one-token Messages request (Anthropic format) with the key →
 //           connected on success, auth_failed on 401 / 403. Any other answer
@@ -35,7 +35,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow, type RemoteTool } from "../_shared/integrationClient.ts";
-import { GOOGLE_ABOUT_URL, isGoogleDriveRow } from "../_shared/googleOAuth.ts";
+import { googleProfileOf } from "../_shared/googleOAuth.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { manifestFromTools, parseManifest } from "../_shared/connectorManifest.ts";
 import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
@@ -147,15 +147,16 @@ async function runTest(row: IntegrationRow & { preset: string | null }, secret: 
   }
 }
 
-/** A signed-in connection. GitHub: the token opens its MCP server. Google
- *  Drive: who the stored token belongs to, asked of Drive itself. */
+/** A signed-in connection. GitHub: the token opens its MCP server. Google:
+ *  who the stored token belongs to, asked at the profile's account check. */
 async function runOAuthTest(admin: SupabaseClient, row: IntegrationRow & { preset: string | null }, raw: string | null): Promise<LastTest> {
   const at = new Date().toISOString();
   if (isGithubOAuthRow(row)) {
     const token = raw ? await resolveCredential(admin, row, raw) : null;
     return token ? await runTest(row, token) : { ok: false, at, code: "oauth_required", detail: "" };
   }
-  if (!isGoogleDriveRow(row) || !raw) return { ok: false, at, code: "oauth_required", detail: "" };
+  const profile = googleProfileOf(row);
+  if (!profile || !raw) return { ok: false, at, code: "oauth_required", detail: "" };
   let token: string | null;
   try {
     token = await resolveCredential(admin, row, raw);
@@ -171,7 +172,7 @@ async function runOAuthTest(admin: SupabaseClient, row: IntegrationRow & { prese
   try {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 20_000);
-    const res = await fetch(GOOGLE_ABOUT_URL, { headers: { Authorization: `Bearer ${token}`, accept: "application/json" }, signal: ctl.signal, redirect: "manual" })
+    const res = await fetch(profile.accountCheck.url, { headers: { Authorization: `Bearer ${token}`, accept: "application/json" }, signal: ctl.signal, redirect: "manual" })
       .finally(() => clearTimeout(timer));
     await readCapped(res, 100_000);
     if (res.status === 401 || res.status === 403) return { ok: false, at, code: "auth_failed", status: res.status, detail: "" };

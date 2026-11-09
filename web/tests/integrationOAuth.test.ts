@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presetById } from '@/AIP/connectors/catalog';
+import { oauthProviderOf, presetById, type IntegrationPreset } from '@/AIP/connectors/catalog';
 import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn } from '@/AIP/connectors/oauthReturn';
 
 // Google Drive over OAuth (ADR 0035): the pure parts of integration-oauth,
@@ -468,5 +468,131 @@ describe('GitHub sign-in', () => {
     expect(await client.resolveCredential(admin, GITHUB_ROW, secret)).toBe('gho_x');
     expect(await client.resolveCredential(admin, GITHUB_ROW, JSON.stringify(SECRET))).toBeNull();
     expect(await client.resolveCredential(admin, GITHUB_ROW, 'gho_plain')).toBeNull();
+  });
+});
+
+// Provider profiles (P0): what differs between Google services lives in
+// one table — the row each profile claims, its scopes, its account check.
+// Drive's profile carries exactly the values the flow was hard-wired to,
+// and Gmail's first stage asks to read only (D1).
+const GMAIL_ROW = {
+  id: INTEGRATION, preset: 'gmail', kind: 'http', name: 'Gmail', description: null,
+  endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me', auth_type: 'oauth', auth_header: null, delegation: 'approve_each',
+};
+const GMAIL_SECRET = { ...SECRET, scope: 'https://www.googleapis.com/auth/gmail.readonly' };
+
+describe('Google provider profiles', () => {
+  it('claims each row by preset and endpoint together', () => {
+    expect(oauth.googleProfileOf(DRIVE_ROW)).toBe(oauth.GOOGLE_DRIVE_PROFILE);
+    expect(oauth.googleProfileOf(GMAIL_ROW)).toBe(oauth.GOOGLE_GMAIL_PROFILE);
+    // A preset at another profile's endpoint (or the reverse) is no profile's row.
+    expect(oauth.googleProfileOf({ ...GMAIL_ROW, endpoint: oauth.GOOGLE_DRIVE_ENDPOINT })).toBeNull();
+    expect(oauth.googleProfileOf({ ...DRIVE_ROW, endpoint: oauth.GOOGLE_GMAIL_ENDPOINT })).toBeNull();
+    expect(oauth.googleProfileOf({ ...GMAIL_ROW, kind: 'mcp' })).toBeNull();
+    expect(oauth.googleProfileOf({ ...GMAIL_ROW, auth_type: 'bearer' })).toBeNull();
+    expect(oauth.googleProfileOf({ ...GMAIL_ROW, preset: 'custom-http' })).toBeNull();
+    expect(oauth.googleProfileOf(null)).toBeNull();
+    expect(oauth.googleProfileOf(undefined)).toBeNull();
+  });
+
+  it('keeps Drive acceptance exactly the Drive profile, and widens only the Google question', () => {
+    expect(oauth.isGoogleOAuthRow(DRIVE_ROW)).toBe(true);
+    expect(oauth.isGoogleOAuthRow(GMAIL_ROW)).toBe(true);
+    expect(oauth.isGoogleDriveRow(GMAIL_ROW)).toBe(false);
+    expect(oauth.isGoogleOAuthRow(GITHUB_ROW)).toBe(false);
+    expect(oauth.isGoogleOAuthRow({ ...DRIVE_ROW, endpoint: 'https://evil.example.com' })).toBe(false);
+  });
+
+  it('holds the scopes each profile requires — Drive’s one, Gmail read-only at the first stage', () => {
+    expect(oauth.GOOGLE_DRIVE_PROFILE.scopes).toEqual(['https://www.googleapis.com/auth/drive.file']);
+    expect(oauth.GOOGLE_GMAIL_PROFILE.scopes).toEqual(['https://www.googleapis.com/auth/gmail.readonly']);
+    expect(oauth.GOOGLE_GMAIL_PROFILE.includeGrantedScopes).toBe(true);
+    expect(oauth.GOOGLE_DRIVE_PROFILE.includeGrantedScopes).toBe(false);
+    expect(oauth.grantsRequiredScopes('openid https://www.googleapis.com/auth/drive.file', oauth.GOOGLE_DRIVE_PROFILE)).toBe(true);
+    expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/drive.readonly', oauth.GOOGLE_DRIVE_PROFILE)).toBe(false);
+    expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/gmail.readonly', oauth.GOOGLE_GMAIL_PROFILE)).toBe(true);
+    expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/drive.file', oauth.GOOGLE_GMAIL_PROFILE)).toBe(false);
+    expect(oauth.grantsRequiredScopes(undefined, oauth.GOOGLE_DRIVE_PROFILE)).toBe(false);
+  });
+
+  it('builds the same authorize URL for Drive with the profile spelled out as by default', () => {
+    const base = {
+      clientId: 'client-1.apps.googleusercontent.com',
+      redirectUri: 'https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback',
+      state: 'state-abc',
+      codeChallenge: 'challenge-xyz',
+    };
+    expect(oauth.buildAuthorizeUrl({ ...base, profile: oauth.GOOGLE_DRIVE_PROFILE })).toBe(oauth.buildAuthorizeUrl(base));
+    expect(new URL(oauth.buildAuthorizeUrl(base)).searchParams.has('include_granted_scopes')).toBe(false);
+  });
+
+  it('asks for Gmail read-only, keeping earlier grants for the staged consent', () => {
+    const url = new URL(oauth.buildAuthorizeUrl({
+      clientId: 'client-1.apps.googleusercontent.com',
+      redirectUri: 'https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback',
+      state: 'state-abc',
+      codeChallenge: 'challenge-xyz',
+      profile: oauth.GOOGLE_GMAIL_PROFILE,
+    }));
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      client_id: 'client-1.apps.googleusercontent.com',
+      redirect_uri: 'https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback',
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      access_type: 'offline',
+      prompt: 'consent',
+      include_granted_scopes: 'true',
+      state: 'state-abc',
+      code_challenge: 'challenge-xyz',
+      code_challenge_method: 'S256',
+    });
+  });
+
+  it('reads the account email from each profile’s own answer shape', () => {
+    expect(oauth.GOOGLE_DRIVE_PROFILE.accountCheck.url).toBe(oauth.GOOGLE_ABOUT_URL);
+    expect(oauth.GOOGLE_GMAIL_PROFILE.accountCheck.url).toBe('https://gmail.googleapis.com/gmail/v1/users/me/profile');
+    expect(oauth.GOOGLE_GMAIL_PROFILE.endpoint).toBe(oauth.GOOGLE_GMAIL_ENDPOINT);
+    const drive = oauth.GOOGLE_DRIVE_PROFILE.accountCheck.emailOf;
+    const gmail = oauth.GOOGLE_GMAIL_PROFILE.accountCheck.emailOf;
+    expect(drive({ user: { emailAddress: 'a@example.com' } })).toBe('a@example.com');
+    expect(drive({ emailAddress: 'a@example.com' })).toBeNull();
+    expect(drive({ user: {} })).toBeNull();
+    expect(drive(null)).toBeNull();
+    expect(gmail({ emailAddress: 'a@example.com', messagesTotal: 12 })).toBe('a@example.com');
+    expect(gmail({ user: { emailAddress: 'a@example.com' } })).toBeNull();
+    expect(gmail({ emailAddress: 42 })).toBeNull();
+    // The cap the sign-in flow has always applied to a read address.
+    expect(gmail({ emailAddress: 'x'.repeat(321) })).toBeNull();
+  });
+
+  it('maps a Gmail-shaped OAuth preset to the Google sign-in on the web side', () => {
+    const gmailPreset: IntegrationPreset = {
+      id: 'gmail', name: 'Gmail', icon: null, kind: 'http', endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me', auth: 'oauth',
+      description: 'Read Gmail.', credentialLabel: 'Google account', category: 'communication', source: 'official',
+      builtBy: 'Google', featured: false, custom: false,
+    };
+    expect(oauthProviderOf(gmailPreset)).toBe('google');
+    expect(gmailPreset.endpoint).toBe(oauth.GOOGLE_GMAIL_ENDPOINT);
+  });
+
+  it('resolves a Gmail row’s credential through the same refresh path as Drive’s', async () => {
+    const calls: [string, Record<string, unknown>][] = [];
+    const admin = {
+      rpc: async (fn: string, args: Record<string, unknown>) => { calls.push([fn, args]); return { data: true, error: null }; },
+      from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }),
+    };
+    const CLIENT = { clientId: 'cid', clientSecret: 'csecret' };
+    const noFetch = async () => { throw new Error('no network expected'); };
+    // Fresh: used as stored, no refresh.
+    expect(await client.resolveCredential(admin, GMAIL_ROW, JSON.stringify(GMAIL_SECRET), { now: GMAIL_SECRET.expires_at - 600_000, client: CLIENT, fetchImpl: noFetch })).toBe('ya29.access');
+    // Due: refreshed and stored, exactly as a Drive row is.
+    const fetchImpl = async () => new Response(JSON.stringify({ access_token: 'ya29.new', expires_in: 3600 }), { status: 200 });
+    const now = GMAIL_SECRET.expires_at - 60_000;
+    expect(await client.resolveCredential(admin, GMAIL_ROW, JSON.stringify(GMAIL_SECRET), { now, client: CLIENT, fetchImpl })).toBe('ya29.new');
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe('store_integration_oauth_token');
+    expect(JSON.parse(String(calls[0][1].p_secret))).toEqual({ ...GMAIL_SECRET, access_token: 'ya29.new', expires_at: now + 3_600_000 });
+    // A row no profile claims (preset and endpoint disagreeing) gets nothing.
+    expect(await client.resolveCredential(admin, { ...GMAIL_ROW, endpoint: 'https://www.googleapis.com/drive/v3' }, JSON.stringify(GMAIL_SECRET), { now, client: CLIENT, fetchImpl })).toBeNull();
   });
 });

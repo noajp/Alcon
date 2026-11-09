@@ -11,8 +11,11 @@ export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 export const GOOGLE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about?fields=user";
 export const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 /** The endpoint a google-drive integration row carries (catalog.ts). */
 export const GOOGLE_DRIVE_ENDPOINT = "https://www.googleapis.com/drive/v3";
+/** The endpoint a gmail integration row carries (catalog.ts). */
+export const GOOGLE_GMAIL_ENDPOINT = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 export const NONCE_COOKIE = "ioauth";
 export const COOKIE_PATH = "/functions/v1/integration-oauth";
@@ -30,9 +33,85 @@ export interface OAuthSecret {
   scope: string;
 }
 
-/** The integration rows the OAuth flow and the Drive tools accept. */
-export function isGoogleDriveRow(row: { preset?: string | null; kind?: string; auth_type?: string; endpoint?: string } | null | undefined): boolean {
-  return !!row && row.preset === "google-drive" && row.kind === "http" && row.auth_type === "oauth" && row.endpoint === GOOGLE_DRIVE_ENDPOINT;
+type IntegrationRowLike = { preset?: string | null; kind?: string; auth_type?: string; endpoint?: string } | null | undefined;
+
+/** An account email read from a provider's answer, or null: not a string,
+ *  or longer than an email can be. */
+function accountEmail(value: unknown): string | null {
+  return typeof value === "string" && value.length <= 320 ? value : null;
+}
+
+/**
+ * What differs between the services a person signs in to with Google: the
+ * rows that belong to it, the scopes a sign-in asks for and must come back
+ * with, and how the signed-in account is read back. The flow around it —
+ * PKCE, the token exchange, refresh, the Vault shape — is one for every
+ * profile (this module); a new Google service is a new row here, not new
+ * flow code.
+ */
+export interface GoogleProviderProfile {
+  /** The integrations preset this profile serves. */
+  preset: string;
+  /** The endpoint a row of this preset carries. */
+  endpoint: string;
+  /** The scopes a sign-in requests, and the stored grant must cover. */
+  scopes: readonly string[];
+  /**
+   * Ask with include_granted_scopes, so consenting to a wider set later
+   * keeps what was granted before. Gmail's scopes arrive in stages (read
+   * first, send on a second consent); Drive asks once, for exactly its
+   * one scope, and leaves the parameter off as it always has.
+   */
+  includeGrantedScopes: boolean;
+  /** The request that answers who signed in. */
+  accountCheck: {
+    url: string;
+    /** The account's email in that answer's JSON, or null when absent. */
+    emailOf(body: unknown): string | null;
+  };
+}
+
+export const GOOGLE_DRIVE_PROFILE: GoogleProviderProfile = {
+  preset: "google-drive",
+  endpoint: GOOGLE_DRIVE_ENDPOINT,
+  scopes: [DRIVE_FILE_SCOPE],
+  includeGrantedScopes: false,
+  accountCheck: {
+    url: GOOGLE_ABOUT_URL,
+    emailOf: (body) => accountEmail((body as { user?: { emailAddress?: unknown } } | null)?.user?.emailAddress),
+  },
+};
+
+export const GOOGLE_GMAIL_PROFILE: GoogleProviderProfile = {
+  preset: "gmail",
+  endpoint: GOOGLE_GMAIL_ENDPOINT,
+  // Stage one is read-only (D1); gmail.send joins on a second consent.
+  scopes: [GMAIL_READONLY_SCOPE],
+  includeGrantedScopes: true,
+  accountCheck: {
+    url: `${GOOGLE_GMAIL_ENDPOINT}/profile`,
+    emailOf: (body) => accountEmail((body as { emailAddress?: unknown } | null)?.emailAddress),
+  },
+};
+
+export const GOOGLE_PROFILES: readonly GoogleProviderProfile[] = [GOOGLE_DRIVE_PROFILE, GOOGLE_GMAIL_PROFILE];
+
+/** The Google profile an integration row belongs to, or null: not a row
+ *  that signs in with Google (preset, kind, auth and endpoint all agree). */
+export function googleProfileOf(row: IntegrationRowLike): GoogleProviderProfile | null {
+  if (!row || row.kind !== "http" || row.auth_type !== "oauth") return null;
+  return GOOGLE_PROFILES.find((p) => p.preset === row.preset && p.endpoint === row.endpoint) ?? null;
+}
+
+/** The integration rows that sign in with Google, under any profile. */
+export function isGoogleOAuthRow(row: IntegrationRowLike): boolean {
+  return googleProfileOf(row) !== null;
+}
+
+/** The integration rows the Drive tools accept: the Drive profile only —
+ *  a Gmail row never opens Drive's typed tools. */
+export function isGoogleDriveRow(row: IntegrationRowLike): boolean {
+  return googleProfileOf(row)?.preset === GOOGLE_DRIVE_PROFILE.preset;
 }
 
 export function base64Url(bytes: Uint8Array): string {
@@ -63,15 +142,18 @@ export function redirectUriFor(supabaseUrl: string): string {
   return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/integration-oauth/callback`;
 }
 
-export function buildAuthorizeUrl(p: { clientId: string; redirectUri: string; state: string; codeChallenge: string }): string {
+export function buildAuthorizeUrl(p: { clientId: string; redirectUri: string; state: string; codeChallenge: string; profile?: GoogleProviderProfile }): string {
+  const profile = p.profile ?? GOOGLE_DRIVE_PROFILE;
   const u = new URL(GOOGLE_AUTH_URL);
   u.searchParams.set("client_id", p.clientId);
   u.searchParams.set("redirect_uri", p.redirectUri);
   u.searchParams.set("response_type", "code");
-  u.searchParams.set("scope", DRIVE_FILE_SCOPE);
+  u.searchParams.set("scope", profile.scopes.join(" "));
   u.searchParams.set("access_type", "offline");
   u.searchParams.set("prompt", "consent");
-  // No include_granted_scopes: the grant stays drive.file alone.
+  // Only a profile that consents in stages asks to keep earlier grants;
+  // Drive's URL is unchanged (the grant stays drive.file alone).
+  if (profile.includeGrantedScopes) u.searchParams.set("include_granted_scopes", "true");
   u.searchParams.set("state", p.state);
   u.searchParams.set("code_challenge", p.codeChallenge);
   u.searchParams.set("code_challenge_method", "S256");
@@ -81,6 +163,11 @@ export function buildAuthorizeUrl(p: { clientId: string; redirectUri: string; st
 /** True when the space-separated scope string grants `scope`. */
 export function hasScope(granted: unknown, scope = DRIVE_FILE_SCOPE): boolean {
   return typeof granted === "string" && granted.split(/\s+/).includes(scope);
+}
+
+/** True when the granted scope string covers every scope the profile requires. */
+export function grantsRequiredScopes(granted: unknown, profile: GoogleProviderProfile): boolean {
+  return profile.scopes.every((scope) => hasScope(granted, scope));
 }
 
 /** The stored secret, or null when it is not a well-formed Google OAuth secret. */
