@@ -64,6 +64,16 @@
 //     read as a compensation that merely never fires. The payload a
 //     landed write leaves is resolved and recorded at execution time
 //     (_shared/compensation.ts), bound, never re-derived later.
+//   transform (P1T): on any command — the name of a server-side pure
+//     function that shapes the service's raw answer into the form a
+//     reader works from (a Gmail message resource into its headers
+//     and plain-text body). The names live in a closed code-side
+//     registry (_shared/manifestTransforms.ts): a manifest may only
+//     name one that exists — an unknown name is a parse error and
+//     the command is left out, exactly as a verify may only name a
+//     read command that exists. First-party manifests carry these;
+//     a G4 draft never may (connectorDraft.ts refuses them outright),
+//     so a drafted manifest cannot invent a code reference.
 
 export type Effect = "read" | "write";
 export type Permission = "allow" | "ask" | "deny";
@@ -176,6 +186,11 @@ export interface ManifestCommand {
    *  report then names it as uncompensatable. Writes only: a read's
    *  undo declaration is read and discarded by the parser. */
   undo: UndoDeclaration | null;
+  /** The named response transform (P1T), when the manifest says: a
+   *  pure function in the closed registry (manifestTransforms.ts)
+   *  shapes this command's live answer before anyone reads it. Null
+   *  leaves the answer exactly as the service returned it. */
+  transform: string | null;
 }
 
 export interface Manifest {
@@ -320,6 +335,32 @@ export function parseUndo(raw: unknown): UndoDeclaration | null | undefined {
   return { command: x.command, input: { ...inputRaw } };
 }
 
+/**
+ * The response-transform names a manifest may reference (P1T): the
+ * grammar's side of the closed registry — the implementations live
+ * in manifestTransforms.ts, which executes them. This module stays
+ * import-free (the web's type check reads it directly), so the names
+ * are spelled here and the three lists — this one, the registry's
+ * keys, and the web twin's set in draftModel.ts — are pinned equal
+ * by manifestTransforms.test.ts: a transform is added in all three
+ * places, in code review, or it does not exist.
+ */
+export const RESPONSE_TRANSFORM_NAMES: readonly string[] = ["gmail_message"];
+
+/**
+ * Pure. A command's response-transform reference (P1T): undefined
+ * when it carries none, null when what it carries cannot be one —
+ * not a string in the name shape, or a name the registry does not
+ * hold. Malformed is distinct from absent for the same reason as
+ * verify: the reference is code, not data, so a name that resolves
+ * to nothing must never survive as a shaping that merely never runs.
+ */
+export function parseTransform(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "string" || !NAME.test(raw) || !RESPONSE_TRANSFORM_NAMES.includes(raw)) return null;
+  return raw;
+}
+
 /** Pure. The rules stored on a command; one that cannot be read is left out. */
 export function parseRules(raw: unknown): CommandRule[] {
   const rules: CommandRule[] = [];
@@ -455,6 +496,8 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
     // a parse error, as with verify and quota.
     const undo = effect === "write" ? parseUndo(x.undo) : undefined;
     if (undo === null) { errors.push(`${name}: undo の形が読めません（command と input が必要です）`); continue; }
+    const transform = parseTransform(x.transform);
+    if (transform === null) { errors.push(`${name}: transform の名前が読めません（登録された整形の名前だけが使えます）`); continue; }
     seen.add(name);
     commands.push({
       name, effect, permission, http, mcp,
@@ -468,6 +511,7 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       reversibility: parseReversibility(x.reversibility),
       quota: quota ?? null,
       undo: undo ?? null,
+      transform: transform ?? null,
     });
   }
   // A verify is only as real as its target: it must sit on a write and
@@ -662,6 +706,7 @@ export function manifestFromTools(tools: { name: string; description?: string; r
       ...(parseReversibility(before?.reversibility) ? { reversibility: before!.reversibility } : {}),
       ...(obj(before?.quota) ? { quota: before!.quota } : {}),
       ...(obj(before?.undo) ? { undo: before!.undo } : {}),
+      ...(typeof before?.transform === "string" && before.transform ? { transform: before.transform } : {}),
       description: (t.description ?? "").slice(0, 1000),
       mcp: t.name,
     });

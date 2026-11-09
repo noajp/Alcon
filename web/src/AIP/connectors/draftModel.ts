@@ -222,6 +222,7 @@ interface TwinCommand {
   reversibility: 'contained' | 'wide' | 'none' | null;
   quota: { writesPerHour: number } | null;
   undo: TwinUndo | null;
+  transform: string | null;
 }
 
 const NAME_RE = /^[a-z][a-z0-9_]{0,47}$/;
@@ -292,6 +293,23 @@ function parseUndoTwin(raw: unknown): TwinUndo | null | undefined {
   return { command: x.command, input: { ...inputRaw } };
 }
 
+/** The response-transform names the server's registry holds
+ *  (manifestTransforms.ts RESPONSE_TRANSFORMS): the twin of its keys.
+ *  The two must move together — a name the server learns and this set
+ *  does not would hash differently on the two sides — and
+ *  manifestTransforms.test.ts pins them against each other. */
+const RESPONSE_TRANSFORM_NAMES = new Set(['gmail_message']);
+
+/** A command's transform reference, read as the server's parseTransform
+ *  reads it (P1T): undefined when absent, null when it cannot be one —
+ *  not a string in the name shape, or a name the registry does not
+ *  hold — because the reference is code, not data. */
+function parseTransformTwin(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'string' || !NAME_RE.test(raw) || !RESPONSE_TRANSFORM_NAMES.has(raw)) return null;
+  return raw;
+}
+
 /** A stored manifest read the way the server's parseManifest reads it —
  *  for manifests that were validated when drafted, so the loose cases
  *  here only mirror the server's refusals. */
@@ -331,6 +349,8 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
     // place, as the server's does.
     const undo = effect === 'write' ? parseUndoTwin(x.undo) : undefined;
     if (undo === null) continue;
+    const transform = parseTransformTwin(x.transform);
+    if (transform === null) continue;
     seen.add(name);
     const rules = (Array.isArray(x.rules) ? x.rules : []).flatMap((r): TwinCommand['rules'] => {
       const y = obj(r);
@@ -350,6 +370,7 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
       reversibility: typeof x.reversibility === 'string' && REVERSIBILITIES.has(x.reversibility) ? x.reversibility as TwinCommand['reversibility'] : null,
       quota: quota ?? null,
       undo: undo ?? null,
+      transform: transform ?? null,
     });
   }
   // The server's second pass, mirrored: a verify must sit on a write and
@@ -380,7 +401,7 @@ export function draftStructureOfWeb(c: DraftContentLike): unknown {
   return {
     name: c.name, endpoint: c.endpoint, auth_type: c.auth_type, auth_header: c.auth_header, guide: c.guide,
     commands: commands
-      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota, undo: cmd.undo }))
+      .map((cmd) => ({ name: cmd.name, action: cmd.action, effect: cmd.effect, http: cmd.http, mcp: cmd.mcp, input: cmd.input, required: cmd.required, verify: cmd.verify, reversibility: cmd.reversibility, quota: cmd.quota, undo: cmd.undo, transform: cmd.transform }))
       .sort((a, b) => (a.name < b.name ? -1 : 1)),
     aliases,
   };

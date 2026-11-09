@@ -41,6 +41,7 @@ import { isGoogleDriveRow } from "./googleOAuth.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName } from "./connectorNeeds.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
+import { applyResponseTransform } from "./manifestTransforms.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
 import { takeStashedCredentialForIntegration } from "./credentialRequests.ts";
 import { recordIntegrationUse } from "./credentialUseAudit.ts";
@@ -440,11 +441,23 @@ export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall
   // assembly, and never for the approval decision, which reads only the
   // manifest facts gathered from this same tool.
   const binding = await bindingOf(it);
-  const r = it.drive && it.remote
+  const raw = it.drive && it.remote
     ? await runDriveTool(it.remote.name, call.input, binding.secret ?? "")
     : it.remote && binding.session
       ? await binding.session.callTool(it.remote.name, call.input)
       : await callHttp(it.integration, binding.secret, httpInput);
+  // Named response shaping (P1T; manifestTransforms.ts): a command
+  // that names a transform has its live answer shaped here — after
+  // the transport's own cap (callHttp / callTool already truncated),
+  // before the verify read-back below — so the read-back, the call
+  // log and the model all work from the one shaped text. An error
+  // answer is feedback, not data, and is never shaped. A replayed
+  // call never reaches this point (it answered above, from the
+  // fixture) and must not: the fixture holds the shaped string the
+  // source run saw, so shaping is a live-path act, exactly once.
+  const r = raw.isError || !it.command?.transform
+    ? raw
+    : { ...raw, text: applyResponseTransform(it.command.transform, raw.text) };
   if (r.isError || !it.command?.verify || !it.manifest) return r;
   // Manifest v2 (B2): the write declares a read-back. It runs through this
   // same executor as the read command it names — the deny recheck above
