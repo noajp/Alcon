@@ -95,7 +95,11 @@ export function useStrategyConversation(strategyId: string, onAnswered?: () => v
     if (!message || sending) return;
     setSending(true); setError(null); setPendingText(message);
     try {
-      let runId = run?.id ?? null;
+      // A cancelled run is finished: a stopped conversation is never
+      // resumed onto its run — the next message opens a fresh one, as
+      // after Start over. Any other resting run is the conversation's
+      // own and takes the message.
+      let runId = run && run.status !== 'cancelled' ? run.id : null;
       if (!runId) {
         const userId = await getCurrentUserId();
         const { data, error: insertError } = await supabase.from('agent_runs').insert({
@@ -118,6 +122,23 @@ export function useStrategyConversation(strategyId: string, onAnswered?: () => v
   // eslint-disable-next-line react-hooks/exhaustive-deps -- key is derived from strategyId
   }, [run?.id, sending, strategyId, qc]);
 
+  /** Stops the turn being answered: the run is cancelled directly —
+   *  the same write a chat run's stop makes (retireCopilotRun), guarded
+   *  to a conversation run's open statuses. The engine honours it at
+   *  its next turn boundary; everything the turn already wrote stands,
+   *  and the next message opens a fresh run (send treats a cancelled
+   *  run as finished). */
+  const stop = useCallback(async () => {
+    if (!run || !WORKING.includes(run.status)) return;
+    const { error: stopError } = await supabase.from('agent_runs')
+      .update({ status: 'cancelled', finished_at: new Date().toISOString() })
+      .eq('id', run.id)
+      .in('status', WORKING);
+    if (stopError) { setError(formatError(stopError)); return; }
+    await qc.invalidateQueries({ queryKey: key });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key is derived from strategyId
+  }, [run?.id, run?.status, qc]);
+
   /** Starts over: the next message opens a new conversation. */
   const startOver = useCallback(() => { setFresh(true); setError(null); }, []);
 
@@ -130,6 +151,7 @@ export function useStrategyConversation(strategyId: string, onAnswered?: () => v
     pendingText,
     error: error ?? (query.error ? (query.error as Error).message : null),
     send,
+    stop,
     startOver,
   };
 }

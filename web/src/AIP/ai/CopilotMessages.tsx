@@ -86,7 +86,15 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
         <CredentialRequestCard key={c.requestId} spaceId={spaceId ?? null} requestId={c.requestId} label={c.label}
           onContinue={onContinueCredential ? () => onContinueCredential(c) : undefined} />
       ))}
-      {settled && message.content && (
+      {settled && message.stopped ? (
+        // A stopped turn's place in the record: one quiet caption where
+        // the action row would stand — the state, and the turn's time —
+        // never a sentence put in the assistant's mouth.
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
+          <span>{t('Stopped')}</span>
+          {message.at != null && <span>{formatAge(new Date(message.at), true)}</span>}
+        </div>
+      ) : settled && message.content && (
         <div className={`flex items-center gap-0.5 transition-opacity ${onRetry ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
           <CopyButton text={message.content} />
           {onRetry && <ActionButton label={t('Retry')} onClick={onRetry}><RotateCcw size={12} /></ActionButton>}

@@ -150,7 +150,7 @@ import { applyDecision, makeRememberApproval, restorePendingApproval, type Saved
 import { buildCopilotTurn, foldCopilotContext, type CopilotContextLike, type CopilotTurn } from "../_shared/copilotTurn.ts";
 import { COPILOT_AGENT_NAME, persistCopilotApproval, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
 import {
-  copilotApprovalExpiresAt, resumedAssistantMessage, seedMessagesFromPanel, withApprovalDecision,
+  copilotApprovalExpiresAt, resumedAssistantMessage, seedMessagesFromPanel, stoppedAssistantMessage, withApprovalDecision,
   type PanelMessage, type PanelToolEvent,
 } from "../_shared/copilotSession.ts";
 import { answerAllowed, claimFor, driverForRun, entryForBody, heartbeatEntryAllowed, messageAllowed } from "./dispatch.ts";
@@ -5943,10 +5943,20 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
       await saveTranscript();
       await scheduleContinuation();
       return;
-    case "cancelled":
+    case "cancelled": {
+      // A person's stop: the turn is kept, marked stopped — its words
+      // and steps as they stood when the stop landed — so the record
+      // (and the context the next turn seeds from) says the turn
+      // happened and was stopped, instead of the person's message
+      // standing with no answer at all. Everything the turn already
+      // created stands; the kept events are its record.
+      await flushLifted();
       await saveTranscript();
+      await updateCopilotSessionMessages(admin, sessionId, (messages) => [...messages,
+        stoppedAssistantMessage({ text: lastWords(), toolEvents, connections: connectProposals, credentials: credentialAsks })]);
       await bound("status", "停止しました");
       return;
+    }
     default: {
       // limit / budget / refusal: the turn stops here; the kept
       // conversation says so, and the run rests for the next message —

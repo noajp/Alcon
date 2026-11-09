@@ -116,6 +116,21 @@ describe('kept conversation updates', () => {
     expect(withCard.toolEvents).toHaveLength(1);
     expect(withCard.approvals?.[0].actionId).toBe('a9');
   });
+
+  it('shapes a stopped turn as its words and steps, marked stopped — never a form sentence', () => {
+    const stopped = session.stoppedAssistantMessage({
+      text: '途中まで書きました',
+      toolEvents: [{ name: 'createElements', result: { ok: true, rows: 12 } }],
+    });
+    expect(stopped).toEqual({
+      role: 'assistant', content: '途中まで書きました', done: true, stopped: true,
+      toolEvents: [{ name: 'createElements', result: { ok: true, rows: 12 } }],
+    });
+    // A stop before the turn said anything still leaves its mark, and
+    // no words are invented for it.
+    const bare = session.stoppedAssistantMessage({ text: '' });
+    expect(bare).toEqual({ role: 'assistant', content: '', done: true, stopped: true });
+  });
 });
 
 // A chainable fake for the two tables applyDecision touches. Updates are

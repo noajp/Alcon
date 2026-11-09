@@ -39,7 +39,7 @@ export function ProfileAI({ activeDomainId }: { activeDomainId?: string | null }
         <textarea aria-label={t('Message AI')} placeholder={t('Ask Alcon…')} value={input} onChange={event => setInput(event.target.value)} rows={2} className="flex-1 min-w-0 resize-none bg-transparent text-sm focus:bg-[var(--surface-raised)]" onKeyDown={event => {
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
         }} />
-        {streaming ? <Button type="button" size="icon-sm" aria-label={t('Stop response')} onClick={cancel}><Square size={16} /></Button> : <Button type="submit" size="icon-sm" aria-label={t('Send message')} disabled={!input.trim()}><ArrowUp size={16} /></Button>}
+        {streaming ? <Button type="button" size="icon-sm" aria-label={t('Stop')} onClick={cancel}><Square size={16} /></Button> : <Button type="submit" size="icon-sm" aria-label={t('Send message')} disabled={!input.trim()}><ArrowUp size={16} /></Button>}
       </form>
     </section>
   );
