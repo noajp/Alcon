@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { MoreHorizontal, Plus } from '@/ui/icons';
+import { MoreHorizontal, Plus, Tag } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -350,7 +350,7 @@ function ColorSwatch({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label={t('Colour of {name}', { name: label })}>
-          <span className="size-2.5 rounded-full" style={{ backgroundColor: hex }} />
+          <Tag aria-hidden size={12} className="shrink-0" style={{ color: hex }} />
         </Button>
       </PopoverTrigger>
       <MenuShell align="start">

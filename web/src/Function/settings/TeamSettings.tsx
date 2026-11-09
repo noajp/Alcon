@@ -257,9 +257,9 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
         </SettingsSection>
       )}
 
-      <SettingsSection title={t('AI agents ({n})', { n: agents.length })}>
+      <SettingsSection title={t('Models ({n})', { n: agents.length })}>
         {agents.length === 0 ? (
-          <div className="py-3 text-[13px] text-muted-foreground">{t('No AI agents yet.')}</div>
+          <div className="py-3 text-[13px] text-muted-foreground">{t('No models yet.')}</div>
         ) : (
           agents.map((w) => (
             <WorkerRow
