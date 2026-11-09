@@ -44,6 +44,9 @@ interface MainContentProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  /** Open an item (a Strategy, an Element) in a shell tab of its own —
+   *  the shell routes it; without it, opens navigate this tab in place. */
+  onOpenItem?: (view: string, nav?: Partial<NavigationState>) => void;
   onOpenSettings: () => void;
   onRefresh?: () => void;
   pendingNewNote?: number;
@@ -57,7 +60,7 @@ interface MainContentProps {
   aiSubject?: CopilotSubject;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenItem, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
   const notebookVisible = activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder');
   // The notebook stays mounted once opened (it keeps its editor state while
   // hidden), but it is not loaded until the user first opens it.
@@ -93,8 +96,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'automation' && (
-            <AutomationView onOpenStrategy={(id) => { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }}
-              onOpenElement={(id) => { onNavigate({ elementId: id }); onViewChange?.('domain-elements'); }} />
+            <AutomationView onOpenStrategy={(id) => {
+                if (onOpenItem) onOpenItem('strategy', { strategyId: id });
+                else { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }
+              }}
+              onOpenElement={(id) => {
+                if (onOpenItem) onOpenItem('domain-elements', { elementId: id });
+                else { onNavigate({ elementId: id }); onViewChange?.('domain-elements'); }
+              }} />
           )}
 
           {activeActivity === 'strategy' && (
