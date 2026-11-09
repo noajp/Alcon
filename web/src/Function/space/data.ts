@@ -7,8 +7,6 @@ import { useCurrentUserId } from '@/providers/authContext';
 import type { ActivitySpace, ActivitySpaceInsert, ActivitySpaceUpdate } from '@/types/database';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { useActiveSpaceId } from './activeSpaceStore';
-import { spaceScope, type SpaceScope } from './spaceScope';
 
 
 // Cross-Domain Guests of a Space, for Administration > Member (el_QLT-026).
@@ -111,16 +109,6 @@ export function useActivitySpaces() {
     error: (query.error as Error | null) ?? null,
     refetch,
   };
-}
-
-/** What the active Space shows (ADR 0048). The Space resolved the way the
- *  shell resolves it: the stored one while it is still a membership, else
- *  the first. 'full' until the Spaces are read. */
-export function useActiveSpaceScope(): SpaceScope {
-  const activeId = useActiveSpaceId();
-  const { data } = useActivitySpaces();
-  const space = data.find(s => s.id === activeId) ?? data[0];
-  return spaceScope(space?.scope);
 }
 
 /** The viewer's seat in a Space ('owner' | 'member'), or null while unknown.

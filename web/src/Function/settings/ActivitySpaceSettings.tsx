@@ -17,8 +17,6 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { Button } from '@/ui/button';
-import { ChoiceCard } from '@/ui/choice-card';
-import { spaceScope, type SpaceScope } from '@/Function/space/spaceScope';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
 
@@ -118,22 +116,6 @@ export function ActivitySpaceSettings() {
       await reloadMembers();
     } catch (e) {
       console.error('Failed to remove member', e);
-    }
-  };
-
-  // What the Space shows (ADR 0048). Only its owner changes it; the
-  // database refuses anyone else and any delegated call.
-  const scope = spaceScope(active?.scope);
-  const [scopeError, setScopeError] = useState(false);
-  const saveScope = async (next: SpaceScope) => {
-    if (!active || next === scope) return;
-    setScopeError(false);
-    try {
-      await updateActivitySpace(active.id, { scope: next });
-      await refetch();
-    } catch (e) {
-      console.error('Scope change failed', e);
-      setScopeError(true);
     }
   };
 
@@ -287,19 +269,6 @@ export function ActivitySpaceSettings() {
             disabled={saving}
           />
         </SettingsRow>
-      </SettingsSection>
-
-      <SettingsSection title={t('Plan and scope')} description={t('What this Space shows. Switching changes what can be reached, never what is stored.')}>
-        <div className="grid grid-cols-1 gap-2 py-2 sm:grid-cols-2">
-          <ChoiceCard selected={scope === 'audit'} label={t('AI audit')} disabled={!isOwner} onClick={() => void saveScope('audit')}>
-            <span className="text-[12px] text-muted-foreground">{t('The Space, its People and Audit only: what AI did in your work, who approved it, and whether the records are whole.')}</span>
-          </ChoiceCard>
-          <ChoiceCard selected={scope === 'full'} label={t('Full')} disabled={!isOwner} onClick={() => void saveScope('full')}>
-            <span className="text-[12px] text-muted-foreground">{t('Adds Strategy, Execution and every tool. Whatever the Space already holds appears as it is.')}</span>
-          </ChoiceCard>
-        </div>
-        {!isOwner && <p className="text-[12px] text-muted-foreground">{t("Only the Space's owner can change what it shows.")}</p>}
-        {scopeError && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{t('Could not change what the Space shows.')}</p>}
       </SettingsSection>
 
       <HeartbeatSettings spaceId={active.id} isOwner={isOwner} />

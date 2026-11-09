@@ -164,8 +164,6 @@ export interface ActivitySpace {
   created_by: string | null
   created_at: string | null
   updated_at: string | null
-  /** What the Space shows: everything, or only the Space, People and Audit (ADR 0048). */
-  scope?: 'audit' | 'full'
   /** How Athena's writes are held in this Space: 'ask' every write, 'auto' critical only, 'free' none (policy approvals). */
   approval_mode?: 'ask' | 'auto' | 'free'
   /** The Space's heartbeat: whether Athena wakes on a cadence to raise
@@ -204,7 +202,6 @@ export interface ActivitySpaceUpdate {
   color?: string | null
   logo?: string | null
   order_index?: number
-  scope?: 'audit' | 'full'
 }
 
 export interface ActivitySpaceMember {

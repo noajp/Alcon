@@ -10,8 +10,7 @@ import {
 } from './settingsNav';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
-import { useActiveSpaceScope } from '@/Function/space/data';
-import { settingsInScope } from '@/Function/space/spaceScope';
+
 
 /** A page listed in the nav — opened on `tab` when the search matched one of its tabs. */
 interface NavHit { item: SettingsNavItem; tab?: string }
@@ -21,9 +20,8 @@ interface NavHit { item: SettingsNavItem; tab?: string }
 // updates the shared store; SettingsView reacts and swaps its content panel.
 export function SettingsSidebarPanel() {
   const { t } = useI18n();
-  const scope = useActiveSpaceScope();
   const stored = useActiveSettingsSection();
-  const active = settingsInScope(stored, scope) ? stored : 'workspace';
+  const active = stored;
   const [query, setQuery] = useState('');
 
   // Search matches a page by its own label or by one of its tabs, so
@@ -31,10 +29,7 @@ export function SettingsSidebarPanel() {
   // the page on that tab.
   const filtered = useMemo((): { title: string; items: NavHit[] }[] => {
     const q = query.trim().toLowerCase();
-    // An audit Space lists only the pages it shows (ADR 0048).
-    const nav = SETTINGS_NAV
-      .map((s) => ({ ...s, items: s.items.filter((item) => settingsInScope(item.id, scope)) }))
-      .filter((s) => s.items.length > 0);
+    const nav = SETTINGS_NAV;
     if (!q) return nav.map((s) => ({ title: s.title, items: s.items.map((item) => ({ item })) }));
     return nav
       .map((s) => ({
@@ -46,7 +41,7 @@ export function SettingsSidebarPanel() {
         }),
       }))
       .filter((s) => s.items.length > 0);
-  }, [query, t, scope]);
+  }, [query, t]);
 
   return (
     <div className="pt-1">

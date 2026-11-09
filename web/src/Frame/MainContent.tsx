@@ -2,7 +2,6 @@
 
 import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
 import type { CopilotSubject } from '@/AIP/ai/useAlconCopilot';
-import { useActiveSpaceScope } from '@/Function/space/data';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
@@ -34,7 +33,6 @@ const TableView = dynamic(() => import('@/ActivitySpace/table').then(m => m.Tabl
 const FilesView = dynamic(() => import('@/ActivitySpace/artifacts').then(m => m.FilesView), { ssr: false, loading: viewLoading });
 const SlidesView = dynamic(() => import('@/ActivitySpace/artifacts/slides').then(m => m.SlidesView), { ssr: false, loading: viewLoading });
 const AuditView = dynamic(() => import('@/ActivitySpace/audit/AuditView').then(m => m.AuditView), { ssr: false, loading: viewLoading });
-const TeamView = dynamic(() => import('@/ActivitySpace/people/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
 const ReviewsView = dynamic(() => import('@/ActivitySpace/reviews/ReviewsView').then(m => m.ReviewsView), { ssr: false, loading: viewLoading });
@@ -60,7 +58,6 @@ interface MainContentProps {
 }
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
-  const scope = useActiveSpaceScope();
   const notebookVisible = activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder');
   // The notebook stays mounted once opened (it keeps its editor state while
   // hidden), but it is not loaded until the user first opens it.
@@ -259,9 +256,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {(activeActivity === 'team' || activeActivity === 'workload') && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              {/* An audit Space (ADR 0048) shows its people without opening
-                  their Elements or their load. */}
-              {scope === 'audit' ? <TeamView /> : <PeopleView workerId={navigation.workerId} unitId={navigation.unitId} onNavigate={onNavigate} onViewChange={onViewChange} />}
+              <PeopleView workerId={navigation.workerId} unitId={navigation.unitId} onNavigate={onNavigate} onViewChange={onViewChange} />
             </div>
           )}
 

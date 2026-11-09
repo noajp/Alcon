@@ -47,7 +47,7 @@ type AssigneeRole = 'assignee' | 'reviewer' | 'collaborator'
 
 /** Column overrides per table, applied to Row, Insert and Update alike. */
 interface ColumnOverrides {
-  activity_spaces: { scope: 'audit' | 'full'; approval_mode: 'ask' | 'auto' | 'free' }
+  activity_spaces: { approval_mode: 'ask' | 'auto' | 'free' }
   space_approval_mode_changes: { from_mode: 'ask' | 'auto' | 'free' | null; to_mode: 'ask' | 'auto' | 'free' }
   // The chat transcript; readers check Array.isArray before use.
   ai_sessions: { messages: unknown[] }

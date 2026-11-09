@@ -11,7 +11,6 @@ import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
-import { useActiveSpaceScope } from '@/Function/space/data';
 import { NavAutomationIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
@@ -47,7 +46,6 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import { SpaceSwitcher } from '@/Function/space/SpaceSwitcher';
 
 import { MODE_META, railModeOf } from '@/Frame/railApps';
-import { viewInScope } from '@/Function/space/spaceScope';
 import type { RailMode } from '@/Frame/railApps';
 import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/Frame/QuickAddElementLauncher';
 import { useCalendarDay } from '@/ActivitySpace/calendar/calendarStore';
@@ -117,8 +115,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
-  // An audit Space (ADR 0048) lists its people without their load.
-  const spaceScope = useActiveSpaceScope();
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
@@ -391,19 +387,13 @@ export function AppSidebar({
               list — the Domains for the Workspace, the tables for Table,
               and so on. */}
           <div className="mt-5">
-            {viewInScope('ai', spaceScope) && (
-              <SidebarRow active={activeView === 'ai'} icon={<AiIcon size={16} />} label={t(aiLabel)}
-                onClick={() => onViewChange('ai')} />
-            )}
-            {viewInScope('strategy', spaceScope) && (
-              <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
-                onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
-            )}
-            {viewInScope('automation', spaceScope) && (
-              <SidebarRow active={activeView === 'automation'} icon={<NavAutomationIcon size={16} />} label={t('Automation')}
-                onClick={() => onViewChange('automation')} />
-            )}
-            {SIDEBAR_TOOLS.filter((mode) => viewInScope(MODE_META[mode].defaultView, spaceScope)).map((mode) => {
+            <SidebarRow active={activeView === 'ai'} icon={<AiIcon size={16} />} label={t(aiLabel)}
+              onClick={() => onViewChange('ai')} />
+            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
+              onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
+            <SidebarRow active={activeView === 'automation'} icon={<NavAutomationIcon size={16} />} label={t('Automation')}
+              onClick={() => onViewChange('automation')} />
+            {SIDEBAR_TOOLS.map((mode) => {
               const { label, icon: Icon, defaultView } = MODE_META[mode];
               return <SidebarRow key={mode} active={railMode === mode} icon={<Icon size={16} />} label={t(label)}
                 onClick={() => { if (railMode !== mode) onViewChange(defaultView); }} />;

@@ -26,13 +26,9 @@ import type { ViewId } from '@/Frame/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/Frame/QuickAddElementLauncher';
 import { filterCreateCommands, type CreateCommandId } from '@/Frame/paletteCreateCommands';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 import { usePageCommands } from '@/Function/shared/pageCommands';
 
 interface CommandPaletteProps {
-  /** An audit Space (ADR 0048) offers only the views it shows: no search
-   *  into Elements, Objects, Notes or artifacts, and nothing to create. */
-  scope: SpaceScope;
   /** Where an opened Element's Back returns to: what is open now. */
   returnTo: ElementReturn;
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -79,8 +75,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOpenSettings, canGoBack, onGoBack }: CommandPaletteProps) {
-  const full = scope === 'full';
+export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenSettings, canGoBack, onGoBack }: CommandPaletteProps) {
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
@@ -106,7 +101,7 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim() || !full) { setResults([]); setSearching(false); return; }
+    if (!query.trim()) { setResults([]); setSearching(false); return; }
     setSearching(true);
     debounceRef.current = window.setTimeout(async () => {
       try {
@@ -120,7 +115,7 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, full]);
+  }, [query]);
 
   const close = () => { setOpen(false); setQuery(''); setResults([]); };
 
@@ -157,27 +152,27 @@ export function CommandPalette({ scope, returnTo, onNavigate, onViewChange, onOp
     note:    results.filter(r => r.kind === 'note'),
     file:    results.filter(r => r.kind === 'file'),
   };
-  const visibleCreateCommands = full ? filterCreateCommands(query) : [];
-  const navCommands = NAV_COMMANDS.filter(c => viewInScope(c.view, scope));
+  const visibleCreateCommands = filterCreateCommands(query);
+  const navCommands = NAV_COMMANDS;
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title={t(full ? 'Search' : 'Go to')}
-      description={t(full ? 'Search elements, objects, notes and artifacts. Press ⌘K to open.' : 'Go to Inbox, People, Audit or Settings. Press ⌘K to open.')}
+      title={t('Search')}
+      description={t('Search elements, objects, notes and artifacts. Press ⌘K to open.')}
     >
       <CommandInput
-        placeholder={t(full ? 'Search elements, objects, notes, artifacts…' : 'Go to Inbox, People, Audit or Settings…')}
+        placeholder={t('Search elements, objects, notes, artifacts…')}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>
-          {t(searching ? 'Searching…' : query ? 'No results.' : full ? 'Type to search.' : 'Type to filter.')}
+          {t(searching ? 'Searching…' : query ? 'No results.' : 'Type to search.')}
         </CommandEmpty>
 
-        {full && pageCommands.length > 0 && (
+        {pageCommands.length > 0 && (
           <>
             <CommandGroup heading={t('On this page')}>
               {pageCommands.map(({ icon: Icon, ...c }) => (
