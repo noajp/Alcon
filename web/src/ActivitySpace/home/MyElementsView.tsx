@@ -2,6 +2,7 @@
 
 import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -44,6 +45,9 @@ import {
 
 interface MyElementsViewProps {
   embedded?: boolean;
+  /** Embedded: where its list controls go (the host's tab row), in place
+   *  of a header row of its own. */
+  controlsSlot?: HTMLElement | null;
   onRefresh?: () => void;
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
@@ -72,7 +76,7 @@ const MY_DEFAULT_VISIBLE: ColumnId[] = [...ELEMENT_DEFAULT_VISIBLE, 'objects'];
 const EMPTY_ELEMENTS: ElementWithDetails[] = [];
 const EMPTY_WORKERS: Worker[] = [];
 
-export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded = false }: MyElementsViewProps) {
+export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded = false, controlsSlot = null }: MyElementsViewProps) {
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
 
@@ -295,7 +299,34 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Plain header — no Domain breadcrumb because personal Elements are
-          intentionally Domain-less. */}
+          intentionally Domain-less. Embedded with a slot, there is no header
+          row: the controls stand in the host's tab row. */}
+      {embedded && controlsSlot ? createPortal(<div className="flex items-center gap-1">
+        <ListControls
+          state={controls}
+          onChange={setControls}
+          typeOptions={typeOptions}
+          labelOptions={labelOptions}
+          workerOptions={workerOptions}
+          showOwnerFilter={false}
+          onReset={() => setControls(DEFAULT_STATE)}
+          sortColumnsStorageKey="my-elements"
+          showClosedWindow
+        />
+        <ButtonAppearanceProvider appearance="navigation">
+          {userId && (
+            <Button variant="ghost" size="icon-xs" onClick={() => setDeletedOpen(true)} title={t('Deleted Elements')} aria-label={t('Deleted Elements')}>
+              <Trash2 size={14} />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon-xs" onClick={() => setQuickAddOpen(true)} title={t('Add personal Element')} aria-label={t('Add personal Element')}>
+            <Plus size={14} />
+          </Button>
+        </ButtonAppearanceProvider>
+        {deletedOpen && userId && (
+          <DeletedElementsDialog mine={userId} onClose={() => setDeletedOpen(false)} onRestored={() => { void fetchMine(); void onRefresh?.(); }} />
+        )}
+      </div>, controlsSlot) : (
       <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <SidebarReveal />
         {!embedded && <span className="text-[13px] font-medium text-foreground">{t('My Elements')}</span>}
@@ -326,6 +357,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
           <DeletedElementsDialog mine={userId} onClose={() => setDeletedOpen(false)} onRestored={() => { void fetchMine(); void onRefresh?.(); }} />
         )}
       </div>
+      )}
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-[13px] text-muted-foreground" role="status">
