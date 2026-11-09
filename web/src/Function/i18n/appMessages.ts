@@ -848,6 +848,22 @@ const APP_MESSAGES: Record<string, Row> = {
   'Expired': ['期限切れ', '만료됨', 'Expiré', 'Expirado'],
   'Archived': ['アーカイブ済み', '보관됨', 'Archivé', 'Archivado'],
   'Expires {date}': ['{date} に期限切れ', '{date} 만료', 'Expire le {date}', 'Expira el {date}'],
+  // The definition flow canvas (Sim-incorporation P3): a definition
+  // drawn from its own structure, on the promotion review and in an
+  // Automation's expansion — read-only in both places.
+  'Flow diagram': ['フロー図', '흐름도', 'Schéma du flux', 'Diagrama de flujo'],
+  'Definition text': ['定義の本文', '정의 본문', 'Texte de la définition', 'Texto de la definición'],
+  'Trigger': ['トリガ', '트리거', 'Déclencheur', 'Activador'],
+  'Element target': ['起票先', '생성 위치', 'Destination de l’Element', 'Destino del Element'],
+  'Step': ['ステップ', '단계', 'Étape', 'Paso'],
+  'Condition step': ['条件', '조건', 'Condition', 'Condición'],
+  'Checks gate': ['点検', '점검', 'Contrôle', 'Control'],
+  'Stop when': ['止める条件', '중지 조건', 'Arrêt quand', 'Detener cuando'],
+  'Started by a person': ['人が手で開始', '사람이 직접 시작', 'Lancé par une personne', 'Iniciado por una persona'],
+  'Posted from outside': ['外部から POST', '외부에서 POST', 'Envoyé depuis l’extérieur', 'Enviado desde fuera'],
+  'How work is assigned': ['担当の決め方', '담당 결정 방식', 'Attribution du travail', 'Cómo se asigna el trabajo'],
+  'Dashed lines are conditions written in the definition text — declared intent, not fixed routes. The engine reads the text; it does not follow the drawing.': ['破線は定義の文章に書かれた条件です。宣言された意図であって、固定の経路ではありません。エンジンは文章を読んで動きます — 図のとおりに動くわけではありません。', '점선은 정의 본문에 적힌 조건입니다. 선언된 의도일 뿐 고정된 경로가 아닙니다. 엔진은 본문을 읽고 움직입니다 — 그림을 따라 움직이지 않습니다.', 'Les lignes en pointillés sont des conditions écrites dans le texte de la définition — une intention déclarée, pas des routes fixes. Le moteur lit le texte ; il ne suit pas le dessin.', 'Las líneas discontinuas son condiciones escritas en el texto de la definición: intención declarada, no rutas fijas. El motor lee el texto; no sigue el dibujo.'],
+  'No flow to draw — this definition has no procedure written yet.': ['描くフローがありません — この定義にはまだ進め方が書かれていません。', '그릴 흐름이 없습니다 — 이 정의에는 아직 절차가 적혀 있지 않습니다.', 'Aucun flux à dessiner — cette définition n’a pas encore de procédure écrite.', 'No hay flujo que dibujar: esta definición aún no tiene un procedimiento escrito.'],
   'Written by a person': ['人が書いた', '사람이 작성', 'Écrit par une personne', 'Escrito por una persona'],
   'Distilled from a conversation': ['会話からの蒸留', '대화에서 증류', 'Distillé d’une conversation', 'Destilado de una conversación'],
   'Distilled from a run': ['実行からの蒸留', '실행에서 증류', 'Distillé d’une exécution', 'Destilado de una ejecución'],

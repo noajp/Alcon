@@ -18,6 +18,7 @@ import {
   useAutomationEvents, useAutomations, webhookUrl, type Automation, type AutomationKind,
 } from '@/hooks/automationData';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
+import { DefinitionFlow } from '@/AIP/harness/DefinitionFlow';
 import { decideAgentActionById, usePendingAgentAction } from '@/AIP/ai/agentData';
 import { useIsSpaceOwner } from '@/AIP/connectors/data';
 
@@ -95,6 +96,7 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
           {automations.data.map((a) => {
             const expanded = open === a.id;
             const when = a.kind === 'schedule' ? describeCron(a.cron ?? '') : t('When an outside service posts');
+            const def = harnesses.data.find((d) => d.id === a.definition_id) ?? null;
             return (
               <li key={a.id} className="py-2">
                 <div className="flex items-center gap-2">
@@ -139,6 +141,20 @@ export function AutomationsSection({ spaceId, onOpenElement }: { spaceId: string
                         )}
                       </div>
                     )}
+                    {def ? (
+                      <div className="space-y-1">
+                        <h5 className="text-[12px] font-medium text-muted-foreground">{t('Flow diagram')}</h5>
+                        <DefinitionFlow
+                          body={def.body}
+                          context={{
+                            trigger: a.kind === 'schedule'
+                              ? { kind: 'schedule', cron: a.cron ?? '', timezone: a.timezone }
+                              : { kind: 'webhook' },
+                            objectName: objectName.get(a.object_id) ?? null,
+                          }}
+                        />
+                      </div>
+                    ) : null}
                     <RecentStarts automationId={a.id} spaceId={spaceId} onOpenElement={onOpenElement} />
                     <Button size="xs" variant="ghost" className="text-[var(--status-danger)]" disabled={busy === a.id}
                       onClick={() => void act(a.id, () => deleteAutomation(a.id))}>{t('Delete')}</Button>

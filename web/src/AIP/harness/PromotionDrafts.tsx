@@ -20,6 +20,7 @@ import {
   draftPackageWeb, promotionDriftWeb, promotionStructureHashWeb, readRehearsalReportWeb,
 } from './promotionModel';
 import { checkHarness, parseDefinition } from './harnessDefinition';
+import { DefinitionFlow } from './DefinitionFlow';
 
 // Settings › AI › Harnesses › Promotions: one-off work on its way to
 // becoming a standing harness. The section lists the Space's drafts at
@@ -175,6 +176,10 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
 
   const [deciding, setDeciding] = useState(false);
   const [decideError, setDecideError] = useState<string | null>(null);
+  // The package reads two ways: the text itself, or its flow drawn
+  // from the text (DefinitionFlow, the read-only projection) — the
+  // reviewer picks per glance; the body stays the truth either way.
+  const [packageView, setPackageView] = useState<'text' | 'flow'>('text');
   const decide = async (action: 'activate' | 'reject' | 'accept' | 'rollback') => {
     const confirmText = action === 'activate'
       ? `${t('Activate this promotion?')} ${t('The tested definition goes live exactly as reviewed.')}${pkg?.binding.trigger ? ` ${t('Its automation starts enabled.')}` : ''}`
@@ -242,9 +247,29 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
                   {t('A different harness already carries this name: {name}', { name: nameConflict.name })}
                 </p>
               )}
-              <div className="max-h-[40vh] overflow-y-auto rounded-md bg-[var(--surface-strong)] p-3">
-                <MarkdownLite text={pkg.body} />
+              <div className="flex items-center gap-1">
+                <Button shape="tab" variant={packageView === 'text' ? 'secondary' : 'ghost'} onClick={() => setPackageView('text')}>
+                  {t('Definition text')}
+                </Button>
+                <Button shape="tab" variant={packageView === 'flow' ? 'secondary' : 'ghost'} onClick={() => setPackageView('flow')}>
+                  {t('Flow diagram')}
+                </Button>
               </div>
+              {packageView === 'flow' ? (
+                <DefinitionFlow
+                  body={pkg.body}
+                  context={{
+                    trigger: pkg.binding.trigger
+                      ? { kind: 'schedule', cron: pkg.binding.trigger.cron, timezone: pkg.binding.trigger.timezone }
+                      : { kind: 'manual' },
+                    objectName,
+                  }}
+                />
+              ) : (
+                <div className="max-h-[40vh] overflow-y-auto rounded-md bg-[var(--surface-strong)] p-3">
+                  <MarkdownLite text={pkg.body} />
+                </div>
+              )}
               {warnings.length > 0 && (
                 <ul className="list-inside list-disc text-[12px] text-muted-foreground">
                   {warnings.map((w) => <li key={w}>{w}</li>)}
