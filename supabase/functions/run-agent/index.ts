@@ -71,7 +71,7 @@ import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type R
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
 import {
-  adoptPlannedTools, approvalDisplayForCall, bindingOf, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, integrationCallIsRead, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools,
+  adoptPlannedTools, approvalDisplayForCall, bindingOf, connectorMatches, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, integrationCallIsRead, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools,
   type ApprovalDisplay, type IntegrationBinding, type IntegrationTool, type PlannedIntegrationTool,
 } from "../_shared/integrationTools.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
@@ -172,6 +172,11 @@ import {
 } from "../_shared/heartbeatSnapshot.ts";
 import { credentialAnomalySignals, type CredentialUseFact } from "../_shared/credentialAnomalies.ts";
 import { calibrationCandidateSignals, type CalibrationCandidateFact } from "../_shared/verifierCalibration.ts";
+import {
+  CHAIN_POLICY, chainClaimMatches, chainDepthFor, chainDenyRefusal, chainFactFor, chainScopeMalformed, deriveChildScope, deriveScopeFromDefinition,
+  loadDerivationIntegrations, parseChainScope, rootChainScope, strategyIdForObject, type ChainScope, type DerivationIntegration,
+} from "../_shared/chainScope.ts";
+import { chainClaimOf, mintChainJwt } from "../_shared/delegatedAuth.ts";
 import { constraintDraftSignals, constraintOfferCandidate, constraintOfferText, definitionConstraintBlock, effectiveDefinitionText, strategyConstraintSection, type ActiveConstraintFact } from "../_shared/constraintDrafts.ts";
 import { recordIntegrationAuthFailure, recordIntegrationUse } from "../_shared/credentialUseAudit.ts";
 import { loadRunBudget, USER_MONTHLY_BUDGET_USD } from "./budget.ts";
@@ -271,6 +276,11 @@ type Run = {
   continuation_count: number; continuation_token: string | null;
   /** The approval mode this run started under, snapshotted by serve(); null until first driven. */
   approval_mode: string | null;
+  /** The chain scope minted at this run's birth (B10): the row is the
+   *  truth the gate enforces from; null/absent is an unscoped root.
+   *  Read as unknown jsonb and parsed by chainScope.parseChainScope —
+   *  a deploy ahead of the migration simply finds the key absent. */
+  chain_scope?: unknown;
 };
 
 // IntegrationTool and ApprovalDisplay live in _shared/integrationTools.ts,
@@ -283,13 +293,10 @@ function downIntegration(name: string, reason: string): TaskContext["integration
 }
 
 /** Preset display names (web/src/AIP/connectors/catalog.ts): a harness may name a connector by any of them. */
-const PRESET_NAMES: Record<string, string> = {
-  linear: "Linear", asana: "Asana", "google-drive": "Google Drive", github: "GitHub", slack: "Slack",
-  deepseek: "DeepSeek", kimi: "Kimi", "custom-mcp": "Custom MCP", "custom-http": "Custom API", "custom-model": "Custom model API",
-};
-
-/** The fold harness connector names are matched by (the same fold as checkHarness). */
-const foldName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+// Connector-name matching itself lives in _shared/integrationTools.ts
+// (connectorMatches) — the assembly below and B10's scope derivation
+// share the one rule, so what is offered and what a chain may touch
+// are computed from the same names.
 
 /** A Space's approval mode, read with the service role: policy comes from
  *  the Space's row, never from the request or the model. An unreadable or
@@ -297,6 +304,25 @@ const foldName = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
 async function loadSpaceApprovalMode(admin: SupabaseClient, spaceId: string): Promise<ApprovalMode> {
   const { data } = await admin.from("activity_spaces").select("approval_mode").eq("id", spaceId).maybeSingle();
   return approvalModeOf((data as { approval_mode?: unknown } | null)?.approval_mode);
+}
+
+/**
+ * The JWT a chained run is driven with (B10): a fresh chain token
+ * minted from the run's ROW scope for this one drive — slices
+ * outlive the carriage's 300 seconds, so every hand-off (a child's
+ * first drive, a slice's continuation) mints its own. A failed mint
+ * (no signing key) does NOT fall back to driving unscoped: the
+ * person's own JWT drives, the failure is said out loud, and the
+ * row keeps enforcing the scope at the gate — carriage is
+ * best-effort, enforcement is the row.
+ */
+async function chainDriveJwt(userId: string, scope: ChainScope, runId: string, fallback: string): Promise<string> {
+  try {
+    return await mintChainJwt({ userId, scope, runId });
+  } catch (e) {
+    console.error("run-agent: chain JWT mint failed; driving with the person's session — the run's row still enforces its scope", errorMessage(e));
+    return fallback;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -369,6 +395,18 @@ Deno.serve(async (req: Request) => {
   const run = runRow as Run;
   // The agent acts as the person who started it; only they may drive it.
   if (run.triggered_by !== user.id) return json({ error: "この実行を動かせるのは、実行を始めた人だけです。" }, 403);
+
+  // A drive that presents a chain claim (B10) must be carrying THIS
+  // run's scope: the claim names the one run it may drive and must
+  // equal the row's scope in canonical form. The claim is read
+  // unverified and grants nothing — a forgery can only narrow or
+  // refuse its bearer — the row below is the truth the gate
+  // enforces from; a drive with no claim (the person's session, the
+  // tick's revival) is judged by the row alone.
+  const chainClaim = chainClaimOf(jwt);
+  if (chainClaim && !chainClaimMatches(chainClaim, parseChainScope(run.chain_scope), runId)) {
+    return json({ error: "提示された連鎖の範囲が、この実行の範囲と一致しません。" }, 403);
+  }
 
   // A decision is checked before the run is touched: a stale or mismatched
   // decision is refused and the run keeps waiting for the right one. The
@@ -621,6 +659,23 @@ async function execute(a: ExecArgs): Promise<void> {
     return;
   }
 
+  // The chain this run stands in (B10), from its row — the truth,
+  // whoever's JWT carried this drive here (serve() refused a chain
+  // claim that disagrees with it). Null is an unscoped root: a
+  // person's own start, or every run born before B10. A malformed
+  // record parses to the empty scope at full depth — the run can
+  // still work with its own tools, but every integration call will
+  // be refused at the gate, and its first slice says so on the
+  // record rather than letting the refusals speak for themselves.
+  const runScope = parseChainScope(run.chain_scope);
+  if (!run.transcript) {
+    if (chainScopeMalformed(run.chain_scope)) {
+      await addStep(admin, run.id, "error", "連鎖の範囲の記録が読めなかったため、連携の操作はすべて拒否します", "範囲は実行の行に固定されていて書き換えられないため、直せるのは人が新しく開始し直すことだけです。");
+    } else if (runScope) {
+      await addStep(admin, run.id, "status", `連鎖実行として開始（深さ ${runScope.depth}/${runScope.maxDepth}、起点の実行 ${runScope.rootRunId}）`, `許可された操作は連携 ${runScope.integrations.length} 件・操作 ${runScope.actions.length} 件です。`);
+    }
+  }
+
   // ── Agent profile ───────────────────────────────────────────────────────
   // An AI Worker's profile (its instructions above all) loads only when that
   // Worker is assignable to this Element for the person running it — the
@@ -803,11 +858,19 @@ async function execute(a: ExecArgs): Promise<void> {
     const matchedConnectors = new Set<string>();
     for (const row of (rows ?? []) as (IntegrationRow & { enabled: boolean; manifest: unknown; guide: string | null; updated_at?: string | null })[]) {
       if (wantedConnectors.length) {
-        const names = [row.name, row.preset ?? "", PRESET_NAMES[row.preset ?? ""] ?? ""].filter(Boolean);
-        const hits = wantedConnectors.filter((c) => names.some((n) => foldName(n) === foldName(c)));
+        // The one matching rule (integrationTools' connectorMatches):
+        // B10's scope derivation reads definitions by the same names,
+        // so what is offered and what a chain may touch cannot drift.
+        const hits = wantedConnectors.filter((c) => connectorMatches(row, [c]));
         if (!hits.length) continue;
         for (const h of hits) matchedConnectors.add(h);
       }
+      // B10 (§5.5, politeness): a scoped run is not OFFERED what its
+      // fence excludes. The gate remains the boundary — a leaked
+      // offer (a cached plan, a tool named from memory) is refused
+      // there — but the offer stays honest, and a fenced-off row
+      // costs no binding spend (a Drive secret, an MCP session).
+      if (runScope && !runScope.integrations.includes(row.id)) continue;
       if (!isSafeEndpoint(row.endpoint)) continue;
       // A manifest declares what the integration may be asked to do. One that
       // declares nothing usable closes the integration rather than opening it.
@@ -1073,7 +1136,13 @@ async function execute(a: ExecArgs): Promise<void> {
     ? await loadAutonomyGrantFacts(admin, run.activity_space_id)
     : new Map<string, { lane: 1 | 2; clean: number }>();
   const verdicts = new Map<string, { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null }>();
-  const factsForCall = (call: ToolCall): ApprovalFacts => {
+  // B10: the calls this slice's fence refused — their ids, so the
+  // deny delivery answers with the fence's own wording (the chain
+  // reason is the recorded one when a call is refused twice over),
+  // and their count, which the verdict record seals.
+  const chainDeniedCalls = new Set<string>();
+  let chainDeniedCount = 0;
+  const factsForCall = (call: ToolCall, opts?: { noChain?: boolean }): ApprovalFacts => {
     // Alcon's own operations: the Element entry's policy decides each call.
     if (isCatalogTool(call.name)) {
       const tool = catalogTool(call.name);
@@ -1083,13 +1152,29 @@ async function execute(a: ExecArgs): Promise<void> {
     const it = integrationTools.get(call.name);
     const facts = integrationApprovalFacts(it, call, kindOf(call.name) === "write");
     facts.autonomyGrant = grantFactFor(autonomyGrants, it?.integration.id, it?.command?.name);
+    // B10: the chain fact, composed from the run's ROW scope for
+    // every integration call — this composition point is the whole
+    // enforcement: approvalVerdict judges it first, and nothing
+    // downstream (mode, delegation, rule, grant, plan) can lift the
+    // deny it returns. The compensation pass asks for noChain
+    // verdicts (see compensationDeps): an undo is the clean-up of
+    // an act already inside the fence, not a new act — its command
+    // may legitimately sit outside the scope its write stood in.
+    if (runScope && !opts?.noChain) {
+      const chainFact = chainFactFor(runScope, it, call);
+      if (chainFact) {
+        facts.chain = chainFact;
+        if (!chainFact.inScope) chainDeniedCalls.add(call.id);
+      }
+    }
     return facts;
   };
-  const verdictForCall = (call: ToolCall): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null } => {
-    let v = verdicts.get(call.id);
+  const verdictForCall = (call: ToolCall, opts?: { noChain?: boolean }): { base: ApprovalVerdict; final: ApprovalVerdict; lift: "track-record" | null } => {
+    const key = opts?.noChain ? `${call.id} (compensation)` : call.id;
+    let v = verdicts.get(key);
     if (!v) {
-      v = verdictWithAutonomy(factsForCall(call), mode);
-      verdicts.set(call.id, v);
+      v = verdictWithAutonomy(factsForCall(call, opts), mode);
+      verdicts.set(key, v);
     }
     return v;
   };
@@ -1712,7 +1797,12 @@ async function execute(a: ExecArgs): Promise<void> {
       }
       return null;
     },
-    verdictOf: (call: ToolCall) => verdictForCall(call),
+    // B10 (§6.4): compensation verdicts carry NO chain fact — the
+    // deliberate asymmetry. An undo is the clean-up of an act that
+    // already stood inside the fence, judged by B9's own policy
+    // path; fencing it could strand a half-rollback behind a scope
+    // the undo command was never part of.
+    verdictOf: (call: ToolCall) => verdictForCall(call, { noChain: true }),
     executeUndo: async (call: ToolCall): Promise<{ ok: boolean; errorText?: string }> => {
       const rowId = call.id.startsWith("undo-") ? call.id.slice("undo-".length) : null;
       if (rowId) compensationOfCall.set(call.id, rowId);
@@ -2008,6 +2098,19 @@ async function execute(a: ExecArgs): Promise<void> {
     const pit = integrationTools.get(call.name);
     if (pit) {
       const label = `${pit.integration.name}: ${operationOf(pit, call.input)}`;
+      // B10 (§5.3, record time): the fence is judged before a call
+      // is recorded OR run live — an out-of-scope write never enters
+      // the plan (a plan approval gathered over it could not cover
+      // what the fence refuses anyway: an approval never widens a
+      // binding), and a read the plan mode would run live is refused
+      // here exactly as the gate would refuse it.
+      if (runScope) {
+        const chainFact = chainFactFor(runScope, pit, call);
+        if (chainFact && !chainFact.inScope) {
+          chainDeniedCount++;
+          return { content: chainDenyRefusal(pit.integration.name, operationOf(pit, call.input)), is_error: true };
+        }
+      }
       if (integrationCallIsRead(pit, call)) return await executeCall(call);
       let problem: string | null = null;
       if (pit.command) {
@@ -2165,9 +2268,14 @@ async function execute(a: ExecArgs): Promise<void> {
     if (!armed) return; // cancelled meanwhile
     await addStep(admin, run.id, "status", "区切りました — 続きを実行します");
     // The next slice, with the same person's session, in a fresh invocation.
+    // A scoped run's next slice is driven under a FRESH chain token
+    // minted from its row (B10): slices outlive the 300-second
+    // carriage that brought this one here, so the hand-off re-mints
+    // rather than forwarding a dying claim.
+    const driveJwt = runScope ? await chainDriveJwt(user.id, runScope, run.id, a.jwt) : a.jwt;
     await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
       method: "POST",
-      headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+      headers: { "content-type": "application/json", Authorization: `Bearer ${driveJwt}` },
       body: JSON.stringify({ runId: run.id, continue: true, token }),
     }).then(async (res) => {
       // A refused hand-off (a 409, a gateway error) would leave the run
@@ -2614,6 +2722,28 @@ async function execute(a: ExecArgs): Promise<void> {
       const covered = planMatches.get(call.id);
       if (covered) {
         const cit = integrationTools.get(call.name);
+        // B10 (§5.3, apply time): the covered call is asserted
+        // against the fence before it runs. The scope is immutable,
+        // so this holds by construction — claimPlanCover already
+        // refused to cover a call whose base verdict is a deny —
+        // but an approval must never be able to widen a binding, so
+        // the assert is made here too, and if it is ever reached it
+        // fails closed the way a drifted premise does.
+        if (runScope && cit) {
+          const chainFact = chainFactFor(runScope, cit, call);
+          if (chainFact && !chainFact.inScope) {
+            const text = chainDenyRefusal(cit.integration.name, operationOf(cit, call.input));
+            const chainActionId = await recordPlanApproval(admin, {
+              runId: run.id, elementId: run.element_id, call, display: covered.display,
+              planActionId: approvedPlan?.actionId ?? null,
+              integrationId: cit.integration.id, decidedBy: run.triggered_by,
+            });
+            if (chainActionId) await settlePlanApproval(admin, chainActionId, false, { chainDenied: true });
+            await addStep(admin, run.id, "approval", `連鎖の範囲外のため実行しません: ${covered.label}`, text);
+            chainDeniedCount++;
+            return { content: text, is_error: true };
+          }
+        }
         if (cit && covered.expected) {
           const drift = await checkPlanDrift(cit, call, covered.expected);
           if (drift && drift.length) {
@@ -2646,6 +2776,21 @@ async function execute(a: ExecArgs): Promise<void> {
       // an approval given before a rule denied these arguments must not
       // carry them through the decision path, which never passes here.)
       if (v?.final === "deny") {
+        // B10: the fence's refusal, worded as the fence's. When a
+        // call is refused twice over (the fence and the manifest),
+        // the chain reason is the recorded one — it was judged
+        // first, and it is the one that tells the model the truth:
+        // no argument change inside this run can move it.
+        if (chainDeniedCalls.has(call.id)) {
+          const deniedTool = integrationTools.get(call.name);
+          const refusal = chainDenyRefusal(
+            deniedTool?.integration.name ?? call.name,
+            deniedTool ? operationOf(deniedTool, call.input) : call.name,
+          );
+          await addStep(admin, run.id, "action", `${deniedTool?.integration.name ?? call.name}: ${deniedTool ? operationOf(deniedTool, call.input) : call.name}`, refusal.slice(0, 500));
+          chainDeniedCount++;
+          return { content: refusal, is_error: true };
+        }
         if (isCatalogTool(call.name)) {
           const refusal = catalogDenyRefusal(call.name, call.input);
           await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, call.input)}`, refusal);
@@ -2782,6 +2927,10 @@ async function execute(a: ExecArgs): Promise<void> {
         verifyTally,
         corrections,
         inputsHash,
+        // B10: the fence's refusals in this slice, counted as they
+        // were delivered — the record carries the block only when
+        // the fence actually refused something.
+        chainDenied: chainDeniedCount,
       });
       // The compensation pass (B9): a finish that failed — a partial
       // or blocked outcome, or a completed one the verifier marked
@@ -5449,8 +5598,10 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
 
   if (auto) {
     try {
-      const { started, skipped } = await advanceFrom(a, run.element_id);
-      if (started.length) await addStep(admin, run.id, "status", `次の作業を ${started.length} 件開始しました`);
+      const { started, skipped, startedLines } = await advanceFrom(a, run.element_id, {
+        id: run.id, chain_scope: run.chain_scope, activity_space_id: run.activity_space_id, triggered_by: run.triggered_by,
+      });
+      if (started.length) await addStep(admin, run.id, "status", `次の作業を ${started.length} 件開始しました`, startedLines.length ? startedLines.join("\n") : null);
       if (skipped.length) await addStep(admin, run.id, "status", `合格済みの ${skipped.length} 件は再実行しませんでした`, "前回の実行で合格（または受け入れ済み）で、Element と定義が変わっていないためです。");
     } catch (e) {
       console.error("run-agent: advance failed", errorMessage(e));
@@ -5708,11 +5859,31 @@ async function decidePlan(a: ExecArgs): Promise<void> {
     return;
   }
 
-  const { data: next, error } = await userDb.from("agent_runs").insert({
+  // B10: an apply run inherits its plan run's scope verbatim — plan
+  // and apply are ONE chain link, the pair consuming no depth; the
+  // copy differs from the original only in whose child it is. An
+  // unscoped plan run's apply run is unscoped and starts as today.
+  const planScope = parseChainScope(run.chain_scope);
+  let applyScope: ChainScope | null = planScope ? { ...planScope, parentRunId: run.id } : null;
+  let inserted = await (applyScope ? admin : userDb).from("agent_runs").insert({
     element_id: run.element_id, domain_id: run.domain_id, worker_id: run.worker_id,
     triggered_from: "plan", triggered_by: user.id, status: "queued", mode: run.mode,
     prompt: run.prompt,
+    ...(applyScope ? { id: crypto.randomUUID(), chain_scope: applyScope } : {}),
   }).select("id").single();
+  if ((inserted.error || !inserted.data) && applyScope) {
+    // A database whose chain_scope column has not landed yet (the
+    // production catch-up is still behind): the apply run starts
+    // unscoped — pre-B10 behaviour — rather than not starting at all.
+    console.error("run-agent: apply run scope insert failed; starting unscoped", inserted.error?.message);
+    applyScope = null;
+    inserted = await userDb.from("agent_runs").insert({
+      element_id: run.element_id, domain_id: run.domain_id, worker_id: run.worker_id,
+      triggered_from: "plan", triggered_by: user.id, status: "queued", mode: run.mode,
+      prompt: run.prompt,
+    }).select("id").single();
+  }
+  const { data: next, error } = inserted;
   if (error || !next) {
     await addStep(admin, run.id, "error", "適用 run を開始できませんでした", error?.message ?? null);
     await admin.from("agent_runs").update({ status: "awaiting_approval" }).eq("id", run.id).eq("status", "running");
@@ -5739,10 +5910,12 @@ async function decidePlan(a: ExecArgs): Promise<void> {
     element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
     content: `**計画が承認されました** — ${summary}。適用 run が計画どおりに実行します。`,
   });
-  // Drive the apply run as the approver (advanceFrom's pattern).
+  // Drive the apply run as the approver (advanceFrom's pattern) —
+  // under a fresh chain token when the plan run was scoped (B10).
+  const driveJwt = applyScope ? await chainDriveJwt(user.id, applyScope, applyRunId, a.jwt) : a.jwt;
   await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
     method: "POST",
-    headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+    headers: { "content-type": "application/json", Authorization: `Bearer ${driveJwt}` },
     body: JSON.stringify({ runId: applyRunId }),
   }).then(async (res) => {
     if (!res.ok) {
@@ -5765,12 +5938,25 @@ async function decidePlan(a: ExecArgs): Promise<void> {
  * over inputs provably unchanged since is not re-run, and the skip is
  * reported beside the starts. A person's own explicit start (the web's
  * startElementRun) is not the dispatcher and is never gated by this.
+ *
+ * Every child born here is born scoped (B10): its chain scope is
+ * minted at the insert below from settled records alone — the
+ * parent run's row scope, the child's own resolved definition, the
+ * Space's connection rows and their tested manifests — and written
+ * by the service role, the only writer the row allows. A child past
+ * the depth cap is not created at all: its Element stays ready, and
+ * the cap is said on the parent's trace, on the Element's thread,
+ * and to the parent run's starter.
  */
-async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt" | "supabaseUrl">, doneId: string): Promise<{ started: string[]; skipped: string[] }> {
+async function advanceFrom(
+  a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt" | "supabaseUrl">,
+  doneId: string,
+  parentRun?: { id: string; chain_scope?: unknown; activity_space_id: string | null; triggered_by: string | null } | null,
+): Promise<{ started: string[]; skipped: string[]; startedLines: string[]; capped: { elementId: string; title: string }[] }> {
   const { admin, userDb, user } = a;
   const { data: out } = await userDb.from("element_edges").select("from_element, to_element").eq("from_element", doneId).eq("edge_type", "depends_on");
   const downIds = [...new Set(((out ?? []) as { to_element: string }[]).map((e) => e.to_element))];
-  if (downIds.length === 0) return { started: [], skipped: [] };
+  if (downIds.length === 0) return { started: [], skipped: [], startedLines: [], capped: [] };
   const [{ data: inEdges }, { data: els }, { data: assignees }, { data: open }] = await Promise.all([
     userDb.from("element_edges").select("from_element, to_element").in("to_element", downIds).eq("edge_type", "depends_on"),
     userDb.from("elements").select("id, status, title, description, object_id, objects(domain_id)").in("id", downIds),
@@ -5786,7 +5972,7 @@ async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt"
     && r.workers?.type === "ai_agent"
     && !(r.workers.ai_config && typeof r.workers.ai_config === "object" && (r.workers.ai_config as Record<string, unknown>).runner === "claude-code"));
   const busy = new Set(((open ?? []) as { element_id: string }[]).map((r) => r.element_id));
-  type ElementRow = { id: string; status: string | null; title: string; description: string | null; objects: { domain_id: string | null } | null };
+  type ElementRow = { id: string; status: string | null; title: string; description: string | null; object_id: string | null; objects: { domain_id: string | null } | null };
   const rows = (els ?? []) as unknown as ElementRow[];
 
   // The standing record behind the unit-return rule: the Element's
@@ -5828,22 +6014,129 @@ async function advanceFrom(a: Pick<ExecArgs, "admin" | "userDb" | "user" | "jwt"
   const wouldStart = readyDownstream({ doneId, edges: allEdges, candidates: candidates.map((c) => ({ ...c, standingPass: false })), statusOf });
   const skipped = wouldStart.filter((id) => !ready.includes(id));
 
+  // The parent run every child born here descends from (B10):
+  // finishRun hands over the run whose finish this is; a person
+  // closing the Element by hand has no run in flight, so the parent
+  // is that Element's latest verdict-bearing run — the completed one
+  // itself; and when no run exists at all, the children are their
+  // own roots. The parent's Space comes from its row; a spaceless
+  // chain (a personal graph) has no connections to fence and its
+  // children are born unscoped, exactly as before B10.
+  type ParentInfo = { id: string; scope: ChainScope | null; spaceId: string | null; triggeredBy: string | null };
+  let parent: ParentInfo | null = null;
+  if (parentRun) {
+    parent = { id: parentRun.id, scope: parseChainScope(parentRun.chain_scope), spaceId: parentRun.activity_space_id, triggeredBy: parentRun.triggered_by };
+  } else {
+    const { data: last } = await admin.from("agent_runs")
+      .select("id, chain_scope, activity_space_id, triggered_by")
+      .eq("element_id", doneId).eq("rehearsal", false)
+      .in("status", ["completed", "awaiting_review"])
+      .order("finished_at", { ascending: false, nullsFirst: false }).limit(1);
+    const row0 = (last ?? [])[0] as { id: string; chain_scope?: unknown; activity_space_id: string | null; triggered_by: string | null } | undefined;
+    if (row0) parent = { id: row0.id, scope: parseChainScope(row0.chain_scope), spaceId: row0.activity_space_id, triggeredBy: row0.triggered_by };
+  }
+  const spaceByDomain = new Map<string, string | null>();
+  const spaceFor = async (domainId: string | null): Promise<string | null> => {
+    if (!domainId) return parent?.spaceId ?? null;
+    if (!spaceByDomain.has(domainId)) {
+      const { data: d } = await admin.from("domains").select("activity_space_id").eq("id", domainId).maybeSingle();
+      spaceByDomain.set(domainId, (d as { activity_space_id?: string | null } | null)?.activity_space_id ?? null);
+    }
+    return spaceByDomain.get(domainId) ?? null;
+  };
+  const derivationBySpace = new Map<string, DerivationIntegration[]>();
+  const derivationFor = async (spaceId: string): Promise<DerivationIntegration[]> => {
+    if (!derivationBySpace.has(spaceId)) {
+      derivationBySpace.set(spaceId, await loadDerivationIntegrations(admin, spaceId).catch(() => []));
+    }
+    return derivationBySpace.get(spaceId)!;
+  };
+
   const started: string[] = [];
+  const startedLines: string[] = [];
+  const capped: { elementId: string; title: string }[] = [];
   for (const id of ready) {
-    const domainId = rows.find((e) => e.id === id)?.objects?.domain_id ?? null;
-    const { data: next, error } = await userDb.from("agent_runs").insert({
+    const el = rows.find((e) => e.id === id);
+    const domainId = el?.objects?.domain_id ?? null;
+    // The child's scope, minted here from settled records: capped
+    // children are not created (their Element stays ready — the
+    // same resting place an expired drive leaves today — and the
+    // cap surfaces below say why).
+    let scope: ChainScope | null = null;
+    let scopedInsertId: string | null = null;
+    const spaceId = await spaceFor(domainId);
+    if (spaceId) {
+      if (parent && chainDepthFor({ parent: parent.scope, hasParentRun: true }).capped) {
+        capped.push({ elementId: id, title: el?.title ?? id });
+        continue;
+      }
+      // The child's run id is fixed before its scope is minted: a
+      // root's scope names its own run as root and parent.
+      const childRunId = crypto.randomUUID();
+      const { definition: childDef } = await loadDefinition(userDb, id);
+      const derived = deriveScopeFromDefinition({
+        connectors: childDef ? parseDefinition(childDef.body).connectors : [],
+        integrations: await derivationFor(spaceId),
+        strategyId: null,
+      });
+      const strategyId = await strategyIdForObject(admin, el?.object_id ?? null);
+      scope = parent
+        ? deriveChildScope({ parent: parent.scope, parentRunId: parent.id, derived, strategyId })
+        : rootChainScope({ runId: childRunId, derived, strategyId });
+      scopedInsertId = childRunId;
+    }
+    const insertRow = {
       element_id: id, domain_id: domainId, triggered_from: "board", triggered_by: user.id, status: "queued", mode: "execute",
-    }).select("id").single();
+      ...(scope ? { id: scopedInsertId!, chain_scope: scope } : {}),
+    };
+    let inserted = await (scope ? admin : userDb).from("agent_runs").insert(insertRow).select("id").single();
+    if ((inserted.error || !inserted.data) && scope) {
+      // A database whose chain_scope column has not landed yet (the
+      // production catch-up is still behind): the child starts
+      // unscoped — pre-B10 behaviour — rather than not starting.
+      console.error("run-agent: chain scope insert failed; starting unscoped", inserted.error?.message);
+      scope = null;
+      inserted = await userDb.from("agent_runs").insert({
+        element_id: id, domain_id: domainId, triggered_from: "board", triggered_by: user.id, status: "queued", mode: "execute",
+      }).select("id").single();
+    }
+    const { data: next, error } = inserted;
     if (error || !next) continue; // another start won the race
+    const driveJwt = scope ? await chainDriveJwt(user.id, scope, next.id, a.jwt) : a.jwt;
     const res = await fetch(`${a.supabaseUrl}/functions/v1/run-agent`, {
       method: "POST",
-      headers: { "content-type": "application/json", Authorization: `Bearer ${a.jwt}` },
+      headers: { "content-type": "application/json", Authorization: `Bearer ${driveJwt}` },
       body: JSON.stringify({ runId: next.id }),
     }).catch(() => null);
-    if (res && res.ok) started.push(id);
+    if (res && res.ok) {
+      started.push(id);
+      if (scope) startedLines.push(`「${el?.title ?? id}」: 連携 ${scope.integrations.length} 件・操作 ${scope.actions.length} 件まで、深さ ${scope.depth}/${scope.maxDepth}`);
+    }
     else await admin.from("agent_runs").update({ status: "cancelled", finished_at: new Date().toISOString() }).eq("id", next.id).eq("status", "queued");
   }
-  return { started, skipped };
+  // The cap, said in the three places a person looks (design §4.2):
+  // the parent run's trace, each held Element's thread, and one
+  // notice to the parent run's starter. The Elements stay ready; a
+  // person's own start begins them as a new root and resets the
+  // depth — by a person's act, as every widening in this design is.
+  if (capped.length && parent) {
+    const maxDepth = parent.scope?.maxDepth ?? CHAIN_POLICY.maxDepth;
+    const titles = capped.map((c) => c.title);
+    await addStep(admin, parent.id, "status",
+      `連鎖の深さ上限（${maxDepth}）に達したため、「${titles.join("」「")}」は開始しませんでした`,
+      `開始しなかった作業: ${titles.join("、")}`);
+    for (const c of capped) {
+      await admin.from("element_comments").insert({
+        element_id: c.elementId, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
+        content: `**連鎖の上限** — 連鎖の深さ上限（${maxDepth}）に達したため、この作業は自動では開始しませんでした。起点の実行: ${parent.scope?.rootRunId ?? parent.id}。開始ボタンで新しく始められます（新しい連鎖として始まります）。`,
+      }).then(() => {}, () => {});
+    }
+    await admin.from("notifications").insert({
+      recipient_id: parent.triggeredBy ?? user.id, actor_name: "Alcon Agent", kind: "status_change", element_id: doneId,
+      title: "連鎖の上限に達しました", body: titles.join("、"),
+    }).then(() => {}, () => {});
+  }
+  return { started, skipped, startedLines, capped };
 }
 
 /** What the Elements this one waits on left behind: their latest report, their

@@ -474,6 +474,11 @@ export interface RunVerdict {
    *  inputs when this record was sealed — the standing-pass
    *  comparison the unit-return rule makes at dispatch. */
   inputsHash?: string;
+  /** v2 only, optional within it (B10): the run's chain-denial
+   *  accounting — how many integration calls the chain fence
+   *  refused in the run's final slice. Absent when nothing was
+   *  refused, and on every unscoped run. */
+  chain?: { denied: number };
 }
 
 const VERDICT_RESULTS: readonly string[] = ['pass', 'fail', 'unchecked'];
@@ -591,7 +596,70 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     }
     out = { ...out, corrections };
   }
+  // B10's block, the same: optional within v2, exact when present —
+  // one non-negative count of the fence's refusals.
+  if (r.chain !== undefined) {
+    const chain = r.chain;
+    if (!chain || typeof chain !== 'object' || Array.isArray(chain)) return null;
+    const denied = (chain as Record<string, unknown>).denied;
+    if (typeof denied !== 'number' || !Number.isInteger(denied) || denied < 0) return null;
+    out = { ...out, chain: { denied } };
+  }
   return out;
+}
+
+// ── Chain scopes (B10) ───────────────────────────────────────────────
+// The web mirror of _shared/chainScope.ts: a chained run's scope as
+// minted on its row — the allowlist of (integration, canonical
+// action) pairs, the integration fence, and its depth under the
+// cap. Parsed with the server's rules: absent is null (an unscoped
+// root); present but malformed reads as the EMPTY scope, never as
+// unscoped — a broken record must not widen on any surface either.
+
+/** The chain cap, mirrored from the server's CHAIN_POLICY. */
+const CHAIN_MAX_DEPTH = 8;
+
+export interface ChainScope {
+  v: 1;
+  rootRunId: string;
+  parentRunId: string;
+  strategyId: string | null;
+  depth: number;
+  maxDepth: number;
+  actions: string[];
+  integrations: string[];
+}
+
+const emptyChainScope = (): ChainScope => ({
+  v: 1, rootRunId: '', parentRunId: '', strategyId: null,
+  depth: CHAIN_MAX_DEPTH, maxDepth: CHAIN_MAX_DEPTH, actions: [], integrations: [],
+});
+
+/** Pure. A stored chain_scope read as a scope (the server's
+ *  parseChainScope, mirrored): null when absent, the empty scope
+ *  when malformed, the canonical (sorted, de-duplicated) scope
+ *  when well-formed. */
+export function parseChainScope(value: unknown): ChainScope | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return emptyChainScope();
+  const r = value as Record<string, unknown>;
+  const list = (v: unknown): string[] | null =>
+    Array.isArray(v) && v.every(x => typeof x === 'string') ? [...new Set(v as string[])].sort() : null;
+  const actions = list(r.actions);
+  const integrations = list(r.integrations);
+  const valid = r.v === 1
+    && typeof r.rootRunId === 'string' && r.rootRunId.length > 0
+    && typeof r.parentRunId === 'string' && r.parentRunId.length > 0
+    && (r.strategyId === null || typeof r.strategyId === 'string')
+    && typeof r.depth === 'number' && Number.isInteger(r.depth) && r.depth >= 0
+    && typeof r.maxDepth === 'number' && Number.isInteger(r.maxDepth) && r.maxDepth >= 1
+    && actions !== null && integrations !== null;
+  if (!valid) return emptyChainScope();
+  return {
+    v: 1, rootRunId: r.rootRunId as string, parentRunId: r.parentRunId as string,
+    strategyId: (r.strategyId as string | null) ?? null,
+    depth: r.depth as number, maxDepth: r.maxDepth as number, actions: actions!, integrations: integrations!,
+  };
 }
 
 /** One fact a finish stated, typed at the source (server: finishClaims.ts). */
@@ -713,6 +781,13 @@ export interface AgentRunRecord {
   verdict: RunVerdict | null;
   /** The finish as submitted, typed (claims + unconfirmed); null pre-B1. */
   finishDetail: FinishDetail | null;
+  /** The chain scope minted at this run's birth (B10), parsed;
+   *  null for an unscoped root — a person's own start, and every
+   *  run born before scopes existed. */
+  chainScope: ChainScope | null;
+  /** The names of this run's fenced integrations, in scope order
+   *  (an id stands in for a name the read could not resolve). */
+  chainIntegrationNames: string[];
   proposed_readings: ProposedReading[] | null;
   elementTitle: string;
   elementStatus: string | null;

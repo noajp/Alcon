@@ -229,3 +229,78 @@ describe('liftOf', () => {
     expect(underMode(lifted, 'free')).toBe('allow');
   });
 });
+
+describe('chain scope (B10) — the fence is the verdict\u2019s first rule', () => {
+  const verdict = ap.approvalVerdict as (facts: Record<string, unknown>) => string;
+  const withAutonomy = ap.verdictWithAutonomy as (facts: Record<string, unknown>, mode: string) => { base: string; final: string; lift: string | null };
+  const grantLiftable = ap.grantLiftable as (facts: Record<string, unknown>) => boolean;
+
+  // The matrix the design pins (§10 fixture 7): mode × delegation ×
+  // grant × critical, over the fact shapes a call can carry. An
+  // out-of-scope call is denied in EVERY combination — no mode,
+  // delegation, standing rule, grant or plan approval composes over
+  // the fence, because each of them reads this verdict and applyMode
+  // never moves a deny — and an in-scope call's verdict is
+  // byte-identical to the same call with no chain fact at all (the
+  // fact does nothing but deny the outside).
+  const shapes: Record<string, Record<string, unknown>> = {
+    'grant-liftable ask': { isWrite: true, isRead: false, manifest: { permission: 'ask', rule: null, critical: null } },
+    'allowed write': { isWrite: true, isRead: false, manifest: { permission: 'allow', rule: null, critical: null } },
+    'rule-bound ask': { isWrite: true, isRead: false, manifest: { permission: 'ask', rule: 0, critical: null } },
+    'a read': { isWrite: true, isRead: true, manifest: { permission: 'allow', rule: null, critical: null } },
+    'raw http write': { isWrite: true, isRead: false, rawHttp: true },
+    'catalog allow': { catalogDecision: 'allow', isWrite: true, isRead: false },
+  };
+  const modes = ['ask', 'auto', 'free'];
+  const delegations = ['approve_each', 'full_delegation', null];
+  const grants = [null, { lane: 1, clean: 9 }];
+  const criticals = [null, 'send'];
+
+  it('out-of-scope is deny in every combination of the matrix', () => {
+    for (const [shapeName, shape] of Object.entries(shapes)) {
+      for (const mode of modes) for (const delegation of delegations) for (const grant of grants) for (const critical of criticals) {
+        const facts = {
+          ...shape, delegation,
+          ...(shape.manifest ? { manifest: { ...(shape.manifest as Record<string, unknown>), critical } } : {}),
+          ...(shape.critical === undefined && critical && !shape.manifest ? { critical } : {}),
+          autonomyGrant: grant, chain: { inScope: false },
+        };
+        const v = withAutonomy(facts, mode);
+        expect(v, `${shapeName} / ${mode} / ${delegation} / grant=${!!grant} / critical=${critical}`).toEqual({ base: 'deny', final: 'deny', lift: null });
+        expect(needs(facts)).toBe(false); // a deny is refused, never asked about
+      }
+    }
+  });
+
+  it('in-scope verdicts are byte-identical to the no-fact verdicts (the regression pin)', () => {
+    for (const shape of Object.values(shapes)) {
+      for (const mode of modes) for (const delegation of delegations) for (const grant of grants) for (const critical of criticals) {
+        const base = {
+          ...shape, delegation,
+          ...(shape.manifest ? { manifest: { ...(shape.manifest as Record<string, unknown>), critical } } : {}),
+          autonomyGrant: grant,
+        };
+        expect(withAutonomy({ ...base, chain: { inScope: true } }, mode)).toEqual(withAutonomy(base, mode));
+        expect(withAutonomy({ ...base, chain: null }, mode)).toEqual(withAutonomy(base, mode));
+      }
+    }
+  });
+
+  it('a grant can never reach an out-of-scope call: grantLiftable requires an ask, and the base is deny', () => {
+    const liftableShape = {
+      isWrite: true, isRead: false, delegation: 'approve_each',
+      manifest: { permission: 'ask', rule: null, critical: null }, autonomyGrant: { lane: 1, clean: 9 },
+    };
+    expect(grantLiftable(liftableShape)).toBe(true);
+    expect(verdict(liftableShape)).toBe('ask');
+    const fenced = { ...liftableShape, chain: { inScope: false } };
+    expect(verdict(fenced)).toBe('deny');
+    expect(grantLiftable(fenced)).toBe(false);
+  });
+
+  it('the fence precedes the catalog\u2019s entry policy and the manifest\u2019s own deny', () => {
+    expect(verdict({ catalogDecision: 'allow', isWrite: true, isRead: false, chain: { inScope: false } })).toBe('deny');
+    expect(verdict({ catalogDecision: 'deny', isWrite: true, isRead: false, chain: { inScope: true } })).toBe('deny');
+    expect(verdict({ isWrite: true, isRead: false, manifest: { permission: 'deny', rule: null, critical: null }, chain: { inScope: false } })).toBe('deny');
+  });
+});

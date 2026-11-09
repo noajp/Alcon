@@ -102,6 +102,14 @@ export interface RunVerdict {
    * do not hold.
    */
   inputsHash?: string;
+  /**
+   * v2 only, and optional within it (B10): the run's chain-denial
+   * accounting — how many integration calls the chain fence refused
+   * in the run's final slice (the tally is per-slice, like B2's
+   * verify accounting). Absent when nothing was refused — most
+   * runs, and every unscoped one.
+   */
+  chain?: { denied: number };
 }
 
 export interface VerdictInputs {
@@ -136,6 +144,13 @@ export interface VerdictInputs {
    * the driver). Null when the driver could not take it.
    */
   inputsHash?: string | null;
+  /**
+   * B10: how many integration calls the chain fence refused during
+   * the sealed slice, counted by the driver as the refusals were
+   * delivered. Optional: a run with no scope (or no refusals)
+   * supplies none, and the record then carries none.
+   */
+  chainDenied?: number | null;
 }
 
 const claimFields = (input: VerdictInputs): Pick<RunVerdict, "claims" | "claimGaps"> => ({
@@ -145,6 +160,10 @@ const claimFields = (input: VerdictInputs): Pick<RunVerdict, "claims" | "claimGa
 
 const verifyFields = (input: VerdictInputs): Pick<RunVerdict, "verify"> => (
   input.verifyTally && input.verifyTally.checked > 0 ? { verify: { ...input.verifyTally } } : {}
+);
+
+const chainFields = (input: VerdictInputs): Pick<RunVerdict, "chain"> => (
+  input.chainDenied && input.chainDenied > 0 ? { chain: { denied: input.chainDenied } } : {}
 );
 
 const correctionFields = (input: VerdictInputs): Pick<RunVerdict, "corrections" | "inputsHash"> => ({
@@ -166,6 +185,7 @@ const noCheck = (input: VerdictInputs, reason: RunVerdictReason): RunVerdict => 
   ...claimFields(input),
   ...verifyFields(input),
   ...correctionFields(input),
+  ...chainFields(input),
 });
 
 /**
@@ -194,6 +214,7 @@ export function buildRunVerdict(input: VerdictInputs): RunVerdict {
       ...claimFields(input),
       ...verifyFields(input),
       ...correctionFields(input),
+      ...chainFields(input),
     };
   }
   // Attempted or not, from the record's side the fact is the same: the
@@ -286,6 +307,15 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
       corrections.push(parsed);
     }
     out = { ...out, corrections };
+  }
+  // B10's block is optional within v2 the same way (absent = nothing
+  // was refused), and exact when present: one non-negative count.
+  if (r.chain !== undefined) {
+    const chain = r.chain;
+    if (!chain || typeof chain !== "object" || Array.isArray(chain)) return null;
+    const ct = chain as Record<string, unknown>;
+    if (!count(ct.denied)) return null;
+    out = { ...out, chain: { denied: ct.denied as number } };
   }
   return out;
 }

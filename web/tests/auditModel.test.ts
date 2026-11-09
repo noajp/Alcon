@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
   agentRunEvents, agentRunNeedsPerson, agentRunOutcome, auditShowsSample, exceptionReason, flowObservation, grantChanges, grantConnectors,
-  mergeAuditTimeline, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
+  mergeAuditTimeline, parseChainScope, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
   type AgentRunRecord, type ChainStep, type LedgerRun, type RunVerdict, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
+import { chainChildrenOf } from '@/Function/audit/chainScopeModel';
 import { buildAuditSample } from '@/Function/audit/auditSample';
 
 const sha = async (text: string) => createHash('sha256').update(text).digest('hex');
@@ -217,6 +218,7 @@ function agentRun(patch: Partial<AgentRunRecord>): AgentRunRecord {
     id: 'ar1', element_id: 'e1', domain_id: null, worker_id: null, status: 'running', mode: 'execute',
     summary: null, error: null, started_at: '2026-11-06T01:00:00Z', finished_at: null, created_at: '2026-11-06T01:00:00Z',
     cost_usd: 0, verdict: null, finishDetail: null, proposed_readings: null, elementTitle: '経費処理', elementStatus: 'todo', objectName: null,
+    chainScope: null, chainIntegrationNames: [],
     pendingActions: 0, ...patch,
   };
 }
@@ -324,5 +326,54 @@ describe('auditShowsSample', () => {
     expect(auditShowsSample(0, 0)).toBe(true);
     expect(auditShowsSample(1, 0)).toBe(false);
     expect(auditShowsSample(0, 3)).toBe(false);
+  });
+});
+
+describe('chain scopes in the audit (B10)', () => {
+  const scopeOf = (patch: Record<string, unknown> = {}) => parseChainScope({
+    v: 1, rootRunId: 'root1', parentRunId: 'ar1', strategyId: null, depth: 1, maxDepth: 8,
+    actions: ['gh:issues.create'], integrations: ['gh'], ...patch,
+  });
+
+  it('parseChainScope mirrors the server: absent is null, valid is canonical', () => {
+    expect(parseChainScope(null)).toBeNull();
+    expect(parseChainScope(undefined)).toBeNull();
+    const scope = parseChainScope({
+      v: 1, rootRunId: 'root1', parentRunId: 'p1', strategyId: null, depth: 2, maxDepth: 8,
+      actions: ['b:x', 'a:y', 'a:y'], integrations: ['gh', 'gh'],
+    });
+    expect(scope?.actions).toEqual(['a:y', 'b:x']);
+    expect(scope?.integrations).toEqual(['gh']);
+  });
+
+  it('a malformed scope reads as the empty scope — never as unscoped', () => {
+    for (const bad of ['scoped', [], { v: 2 }, { v: 1, rootRunId: 'r', parentRunId: 'p', strategyId: null, depth: -1, maxDepth: 8, actions: [], integrations: [] }]) {
+      const scope = parseChainScope(bad);
+      expect(scope).not.toBeNull();
+      expect(scope?.actions).toEqual([]);
+      expect(scope?.integrations).toEqual([]);
+    }
+  });
+
+  it('chainChildrenOf lists a run\u2019s children in chain order, with their scope summaries and denial counts', () => {
+    const parent = agentRun({ id: 'ar1' });
+    const childB = agentRun({
+      id: 'ar3', created_at: '2026-11-06T03:00:00Z', elementTitle: '送信する',
+      chainScope: scopeOf({ depth: 2 }), chainIntegrationNames: ['GitHub'],
+      verdict: { v: 2, result: 'pass', source: 'verifier', model: 'm', gaps: [], revisions: 0, checkedAt: null, outcome: 'completed', reason: null, evidence: { verifyStepIdx: null, artifactIds: [] }, chain: { denied: 2 } } as RunVerdict,
+    });
+    const childA = agentRun({
+      id: 'ar2', created_at: '2026-11-06T02:00:00Z', elementTitle: '下書きを作る',
+      chainScope: scopeOf({ depth: 1 }), chainIntegrationNames: ['GitHub'],
+    });
+    const grandchild = agentRun({ id: 'ar4', chainScope: scopeOf({ parentRunId: 'ar2', depth: 2 }) });
+    const unscoped = agentRun({ id: 'ar5' });
+    const rows = chainChildrenOf([parent, childB, childA, grandchild, unscoped], 'ar1');
+    expect(rows.map(r => r.runId)).toEqual(['ar2', 'ar3']); // depth order; the grandchild belongs to ar2's panel
+    expect(rows[0]).toMatchObject({ elementTitle: '下書きを作る', depth: 1, actionCount: 1, integrationNames: ['GitHub'], denied: null });
+    expect(rows[1]).toMatchObject({ elementTitle: '送信する', depth: 2, denied: 2 });
+    // A root is not its own child.
+    const root = agentRun({ id: 'ar9', chainScope: scopeOf({ parentRunId: 'ar9', depth: 0 }) });
+    expect(chainChildrenOf([root], 'ar9')).toEqual([]);
   });
 });

@@ -37,6 +37,7 @@ import {
   type IntegrationRow, type RemoteTool,
 } from "./integrationClient.ts";
 import { isGoogleDriveRow } from "./googleOAuth.ts";
+import { CONNECTOR_PRESET_NAMES, foldConnectorName } from "./connectorNeeds.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
@@ -54,6 +55,21 @@ export const INTEGRATION_SEPARATOR = "__";
 export function integrationPrefix(name: string, id: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
   return `${base || "x"}_${id.replace(/-/g, "").slice(0, 4)}`;
+}
+
+/**
+ * Pure. Whether a connection answers to one of the names a
+ * definition's connectors section names — by the name the Space
+ * gave the row, its preset's id, or its preset's display name,
+ * folded the one way connector names fold (connectorNeeds). THE
+ * matching rule, shared on purpose (#7): run-agent's assembly
+ * offers by it and B10's scope derivation (chainScope.ts) derives
+ * by it, so what is offered and what a chain may touch are computed
+ * from the same names and cannot drift apart.
+ */
+export function connectorMatches(row: { name: string; preset?: string | null }, wantedNames: readonly string[]): boolean {
+  const aliases = [row.name, row.preset ?? "", CONNECTOR_PRESET_NAMES[row.preset ?? ""] ?? ""].filter(Boolean);
+  return wantedNames.some((wanted) => aliases.some((alias) => foldConnectorName(alias) === foldConnectorName(wanted)));
 }
 
 /** Pure. A valid tool name (≤64 chars, [a-zA-Z0-9_-]) not already taken. */
