@@ -11,14 +11,15 @@ import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
-import { NavAutomationIcon, NavStrategyIcon } from './sidebar/NavIcons';
+import { NavAutomationIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from '@/ui/icons';
-import { updateDomain, deleteDomain, leaveDomain } from '@/hooks/useSupabase';
+import { updateDomain, deleteDomain, leaveDomain, useNotifications } from '@/hooks/useSupabase';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
 import { countDomainObjects } from '@/hooks/useObjectArchive';
 import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
@@ -113,6 +114,11 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
+  // The Inbox row's unread count — the same hook and count the StatusBar's
+  // badge reads (useNotifications over the signed-in user), projected as a
+  // plain number in the row's meta slot.
+  const { user } = useAuthContext();
+  const { unreadCount } = useNotifications(user?.id ?? null);
   const { guestDomains, refetch: refetchMemberDomains } = useDomains();
   const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
   const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
@@ -369,13 +375,16 @@ export function AppSidebar({
               a list in the main island where their nesting shows), then
               Execution (the Domains, where
               the work is done). */}
-          {/* The fixed top of every sidebar: the AI, then Strategy, then
-              the tools. What sits under it is the open surface's own
-              list — the Domains for the Workspace, the tables for Table,
-              and so on. */}
+          {/* The fixed top of every sidebar: the AI, then Inbox, then
+              Strategy, then the tools. What sits under it is the open
+              surface's own list — the Domains for the Workspace, the
+              tables for Table, and so on. */}
           <div className="mt-5">
             <SidebarRow active={activeView === 'ai'} icon={<AiIcon size={16} />} label={t(aiLabel)}
               onClick={() => onViewChange('ai')} />
+            <SidebarRow active={activeView === 'inbox'} icon={<NavInboxIcon size={16} />} label={t('Inbox')}
+              meta={unreadCount > 0 ? unreadCount : undefined}
+              onClick={() => onViewChange('inbox')} />
             <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
               onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
             <SidebarRow active={activeView === 'automation'} icon={<NavAutomationIcon size={16} />} label={t('Automation')}
