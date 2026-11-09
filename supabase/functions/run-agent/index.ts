@@ -2058,7 +2058,7 @@ async function execute(a: ExecArgs): Promise<void> {
     if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
     if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
     if (baseKindOf(call.name) === "board") {
-      const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved });
+      const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved, spaceId: run.activity_space_id ?? null });
       await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
       // A failed Element resolution is recorded with its evidence — the
       // raw identifier, the stage it died at, the session's user (audit
@@ -3783,7 +3783,7 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
       return { content: "会話に「答えを送る」カードを出しました。人が押すと Web がその言葉を実行へ送ります。送ったとは言わないでください。" };
     }
     toolCallsThisTurn += 1;
-    const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "conversation" });
+    const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "conversation", spaceId: run.activity_space_id ?? null });
     const writes = (catalogTool(call.name)?.effect ?? "read") !== "read";
     // The page draws the conversation from these steps: what was done, about what, and whether it failed.
     await addStep(admin, run.id, !r.ok ? "error" : writes ? "write" : "action", `Alcon: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);

@@ -31,7 +31,7 @@ export interface CatalogTool extends ToolDef {
 const DELETES = new Set(["deleteElement", "deleteSubelement", "deleteObject", "bulkDeleteElements", "removeIntent", "deleteInitiative"]);
 const READS = new Set([
   "listMyDomains", "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",
-  "listInitiatives", "getInitiative", "getInitiativeExecution", "listFiles", "readFile", "listHarnesses", "readHarness",
+  "listInitiatives", "getInitiative", "getInitiativeExecution", "listFiles", "searchFiles", "readFile", "listHarnesses", "readHarness",
   "recall_memory",
 ]);
 
@@ -101,7 +101,7 @@ export interface EntryPolicy {
   core: string[];
 }
 
-const READ_CORE = ["listInitiatives", "getInitiative", "listObjects", "listElements", "getElement", "findByText", "listFiles", "readFile", "listHarnesses"];
+const READ_CORE = ["listInitiatives", "getInitiative", "listObjects", "listElements", "getElement", "findByText", "listFiles", "searchFiles", "readFile", "listHarnesses"];
 
 export const ENTRY_POLICIES: Record<Entry, EntryPolicy> = {
   // The AI panel: the person at the keyboard asked, and confirms deletes in the chat.
@@ -205,10 +205,13 @@ export function catalogDenyRefusal(name: string, input: Record<string, unknown>)
  * Runs one catalog tool with the caller's client, under the entry's policy:
  * a call the entry may not run is refused, and one that needs approval runs
  * only when `approved` says the person approved this call. Never throws.
+ * `spaceId` is the entry's ambient Space (the chat's context, a run's
+ * Space), threaded to the tools whose scope is a Space — file search —
+ * the way `actor` threads who is acting; the model never supplies it.
  */
 export async function runCatalogTool(
   db: SupabaseClient, name: string, input: Record<string, unknown>, actor: BoardActor,
-  under: { entry: Entry; approved?: boolean },
+  under: { entry: Entry; approved?: boolean; spaceId?: string | null },
 ): Promise<ToolResult> {
   const tool = BY_NAME.get(name);
   if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
@@ -224,7 +227,7 @@ export async function runCatalogTool(
       case "strategy":
         return tool.effect === "read" ? await runStrategyTool(db, name, input) : await runStrategyWriteTool(db, name, input);
       case "files":
-        return await runFileTool(db, name, input);
+        return await runFileTool(db, name, input, { spaceId: under.spaceId ?? null });
       case "harness":
         return await runHarnessTool(db, name, input);
       default:

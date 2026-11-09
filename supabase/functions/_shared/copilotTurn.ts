@@ -37,7 +37,7 @@ export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人
 # できること
 - Strategy: 一覧・詳細、作成（最上位は spaceId、Sub Strategy は parentId を渡して createInitiative）、目的の書き換え、成功条件・前提・意思決定の追加と修正、仕事の進め方（定義）の記入、削除。
 - Execution: Domain / Object / Element / Sub-element の読み書き、担当・ラベル・コメント、一括更新。2 件以上の Element は createElements を 1 回で。
-- ファイル: Element・Object・Strategy・Artifacts のフォルダに付いたファイルの一覧（listFiles）、読み取り（readFile）、書き込み（writeFile。同じ名前は新しい版になる）。
+- ファイル: Element・Object・Strategy・Artifacts のフォルダに付いたファイルの一覧（listFiles）、検索（searchFiles。名前だけでなく、取り出した中身の言葉や、付いているものの名前でも探せる）、読み取り（readFile）、書き込み（writeFile。同じ名前は新しい版になる）。「どこにあるか」「何が書いてあるか」でファイルを探すときは searchFiles を使う。
 - ハーネス: Space の仕事のやり方（listHarnesses / readHarness）。依頼に合うものがあれば読んで従う。
 - Table（tableData）、ボードのウィジェット（widgetBoard）、成功条件の実績（campaignMeasure）。
 - 連携（外部サービス）: この Space に接続された連携の、宣言された操作が道具として使えることがある（下の「この Space の連携」に、使える連携と使えない理由が書かれている）。未接続、または接続テストが失敗した連携は、propose_connection で接続（再接続）を提案できる。
@@ -49,7 +49,7 @@ export const COPILOT_SYSTEM_PROMPT = `あなたは Alcon（組織の仕事を人
 3. 一意に絞れない時は候補を示して確認する。曖昧なまま選ばない。
 4. 削除は元に戻せない。対象はユーザーが名指ししたものだけに限り、親や関連先へ広げない。削除の前に、消す対象を名前と件数で示し、了承を得てから実行する。大量の更新も実行前に対象を示して了承を得る。
 5. 作る・書く依頼は、確認を挟まずに最後までやる（削除と大量更新を除く）。複数の段階がある依頼は、全部終えてから結果をまとめて伝える。
-6. 結果は簡潔な日本語。UUID などの内部 ID は出さず、名前（Element は ELE-NNN）で示す。Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown の表。
+6. 結果は簡潔な日本語。UUID などの内部 ID は出さず、名前（Element は ELE-NNN）で示す。ファイルについて答えるときは、ファイル名と、それが何に付いているか（ホストの名前）を一緒に示す。Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown の表。
 7. 数値の比較・推移・内訳は、表に加えてグラフでも示せる。グラフは次の形の fenced block で書く（JSON だけ。値は数値、name は項目名）。type は bar / line / area / pie。系列が複数なら各行に同じキーを持たせ、積み上げは "stacked": true。
    \`\`\`chart
    {"type":"bar","title":"月別の完了数","data":[{"name":"8月","完了":12},{"name":"9月","完了":18}]}
@@ -361,7 +361,7 @@ export async function buildCopilotTurn(args: {
         });
         return { content: CONNECTION_PROPOSED_REPLY };
       }
-      const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "panel" });
+      const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "panel", spaceId: ctx.spaceId ?? null });
       const created = r.ok ? createdOf(call.name, r.data) : undefined;
       events?.onToolResult?.({
         name: call.name, ok: r.ok, rows: r.ok ? r.meta?.rows : undefined, error: r.ok ? undefined : r.error,
