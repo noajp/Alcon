@@ -297,6 +297,8 @@ export interface SpaceFile extends Attachment {
   owner_label: string | null;
   /** For a file on an Element: the Object it is in, to open it there. */
   element_object_id: string | null;
+  /** For a file on an Element: its quotable id (ELE_OBJ-017); null otherwise. */
+  element_display_id: string | null;
   /** The Domain it sits in (through its Element, Object or folder); none for a Strategy's. */
   domain_id: string | null;
   versions: number;
@@ -319,19 +321,23 @@ export function useSpaceAttachments(spaceId: string | null, trashed = false) {
   return { data: query.data ?? (EMPTY as SpaceFile[]), loading: !!spaceId && query.isPending };
 }
 
+/** One attached file by any of its versions' ids, as its latest version
+ *  (null when gone, trashed or not visible). */
+export async function latestVersionOf(fileId: string): Promise<Attachment | null> {
+  const { data: one, error } = await supabase.from('attachments').select(COLUMNS).eq('id', fileId).maybeSingle();
+  if (error) throw error;
+  if (!one) return null;
+  const latest = versionChain(await rowsOf(ownerOf(one as Attachment)), fileId)[0];
+  return latest && !latest.deleted_at ? latest : null;
+}
+
 /** One attached file by id, as its latest version (null when gone, trashed
  *  or not visible) — a board pinned to a file shows it as last edited. */
 export function useAttachment(fileId: string | null) {
   return useQuery({
     queryKey: ['attachment', fileId],
     enabled: !!fileId,
-    queryFn: async (): Promise<Attachment | null> => {
-      const { data: one, error } = await supabase.from('attachments').select(COLUMNS).eq('id', fileId!).maybeSingle();
-      if (error) throw error;
-      if (!one) return null;
-      const latest = versionChain(await rowsOf(ownerOf(one as Attachment)), fileId!)[0];
-      return latest && !latest.deleted_at ? latest : null;
-    },
+    queryFn: () => latestVersionOf(fileId!),
   });
 }
 
@@ -430,6 +436,8 @@ export async function indexSpaceFiles(spaceId: string): Promise<void> {
 export interface FoundFile extends Pick<Attachment, 'id' | 'name' | 'mime_type' | 'element_id' | 'object_id' | 'strategy_id' | 'folder_id'> {
   owner_label: string | null;
   element_object_id: string | null;
+  /** For a file on an Element: its quotable id (ELE_OBJ-017); null otherwise. */
+  element_display_id: string | null;
   /** The Domain it sits in (none for a Strategy's). */
   domain_id: string | null;
   /** The words around where the text matched (null when the name did). */

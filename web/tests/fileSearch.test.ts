@@ -19,22 +19,31 @@ const hitRow = (over: Row = {}): Row => ({
   element_object_id: 'ob-1',
   domain_id: 'do-1',
   snippet: null,
+  element_display_id: 'ELE_OBJ-017',
   ...over,
 });
 
 describe('searchFiles shaping (the RPC rows become host-context results)', () => {
-  it('carries the host with the file: kind, label, the Element\'s Object and Domain', () => {
+  it('carries the host with the file: kind, label, display_id, the Element\'s Object and Domain', () => {
     const hit = files.searchHitOf(hitRow(), '復習');
     expect(hit).toEqual({
       id: 'file-1',
       name: 'CCDV-F 模試1回目 復習ノート.pdf',
       mime_type: 'application/pdf',
-      host: { kind: 'element', label: '再描画が広く伝わる' },
+      host: { kind: 'element', label: '再描画が広く伝わる', display_id: 'ELE_OBJ-017' },
       element_object_id: 'ob-1',
       domain_id: 'do-1',
       snippet: null,
       matched: 'name',
     });
+  });
+
+  it('gives a display_id to an Element host only — the quotable id is an Element\'s', () => {
+    const base = { element_id: null, object_id: null, strategy_id: null, folder_id: null };
+    expect(files.searchHostOf(hitRow({ ...base, object_id: 'o' }))).toEqual({ kind: 'object', label: '再描画が広く伝わる', display_id: null });
+    expect(files.searchHostOf(hitRow({ ...base, strategy_id: 's' }))?.display_id).toBeNull();
+    // A row read before the projection landed has no field: null, not a crash.
+    expect(files.searchHostOf(hitRow({ element_display_id: undefined }))?.display_id).toBeNull();
   });
 
   it('derives what matched in the RPC\'s precedence: name, then contents, then the host', () => {
@@ -78,7 +87,7 @@ describe('searchFiles through runFileTool (a stubbed db)', () => {
     const r = await files.runFileTool(db as never, 'searchFiles', { query: 'ＣＣＤＶ' }, { spaceId: 'space-1' });
     expect(r.ok).toBe(true);
     expect(calls).toEqual([{ fn: 'search_attachments', args: { p_space: 'space-1', p_query: 'CCDV', p_limit: 20 } }]);
-    expect(r.data[0]).toMatchObject({ id: 'file-1', matched: 'name', host: { kind: 'element', label: '再描画が広く伝わる' } });
+    expect(r.data[0]).toMatchObject({ id: 'file-1', matched: 'name', host: { kind: 'element', label: '再描画が広く伝わる', display_id: 'ELE_OBJ-017' } });
   });
 
   it('refuses an empty query', async () => {

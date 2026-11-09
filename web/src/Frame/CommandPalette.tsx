@@ -20,7 +20,7 @@ import {
 } from '@/ui/command';
 import { globalSearch, type SearchResult } from '@/hooks/useSupabase';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
-import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
+import { openFoundFile } from '@/Function/shared/attachments/openOwner';
 import type { ElementReturn, NavigationState } from '@/types/navigation';
 import type { ViewId } from '@/Frame/viewRegistry';
 import { CREATE_ELEMENT_EVENT } from '@/Frame/QuickAddElementLauncher';
@@ -327,16 +327,22 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenItem,
             <CommandSeparator />
             <CommandGroup heading={t('Artifacts')}>
               {grouped.file.map(r => (
-                // A file opens what it is attached to; the line under its name
-                // is where its words matched (or what it is attached to).
-                <CommandItem key={`file-${r.id}`} value={`file-${r.id} ${r.title} ${r.snippet ?? ''} ${r.file?.owner_label ?? ''}`}
-                  onSelect={() => { close(); if (r.file) openAttachmentOwner(r.file); }}>
+                // A file opens the file itself, in the Files view; the line
+                // under its name is where its words matched (or what it is
+                // attached to), and the citation at the right names the
+                // host — by its display_id where the host is an Element.
+                <CommandItem key={`file-${r.id}`} value={`file-${r.id} ${r.title} ${r.snippet ?? ''} ${r.file?.owner_label ?? ''} ${r.file?.element_display_id ?? ''}`}
+                  onSelect={() => { close(); if (r.file) void openFoundFile(r.file); }}>
                   <FileTypeIcon name={r.title} mime={r.file?.mime_type ?? null} />
                   <div className="flex-1 min-w-0">
                     <div className="truncate">{r.title}</div>
                     {r.snippet && <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>}
                   </div>
-                  {r.file?.owner_label && <span className="shrink-0 max-w-40 truncate text-[11px] text-muted-foreground">{r.file.owner_label}</span>}
+                  {(r.file?.element_display_id || r.file?.owner_label) && (
+                    <span className="shrink-0 max-w-40 truncate text-[11px] text-muted-foreground">
+                      {r.file?.element_display_id ? `${r.file.element_display_id} · ` : ''}{r.file?.owner_label ?? ''}
+                    </span>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

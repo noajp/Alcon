@@ -433,7 +433,7 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
   const holder = useFolders('files').data.find((f) => f.id === file.folder_id);
   const where = owner.kind === 'folder' && holder?.is_root
     ? `${t('Artifacts')} · ${t(TABS.find((x) => x.id === TAB_OF[holder.scope])?.label ?? 'Space')}`
-    : `${t(OWNER_LABEL[owner.kind])} · ${file.owner_label ?? '—'}`;
+    : `${t(OWNER_LABEL[owner.kind])} · ${file.element_display_id ? `${file.element_display_id} · ` : ''}${file.owner_label ?? '—'}`;
   return (
     <aside className="flex w-[min(58%,880px)] shrink-0 flex-col border-l border-border/60">
       <div className="flex shrink-0 items-start gap-2 px-4 pb-2 pt-4">
