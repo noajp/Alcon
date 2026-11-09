@@ -10,6 +10,7 @@
 // transcript, the audit trail is the run's steps.
 
 import type { Msg, ToolResult } from "./agentLoop.ts";
+import type { CreatedEntity } from "./createdEntities.ts";
 
 /** How long a Copilot approval waits for its person before it lapses.
  *  An Element's approval waits as long as it takes — it blocks one task.
@@ -43,6 +44,53 @@ export interface PanelToolEvent {
   name: string;
   input?: Record<string, unknown>;
   result?: { ok: boolean; rows?: number; error?: string };
+  /** What this call created in Alcon (the create family only), as card
+   *  records — the turn's creations are part of its record, so what a
+   *  stopped turn made before the stop stands as cards, not prose. */
+  created?: CreatedEntity[];
+}
+
+/** How much of a step's detail the run's step rows hold (addStep's own
+ *  slice, named here because the builder below composes to fit it). */
+export const TOOL_STEP_DETAIL_LIMIT = 8000;
+
+/** How many created records a step's detail carries. The detail is a
+ *  live-display medium, not the record: the kept message's toolEvents
+ *  carry the full list unsliced. Twelve is the panel's card cap — the
+ *  first screenful is what the live turn needs to show. */
+export const TOOL_STEP_CREATED_CAP = 12;
+
+/**
+ * Pure. One tool step's detail JSON, the shape the panel's live turn
+ * parses (copilotSteps). Composed so the created records survive the
+ * 8000-character slice addStep applies: created (capped, with the
+ * full count kept as createdTotal) and the outcome are small and go
+ * in whole; the call's input is the bulky part, so when the whole
+ * would overflow, the input is what is left out — a truncated JSON
+ * would parse as nothing and take the created records down with it.
+ */
+export function toolStepDetail(args: {
+  input?: Record<string, unknown>;
+  rows?: number;
+  error?: string;
+  created?: CreatedEntity[];
+}): string {
+  const created = args.created?.length ? args.created.slice(0, TOOL_STEP_CREATED_CAP) : undefined;
+  const base: Record<string, unknown> = {
+    ...(created ? { created } : {}),
+    ...(args.created && args.created.length > TOOL_STEP_CREATED_CAP
+      ? { createdTotal: args.created.length }
+      : {}),
+    ...(args.rows !== undefined ? { rows: args.rows } : {}),
+    ...(args.error ? { error: args.error } : {}),
+  };
+  if (!args.input) return JSON.stringify(base);
+  const whole = JSON.stringify({ input: args.input, ...base });
+  if (whole.length <= TOOL_STEP_DETAIL_LIMIT) return whole;
+  const withoutInput = JSON.stringify(base);
+  return withoutInput.length <= TOOL_STEP_DETAIL_LIMIT
+    ? withoutInput
+    : withoutInput.slice(0, TOOL_STEP_DETAIL_LIMIT);
 }
 
 export interface PanelApproval {

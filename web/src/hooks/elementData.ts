@@ -404,6 +404,30 @@ export function useParentElement(parentId: string | null | undefined) {
   });
 }
 
+/**
+ * One Element by id, as the summary a reference to it needs: title,
+ * status, display_id, its Object and its progress — the chat's created
+ * cards read their row this way (a rename or a status change since
+ * creation is what shows; the snapshot is only the fallback). `settled`
+ * says the read has answered, so a caller can tell "still loading"
+ * from "the row is gone" (null once settled: deleted, or RLS hides it).
+ */
+export function useElementById(elementId: string | null | undefined) {
+  const query = useQuery({
+    queryKey: ['element-by-id', elementId],
+    enabled: !!elementId,
+    queryFn: async (): Promise<Pick<Element, 'id' | 'title' | 'status' | 'display_id' | 'object_id' | 'progress'> | null> => {
+      const { data, error } = await supabase.from('elements').select('id, title, status, display_id, object_id, progress').eq('id', elementId!).maybeSingle();
+      if (error) throw error;
+      return data as Pick<Element, 'id' | 'title' | 'status' | 'display_id' | 'object_id' | 'progress'> | null;
+    },
+  });
+  return {
+    element: query.data ?? null,
+    settled: !elementId || query.isFetched,
+  };
+}
+
 // ============================================
 // Element Assignee CRUD
 // ============================================

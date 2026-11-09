@@ -150,7 +150,7 @@ import { applyDecision, makeRememberApproval, restorePendingApproval, type Saved
 import { buildCopilotTurn, foldCopilotContext, type CopilotContextLike, type CopilotTurn } from "../_shared/copilotTurn.ts";
 import { COPILOT_AGENT_NAME, persistCopilotApproval, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
 import {
-  copilotApprovalExpiresAt, resumedAssistantMessage, seedMessagesFromPanel, stoppedAssistantMessage, withApprovalDecision,
+  copilotApprovalExpiresAt, resumedAssistantMessage, seedMessagesFromPanel, stoppedAssistantMessage, toolStepDetail, withApprovalDecision,
   type PanelMessage, type PanelToolEvent,
 } from "../_shared/copilotSession.ts";
 import { answerAllowed, claimFor, driverForRun, entryForBody, heartbeatEntryAllowed, messageAllowed } from "./dispatch.ts";
@@ -5538,6 +5538,10 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
           result: r.ok
             ? { ok: true, ...(r.rows !== undefined ? { rows: r.rows } : {}) }
             : { ok: false, ...(r.error ? { error: r.error } : {}) },
+          // What the call created rides the event into the kept message
+          // whole (the record), and into the step detail capped (the
+          // live display) — the panel draws the turn's cards from both.
+          ...(r.created?.length ? { created: r.created } : {}),
         });
         if (r.credentialRequests?.length) {
           // A capture ask is recorded the same way: its own step kind,
@@ -5561,11 +5565,12 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
         stepLater(
           r.ok ? (turn.kindOf(r.name) === "write" ? "write" : "action") : "error",
           r.name,
-          JSON.stringify({
+          toolStepDetail({
             ...(call ? { input: call.input } : {}),
             ...(r.rows !== undefined ? { rows: r.rows } : {}),
             ...(r.error ? { error: r.error } : {}),
-          }).slice(0, 8000),
+            ...(r.created?.length ? { created: r.created } : {}),
+          }),
         );
       },
     },

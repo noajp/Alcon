@@ -12,6 +12,7 @@ import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, Cop
 import { toolVerb } from './copilotFiles';
 import { splitAnswer } from './chartSpec';
 import { CHART_CARD_CLASS } from './chartColors';
+import { CreatedEntities } from './CreatedEntityCard';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
 import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
 import { missingConnectors } from '@/AIP/harness/installFlow';
@@ -86,6 +87,10 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
         <CredentialRequestCard key={c.requestId} spaceId={spaceId ?? null} requestId={c.requestId} label={c.label}
           onContinue={onContinueCredential ? () => onContinueCredential(c) : undefined} />
       ))}
+      {/* What the turn created, as cards — with the message's other
+          card blocks, under the answer. Renders from the live events
+          while streaming too, so the block grows as creations land. */}
+      <CreatedEntities events={events} />
       {settled && message.stopped ? (
         // A stopped turn's place in the record: one quiet caption where
         // the action row would stand — the state, and the turn's time —

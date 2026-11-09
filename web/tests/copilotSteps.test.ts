@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { liveTurnFromSteps, type CopilotStepRow } from '@/AIP/ai/copilotSteps';
-import { toKeptMessages, type CopilotMessage } from '@/AIP/ai/useAlconCopilot';
+import { flattenCreated, liveTurnFromSteps, type CopilotStepRow } from '@/AIP/ai/copilotSteps';
+import { toKeptMessages, type CopilotMessage, type ToolEvent } from '@/AIP/ai/useAlconCopilot';
 
 // The panel's live turn, mapped from a chat run's steps while Athena
 // works (copilotSteps.ts), and the kept shape a cut-back writes
@@ -74,6 +74,57 @@ describe('liveTurnFromSteps', () => {
     expect(live.content).toBe('カードを出しました');
   });
 
+  it('surfaces a step detail’s created records on the live tool event', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('write', 'createElements', JSON.stringify({
+        input: { objectId: 'o1' }, rows: 2,
+        created: [
+          { kind: 'element', id: 'e1', title: 'A', displayId: 'ELE_OBJ-001', status: 'todo' },
+          { kind: 'element', id: 'e2', title: 'B', status: 'todo' },
+        ],
+      })),
+      step('write', 'createObject', JSON.stringify({
+        rows: 1, created: [{ kind: 'object', id: 'o2', title: '請求対応' }],
+      })),
+    ]);
+    expect(live.toolEvents).toEqual([
+      {
+        name: 'createElements', input: { objectId: 'o1' }, result: { ok: true, rows: 2 },
+        created: [
+          { kind: 'element', id: 'e1', title: 'A', displayId: 'ELE_OBJ-001', status: 'todo' },
+          { kind: 'element', id: 'e2', title: 'B', status: 'todo' },
+        ],
+      },
+      {
+        name: 'createObject', result: { ok: true, rows: 1 },
+        created: [{ kind: 'object', id: 'o2', title: '請求対応' }],
+      },
+    ]);
+  });
+
+  it('drops malformed created entries — and the field entirely when none are valid', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '質問'),
+      step('write', 'createElements', JSON.stringify({
+        rows: 3,
+        created: [
+          { kind: 'element', id: 'e1', title: 'A' },
+          { kind: 'widget', id: 'w1', title: '種別違い' },
+          { kind: 'element', title: 'id なし' },
+          { kind: 'object', id: 'o1', title: '' },
+          'not-a-record',
+          null,
+        ],
+      })),
+      step('write', 'createObject', JSON.stringify({ rows: 1, created: [{ kind: 'object', title: 'id なし' }] })),
+      step('write', 'createInitiative', JSON.stringify({ rows: 1, created: 'not-an-array' })),
+    ]);
+    expect(live.toolEvents[0].created).toEqual([{ kind: 'element', id: 'e1', title: 'A' }]);
+    expect(live.toolEvents[1].created).toBeUndefined();
+    expect(live.toolEvents[2].created).toBeUndefined();
+  });
+
   it('maps connection_request steps to the turn’s proposals', () => {
     const live = liveTurnFromSteps([
       step('message', '質問', '質問'),
@@ -83,6 +134,42 @@ describe('liveTurnFromSteps', () => {
     ]);
     expect(live.connections).toEqual([{ names: ['GitHub'], waitingFor: 'PR を作る' }]);
     expect(live.content).toBe('カードを出しました');
+  });
+});
+
+describe('flattenCreated', () => {
+  it('flattens a turn’s events in order, deduped by kind + id, first wins', () => {
+    const events: ToolEvent[] = [
+      { name: 'createObject', result: { ok: true, rows: 1 }, created: [{ kind: 'object', id: 'o1', title: '請求対応' }] },
+      {
+        name: 'createElements', result: { ok: true, rows: 2 },
+        created: [
+          { kind: 'element', id: 'e1', title: 'A', status: 'todo', objectId: 'o1' },
+          { kind: 'element', id: 'e2', title: 'B', status: 'todo', objectId: 'o1' },
+        ],
+      },
+      { name: 'listElements', result: { ok: true, rows: 5 } },
+      // A repeated record (a resumed slice re-reporting) never rewrites
+      // the first, and the same id under another kind is another entity.
+      {
+        name: 'createElements', result: { ok: true, rows: 1 },
+        created: [
+          { kind: 'element', id: 'e1', title: 'A（再掲）', status: 'done' },
+          { kind: 'strategy', id: 'e1', title: '同 id の Strategy' },
+        ],
+      },
+    ];
+    expect(flattenCreated(events)).toEqual([
+      { kind: 'object', id: 'o1', title: '請求対応' },
+      { kind: 'element', id: 'e1', title: 'A', status: 'todo', objectId: 'o1' },
+      { kind: 'element', id: 'e2', title: 'B', status: 'todo', objectId: 'o1' },
+      { kind: 'strategy', id: 'e1', title: '同 id の Strategy' },
+    ]);
+  });
+
+  it('a turn that created nothing flattens to nothing', () => {
+    expect(flattenCreated([])).toEqual([]);
+    expect(flattenCreated([{ name: 'readFile', result: { ok: true } }])).toEqual([]);
   });
 });
 
@@ -126,6 +213,35 @@ describe('toKeptMessages', () => {
         toolEvents: [{ name: 'createElements', result: { ok: true, rows: 12 } }],
       },
       { role: 'assistant', content: '通常の答え' },
+    ]);
+  });
+
+  it('carries a tool event’s created records through — they ride inside toolEvents, whole', () => {
+    const shown: CopilotMessage[] = [
+      { role: 'user', content: '作って' },
+      {
+        role: 'assistant', content: '作りました', done: true, at: 400,
+        toolEvents: [{
+          name: 'createElements', result: { ok: true, rows: 2 },
+          created: [
+            { kind: 'element', id: 'e1', title: 'A', displayId: 'ELE_OBJ-001', status: 'todo', objectId: 'o1' },
+            { kind: 'element', id: 'e2', title: 'B', status: 'todo', objectId: 'o1' },
+          ],
+        }],
+      },
+    ];
+    expect(toKeptMessages(shown)).toEqual([
+      { role: 'user', content: '作って' },
+      {
+        role: 'assistant', content: '作りました',
+        toolEvents: [{
+          name: 'createElements', result: { ok: true, rows: 2 },
+          created: [
+            { kind: 'element', id: 'e1', title: 'A', displayId: 'ELE_OBJ-001', status: 'todo', objectId: 'o1' },
+            { kind: 'element', id: 'e2', title: 'B', status: 'todo', objectId: 'o1' },
+          ],
+        }],
+      },
     ]);
   });
 

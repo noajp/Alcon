@@ -1,10 +1,11 @@
-import type { CopilotConnectionProposal, CopilotCredentialAsk, ToolEvent } from './useAlconCopilot';
+import type { CopilotConnectionProposal, CopilotCredentialAsk, CreatedEntity, ToolEvent } from './useAlconCopilot';
 
 // A Copilot turn in progress, read from its run's steps — the live
 // display while Athena works, before the kept conversation carries the
 // settled turn. The chat driver writes the steps (run-agent): the
 // person's 'message', a step per tool result (its title the tool, its
-// detail a JSON of the call's input and the result's rows or error),
+// detail a JSON of the call's input, the result's rows or error, and
+// what the call created when it created Alcon entities),
 // 'draft' steps holding the answer as it grows, 'reply' steps for
 // each stretch of finished words, a 'connection_request' step per
 // connection proposal, and a 'credential_request' step per credential
@@ -27,6 +28,49 @@ function proposalOf(step: CopilotStepRow): CopilotConnectionProposal | null {
   } catch {
     return null;
   }
+}
+
+/** Pure. A tool step detail's created records, defensively parsed —
+ *  each entry must carry a known kind, an id and a title to become a
+ *  card record; anything else in the list is dropped, and a detail
+ *  with no valid entry yields none. */
+function createdOf(parsed: unknown): CreatedEntity[] | undefined {
+  if (!parsed || typeof parsed !== 'object') return undefined;
+  const raw = (parsed as { created?: unknown }).created;
+  if (!Array.isArray(raw)) return undefined;
+  const out: CreatedEntity[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const { kind, id, title, displayId, status, objectId } = entry as Record<string, unknown>;
+    if (kind !== 'element' && kind !== 'object' && kind !== 'strategy') continue;
+    if (typeof id !== 'string' || !id || typeof title !== 'string' || !title) continue;
+    out.push({
+      kind, id, title,
+      ...(typeof displayId === 'string' && displayId ? { displayId } : {}),
+      ...(typeof status === 'string' && status ? { status } : {}),
+      ...(typeof objectId === 'string' && objectId ? { objectId } : {}),
+    });
+  }
+  return out.length ? out : undefined;
+}
+
+/** Pure. A turn's created entities, from its tool events in order:
+ *  creation is ordered work and the events are its chronological
+ *  record, so the panel derives the card list by flattening them —
+ *  deduped by kind + id, first wins (a later event never rewrites
+ *  what an earlier one made). */
+export function flattenCreated(events: readonly ToolEvent[]): CreatedEntity[] {
+  const seen = new Set<string>();
+  const out: CreatedEntity[] = [];
+  for (const event of events) {
+    for (const entity of event.created ?? []) {
+      const key = `${entity.kind}:${entity.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(entity);
+    }
+  }
+  return out;
 }
 
 /** Pure. A credential_request step's ask, defensively parsed — the
@@ -71,12 +115,14 @@ export function liveTurnFromSteps(steps: readonly CopilotStepRow[]): { content: 
       let input: Record<string, unknown> | undefined;
       let rows: number | undefined;
       let error: string | undefined;
+      let created: CreatedEntity[] | undefined;
       try {
         const parsed = JSON.parse(step.detail ?? '') as { input?: Record<string, unknown>; rows?: number; error?: string };
         if (parsed && typeof parsed === 'object') {
           input = parsed.input;
           rows = typeof parsed.rows === 'number' ? parsed.rows : undefined;
           error = typeof parsed.error === 'string' ? parsed.error : undefined;
+          created = createdOf(parsed);
         }
       } catch {
         // A step whose detail is not the driver's JSON still shows: a
@@ -89,6 +135,7 @@ export function liveTurnFromSteps(steps: readonly CopilotStepRow[]): { content: 
         result: step.type === 'error'
           ? { ok: false, ...(error ? { error } : {}) }
           : { ok: true, ...(rows !== undefined ? { rows } : {}) },
+        ...(created ? { created } : {}),
       });
     }
   }
