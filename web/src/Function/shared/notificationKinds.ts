@@ -1,6 +1,6 @@
 import {
   AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, CalendarClock, Bell, Plug, TriangleAlert, HeartPulse,
-  ArrowUpCircle, HelpCircle,
+  ArrowUpCircle, HelpCircle, FlaskConical,
 } from '@/ui/icons';
 import type { NotificationKind } from '@/hooks/useSupabase';
 import { MessageIcon } from '@/Function/shared/conceptIcons';
@@ -31,6 +31,7 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMe
   heartbeat:          { icon: HeartPulse,    color: 'text-rose-400',    label: 'Heartbeat' },
   promotion:          { icon: ArrowUpCircle, color: 'text-teal-400',    label: 'Promotion' },
   question:           { icon: HelpCircle,    color: 'text-sky-400',     label: 'Question' },
+  definition_test:    { icon: FlaskConical,  color: 'text-teal-400',    label: 'Definition test' },
 };
 
 export const NOTIFICATION_KINDS = Object.keys(NOTIFICATION_KIND_META) as NotificationKind[];

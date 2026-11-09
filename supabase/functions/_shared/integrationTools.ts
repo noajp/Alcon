@@ -27,15 +27,16 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { ToolCall } from "./agentLoop.ts";
 import type { RunToolDef } from "./toolLoading.ts";
 import {
-  commandSchema, criticalClassForTokens, criticalClassOf, decide, offeredCommands, parseManifest, requestFor,
+  commandSchema, canonicalAction, criticalClassForTokens, criticalClassOf, decide, offeredCommands, parseManifest, requestFor,
   type CommandPresent, type CriticalClass, type Manifest, type ManifestCommand,
 } from "./connectorManifest.ts";
 import { askReasonOf, type ApprovalFacts, type AskReason } from "./approvalPolicy.ts";
 import { overlayPresentation } from "./approvalPresentations.ts";
 import {
-  McpSession, callHttp, httpIsRead, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential,
+  McpSession, callHttp, httpIsRead, httpPseudoAction, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential,
   type IntegrationRow, type RemoteTool,
 } from "./integrationClient.ts";
+import type { ReplayTransport } from "./definitionTests.ts";
 import { isGoogleDriveRow } from "./googleOAuth.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName } from "./connectorNeeds.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
@@ -113,6 +114,12 @@ export interface IntegrationTool {
   bind?: () => Promise<IntegrationBinding>;
   /** The binding's memo, once resolution has started. */
   binding?: Promise<IntegrationBinding>;
+  /** A definition test run's replay transport (B14): when set, the
+   *  executor answers from the fixture at its seam and the binding
+   *  is never resolved — the caller also swaps `bind` for a named
+   *  refusal, so no path out of the executor can spend a credential
+   *  for a replayed call either. */
+  replay?: ReplayTransport;
 }
 
 /**
@@ -389,9 +396,38 @@ export function manifestDenyRefusal(commandName: string): string {
   return `${commandName} はこの引数では許可されていません（連携のルール）。別の引数にするか、人に頼んでください。`;
 }
 
-export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall): Promise<{ text: string; isError: boolean; verify?: VerifyCheck }> {
+/** Pure. The action a call matches under in a definition test's
+ *  replay (B14 §4.2): the manifest's canonical action for a declared
+ *  command, the remote tool's own name for a typed tool (Drive), or
+ *  the raw request's pseudo-action. The capture resolver derives the
+ *  same key from the source run's record — one rule at both ends. */
+export function replayActionFor(it: IntegrationTool, call: ToolCall): string {
+  if (it.command) {
+    return it.manifest ? (canonicalAction(it.manifest, it.command.name) ?? it.command.action) : it.command.action;
+  }
+  if (it.remote) return it.remote.name;
+  return httpPseudoAction(call.input);
+}
+
+export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall): Promise<{ text: string; isError: boolean; verify?: VerifyCheck; replayed?: true }> {
   if (it.command && it.manifest && decide(it.manifest, it.command, call.input).permission === "deny") {
     return { text: manifestDenyRefusal(it.command.name), isError: true };
+  }
+  // Definition tests (B14 §4.1): a test run's call is answered from
+  // the fixture HERE — after the manifest's own deny recheck (a
+  // replay never widens what the manifest allows: a call the
+  // manifest now denies is refused, not replayed), and before
+  // request mapping and the binding. This is the one point every
+  // dispatch direction crosses, and standing before bindingOf is
+  // what makes the guarantee structural: no Vault secret read, no
+  // MCP session, no stash take and no credential-use audit can fire
+  // for a replayed call, because none of that code is reached. The
+  // result carries `replayed` the way a verified write carries its
+  // verify record, so the call-log writer and the auth-failure
+  // branch above this seam can tell a recorded answer from a live
+  // one and keep the connection's live state untainted by it.
+  if (it.replay) {
+    return await it.replay.dispatch(replayActionFor(it, call), call.input);
   }
   // A declared API command becomes exactly the request its manifest maps it to.
   let httpInput: Record<string, unknown> = call.input;

@@ -20,6 +20,10 @@ import { resolveRevisionCandidate, useDefinitionCalibration } from '@/hooks/cali
 import { calibrationSummaryOf, candidateErrorCount, ratePercent } from './calibrationModel';
 import { activateConstraintDraft, deactivatePlanningConstraint, rejectConstraintDraft, useDefinitionConstraints, useSpaceConstraintQueue } from '@/hooks/constraintData';
 import { constraintEffectOf, constraintKpiOf, draftBaselineOf } from './constraintModel';
+import { deleteDefinitionTest, launchDefinitionTestRun, useDefinitionTests, useSpaceDefinitionTests } from '@/hooks/definitionTestData';
+import { useHeartbeatSteps } from '@/hooks/heartbeatData';
+import { constraintTestSummary, definitionBodyHashWeb, fixtureExchangeCount, manifestActionsByIntegration, readTestVerdict, testFreshness, vanishedActions } from './definitionTestModel';
+import type { DefinitionTest } from '@/types/database';
 import { useCatalog, useConnectorDirectory, type CatalogDefinition } from '@/hooks/customizeData';
 import { useExceptionInstalls } from '@/hooks/exceptionData';
 import { ExceptionCatalogSection } from './ExceptionCatalog';
@@ -297,7 +301,8 @@ export function HarnessesPanel() {
       )}
 
       {mode === 'yours' && (
-        <ConstraintsSection spaceId={spaceId} isOwner={isOwner} />
+        <ConstraintsSection spaceId={spaceId} isOwner={isOwner}
+          bodiesById={new Map(library.data.map((d) => [d.id, d.body]))} />
       )}
 
       {mode === 'yours' ? (
@@ -595,6 +600,7 @@ function HarnessEditor({ spaceId, definition, connected, isOwner, exceptions, on
           {body.trim() && <Diagnostics diagnostics={diagnostics} />}
           {definition && <CalibrationSection spaceId={spaceId} definitionId={definition.id} isOwner={isOwner} />}
           {definition && <ActiveConstraintsSection spaceId={spaceId} definitionId={definition.id} isOwner={isOwner} />}
+          {definition && <DefinitionTestsSection spaceId={spaceId} definitionId={definition.id} savedBody={definition.body} editingBody={body} />}
           {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         </div>
         <DialogFooter>
@@ -682,9 +688,12 @@ function CalibrationSection({ spaceId, definitionId, isOwner }: {
  *  The KPI line is the loop's own scoreboard: drafted / active /
  *  established / not helping. Nothing renders at all until the
  *  derivation has something to say. */
-function ConstraintsSection({ spaceId, isOwner }: { spaceId: string | null; isOwner: boolean }) {
+function ConstraintsSection({ spaceId, isOwner, bodiesById }: {
+  spaceId: string | null; isOwner: boolean; bodiesById: ReadonlyMap<string, string>;
+}) {
   const { t } = useI18n();
   const { drafts, constraints, loading, refetch } = useSpaceConstraintQueue(spaceId);
+  const { tests: spaceTests } = useSpaceDefinitionTests(spaceId);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!spaceId || (drafts.length === 0 && constraints.length === 0 && !loading)) return null;
@@ -720,6 +729,12 @@ function ConstraintsSection({ spaceId, isOwner }: { spaceId: string | null; isOw
                 <div className="truncate text-[12px] text-muted-foreground">
                   {d.targetName} · {derivedLabel(d)}
                 </div>
+                {d.target_definition_id && bodiesById.get(d.target_definition_id) !== undefined && (
+                  <ConstraintTestSummaryLine
+                    body={bodiesById.get(d.target_definition_id)!}
+                    tests={spaceTests.filter((x) => x.definition_id === d.target_definition_id)}
+                  />
+                )}
                 {baseline && (
                   <div className="text-[11px] tabular-nums text-muted-foreground">
                     {t('This failure showed in {with} of {total} runs ({rate}%)', {
@@ -796,6 +811,185 @@ function ActiveConstraintsSection({ spaceId, definitionId, isOwner }: {
           </div>
         );
       })}
+      {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+    </div>
+  );
+}
+
+/** The constraint review's test line (B14 §8.3, D2): how the target
+ *  definition's tests stand against its CURRENT body — one line of
+ *  information at the moment of the activation decision. It never
+ *  blocks activation and never renders when the definition has no
+ *  tests; absence is not a warning, and the owner's judgement
+ *  decides. */
+function ConstraintTestSummaryLine({ body, tests }: { body: string; tests: DefinitionTest[] }) {
+  const { t } = useI18n();
+  const [hash, setHash] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    definitionBodyHashWeb(body).then((h) => { if (live) setHash(h); }).catch(() => { /* no line without the hash */ });
+    return () => { live = false; };
+  }, [body]);
+  const summary = hash ? constraintTestSummary(tests, hash) : null;
+  if (!summary) return null;
+  return (
+    <div className="text-[11px] tabular-nums text-muted-foreground">
+      {t('Definition tests — {pass} passed · {fail} failed · {old} older-version results, of {total}', {
+        pass: summary.passCurrent, fail: summary.failCurrent, old: summary.oldVersion, total: summary.total,
+      })}
+    </div>
+  );
+}
+
+/** The latest test run's steps, inline (the drill-down §8.2 asks
+ *  for): the run is a real run on a real Element, and its step
+ *  record is the audit's own — read here the way the heartbeat
+ *  card reads a wake's. */
+function TestRunSteps({ runId }: { runId: string }) {
+  const { t } = useI18n();
+  const { steps, loading } = useHeartbeatSteps(runId);
+  if (loading) return <p className="mt-1 text-[12px] text-muted-foreground">{t('Loading…')}</p>;
+  if (!steps.length) return <p className="mt-1 text-[12px] text-muted-foreground">{t('No steps recorded.')}</p>;
+  return (
+    <ol className="mt-1 space-y-1 border-l border-border/60 pl-3">
+      {steps.map((s) => (
+        <li key={s.idx} className="text-[12px] text-muted-foreground">
+          <span className="text-foreground/80">{s.title}</span>
+          {s.detail && <span className="block whitespace-pre-wrap">{s.detail}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** The definition's tests (B14 §8.2): the fixtures a person cut
+ *  from real runs, each with its latest settled result on one line
+ *  (pass/fail + the classification + the first divergence), and the
+ *  freshness chips on their two separate axes — a result that tried
+ *  an older body, a fixture past the staleness age, and the taint
+ *  mark a web-reading source run leaves. Launching is always a
+ *  person's act (D7); a launch runs against the body AS EDITED here
+ *  when it differs from the saved one (D6), the result binding to
+ *  that body's hash. Actions a manifest no longer declares are
+ *  named as a courtesy before launch — never a block (§5.4). */
+function DefinitionTestsSection({ spaceId, definitionId, savedBody, editingBody }: {
+  spaceId: string; definitionId: string; savedBody: string; editingBody: string;
+}) {
+  const { t } = useI18n();
+  const { tests, loading, refetch } = useDefinitionTests(definitionId);
+  const integrations = useIntegrations(spaceId);
+  const [savedHash, setSavedHash] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [runningAll, setRunningAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    definitionBodyHashWeb(savedBody).then((h) => { if (live) setSavedHash(h); }).catch(() => { /* chips wait for the hash */ });
+    return () => { live = false; };
+  }, [savedBody]);
+  const manifestActions = useMemo(() => manifestActionsByIntegration(integrations.data), [integrations.data]);
+  const knownIds = useMemo(() => new Set(integrations.data.map((r) => r.id)), [integrations.data]);
+  const bodyOverride = editingBody !== savedBody ? editingBody : undefined;
+  const busy = busyId !== null || runningAll;
+
+  const launch = async (testId: string) => {
+    const res = await launchDefinitionTestRun(testId, bodyOverride);
+    if (!res.ok) throw new Error(res.reason);
+  };
+  const runOne = async (testId: string) => {
+    setBusyId(testId); setError(null);
+    try { await launch(testId); refetch(); } catch (e) { setError(formatError(e)); }
+    setBusyId(null);
+  };
+  const runAll = async () => {
+    setRunningAll(true); setError(null);
+    try {
+      // Sequential on purpose (§8.2): one run at a time — cost, and
+      // the replay transport's simplicity.
+      for (const test of tests) await launch(test.id);
+      refetch();
+    } catch (e) { setError(formatError(e)); }
+    setRunningAll(false);
+  };
+  const remove = async (test: DefinitionTest) => {
+    if (!window.confirm(t('Delete the test “{name}”?', { name: test.name }))) return;
+    setBusyId(test.id); setError(null);
+    try { await deleteDefinitionTest(test.id); refetch(); }
+    catch (e) { setError(formatError(e)); }
+    setBusyId(null);
+  };
+
+  if (loading) return null;
+  return (
+    <div className="space-y-2 rounded-md border border-[var(--border-default)] p-3">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 text-[11px] text-muted-foreground">{t('Definition tests')}</div>
+        {tests.length > 1 && (
+          <Button size="xs" variant="secondary" disabled={busy} onClick={() => void runAll()}>{t('Run all tests')}</Button>
+        )}
+      </div>
+      {tests.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground">{t('No tests yet. Record one from a finished run in the Audit log.')}</p>
+      ) : (
+        <>
+          {bodyOverride !== undefined && (
+            <p className="text-[11px] text-muted-foreground">
+              {t('Tests run against the body as edited here. Results bind to that version and read as older-version results once the saved body differs.')}
+            </p>
+          )}
+          {tests.map((test) => {
+            const verdict = readTestVerdict(test.last_result);
+            const fresh = testFreshness(test, savedHash, new Date());
+            const vanished = integrations.loading ? [] : vanishedActions(test, manifestActions, knownIds);
+            return (
+              <div key={test.id} className="space-y-1">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] text-foreground">{test.name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {test.source_run_label} · {test.captured_at.slice(0, 10)} · {t('{n} exchanges', { n: fixtureExchangeCount(test) })}
+                    </p>
+                  </div>
+                  <Button size="xs" variant="secondary" className="shrink-0" disabled={busy} onClick={() => void runOne(test.id)}>{t('Run test')}</Button>
+                  <Button size="xs" variant="ghost" className="shrink-0 text-[var(--status-danger)]" disabled={busy} onClick={() => void remove(test)}>{t('Delete')}</Button>
+                </div>
+                <div className="flex flex-wrap items-baseline gap-x-2 text-[11px]">
+                  {verdict ? (
+                    <button
+                      type="button"
+                      className="text-left"
+                      aria-expanded={!!test.last_run_id && openRunId === test.last_run_id}
+                      onClick={() => { if (test.last_run_id) setOpenRunId(openRunId === test.last_run_id ? null : test.last_run_id); }}
+                    >
+                      <span className={verdict.outcome === 'pass' ? 'text-[var(--status-success)]' : 'text-[var(--status-danger)]'}>
+                        {verdict.outcome === 'pass' ? t('Passed') : t('Failed')}
+                      </span>
+                      <span className="text-muted-foreground"> · {verdict.classification}</span>
+                      {verdict.firstDivergence && (
+                        <span className="text-muted-foreground">
+                          {' · '}{t('First divergence: {kind} ({action})', { kind: verdict.firstDivergence.kind, action: verdict.firstDivergence.action })}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground">{t('No result yet')}</span>
+                  )}
+                  {fresh.staleBody && <span className="text-[var(--status-warning)]">{t('Result for an older version')}</span>}
+                  {fresh.oldFixture && <span className="text-[var(--status-warning)]">{t('Old fixture')}</span>}
+                  {test.tainted && <span className="text-[var(--status-warning)]">{t('Tainted')}</span>}
+                </div>
+                {vanished.length > 0 && (
+                  <p className="text-[11px] text-[var(--status-warning)]">
+                    {t('Some recorded actions no longer exist: {names}. The test can still run; the replay will name them as divergences.', { names: vanished.join(', ') })}
+                  </p>
+                )}
+                {test.last_run_id && openRunId === test.last_run_id && <TestRunSteps runId={test.last_run_id} />}
+              </div>
+            );
+          })}
+        </>
+      )}
       {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
     </div>
   );

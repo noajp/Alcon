@@ -57,6 +57,7 @@ import { COPILOT_AGENT_NAME, updateCopilotSessionMessages } from "../_shared/cop
 import { deleteStagedRow, loadDraft, transitionDraft } from "../_shared/integrationDrafts.ts";
 import { loadPromotionDraft, transitionPromotionDraft } from "../_shared/promotionDrafts.ts";
 import { settlePromotionRehearsal } from "../_shared/promotionTest.ts";
+import { DEFINITION_TEST_COLUMNS, settleDefinitionTest, type DefinitionTestRow } from "../_shared/definitionTests.ts";
 import { collectOutcomes } from "../_shared/outcomeCollector.ts";
 import { evaluateCalibration } from "../_shared/verifierCalibration.ts";
 import { evaluateAutonomy } from "../_shared/autonomy.ts";
@@ -623,6 +624,28 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: could not expire promotion", row.id, e instanceof Error ? e.message : e);
     }
   }
+  // Definition tests (B14): a finished test run settles onto its
+  // row — the verdict against the stored expectation, one step on
+  // the run, one notification to the launcher. The settle is
+  // idempotent (last_run_at stands at or after the run's finish),
+  // so candidates are simply the tests whose latest run may have
+  // finished since the last settle; the run-agent catch-up settles
+  // the same rows when a person drives a test action first.
+  let definitionTestsSettled = 0;
+  const { data: testCandidates } = await env.admin.from("definition_tests")
+    .select(DEFINITION_TEST_COLUMNS)
+    .not("last_run_id", "is", null)
+    .order("captured_at", { ascending: false })
+    .limit(20);
+  for (const row of testCandidates ?? []) {
+    try {
+      if ((await settleDefinitionTest(env.admin, row as unknown as DefinitionTestRow)).settled) {
+        definitionTestsSettled += 1;
+      }
+    } catch (e) {
+      console.error("automations: could not settle definition test", (row as { id: string }).id, e instanceof Error ? e.message : e);
+    }
+  }
   // Outcome records (B4): every finished run leaves one, pairing the
   // machine's judgement with what the human eventually did. The
   // collector is deterministic and derives everything from sealed
@@ -730,7 +753,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

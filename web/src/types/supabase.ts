@@ -2283,6 +2283,92 @@ export type Database = {
           },
         ]
       }
+      definition_tests: {
+        Row: {
+          activity_space_id: string
+          captured_at: string
+          captured_by: string | null
+          definition_id: string
+          expected: Json
+          fixture: Json
+          id: string
+          last_body_hash: string | null
+          last_result: Json | null
+          last_run_at: string | null
+          last_run_id: string | null
+          name: string
+          source_run_id: string | null
+          source_run_label: string | null
+          source_run_status: string | null
+          tainted: boolean
+        }
+        Insert: {
+          activity_space_id: string
+          captured_at?: string
+          captured_by?: string | null
+          definition_id: string
+          expected: Json
+          fixture: Json
+          id?: string
+          last_body_hash?: string | null
+          last_result?: Json | null
+          last_run_at?: string | null
+          last_run_id?: string | null
+          name: string
+          source_run_id?: string | null
+          source_run_label?: string | null
+          source_run_status?: string | null
+          tainted?: boolean
+        }
+        Update: {
+          activity_space_id?: string
+          captured_at?: string
+          captured_by?: string | null
+          definition_id?: string
+          expected?: Json
+          fixture?: Json
+          id?: string
+          last_body_hash?: string | null
+          last_result?: Json | null
+          last_run_at?: string | null
+          last_run_id?: string | null
+          name?: string
+          source_run_id?: string | null
+          source_run_label?: string | null
+          source_run_status?: string | null
+          tainted?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "definition_tests_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "definition_tests_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "definition_tests_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "definition_tests_last_run_id_fkey"
+            columns: ["last_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployment_grant_versions: {
         Row: {
           activity_space_id: string
@@ -4454,6 +4540,7 @@ export type Database = {
           kind: string
           object_id: string | null
           promotion_draft_id: string | null
+          definition_test_id: string | null
           question_ticket_id: string | null
           recipient_id: string
           strategy_comment_id: string | null
@@ -4479,6 +4566,7 @@ export type Database = {
           kind: string
           object_id?: string | null
           promotion_draft_id?: string | null
+          definition_test_id?: string | null
           question_ticket_id?: string | null
           recipient_id: string
           strategy_comment_id?: string | null
@@ -4504,6 +4592,7 @@ export type Database = {
           kind?: string
           object_id?: string | null
           promotion_draft_id?: string | null
+          definition_test_id?: string | null
           question_ticket_id?: string | null
           recipient_id?: string
           strategy_comment_id?: string | null

@@ -27,7 +27,12 @@ const RULES: readonly Rule[] = [
   { name: "api-key-shape", re: /\bsk-[A-Za-z0-9_\-]{16,}\b/ },
   { name: "jwt", re: /\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b/ },
   { name: "private-key-block", re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
-  { name: "url-credentials", re: /[a-z][a-z0-9+.-]*:\/\/[^\s/:@]{1,64}:[^\s/@]{4,}@/i },
+  // The scheme is length-bounded ({0,32} after its first letter):
+  // an unbounded class before the required "://" backtracks
+  // quadratically over a long alphanumeric run — a base64 blob in a
+  // tool response, the very texts B14's capture scrub judges whole.
+  // No real scheme is longer; the rule's reach is unchanged.
+  { name: "url-credentials", re: /[a-z][a-z0-9+.-]{0,32}:\/\/[^\s/:@]{1,64}:[^\s/@]{4,}@/i },
   // A one-time code, named as one: six digits next to the words for it.
   { name: "otp-code", re: /(?:ワンタイム|確認コード|認証コード|検証コード|one[\s-]?time|otp|verification code|passcode)[^\d]{0,24}\b\d{4,8}\b/i },
 ];
