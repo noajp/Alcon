@@ -13,7 +13,17 @@
 //   # 条件 / Conditions        the rules it works under — including freshness
 //                              declarations ("- 価格の鮮度: 30分まで"): how old
 //                              a fact of a type may be before a finish's claim
-//                              to it counts as stale (see DEFAULT_FRESHNESS)
+//                              to it counts as stale (see DEFAULT_FRESHNESS),
+//                              and machine declarations ("- ワークスペース:
+//                              必要", "- 外向き通信: registry.npmjs.org" /
+//                              "- egress: …", "- ワークスペース時間: 4時間
+//                              まで"): the work needs a workspace (a machine
+//                              to run commands in) — see MachineRequirement
+//                              Coding declarations ("- リポジトリ:
+//                              owner/repo", "- テストコマンド: npm test",
+//                              "- ベース: main") mark the work as a code
+//                              change in declared repositories, verified by
+//                              a declared test command — see CodingDeclaration
 //   # 指標 / Metric            "- スコア（大きいほど良い）: how it is measured" — makes it a loop
 //   # 進め方 / Procedure       one round, or the steps
 //   # 止める条件 / Stop        目標 600,000 / $30 まで / 50 周まで, and free text
@@ -37,6 +47,61 @@ export type OutputFormat = "markdown" | "html" | "csv" | "json";
 
 export interface DefinitionMetric { name: string; direction: "max" | "min"; source: string }
 export interface DefinitionStop { target: number | null; budgetUsd: number | null; maxRounds: number | null; text: string }
+
+/**
+ * A machine requirement, declared in Conditions: this work needs a
+ * workspace — a machine it may run commands and write files in —
+ * and says under what terms. Declared only; whether and how a
+ * workspace is bound is the provisioning layer's business
+ * (workspaces.ts), and a run of a definition without one is never
+ * offered machine tools at all.
+ */
+export interface MachineRequirement {
+  /** "per-run": the workspace must be provisioned for the run and
+   *  destroyed at its end. "any": a standing machine on the person's
+   *  own infrastructure may fulfil the requirement too. Per-run is
+   *  the default and the strict reading: only an explicit standing
+   *  wording ("常駐でも可" / "standing") relaxes it. */
+  disposal: "per-run" | "any";
+  /** The hosts the workspace may reach, as declared: bare hostnames,
+   *  "*.example.com" wildcards, or "*" for an explicitly unrestricted
+   *  declaration. Empty declares no world egress at all. A token the
+   *  grammar cannot read as a host is dropped, never widened. */
+  egress: string[];
+  /** The wall-clock cap the definition asks for one workspace, in
+   *  ms; null leaves the server default. A definition may only
+   *  tighten the server cap, never widen it (capsForRequirement). */
+  wallClockMs: number | null;
+}
+
+/**
+ * A coding declaration, declared in Conditions: this work changes
+ * code in a declared set of repositories, and its finish is verified
+ * against a declared test command (coding capability PR2; the loop
+ * itself lives in codingLoop.ts / codingDelivery.ts). Declared only —
+ * a run resolves its one target repository from the set, receives
+ * that repository's tree in its workspace, and its "tests passed"
+ * claim is judged against the run's own step record, never against
+ * the model's word.
+ */
+export interface CodingDeclaration {
+  /** The repositories this work may touch, as "owner/repo". A run's
+   *  target must be one of these — a repository outside the set is
+   *  not a run-time exception but a different definition (its first
+   *  publish is a critical class when publishing lands, PR3). Empty
+   *  declares no target yet: delivery refuses honestly rather than
+   *  guessing a repository. */
+  repositories: string[];
+  /** The test command the finish gate binds to: the exact command a
+   *  run must have executed in its workspace, with its exit code in
+   *  the run's own record. Null declares no command — the gate then
+   *  cannot verify a tests-passed claim and a completed finish of a
+   *  coding run is refused (checkHarness says so at authoring time). */
+  testCommand: string | null;
+  /** The branch the tree is delivered at, unless the work names
+   *  another. "main" when undeclared. */
+  baseBranch: string;
+}
 export interface DefinitionChecks { every: number | null; items: string[] }
 export interface DefinitionOutput { format: OutputFormat; body: string }
 
@@ -115,6 +180,15 @@ export interface ParsedDefinition {
    *  a fact of that type may have before a finish's claim to it is stale.
    *  Declared only — freshnessTableOf layers these over the defaults. */
   freshness: FreshnessTable;
+  /** The machine requirement declared in Conditions, or null when the
+   *  work declares none — in which case no workspace is provisioned
+   *  or bound and the machine tools are never offered. */
+  machine: MachineRequirement | null;
+  /** The coding declaration in Conditions, or null when the work is
+   *  not a code change. A coding run additionally needs a machine
+   *  requirement — the tree is delivered into the workspace the
+   *  machine declaration binds (checkHarness enforces the pairing). */
+  coding: CodingDeclaration | null;
   /** The body's own 制約 section: lessons a person folded into the body
    *  by hand. Activated constraint drafts (planning_constraints) are NOT
    *  parsed from here — they land as a projection at resolution,
@@ -228,7 +302,7 @@ export function parseDefinition(body: string): ParsedDefinition {
   const failureParsed = parseFailureRows(sections.failure);
   const exceptions = [...new Set(bullets(sections.exceptions).map((c) => c.split(/[（(:：]/)[0].trim()).filter(Boolean))];
   return {
-    sections, metric, stop, checks, output, connectors, freshness, constraints: bullets(sections.constraints),
+    sections, metric, stop, checks, output, connectors, freshness, machine: parseMachine(sections.conditions), coding: parseCoding(sections.conditions), constraints: bullets(sections.constraints),
     failure: failureParsed.rows, failureProblems: failureParsed.problems, exceptions,
     exceptionsDeclared: sections.exceptions.trim().length > 0,
   };
@@ -427,6 +501,133 @@ export function freshnessTableOf(def: ParsedDefinition | null): FreshnessTable {
   return { ...DEFAULT_FRESHNESS, ...(def?.freshness ?? {}) };
 }
 
+// ── The machine: a workspace the work needs, declared in Conditions ──────
+// Three bullet families, each in the colon form the grammar uses
+// everywhere ("- 価格の鮮度: 30分まで" is the model), Japanese or English:
+//
+//   - ワークスペース: 必要          / - workspace: required
+//   - ワークスペース: 常駐でも可     / - workspace: standing allowed
+//   - 外向き通信: registry.npmjs.org, pypi.org
+//                                   / - egress: registry.npmjs.org
+//   - ワークスペース時間: 4時間まで  / - workspace time: 4 hours
+//
+// The workspace bullet also reads in its bare keyword form
+// ("- ワークスペースが必要"). An egress or time bullet declares the
+// requirement on its own — both are meaningless without a machine.
+// Reading is fail-closed throughout: disposal defaults to per-run and
+// only an explicit standing wording relaxes it; an egress token that
+// is not a host (or a "*.host" wildcard, or "*" itself) is dropped,
+// so a mistyped declaration narrows egress, never widens it; a time
+// bullet with no readable duration declares the requirement and
+// leaves the server cap standing.
+
+const WORKSPACE_HEAD = /^(?:ワークスペース|workspace|machine)\s*[:：]\s*(.*)$/i;
+// No \b after the keyword: a word boundary is an ASCII notion and
+// never fires between Japanese characters, which would silently
+// un-declare the Japanese bare form.
+const WORKSPACE_BARE = /^(?:ワークスペース|workspace|machine).*?(?:必要|必須|required)/i;
+const EGRESS_HEAD = /^(?:外向き通信|egress|outbound)\s*[:：]\s*(.*)$/i;
+const WORKSPACE_TIME_HEAD = /^(?:ワークスペース時間|workspace\s+time|machine\s+time)\s*[:：]\s*(.*)$/i;
+
+/** Pure. Whether a token reads as an egress host: "*", a bare
+ *  hostname with at least one dot, or a "*.host" wildcard of one.
+ *  Ports, paths and schemes are not hosts — the provider's network
+ *  policy matches domains, so anything carrying them drops. */
+function isEgressHost(token: string): boolean {
+  if (token === "*") return true;
+  const host = token.startsWith("*.") ? token.slice(2) : token;
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(host);
+}
+
+/** Pure. The machine requirement a Conditions section declares. */
+function parseMachine(conditions: string): MachineRequirement | null {
+  let declared = false;
+  let disposal: "per-run" | "any" = "per-run";
+  let wallClockMs: number | null = null;
+  const egress: string[] = [];
+  for (const b of bullets(conditions)) {
+    let m: RegExpExecArray | null;
+    if ((m = EGRESS_HEAD.exec(b))) {
+      declared = true;
+      // Bracketed annotations are commentary, not hosts: strip them
+      // before tokenising, so `*（制限なし）` still reads as `*`.
+      const value = m[1].replace(/（[^）]*）|\([^)]*\)/g, " ");
+      for (const tok of value.split(/[,、\s]+/).map((t) => t.trim().toLowerCase()).filter(Boolean)) {
+        if (isEgressHost(tok) && !egress.includes(tok)) egress.push(tok);
+      }
+      continue;
+    }
+    if ((m = WORKSPACE_TIME_HEAD.exec(b))) {
+      declared = true;
+      const d = parseDuration(b);
+      if (d) wallClockMs = d.ms;
+      continue;
+    }
+    if ((m = WORKSPACE_HEAD.exec(b))) {
+      declared = true;
+      if (/常駐でも可|常駐可|standing/i.test(m[1])) disposal = "any";
+      continue;
+    }
+    if (WORKSPACE_BARE.test(b)) declared = true;
+  }
+  if (!declared) return null;
+  return { disposal, egress, wallClockMs };
+}
+
+// ── Coding: a code change, declared in Conditions ──────────────────────
+// Three bullet families in the same colon form as the machine
+// declarations, Japanese or English:
+//
+//   - リポジトリ: owner/repo, owner/other   / - repositories: owner/repo
+//   - テストコマンド: npm test              / - test command: npm test
+//   - ベース: main                          / - base branch: main
+//
+// Reading is fail-closed throughout, on the machine grammar's
+// discipline: a repository token that is not exactly "owner/repo"
+// drops (a placeholder line an activator has not replaced yet reads
+// as "no repository declared", never as a guess); a test command is
+// the bullet's whole remainder, taken verbatim, because the finish
+// gate matches the run's recorded command against it exactly; a base
+// token that is not branch-shaped drops back to "main".
+
+const REPO_HEAD = /^(?:リポジトリ|対象リポジトリ|repositories|repository|repo)\s*[:：]\s*(.*)$/i;
+const TEST_COMMAND_HEAD = /^(?:テストコマンド|テスト|test\s+command|test)\s*[:：]\s*(.*)$/i;
+const BASE_HEAD = /^(?:ベースブランチ|ベース|base\s+branch|base)\s*[:：]\s*(.*)$/i;
+const REPO_TOKEN = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9_.-]+$/;
+const BRANCH_TOKEN = /^[A-Za-z0-9][A-Za-z0-9_./-]*$/;
+
+/** Pure. The coding declaration a Conditions section declares. */
+function parseCoding(conditions: string): CodingDeclaration | null {
+  let declared = false;
+  const repositories: string[] = [];
+  let testCommand: string | null = null;
+  let baseBranch = "main";
+  for (const b of bullets(conditions)) {
+    let m: RegExpExecArray | null;
+    if ((m = REPO_HEAD.exec(b))) {
+      declared = true;
+      for (const tok of m[1].split(/[,、\s]+/).map((t) => t.trim()).filter(Boolean)) {
+        if (REPO_TOKEN.test(tok) && !tok.includes("..") && !repositories.includes(tok)) repositories.push(tok);
+      }
+      continue;
+    }
+    if ((m = TEST_COMMAND_HEAD.exec(b))) {
+      declared = true;
+      const cmd = m[1].trim();
+      if (cmd) testCommand = cmd;
+      continue;
+    }
+    if ((m = BASE_HEAD.exec(b))) {
+      declared = true;
+      const tok = m[1].trim().split(/[\s、,]+/)[0] ?? "";
+      if (BRANCH_TOKEN.test(tok) && !tok.includes("..") && !tok.endsWith("/")) baseBranch = tok;
+      continue;
+    }
+  }
+  if (!declared) return null;
+  return { repositories, testCommand, baseBranch };
+}
+
 // ── Checking a harness ───────────────────────────────────────────────────────
 
 export type Severity = "error" | "warning" | "hint";
@@ -506,6 +707,24 @@ export function checkHarness(def: ParsedDefinition, ctx: HarnessContext = {}): D
   }
   if (!def.output) {
     out.push({ code: "H006", severity: "hint", message: "成果物の型がないので、保存時に形を確かめません。", fix: "「# 成果物の型」に、見出しだけの Markdown などを ``` で囲んで書いてください。" });
+  }
+  // A coding declaration (coding capability PR2): the loop delivers
+  // a repository tree into the run's workspace and binds the finish
+  // to the declared test command's own step record. Without a
+  // machine declaration no workspace is ever bound, so the tree has
+  // nowhere to land — an error, not a silent no-op. An empty
+  // repository set or a missing test command leaves the gate unable
+  // to judge the finish it exists to judge: warnings, in the open.
+  if (def.coding) {
+    if (!def.machine) {
+      out.push({ code: "H007", severity: "error", message: "コーディングの宣言がありますが、ワークスペースの宣言がありません。リポジトリのツリーを届ける先（実行環境）がないため、この仕事は実行できません。", fix: "「# 条件」に「- ワークスペース: 必要」を書いてください。" });
+    }
+    if (!def.coding.repositories.length) {
+      out.push({ code: "H008", severity: "warning", message: "対象リポジトリが宣言されていません。実行しても、ツリーの届け先が決まらず止まります。", fix: "「# 条件」に「- リポジトリ: owner/repo」の形で、変更してよいリポジトリを書いてください。" });
+    }
+    if (!def.coding.testCommand) {
+      out.push({ code: "H009", severity: "warning", message: "テストコマンドが宣言されていません。「テストが通った」を実行自身の記録で確かめられないため、完了の報告は差し戻されます。", fix: "「# 条件」に「- テストコマンド: npm test」の形で、この変更を確かめるコマンドを書いてください。" });
+    }
   }
   const rank: Record<Severity, number> = { error: 0, warning: 1, hint: 2 };
   return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
@@ -610,6 +829,25 @@ export function definitionReading(def: ParsedDefinition): { reads: string[]; mis
   if (def.checks.items.length) reads.push(`点検: ${def.checks.items.length} 項目${def.checks.every ? `、${def.checks.every} 周ごと` : ""}`);
   if (def.output) reads.push(`成果物の型: ${def.output.format}${def.output.format === "markdown" ? `（見出し ${shapeHeadings(def.output.body).length} 個を保存時に確かめます）` : ""}`);
   else missing.push("成果物の型（# 成果物の型）がないため、保存時に型を確かめません");
+  // A machine requirement reads back like every other declaration, so
+  // the author can check the reading before a run lives under it. No
+  // declaration is NOT a gap — most work needs no machine — so nothing
+  // lands in `missing` for its absence.
+  if (def.machine) {
+    const parts = [def.machine.disposal === "per-run" ? "ランごとに使い捨て" : "常駐のマシンでも可"];
+    parts.push(def.machine.egress.length ? `外向き通信は ${def.machine.egress.join("、")} のみ` : "外向き通信の宣言なし（マシンの中だけ）");
+    if (def.machine.wallClockMs != null) parts.push(`時間上限 ${Math.round(def.machine.wallClockMs / 60_000)} 分`);
+    reads.push(`実行環境: ワークスペースが必要（${parts.join("・")}）`);
+  }
+  // A coding declaration reads back the same way: the repository set
+  // the loop may touch, the branch the tree arrives at, and the test
+  // command the finish will be judged against — so the author sees
+  // the contract before a run lives under it.
+  if (def.coding) {
+    const repos = def.coding.repositories.length ? def.coding.repositories.join("、") : "（未宣言 — 実行は止まります）";
+    const test = def.coding.testCommand ? `テストは「${def.coding.testCommand}」を実行記録で確かめます` : "テストコマンド未宣言（完了は差し戻されます）";
+    reads.push(`コーディング: 対象は ${repos}、ベースは ${def.coding.baseBranch}、${test}`);
+  }
   // Failure handling (B13): the declared rows read back field by
   // field, so the author can check the reading before a run lives
   // under it. No section is NOT a gap — the engine defaults are the

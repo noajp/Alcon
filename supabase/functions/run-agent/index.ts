@@ -64,7 +64,7 @@ import {
   McpSession, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow,
 } from "../_shared/integrationClient.ts";
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
-import { fetchPull, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
+import { fetchPull, githubTokens, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
 import { DRIVE_TOOLS } from "../_shared/googleDrive.ts";
 import { RECORD_TOOLS } from "./records.ts";
 import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type RecordScope } from "./recordStore.ts";
@@ -121,6 +121,24 @@ import { emptyVerifyTally, tallyVerify, verifyDiffText, type VerifyCheck, type V
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, freshnessTableOf, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
 import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, passwordFieldOf, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, signInResultText, type RunnerRow } from "./runnerTools.ts";
+import {
+  DEFAULT_WORKSPACE_CAPS, machineCallKind, provisionedRunIdOf, WORKSPACE_READY_WAIT_MS, type MachineBindingFacts,
+} from "../_shared/workspaces.ts";
+import {
+  closeRunWorkspace, ensureManagedWorkspace, loadLatestWorkspace, loadLiveWorkspace,
+  markWorkspaceReady, recordStandingBinding,
+} from "../_shared/workspaceLifecycle.ts";
+import {
+  captureCommand, changeSetSummaryText, codingFinishGaps, deliveryStepTitle, parseChangeSet,
+  parseDeliveryDetail, patchArtifactTitle, resolveCodingTarget, targetRefusalText, testEvidenceOf,
+  type ChangeSet, type CodingTarget, type ShellCallRecord, type TestEvidence,
+} from "../_shared/codingLoop.ts";
+import { deliverTreeToWorkspace, fetchBaseSha, fetchRepoFileAtSha } from "../_shared/codingDelivery.ts";
+import {
+  branchNameForRun, composePublish, parsePatchFiles, publishCommandKind, publishCriticalReason, publishIsCritical,
+  pullRequestBody, pullRequestTitle, type PublishCommand,
+} from "../_shared/codingPublish.ts";
+import { pullRequestCreatedOf } from "../_shared/createdEntities.ts";
 import {
   runLoop, canonicalCalls, appendDecisionResults,
   type Block, type LoopState, type ToolCall, type ToolKind, type ToolResult, type FinishPayload, type Msg,
@@ -597,6 +615,11 @@ Deno.serve(async (req: Request) => {
 async function failRun(admin: SupabaseClient, run: Run, message: string) {
   await addStep(admin, run.id, "error", "実行に失敗しました", message);
   await admin.from("agent_runs").update({ status: "failed", error: message, finished_at: new Date().toISOString() }).eq("id", run.id).eq("status", "running");
+  // Run end destroys the run's workspace (coding PR1): per-run
+  // disposal is the classification's premise, so it is not left to
+  // the tick's reaper alone. Best effort — a failed destroy leaves
+  // the record live and the reaper retries; it never fails the run.
+  await closeRunWorkspace(admin, (k) => Deno.env.get(k), run.id, "run_failed", new Date()).catch(() => false);
   if (run.triggered_by) {
     await admin.from("notifications").insert({
       recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
@@ -1212,13 +1235,157 @@ async function execute(a: ExecArgs): Promise<void> {
     : { data: [] };
   const runner = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now());
   if (runner) integrationSummary.push({ name: `この人の PC のブラウザ（${runner.name}）`, kind: "PC", delegation: "read_only", tools: RUNNER_TOOLS.length });
-  // A disposable machine of theirs, when one is on: commands and files there.
-  const machine = pickRunner((runnerRows ?? []) as RunnerRow[], Date.now(), "shell");
-  if (machine) integrationSummary.push({ name: `使い捨ての仮想マシン（${machine.name}）`, kind: "VM", delegation: "full_delegation", tools: MACHINE_TOOLS.length });
+  // ── The machine (coding PR1): a workspace exists only where the
+  // run's definition declares one — never merely because a shell
+  // runner happens to be online. The declaration (parsedAll.machine)
+  // is fulfilled by exactly one binding, recorded in run_workspaces:
+  // a managed sandbox the server provisioned for THIS run (per-run,
+  // destroyed at run end, egress the declared list, caps enforced),
+  // or — only when the definition allows a standing machine — an
+  // isolated runner on the person's own infrastructure. A runner the
+  // server provisioned for another run never fulfils this one.
+  // The binding's facts price the machine calls in kindOf below:
+  // the old blanket "a disposable machine changes nothing outside
+  // itself, therefore read" holds only while the invariants do.
+  const machineReq = parsedAll?.machine ?? null;
+  let machine: RunnerRow | null = null;
+  let machineFacts: MachineBindingFacts | null = null;
+  let machineOffered = false;
+  let machineWorkspace: { deadlineMs: number | null } | null = null;
+  if (machineReq && run.activity_space_id && run.triggered_by) {
+    const getEnv = (k: string) => Deno.env.get(k);
+    const rows = (runnerRows ?? []) as RunnerRow[];
+    const assetOnline = (r: RunnerRow | null | undefined): r is RunnerRow =>
+      !!r && !!r.last_seen_at && Date.now() - new Date(r.last_seen_at).getTime() <= RUNNER_ONLINE_MS;
+    const fetchAsset = async (id: string): Promise<RunnerRow | null> => {
+      const inRows = rows.find((r) => r.id === id);
+      if (inRows) return inRows;
+      const { data } = await admin.from("assets").select("id, name, manifest, last_seen_at").eq("id", id).maybeSingle();
+      return (data as RunnerRow | null) ?? null;
+    };
+    const bindMachine = (asset: RunnerRow, facts: MachineBindingFacts, deadlineMs: number | null) => {
+      machine = asset;
+      machineFacts = facts;
+      machineOffered = true;
+      machineWorkspace = { deadlineMs };
+      integrationSummary.push({ name: `使い捨ての仮想マシン（${asset.name}）`, kind: "VM", delegation: "full_delegation", tools: MACHINE_TOOLS.length });
+    };
+    let machineHandled = false;
+    try {
+      const live = await loadLiveWorkspace(admin, run.id).catch(() => null);
+      if (live?.cls === "managed") {
+        machineHandled = true;
+        machineOffered = true;
+        machineWorkspace = { deadlineMs: live.deadline ? new Date(live.deadline).getTime() : null };
+        const asset = live.assetId ? await fetchAsset(live.assetId).catch(() => null) : null;
+        if (assetOnline(asset)) {
+          const ready = live.status === "ready"
+            ? live
+            : await markWorkspaceReady(admin, getEnv, a.supabaseUrl, live).catch(() => live);
+          bindMachine(asset, {
+            cls: "managed", credentialFree: "server",
+            egressDeclared: ready.egressDeclared, egressEnforced: ready.egressEnforced,
+          }, machineWorkspace.deadlineMs);
+        } else if (!run.transcript) {
+          await addStep(admin, run.id, "status", "ワークスペースを用意しています", "定義が宣言した実行環境（使い捨ての仮想マシン）をこの実行専用に用意しています。準備ができ次第、この実行の中で使えるようになります。");
+        }
+      } else if (live?.cls === "standing" && live.assetId) {
+        machineHandled = true;
+        const asset = await fetchAsset(live.assetId).catch(() => null);
+        if (assetOnline(asset) && pickRunner([asset], Date.now(), "shell")) {
+          bindMachine(asset, {
+            cls: "standing", credentialFree: "self-reported",
+            egressDeclared: live.egressDeclared, egressEnforced: false,
+          }, null);
+        }
+      } else if (!live) {
+        // A standing machine may fulfil the requirement when the
+        // definition allows one. Provisioned assets are bound to
+        // their own run and are never candidates here.
+        const standing = machineReq.disposal === "any"
+          ? pickRunner(rows.filter((r) => !provisionedRunIdOf(r.manifest)), Date.now(), "shell")
+          : null;
+        if (standing) {
+          machineHandled = true;
+          await recordStandingBinding(admin, {
+            runId: run.id, spaceId: run.activity_space_id, assetId: standing.id, requirement: machineReq,
+          }).catch(() => null);
+          bindMachine(standing, {
+            cls: "standing", credentialFree: "self-reported",
+            egressDeclared: machineReq.egress, egressEnforced: false,
+          }, null);
+        } else if (!run.rehearsal) {
+          machineHandled = true;
+          // Managed provisioning. A rehearsal never mints a real
+          // sandbox: its machine calls are recorded, not run, and a
+          // trial must not spend the Space's sandbox budget.
+          const ensured = await ensureManagedWorkspace(admin, getEnv, {
+            runId: run.id, spaceId: run.activity_space_id, starterId: run.triggered_by,
+            requirement: machineReq, supabaseUrl: a.supabaseUrl, now: new Date(),
+          }).catch(() => null);
+          if (!ensured) {
+            integrationSummary.push(downIntegration("ワークスペース", "用意に失敗したため、この実行では仮想マシンを使えません"));
+          } else if (ensured.state === "not_configured") {
+            integrationSummary.push(downIntegration("ワークスペース", "サーバーにワークスペースの接続設定がないため使えません"));
+            if (!run.transcript) await addStep(admin, run.id, "error", "定義が宣言したワークスペースを用意できません", "ワークスペースのサービスがサーバーに設定されていないため、この実行では仮想マシンを使えません（サーバー側の設定: SPRITES_API_TOKEN）。");
+          } else if (ensured.state === "runner_bundle_missing") {
+            integrationSummary.push(downIntegration("ワークスペース", "ランナーの配布先がサーバーに設定されていないため使えません"));
+            if (!run.transcript) await addStep(admin, run.id, "error", "定義が宣言したワークスペースを用意できません", "ランナーの配布先がサーバーに設定されていないため、この実行では仮想マシンを使えません（サーバー側の設定: WORKSPACE_RUNNER_URL）。");
+          } else if (ensured.state === "refused") {
+            const why = ensured.reason === "concurrency"
+              ? `この Space で同時に動いているワークスペースが上限（${DEFAULT_WORKSPACE_CAPS.maxConcurrentPerSpace}）に達しているため、新しいワークスペースは用意できませんでした。`
+              : `この Space の今月のワークスペース費用が上限（$${DEFAULT_WORKSPACE_CAPS.monthlySpendCapUsd}）に達しているため、新しいワークスペースは用意できませんでした。`;
+            integrationSummary.push(downIntegration("ワークスペース", why));
+            if (!run.transcript) await addStep(admin, run.id, "error", "定義が宣言したワークスペースを用意できません", why);
+          } else if (ensured.state === "failed") {
+            integrationSummary.push(downIntegration("ワークスペース", "用意に失敗したため、この実行では仮想マシンを使えません"));
+            if (!run.transcript) await addStep(admin, run.id, "error", "定義が宣言したワークスペースを用意できません", `ワークスペースの用意に失敗しました（理由コード: ${ensured.code}）。`);
+          } else {
+            // Provisioning is under way (or was, from an earlier
+            // slice): the tools join the list now — the tool list
+            // freezes at this slice — and a bounded wait gives the
+            // runner a chance to answer before the run goes on.
+            machineOffered = true;
+            machineWorkspace = { deadlineMs: ensured.record.deadline ? new Date(ensured.record.deadline).getTime() : null };
+            if (!run.transcript) await addStep(admin, run.id, "status", "ワークスペースを用意しています", "定義が宣言した実行環境（使い捨ての仮想マシン）をこの実行専用に用意しています。準備ができ次第、この実行の中で使えるようになります。");
+            if (ensured.record.assetId) {
+              const waitUntil = Date.now() + WORKSPACE_READY_WAIT_MS;
+              let asset = await fetchAsset(ensured.record.assetId).catch(() => null);
+              while (!assetOnline(asset) && Date.now() < waitUntil) {
+                await new Promise((r) => setTimeout(r, 3_000));
+                asset = await fetchAsset(ensured.record.assetId).catch(() => null);
+              }
+              if (assetOnline(asset)) {
+                const ready = await markWorkspaceReady(admin, getEnv, a.supabaseUrl, ensured.record).catch(() => ensured.record);
+                bindMachine(asset, {
+                  cls: "managed", credentialFree: "server",
+                  egressDeclared: ready.egressDeclared, egressEnforced: ready.egressEnforced,
+                }, machineWorkspace.deadlineMs);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // A workspace problem never breaks the run: it goes on
+      // without the machine, and the record (or its absence) says why.
+      console.error("run-agent: workspace resolution failed", errorMessage(e));
+      machine = null;
+      machineFacts = null;
+    }
+    // A record left by a provisioning that failed on an earlier
+    // slice: the down-note stands, no second attempt this run.
+    if (!machineHandled) {
+      const latest = await loadLatestWorkspace(admin, run.id).catch(() => null);
+      if (latest?.status === "failed") {
+        integrationSummary.push(downIntegration("ワークスペース", "用意に失敗したため、この実行では仮想マシンを使えません"));
+      }
+    }
+  }
 
   // A connection's tools load when the model searches for them, once there are many.
   const liveTools: RunToolDef[] = withDeferral(
-    [...baseAgentTools(), ...(recordScope ? RECORD_TOOLS : []), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machine ? MACHINE_TOOLS : [])],
+    [...baseAgentTools(), ...(recordScope ? RECORD_TOOLS : []), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machineOffered ? MACHINE_TOOLS : [])],
     integrationDefs,
   );
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
@@ -1237,9 +1404,17 @@ async function execute(a: ExecArgs): Promise<void> {
     // through the approval path; needsApproval decides each call.
     if (base === "board" && mayNeedApproval("element", name)) return "write";
     if (base) return base;
-    // The runner only reads unless its owner started it to write; a
-    // disposable machine changes nothing outside itself.
-    if (isRunnerTool(name) || isMachineTool(name)) return "read";
+    // The browser runner only reads unless its owner started it to
+    // write. A machine's calls are priced from the binding's
+    // invariants (workspaces.ts machineCallKind): "read" only while
+    // the workspace holds no credential, its egress is the
+    // definition's declared list, and it is per-run disposable (or
+    // the definition waived disposal). A binding that fails one
+    // makes the calls ask like writes, judged one by one by the
+    // approval machinery — the classification is re-earned per
+    // binding, not inherited from the tool's shape.
+    if (isMachineTool(name)) return machineFacts && machineReq ? machineCallKind(machineFacts, machineReq) : "read";
+    if (isRunnerTool(name)) return "read";
     return "write"; // decided per call below
   };
   // Sign-in resolutions the D6 gate made for this slice's calls,
@@ -1640,6 +1815,32 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   };
 
+  // The coding publish's landing, recorded (coding PR3, design §8):
+  // the PR the publish opened becomes a created entity on the run —
+  // the step carries the extractor's record (the code_changes row
+  // the call seam just linked, read back by its identity), and the
+  // run's panel draws the card from it, re-reading the row live for
+  // the PR's state. The link step above already named the PR; this
+  // step is its card. A landing whose link could not be read back
+  // still names the PR by its URL — the publish happened; only the
+  // card's live read is missing, and the step says which.
+  const notePublishLanded = async (resultText: string): Promise<void> => {
+    const ref = pullUrlsIn(resultText)[0];
+    if (!ref) {
+      await addStep(admin, run.id, "error", "PR の URL を公開結果から読み取れませんでした", resultText.slice(0, 300));
+      return;
+    }
+    let entity: ReturnType<typeof pullRequestCreatedOf>;
+    if (run.element_id) {
+      const { data: change } = await admin.from("code_changes")
+        .select("id, title, url, repo, number, state")
+        .eq("element_id", run.element_id).eq("repo", ref.repo).eq("number", ref.number).maybeSingle();
+      entity = change ? pullRequestCreatedOf(change as Record<string, unknown>) : undefined;
+    }
+    await addStep(admin, run.id, "pull_request", `PR を開きました: ${ref.repo}#${ref.number}`,
+      entity ? JSON.stringify({ created: [entity] }) : `https://github.com/${ref.repo}/pull/${ref.number}`);
+  };
+
   // A call to the person's PC: queued for its runner, answered within a
   // minute or given up (the runner may have gone offline since). The
   // queue and the wait are separate halves because a sign-in call is
@@ -1708,6 +1909,23 @@ async function execute(a: ExecArgs): Promise<void> {
     if (!settled.ok) return { content: settled.content, is_error: true };
     await noteSignInWall(settled.result);
     return { content: read(settled.result) };
+  };
+
+  /**
+   * A machine call, behind the workspace's wall clock. The cap is
+   * the server's, not the model's: a workspace past its deadline is
+   * destroyed at this seam, so a run that keeps calling cannot
+   * outlive its cap even if the tick's reaper has not come around
+   * yet. A standing binding has no server wall clock (its caps are
+   * the person's own machine's) and passes straight through.
+   */
+  const callMachine = async (call: ToolCall): Promise<{ content: string; is_error?: boolean }> => {
+    if (machineWorkspace?.deadlineMs != null && Date.now() > machineWorkspace.deadlineMs) {
+      await closeRunWorkspace(admin, (k) => Deno.env.get(k), run.id, "wall_clock", new Date()).catch(() => false);
+      machine = null;
+      return { content: "ワークスペースの時間上限に達したため、この実行の仮想マシンは終了しました。残りの作業はほかの道具で進めるか、時間が足りなかったことを報告してください。", is_error: true };
+    }
+    return await callRunner(call, machine, machineResultText);
   };
 
   /**
@@ -2056,7 +2274,7 @@ async function execute(a: ExecArgs): Promise<void> {
     }
     if (call.name === SIGN_IN_TOOL) return await callSignIn(call, approved);
     if (isRunnerTool(call.name)) return await callRunner(call, runner, runnerResultText);
-    if (isMachineTool(call.name)) return await callRunner(call, machine, machineResultText);
+    if (isMachineTool(call.name)) return await callMachine(call);
     if (baseKindOf(call.name) === "board") {
       const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved, spaceId: run.activity_space_id ?? null });
       await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
@@ -2626,6 +2844,12 @@ async function execute(a: ExecArgs): Promise<void> {
   if (standingCompensation) {
     for (const e of standingCompensation.entries) compensationOfCall.set(e.callId, e.rowId);
   }
+  // The publish rest this run stands in, if any (coding PR3): a
+  // finished coding run's publish, offered as one batch. Captured
+  // before applyDecision consumes the pending, like the compensation
+  // rest above: the person's decision finalizes the finish the
+  // publish interrupted instead of resuming the loop.
+  const standingPublish = pending?.publish;
   if (run.transcript?.messages?.length) {
     state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: run.transcript.nudges ?? 0, revisions: run.transcript.revisions ?? 0 };
     turnBudget = run.transcript.turnBudget ?? maxTotalTurns;
@@ -2835,6 +3059,11 @@ async function execute(a: ExecArgs): Promise<void> {
       // the undo command (B9 §7.2): the person declined a rollback,
       // they did not judge the command — its earned grant stands.
       if (standingCompensation) return;
+      // A publish batch's rejection is the same shape (coding PR3):
+      // the person declined this PR, they did not judge the publish
+      // commands — the batch was the server's composition of the
+      // run's patch, not the agent's chosen act.
+      if (standingPublish) return;
       if (!run.activity_space_id) return;
       const seen = new Set<string>();
       for (const c of calls) {
@@ -2903,6 +3132,46 @@ async function execute(a: ExecArgs): Promise<void> {
       failureClass: isFailureClass(standingCompensation.failureClass) ? standingCompensation.failureClass : "run_failure",
       ...(standingCompensation.failurePolicy ? { policy: standingCompensation.failurePolicy } : {}),
     });
+    return;
+  }
+
+  // A decision on a publish batch finalizes the finish the publish
+  // interrupted (coding PR3): the batch has already executed through
+  // applyDecision when approved — its create_pull_request landed
+  // through the call seam, which linked the PR to the Element and
+  // wrote its steps — or it was rejected, and no call ran. Either
+  // way the finish now seals exactly as it would have, with the
+  // publish's outcome said on the run and on the Element's thread:
+  // the PR the batch opened (read back from the code_changes link
+  // the seam wrote), the decline, or the failure that stopped it.
+  // The loop never resumes: the model is done, there is no live turn.
+  if (standingPublish && decisionOutcome.decided && !decisionOutcome.continued) {
+    const decided = decisionOutcome.decided;
+    if (decided.approved) {
+      const prResult = decided.results.find((r) => r.tool_use_id === standingPublish.prCallId);
+      const failed = decided.results.filter((r) => r.is_error).length;
+      if (prResult && !prResult.is_error) {
+        await notePublishLanded(prResult.content);
+      } else {
+        await addStep(admin, run.id, "error", "公開が完了しませんでした",
+          `承認された公開のうち ${failed} 件の呼び出しが失敗し、PR は開かれていません。パッチは成果物として残っています。`);
+        if (run.element_id) {
+          await admin.from("element_comments").insert({
+            element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+            content: "**公開が完了しませんでした** — 承認された公開の一部が失敗し、PR は開かれていません。変更パッチは実行の成果物として残っています。",
+          });
+        }
+      }
+    } else {
+      await addStep(admin, run.id, "approval", "公開は却下されました", "PR は開かれていません。変更パッチは実行の成果物として残っています。");
+      if (run.element_id) {
+        await admin.from("element_comments").insert({
+          element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+          content: "**公開は却下されました** — PR は開かれていません。変更パッチは実行の成果物として残っています。",
+        });
+      }
+    }
+    await settleFinish(standingPublish.finish, standingPublish.verdict);
     return;
   }
 
@@ -2980,10 +3249,25 @@ async function execute(a: ExecArgs): Promise<void> {
   }));
   const checkClaimsOf = (finish: FinishPayload): ClaimCheck =>
     checkFinishClaims(finish.claims ?? [], { usedReads: usedReadsOf(), freshness, now: Date.now() });
-  const mechanicalCheck = (finish: FinishPayload) => {
+  const mechanicalCheck = async (finish: FinishPayload) => {
     attemptCheck = checkClaimsOf(finish);
     returnProvenance = { source: "mechanical", verifyStepIdx: null, artifactIds: [] };
-    return { gaps: attemptCheck.gaps };
+    const gaps = [...attemptCheck.gaps];
+    // The coding gate (PR2): a coding finish is judged against the
+    // run's own records — the declared test command's step record and
+    // the change set captured from the workspace — by the same
+    // mechanical path, before any verifier is consulted. The facts
+    // are gathered by the coding block below (its closures read the
+    // run's asset_calls and, for the change set, its workspace).
+    if (codingDecl && !run.rehearsal && !planRun) {
+      const evidence = await codingEvidence().catch(() => ({ state: "missing" }) as TestEvidence);
+      const changeSet = codingSession?.delivered ? await captureChangeSet().catch(() => null) : null;
+      gaps.push(...codingFinishGaps({
+        decl: codingDecl, outcome: finish.outcome, claims: finish.claims, summary: finish.summary,
+        delivered: !!codingSession?.delivered, evidence, changeSet,
+      }));
+    }
+    return { gaps };
   };
 
   // The verifier reads the task, the Strategy's success conditions and this
@@ -3090,6 +3374,412 @@ async function execute(a: ExecArgs): Promise<void> {
     breakerTripsByCallId.set(call.id, trip);
     return { reason: trip.reason };
   };
+
+  // ── The coding loop (PR2): tree delivery, gate facts, the patch ──
+  // A run whose definition declares a code change (parsedAll.coding)
+  // and bound a workspace (PR1) receives its target repository's tree
+  // in that workspace before the loop starts: the server resolves
+  // repo + base branch → base SHA through the Space's GitHub
+  // connection and delivers a snapshot the runner unpacks
+  // (codingDelivery.ts); no credential ever enters the box. Delivery
+  // is once per run — its step is the record a later slice reads
+  // back instead of re-delivering (the branch may have moved; the
+  // patch is against the delivered base). A rehearsal never receives
+  // a tree (its machine calls are recorded, not run) and a plan run's
+  // coding belongs to its apply run.
+  const codingDecl = parsedAll?.coding ?? null;
+  let codingSession: { target: CodingTarget; baseSha: string; delivered: boolean } | null = null;
+
+  /** A server-issued shell call into the run's bound machine, on the
+   *  same asset_calls queue the model's own calls travel — one path
+   *  (#7). Waits a little past the runner's own per-call cap: the
+   *  command itself cannot outlive it. */
+  const runCodingShell = async (command: string): Promise<{ ok: boolean; exitCode: number | null; stdout: string; stderr: string }> => {
+    if (!machine) return { ok: false, exitCode: null, stdout: "", stderr: "ワークスペースがつながっていません" };
+    const queued = await queueAssetCall(machine, "shell", { command });
+    if (!queued.ok) return { ok: false, exitCode: null, stdout: "", stderr: queued.content };
+    const until = Date.now() + 55_000;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 700));
+      const { data: c } = await admin.from("asset_calls").select("status, result, error").eq("id", queued.id).maybeSingle();
+      if (c?.status === "done") {
+        const r = (c.result ?? {}) as { exit_code?: unknown; stdout?: unknown; stderr?: unknown };
+        return { ok: true, exitCode: typeof r.exit_code === "number" ? r.exit_code : null, stdout: String(r.stdout ?? ""), stderr: String(r.stderr ?? "") };
+      }
+      if (c?.status === "failed") return { ok: false, exitCode: null, stdout: "", stderr: String(c.error ?? "実行役で失敗しました") };
+    }
+    await admin.from("asset_calls").update({ status: "expired", finished_at: new Date().toISOString() }).eq("id", queued.id).in("status", ["pending", "claimed"]);
+    return { ok: false, exitCode: null, stdout: "", stderr: "時間内に答えがありませんでした" };
+  };
+
+  /** The finish gate's test evidence: this run's settled shell calls,
+   *  read from asset_calls — the record, never the model's word. */
+  const codingEvidence = async (): Promise<TestEvidence> => {
+    const { data } = await admin.from("asset_calls").select("id, input, result, status, created_at")
+      .eq("run_id", run.id).eq("tool", "shell").order("created_at", { ascending: true });
+    const records: ShellCallRecord[] = ((data ?? []) as { id: string; input: unknown; result: unknown; status: string; created_at: string }[])
+      .map((r) => {
+        const exit = (r.result as { exit_code?: unknown } | null)?.exit_code;
+        return {
+          id: r.id,
+          command: String((r.input as { command?: unknown } | null)?.command ?? ""),
+          status: r.status,
+          exitCode: typeof exit === "number" ? exit : null,
+          at: r.created_at,
+        };
+      });
+    return testEvidenceOf(records, codingDecl?.testCommand ?? null);
+  };
+
+  /** The change set, captured from the workspace at the gate / at
+   *  the finish: null when the capture itself could not be read. */
+  const captureChangeSet = async () => {
+    const res = await runCodingShell(captureCommand());
+    return res.ok ? parseChangeSet(res.stdout) : null;
+  };
+
+  /** The loop's end (design §4.2 step 6, §8): capture the change set,
+   *  put its summary in the run record, and save the patch as the
+   *  run's artifact — through the existing artifact machinery, not a
+   *  new store. Once per run: a step of its title is the record. The
+   *  change set is returned either way (a re-drive that finds the
+   *  step already written re-captures without re-saving), because
+   *  the publish (PR3) composes from the same capture. */
+  const produceCodingPatch = async (): Promise<ChangeSet | null> => {
+    if (!codingSession?.delivered || !codingDecl) return null;
+    const { data: prior } = await admin.from("agent_run_steps").select("id")
+      .eq("run_id", run.id).like("title", "変更パッチを保存:%").limit(1);
+    const cs = await captureChangeSet().catch(() => null);
+    if (!cs) {
+      await addStep(admin, run.id, "error", "変更を読み取れませんでした", "ワークスペースから変更セットを読み取れなかったため、パッチは保存されませんでした。");
+      return null;
+    }
+    if (prior?.length) return cs;
+    const evidence = await codingEvidence().catch(() => ({ state: "missing" }) as TestEvidence);
+    const summary = changeSetSummaryText({
+      target: codingSession.target, baseSha: codingSession.baseSha, changeSet: cs, evidence,
+      testCommand: codingDecl.testCommand,
+    });
+    if (cs.empty) {
+      await addStep(admin, run.id, "artifact", "変更はありませんでした", summary);
+      return cs;
+    }
+    const title = patchArtifactTitle(codingSession.target);
+    const { data: existing } = await admin.from("agent_artifacts").select("id")
+      .eq("element_id", run.element_id).eq("title", title).maybeSingle();
+    const res = existing
+      ? await admin.from("agent_artifacts").update({ content: cs.patch, format: "text", run_id: run.id, updated_at: new Date().toISOString() }).eq("id", existing.id).select("id").single()
+      : await admin.from("agent_artifacts").insert({ element_id: run.element_id, run_id: run.id, title, content: cs.patch, format: "text", author_name: agentName }).select("id").single();
+    await addStep(admin, run.id, "artifact", `変更パッチを保存: ${codingSession.target.repo}`,
+      res.error ? `${summary}\n（パッチ本体の保存に失敗しました: ${res.error.message}）` : summary);
+    return cs;
+  };
+
+  // ── The publish (PR3): the patch leaves through the connection ──
+  // Design §4.2 step 7, §6 outbound, §7: the server composes the
+  // run's verified patch into governed calls on the Space's GitHub
+  // connection — branch at the delivered base, one tree commit of
+  // the whole change set, the manifest's create_pull_request with
+  // its verify read-back — and judges them with this run's own
+  // machinery (breakerHold before verdicts, verdictForCall's
+  // composition of manifest, mode, delegation and track record).
+  // The calls then run through executeCall, so the call log, the
+  // compensation record, the verify tally and the PR's link to the
+  // Element (callIntegration's own post-step) all apply exactly as
+  // for a call the model made. Nothing here is a model-facing tool,
+  // and no credential enters the box: the box produced a patch, the
+  // server applies it. When any call must ask — or a breaker holds
+  // the batch, or the target sits outside the definition's declared
+  // set (the critical class, §7) — the whole publish rests as ONE
+  // pending approval carrying the finish (decision.ts' publish
+  // rest), and the finish seals at the person's decision.
+  type PublishOutcome = { kind: "landed" | "rested" | "refused" | "failed" };
+
+  /** Parks the publish batch as the run's one pending approval —
+   *  the compensation rest's shape (B9), for the same reason: the
+   *  finish it interrupts rides with it, because the decision
+   *  finalizes that settle instead of resuming a finished loop. */
+  const restPublishBatch = async (
+    calls: ToolCall[],
+    settle: { finish: FinishPayload; verdict: RunVerdict | null; prCallId: string },
+    opts: { critical: boolean; trip: BreakerTrip | null },
+  ): Promise<void> => {
+    const pubPending: SavedPending = { calls, partial: [], publish: settle };
+    await saveTranscript(pubPending);
+    const display = displaysUnderMode(calls.map((c) => approvalDisplayFor(c)), mode);
+    const trip = opts.trip;
+    const summary = trip ? trip.reason : `公開の承認待ち: ${approvalSummary(display)}`;
+    const inputHash = await sha256(canonicalCalls(calls));
+    const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval", summary })
+      .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
+    if (!waiting) return; // cancelled meanwhile
+    const { data: action } = await admin.from("agent_actions").insert({
+      run_id: run.id, element_id: run.element_id, tool_use_id: calls[0].id, tool: "batch",
+      input: {
+        calls, display,
+        publish: {
+          repo: codingSession?.target.repo ?? "", critical: opts.critical,
+          ...(trip ? { breaker: { rule: trip.rule, target: trip.targetKey, evidence: trip.evidence } } : {}),
+        },
+      },
+      input_hash: inputHash, summary,
+      integration_id: integrationTools.get(calls[0].name)?.integration.id ?? null,
+    }).select("id").single();
+    if (trip) {
+      // The trip's audit row, as the loop's own hold writes it: the
+      // decision that answers this rest acknowledges it (the generic
+      // acknowledgement in the decision path covers this run's trips).
+      await admin.from("breaker_trips").insert({
+        run_id: run.id, element_id: run.element_id, activity_space_id: run.activity_space_id,
+        action_id: (action as { id: string } | null)?.id ?? null, rule: trip.rule,
+        integration_id: trip.integrationId, integration_name: trip.integrationName,
+        command_name: trip.commandName, target_key: trip.targetKey,
+        evidence: trip.evidence, reason: trip.reason,
+      }).then(() => {}, () => {});
+    }
+    await addStep(admin, run.id, "approval", summary,
+      opts.critical && codingDecl ? publishCriticalReason(codingDecl, codingSession?.target.repo ?? "") : null);
+    if (run.element_id) {
+      await admin.from("element_comments").insert({
+        element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+        content: `**公開の承認待ち** — ${summary}。承認すると、検証済みのパッチが GitHub 接続経由で適用され、PR が開かれます。`,
+      });
+    }
+    if (run.triggered_by) {
+      await admin.from("notifications").insert({
+        recipient_id: run.triggered_by, actor_name: agentName, kind: "approval_requested", element_id: run.element_id,
+        agent_action_id: (action as { id: string } | null)?.id ?? null,
+        title: `${agentName} が公開の承認を求めています`, body: summary,
+      }).then(() => {}, () => {});
+    }
+  };
+
+  /**
+   * Publishes one completed coding finish's patch. Every refusal is
+   * a stated result on the run (and the Element's thread), never a
+   * silent skip and never a partial tree: the base must not have
+   * moved since delivery, the patch must prove itself whole against
+   * the change set, and every base file it touches must read back
+   * at the delivered base.
+   */
+  const publishCodingChange = async (input: {
+    finish: FinishPayload; verdict: RunVerdict | null; changeSet: ChangeSet;
+  }): Promise<PublishOutcome> => {
+    if (!codingSession?.delivered || !codingDecl) return { kind: "refused" };
+    const target = codingSession.target;
+    const baseSha = codingSession.baseSha;
+    // Once per run: a step of any of these titles is the record an
+    // earlier attempt of this same finish already left.
+    const { data: priorPublish } = await admin.from("agent_run_steps").select("id")
+      .eq("run_id", run.id)
+      .or("title.like.PR を開きました:%,title.like.公開の承認待ち:%,title.like.公開を止めました:%")
+      .limit(1);
+    if (priorPublish?.length) return { kind: "landed" };
+    const refuse = async (reason: string): Promise<PublishOutcome> => {
+      await addStep(admin, run.id, "error", "公開を止めました", reason);
+      if (run.element_id) {
+        await admin.from("element_comments").insert({
+          element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+          content: `**PR は開かれていません** — ${reason}。変更パッチは実行の成果物として残っています。`,
+        });
+      }
+      return { kind: "refused" };
+    };
+    if (!run.element_id) return refuse("この実行には Element がないため、PR の紐付け先がありません");
+    if (input.changeSet.empty) return { kind: "refused" };
+
+    // The base must be where delivery left it: the patch was
+    // computed against that tree, and applying it over a moved base
+    // would silently revert the base's own newer changes to the
+    // files it touches.
+    const tokens = await githubTokens(admin, run.activity_space_id).catch(() => [null] as (string | null)[]);
+    let currentBase: string;
+    try {
+      currentBase = await fetchBaseSha(tokens, target);
+    } catch (e) {
+      return refuse(`ベースの現在位置を確認できませんでした: ${errorMessage(e)}`);
+    }
+    if (currentBase !== baseSha) {
+      return refuse(`ベースブランチ ${target.baseBranch} が、ツリーを届けた時点（${baseSha.slice(0, 7)}）から ${currentBase.slice(0, 7)} へ動いています。古いベースに対するパッチを新しいベースへ公開はしません。実行し直してください`);
+    }
+    const patchFiles = parsePatchFiles(input.changeSet.patch);
+    const baseFiles = new Map<string, { content: string; blobSha: string } | null>();
+    for (const pf of patchFiles) {
+      if (!pf.oldPath || pf.kind === "add") continue;
+      const got = await fetchRepoFileAtSha(tokens, target, pf.oldPath, baseSha).catch(() => null);
+      if (!got) return refuse(`${pf.oldPath} のベース内容を取得できませんでした`);
+      if (!got.ok) {
+        return refuse(got.code === "binary"
+          ? `${pf.oldPath} はバイナリファイルのため、この公開では扱えません`
+          : got.code === "too_large"
+            ? `${pf.oldPath} が大きすぎて読み取れず、パッチを適用できません`
+            : `${pf.oldPath} がベース（${baseSha.slice(0, 7)}）に見つかりませんでした`);
+      }
+      baseFiles.set(pf.oldPath, { content: got.content, blobSha: got.blobSha });
+    }
+
+    const title = pullRequestTitle(await elementTitle(), input.finish.summary);
+    const evidence = await codingEvidence().catch(() => ({ state: "missing" }) as TestEvidence);
+    const changeSummary = changeSetSummaryText({
+      target, baseSha, changeSet: input.changeSet, evidence, testCommand: codingDecl.testCommand,
+    });
+    const composed = composePublish({
+      target, branch: branchNameForRun(run.id), changeSet: input.changeSet, patchFiles, baseFiles,
+      commitMessage: title,
+      prTitle: title,
+      prBody: pullRequestBody({ finishSummary: input.finish.summary, finishMessage: input.finish.message, changeSummary }),
+    });
+    if (!composed.ok) return refuse(composed.reason);
+    const plan = composed.plan;
+
+    // The governed calls, resolved against the connection's declared
+    // commands: the publish exists only as the manifest declares it.
+    const toolFor = (kind: PublishCommand) => {
+      for (const [name, it] of integrationTools) {
+        if (!isGithubRow(it.integration)) continue;
+        if (publishCommandKind(it.command) === kind) return { name, it };
+      }
+      return null;
+    };
+    const branchTool = toolFor("create_branch");
+    const pushTool = plan.writes.length ? toolFor("push_files") : null;
+    const deleteTool = plan.deletes.length ? toolFor("delete_file") : null;
+    const prTool = toolFor("create_pull_request");
+    if (!branchTool || !prTool || (plan.writes.length && !pushTool) || (plan.deletes.length && !deleteTool)) {
+      return refuse("GitHub 接続の宣言に、公開に必要なコマンド（ブランチ作成・ファイルの一括反映・PR 作成）が揃っていません。接続テストでコマンドが宣言されているか確認してください");
+    }
+    const [owner, ...repoParts] = target.repo.split("/");
+    const repoName = repoParts.join("/");
+    const calls: ToolCall[] = [];
+    const addCall = (toolName: string, callInput: Record<string, unknown>) =>
+      calls.push({ id: `publish-${calls.length + 1}`, name: toolName, input: callInput });
+    addCall(branchTool.name, { owner, repo: repoName, branch: plan.branch, from_branch: target.baseBranch });
+    if (pushTool) {
+      addCall(pushTool.name, {
+        owner, repo: repoName, branch: plan.branch, files: plan.writes, message: plan.commitMessage,
+      });
+    }
+    if (deleteTool) {
+      for (const d of plan.deletes) {
+        addCall(deleteTool.name, { owner, repo: repoName, path: d.path, message: plan.commitMessage, branch: plan.branch, sha: d.sha });
+      }
+    }
+    addCall(prTool.name, {
+      owner, repo: repoName, title: plan.pr.title, body: plan.pr.body, head: plan.pr.head, base: plan.pr.base,
+    });
+    const prCallId = calls[calls.length - 1].id;
+
+    // Judged as any manifest write is judged — the breaker before
+    // the verdict, the verdict the run's own composition — plus the
+    // one class that is this seam's own: a target outside the
+    // definition's declared set always rests (design §7), whatever
+    // the mode, the delegation or the track record says.
+    const critical = publishIsCritical(codingDecl, target.repo);
+    let trip: BreakerTrip | null = null;
+    let mustRest = critical;
+    for (const call of calls) {
+      const hold = await breakerHold(call);
+      if (hold && !trip) trip = breakerTripsByCallId.get(call.id) ?? null;
+      const v = verdictForCall(call);
+      if (v.base === "deny") {
+        const it = integrationTools.get(call.name);
+        const refusal = chainDeniedCalls.has(call.id)
+          ? chainDenyRefusal(it?.integration.name ?? call.name, it ? operationOf(it, call.input) : call.name)
+          : it?.command ? manifestDenyRefusal(it.command.name) : "公開の呼び出しがポリシーで拒否されました";
+        return refuse(`公開の呼び出しが拒否されました: ${refusal}`);
+      }
+      if (v.final === "ask") mustRest = true;
+    }
+    if (trip) mustRest = true;
+    if (mustRest) {
+      await restPublishBatch(calls, { finish: input.finish, verdict: input.verdict, prCallId }, { critical, trip });
+      return { kind: "rested" };
+    }
+
+    // Nothing held the batch: it runs now, with the loop's own
+    // bookkeeping for the asks it lifts — a policy approval for the
+    // mode's or the track record's lift, the delegation disclosure
+    // for full delegation's.
+    const landed: string[] = [];
+    for (const call of calls) {
+      const it = integrationTools.get(call.name);
+      const v = verdictForCall(call);
+      let publishPolicyActionId: string | null = null;
+      if (v.base === "ask" && (mode === "free" || v.lift === "track-record")) {
+        const display = approvalDisplayFor(call);
+        publishPolicyActionId = await recordPolicyApproval(admin, {
+          runId: run.id, elementId: run.element_id, call, display, mode,
+          integrationId: it?.integration.id ?? null,
+          ...(v.lift === "track-record" ? { source: "track-record" as const } : {}),
+        });
+        await addStep(admin, run.id, "approval", `ポリシー承認で実行: ${approvalSummary([display])}`,
+          v.lift === "track-record"
+            ? "この公開の呼び出しは、これまで問題なく完了した実績により、承認を求めずに実行しました。記録はポリシー承認（実績）として残ります。"
+            : "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
+      } else if (v.final === "allow" && liftOf(factsForCall(call)) === "delegation") {
+        liftedDisplays.push(approvalDisplayFor(call));
+      }
+      const r = await executeCall(call);
+      if (publishPolicyActionId) await settlePolicyApproval(admin, publishPolicyActionId, !r.is_error, r.verify);
+      if (r.is_error) {
+        await flushLifted();
+        const doneText = landed.length ? `すでに実行された呼び出し: ${landed.join("、")}。` : "";
+        await addStep(admin, run.id, "error", "公開が完了しませんでした",
+          `${it?.integration.name ?? ""}: ${operationOf(it, call.input)} が失敗しました: ${r.content.slice(0, 300)}。${doneText}パッチは成果物として残っています。`);
+        if (run.element_id) {
+          await admin.from("element_comments").insert({
+            element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+            content: `**公開が完了しませんでした** — ${operationOf(it, call.input)} が失敗しました。${doneText}変更パッチは実行の成果物として残っています。`,
+          });
+        }
+        return { kind: "failed" };
+      }
+      landed.push(operationOf(it, call.input));
+      if (publishCommandKind(it?.command) === "create_pull_request") {
+        await notePublishLanded(r.content);
+      }
+    }
+    await flushLifted();
+    return { kind: "landed" };
+  };
+
+  if (codingDecl && machine && !run.rehearsal && !planRun) {
+    try {
+      const { data: priorSteps } = await admin.from("agent_run_steps").select("detail")
+        .eq("run_id", run.id).like("title", "コードを受け取りました:%")
+        .order("idx", { ascending: false }).limit(1);
+      const prior = parseDeliveryDetail((priorSteps?.[0] as { detail?: string | null } | undefined)?.detail);
+      if (prior) {
+        codingSession = { target: { repo: prior.repo, baseBranch: prior.baseBranch }, baseSha: prior.baseSha, delivered: true };
+      } else {
+        const texts: string[] = [];
+        if (run.element_id) {
+          const { data: el } = await userDb.from("elements").select("title, description").eq("id", run.element_id).maybeSingle();
+          if (el) texts.push(`${(el as { title?: string }).title ?? ""}\n${(el as { description?: string | null }).description ?? ""}`);
+        }
+        const resolved = resolveCodingTarget(codingDecl, texts);
+        if (!resolved.ok) {
+          await addStep(admin, run.id, "error", "コードを届けられませんでした", targetRefusalText(resolved.reason, codingDecl));
+        } else {
+          const out = await deliverTreeToWorkspace({
+            admin, runId: run.id, spaceId: run.activity_space_id, target: resolved.target, runShell: runCodingShell,
+          });
+          if (out.ok) {
+            codingSession = { target: resolved.target, baseSha: out.baseSha, delivered: true };
+            await addStep(admin, run.id, "action", deliveryStepTitle(resolved.target, out.baseSha),
+              [`repo=${resolved.target.repo}`, `base=${resolved.target.baseBranch}`, `sha=${out.baseSha}`, out.files != null ? `${out.files} ファイル` : ""].filter(Boolean).join("\n"));
+          } else {
+            await addStep(admin, run.id, "error", "コードを届けられませんでした",
+              `${resolved.target.repo}（${resolved.target.baseBranch}）のツリー取得に失敗しました（理由コード: ${out.code}）。${out.detail}`);
+          }
+        }
+      }
+    } catch (e) {
+      // A delivery problem never breaks the run: it goes on without a
+      // tree, and the finish gate refuses its "completed" in the open.
+      console.error("run-agent: coding delivery failed", errorMessage(e));
+    }
+  }
 
   const outcome = await runLoop(state, {
     callModel: async (messages) => {
@@ -3333,6 +4023,20 @@ async function execute(a: ExecArgs): Promise<void> {
   switch (outcome.kind) {
     case "finished": {
       await flushLifted();
+      // Coding PR2: the loop ends in a patch — before the finish
+      // seals (whichever settle path it takes below), the change set
+      // is captured and the patch lands as the run's artifact, with
+      // its summary in the record. Best effort like every record
+      // here: a failed production says so on a step, never unmakes
+      // the finish. The capture is kept: the publish (PR3) composes
+      // from the same change set.
+      let codingChangeSet: ChangeSet | null = null;
+      if (codingSession?.delivered && codingDecl && !planRun && !run.rehearsal) {
+        codingChangeSet = await produceCodingPatch().catch((e) => {
+          console.error("run-agent: patch production failed", errorMessage(e));
+          return null;
+        });
+      }
       // B8: a plan run that recorded writes seals its plan as ONE approval
       // unit and waits for the person's decision on the whole — the plan
       // is the deliverable, so there is no verdict and no Element move.
@@ -3428,6 +4132,24 @@ async function execute(a: ExecArgs): Promise<void> {
         await settleFinish(outcome.finish, verdict, compOutcome.report);
         await finalizeFailureSettle({ failureClass, policy: failurePolicy });
         return;
+      }
+      // Coding PR3: a completed coding finish (the only kind that
+      // reaches here — a shortfall or a failed verdict settles
+      // through the compensation branch above) publishes its patch
+      // through the GitHub connection before it seals: the PR is
+      // the run's output (design §4.2 step 7). A publish that must
+      // ask rests the run on its batch, and the finish seals at the
+      // person's decision instead (the publish rest's finalize,
+      // before the loop). A refused or failed publish is a stated
+      // result on the run; the finish seals regardless — the work
+      // stands, its patch artifact remains.
+      if (codingSession?.delivered && codingDecl && codingChangeSet && !codingChangeSet.empty) {
+        const pub = await publishCodingChange({ finish: outcome.finish, verdict, changeSet: codingChangeSet })
+          .catch((e) => {
+            console.error("run-agent: publish failed", errorMessage(e));
+            return null;
+          });
+        if (pub?.kind === "rested") return;
       }
       await settleFinish(outcome.finish, verdict);
       return;
@@ -6128,6 +6850,14 @@ async function finishRun(a: ExecArgs, run: Run, agentName: string, finish: Finis
     ...(proposals ? { proposed_readings: proposals } : {}),
   }).eq("id", run.id).eq("status", "running").select("id").maybeSingle();
   if (!closed) return false;
+
+  // A terminal finish (not a pause — a paused run resumes into the
+  // same workspace) destroys the run's workspace (coding PR1):
+  // per-run disposal is the classification's premise. Best effort,
+  // like failRun's close; the tick's reaper is the backstop.
+  if (status === undefined) {
+    await closeRunWorkspace(admin, (k) => Deno.env.get(k), run.id, "run_finished", new Date()).catch(() => false);
+  }
 
   const label = finish.outcome === "blocked" ? "対応が必要です"
     : run.mode === "reply" ? "返信"

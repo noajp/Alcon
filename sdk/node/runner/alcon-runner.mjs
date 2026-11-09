@@ -31,6 +31,14 @@
 //   --isolated --shell          this runner is a disposable VM (e.g. a Vercel Sandbox):
 //                               it also runs shell commands and reads/writes files.
 //                               Never pass these on a computer someone works on.
+//   --no-browser                machine-only: offer shell/files, never the browser.
+//                               A server-provisioned workspace runs this way — it
+//                               must never receive a person's browser calls (a
+//                               sign-in among them), so the capability is not
+//                               announced and the handlers are not even loaded.
+//   ALCON_TOKEN                 an asset token the server minted for this runner
+//                               (a provisioned workspace's own identity). When
+//                               set, it is used as-is: no first-run announce.
 //   ALCON_HOME                  where token and profile live (default ~/.alcon)
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
@@ -55,16 +63,19 @@ const HEADLESS = flag('headless');
 const BROWSER = opt('browser') ?? 'chrome';
 const ISOLATED = flag('isolated');
 const SHELL = ISOLATED && flag('shell');
+const NO_BROWSER = flag('no-browser') || process.env.ALCON_NO_BROWSER === '1';
+const ENV_TOKEN = (process.env.ALCON_TOKEN ?? '').trim();
 /** Where shell commands run and relative file paths point. */
 const WORKDIR = process.env.ALCON_WORKDIR ?? join(HOME, 'work');
 const ALLOW_WRITES = flag('allow-writes');
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 const log = (...m) => console.error(`[alcon-runner ${new Date().toLocaleTimeString()}]`, ...m);
 if (!RELAY) { log('ALCON_RELAY (or --relay) is required'); process.exit(1); }
+if (NO_BROWSER && !SHELL) { log('--no-browser only makes sense with --isolated --shell'); process.exit(1); }
 
 const manifest = {
-  runner: 'alcon-runner', version: VERSION, capabilities: SHELL ? ['browser', 'shell', 'files'] : ['browser'],
+  runner: 'alcon-runner', version: VERSION, capabilities: SHELL ? (NO_BROWSER ? ['shell', 'files'] : ['browser', 'shell', 'files']) : ['browser'],
   host: hostname(), platform: platform(), read_only: !ALLOW_WRITES, headless: HEADLESS, isolated: ISOLATED,
 };
 
@@ -89,6 +100,16 @@ async function relay(path, body, token) {
 
 async function announce() {
   const state = loadState();
+  // A token the server minted for this runner (a provisioned
+  // workspace): the asset already exists and is already accepted, so
+  // the hello-with-token path is the whole announce. It is persisted
+  // like any first-run token, so a restart reuses it.
+  if (!state?.token && ENV_TOKEN) {
+    const r = await relay('/hello', { token: ENV_TOKEN, name: NAME, kind: 'ai_agent', manifest });
+    saveState({ token: ENV_TOKEN, asset_id: r.asset_id, space: r.space });
+    log(`Connected as "${NAME}" (${r.status}).`);
+    return ENV_TOKEN;
+  }
   if (state?.token) {
     const r = await relay('/hello', { token: state.token, name: NAME, kind: 'ai_agent', manifest });
     log(`Connected as "${NAME}" (${r.status}).`);
@@ -318,8 +339,7 @@ const MACHINE = {
   },
 };
 
-const TOOLS = {
-  ...(SHELL ? MACHINE : {}),
+const BROWSER_TOOLS = {
   async open({ url }) {
     if (typeof url !== 'string' || !/^https?:\/\//.test(url)) throw new Error('url must start with http(s)://');
     const p = await browser();
@@ -394,6 +414,14 @@ const TOOLS = {
     await settle(p);
     return snapshot(p);
   },
+};
+
+// A machine-only runner (--no-browser) does not even carry the
+// browser handlers: a call for one answers "unknown tool", and no
+// Chrome is ever launched on a provisioned workspace.
+const TOOLS = {
+  ...(SHELL ? MACHINE : {}),
+  ...(NO_BROWSER ? {} : BROWSER_TOOLS),
 };
 
 // ── The loop ─────────────────────────────────────────────────────────────────
