@@ -1,7 +1,6 @@
 'use client';
 
-import { SidebarReveal } from '@/Function/shared/SidebarReveal';
-import { Archive, Check, Inbox } from '@/ui/icons';
+import { Archive, Check } from '@/ui/icons';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InvitationCard } from '@/Function/membership/InvitationCard';
@@ -34,11 +33,8 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   if (!selected) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-card">
-        <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
-          <SidebarReveal />
-          <Inbox size={12} aria-hidden="true" />
-          <span className="text-[13px] font-medium text-foreground">{t('Inbox')}</span>
-        </header>
+        {/* The title is the list's, beside: this side keeps only the line. */}
+        <div className="h-[50px] flex-shrink-0 border-b border-border/60" />
         <div className="flex flex-1 items-center justify-center text-muted-foreground">
           <p className="text-[13px]">{t('No notification selected')}</p>
         </div>
@@ -49,7 +45,6 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
       <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0 overflow-hidden">
-        <SidebarReveal />
         <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
           {selected.actor_name && <span className="font-medium text-foreground">{selected.actor_name}</span>}
           {selected.actor_name && ' · '}
