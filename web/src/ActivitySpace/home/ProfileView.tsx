@@ -13,7 +13,6 @@ import { ProfileAI } from '@/AIP/ai/ProfileAI';
 import { useSelfWorker } from '@/hooks/teamData';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { useActiveSpaceScope } from '@/Function/space/data';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { NavigationState } from '@/types/navigation';
 
@@ -33,11 +32,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const spaceId = useActiveSpaceId();
-  // An audit Space (ADR 0048) has no Elements, Now or Notebook to show: its
-  // Profile is the person and their AI.
-  const audit = useActiveSpaceScope() === 'audit';
-  const [chosen, setTab] = useState<ProfileTab>('elements');
-  const tab: ProfileTab = audit ? 'ai' : chosen;
+  const [tab, setTab] = useState<ProfileTab>('elements');
   const name = profile?.display_name || user?.email?.split('@')[0] || t('You');
   // The person's Worker id (wrk_015) is the handle other surfaces show.
   const selfWorker = useSelfWorker(user?.id);
@@ -58,7 +53,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
     { id: 'elements', label: 'My Elements', icon: ElementIcon },
     { id: 'notes', label: 'My Notes', icon: FileText },
     { id: 'ai', label: 'AI', icon: Sparkles },
-  ].filter(entry => !audit || entry.id === 'ai') as typeof tabs;
+  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
@@ -83,16 +78,16 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
           ))}
         </nav>
       </header>
-      {!audit && <div className={tab === 'now' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
+      <div className={tab === 'now' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
         <NowScreen spaceId={spaceId} onNavigate={onNavigate} onViewChange={onViewChange} />
-      </div>}
+      </div>
       {/* MyElementsView lays itself out as a flex child (header + scrolling
           list), so its wrapper has to be a bounded flex column or the list
           is clipped instead of scrolling. */}
-      {!audit && <div className={tab === 'elements' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
+      <div className={tab === 'elements' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
         <MyElementsView embedded onNavigate={onNavigate} onViewChange={onViewChange} />
-      </div>}
-      {!audit && <div className={tab === 'notes' ? 'min-h-0 flex-1 overflow-y-auto px-6 py-4' : 'hidden'}>
+      </div>
+      <div className={tab === 'notes' ? 'min-h-0 flex-1 overflow-y-auto px-6 py-4' : 'hidden'}>
         {notesLoading ? <p role="status" className="text-[13px] text-muted-foreground">{t('Loading…')}</p>
           : myNotes.length === 0 ? <p className="text-[13px] text-muted-foreground">{t('No notes yet.')}</p>
           : <ul className="space-y-0.5">
@@ -105,7 +100,7 @@ export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDo
               </li>
             ))}
           </ul>}
-      </div>}
+      </div>
       <div className={tab === 'ai' ? 'flex min-h-0 flex-1' : 'hidden'}>
         <ProfileAI activeDomainId={activeDomainId} />
       </div>

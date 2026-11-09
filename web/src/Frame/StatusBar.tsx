@@ -6,7 +6,6 @@ import { useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { viewInScope, type SpaceScope } from '@/Function/space/spaceScope';
 
 // The strip along the foot of the window, as in VS Code. Notebooks and slides
 // live in Artifacts, and the person at the foot of the sidebar; the right holds what stays at hand from any
@@ -16,13 +15,11 @@ const btn = (active: boolean) =>
   `h-5 gap-1 rounded px-1 text-[11px] font-normal ${active ? 'bg-sidebar-accent text-foreground' : 'text-muted-foreground hover:text-foreground'}`;
 
 export function StatusBar({
-  scope,
   activeView,
   onViewChange,
   sidebar,
   ai,
 }: {
-  scope: SpaceScope;
   activeView: string;
   onViewChange: (view: string) => void;
   /** Absent where the screen has no sidebar. */
@@ -33,7 +30,6 @@ export function StatusBar({
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
   const activeMode = railModeOf(activeView);
-  const inScope = (mode: RailMode) => viewInScope(MODE_META[mode].defaultView, scope);
   const go = (mode: RailMode) => { if (activeMode !== mode) onViewChange(MODE_META[mode].defaultView); };
 
   const modeButton = (mode: RailMode, withLabel: boolean, badge = 0) => {
@@ -65,13 +61,13 @@ export function StatusBar({
             <PanelLeft size={12} />
           </Button>
         )}
-        {inScope('inbox') && modeButton('inbox', false, unreadCount)}
+        {modeButton('inbox', false, unreadCount)}
         <Button variant="ghost" size="sm" onClick={ai.onToggle} aria-pressed={ai.open}
           title={`${t(ai.open ? 'Hide AI' : 'Show AI')} (⌘L)`} aria-label={t(ai.open ? 'Hide AI' : 'Show AI')}
           className={btn(ai.open)}>
           <AiIcon size={12} />
         </Button>
-        {inScope('calendar') && modeButton('calendar', false)}
+        {modeButton('calendar', false)}
       </div>
     </footer>
     </ButtonAppearanceProvider>
