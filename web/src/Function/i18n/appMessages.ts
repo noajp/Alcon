@@ -604,6 +604,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'The address is not allowed': ['そのアドレスは許可されていません', '해당 주소는 허용되지 않습니다', 'Cette adresse n’est pas autorisée', 'Esa dirección no está permitida'],
   'No response from the service': ['サービスから応答がありません', '서비스에서 응답이 없습니다', 'Aucune réponse du service', 'El servicio no responde'],
   'Authentication failed': ['認証に失敗しました', '인증에 실패했습니다', 'Échec de l’authentification', 'La autenticación falló'],
+  'No permission to send — read-only access': ['送信権限がありません（読み取りのみ）', '전송 권한이 없습니다 (읽기 전용)', 'Aucune autorisation d’envoi — lecture seule', 'Sin permiso de envío — solo lectura'],
   'Authentication could not be confirmed': ['認証を確認できませんでした', '인증을 확인할 수 없었습니다', 'L’authentification n’a pas pu être confirmée', 'No se pudo confirmar la autenticación'],
   'The endpoint looks wrong': ['エンドポイントが間違っているようです', '엔드포인트가 잘못된 것 같습니다', 'Le point de terminaison semble erroné', 'El endpoint parece incorrecto'],
   'The arguments did not fit': ['引数の形が合いませんでした', '인수 형식이 맞지 않았습니다', 'Les arguments ne correspondaient pas', 'Los argumentos no encajaban'],

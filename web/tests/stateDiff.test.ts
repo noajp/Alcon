@@ -31,6 +31,11 @@ describe('diffExpect', () => {
 });
 
 describe('stateOfResult', () => {
+  it('steps over an HTTP answer’s status line: the state is the body’s', () => {
+    expect(sd.stateOfResult('HTTP 200\n{"number": 7, "state": "open"}')).toEqual({ number: 7, state: 'open' });
+    expect(sd.stateOfResult('HTTP 404\nplain failure')).toEqual({ content: 'plain failure' });
+  });
+
   it('reads a JSON object as the state itself', () => {
     expect(sd.stateOfResult('{"number": 7, "state": "open"}')).toEqual({ number: 7, state: 'open' });
   });

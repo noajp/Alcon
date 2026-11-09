@@ -503,14 +503,19 @@ describe('Google provider profiles', () => {
     expect(oauth.isGoogleOAuthRow({ ...DRIVE_ROW, endpoint: 'https://evil.example.com' })).toBe(false);
   });
 
-  it('holds the scopes each profile requires — Drive’s one, Gmail read-only at the first stage', () => {
+  it('holds the scopes each profile requires — Drive’s one, Gmail’s read joined by send at the second stage', () => {
     expect(oauth.GOOGLE_DRIVE_PROFILE.scopes).toEqual(['https://www.googleapis.com/auth/drive.file']);
-    expect(oauth.GOOGLE_GMAIL_PROFILE.scopes).toEqual(['https://www.googleapis.com/auth/gmail.readonly']);
+    expect(oauth.GOOGLE_GMAIL_PROFILE.scopes).toEqual(['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send']);
     expect(oauth.GOOGLE_GMAIL_PROFILE.includeGrantedScopes).toBe(true);
     expect(oauth.GOOGLE_DRIVE_PROFILE.includeGrantedScopes).toBe(false);
     expect(oauth.grantsRequiredScopes('openid https://www.googleapis.com/auth/drive.file', oauth.GOOGLE_DRIVE_PROFILE)).toBe(true);
     expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/drive.readonly', oauth.GOOGLE_DRIVE_PROFILE)).toBe(false);
-    expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/gmail.readonly', oauth.GOOGLE_GMAIL_PROFILE)).toBe(true);
+    // A stage-one grant (read-only) no longer covers the Gmail profile:
+    // this false is what the connection test turns into the reauth
+    // state (oauth_scope_missing) — the staging itself, pinned.
+    expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/gmail.readonly', oauth.GOOGLE_GMAIL_PROFILE)).toBe(false);
+    expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/gmail.send', oauth.GOOGLE_GMAIL_PROFILE)).toBe(false);
+    expect(oauth.grantsRequiredScopes('openid https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send', oauth.GOOGLE_GMAIL_PROFILE)).toBe(true);
     expect(oauth.grantsRequiredScopes('https://www.googleapis.com/auth/drive.file', oauth.GOOGLE_GMAIL_PROFILE)).toBe(false);
     expect(oauth.grantsRequiredScopes(undefined, oauth.GOOGLE_DRIVE_PROFILE)).toBe(false);
   });
@@ -526,7 +531,7 @@ describe('Google provider profiles', () => {
     expect(new URL(oauth.buildAuthorizeUrl(base)).searchParams.has('include_granted_scopes')).toBe(false);
   });
 
-  it('asks for Gmail read-only, keeping earlier grants for the staged consent', () => {
+  it('asks for Gmail read and send, keeping earlier grants for the staged consent', () => {
     const url = new URL(oauth.buildAuthorizeUrl({
       clientId: 'client-1.apps.googleusercontent.com',
       redirectUri: 'https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback',
@@ -538,7 +543,7 @@ describe('Google provider profiles', () => {
       client_id: 'client-1.apps.googleusercontent.com',
       redirect_uri: 'https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback',
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send',
       access_type: 'offline',
       prompt: 'consent',
       include_granted_scopes: 'true',

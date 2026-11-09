@@ -357,3 +357,107 @@ describe('executeIntegrationTool: shaping at the seam (P1T)', () => {
     expect(r.isError).toBe(false);
   });
 });
+
+// ── Body builders (P2): the registry's other half ───────────────────────
+
+const SEND_WITH_BUILDER = {
+  name: 'gmail_send', action: 'gmail.send', effect: 'write',
+  description: 'Send one message', input: { to: { type: 'string' }, body: { type: 'string' } }, required: ['to', 'body'],
+  http: { method: 'POST', path: '/messages/send', body: [], bodyFrom: 'gmail_mime' },
+};
+
+describe('parseBodyFrom via parseManifest (P2)', () => {
+  it('keeps a command naming a registered builder, the reference on its http mapping', () => {
+    const { manifest, errors } = cm.parseManifest(manifestWith([SEND_WITH_BUILDER]));
+    expect(errors).toEqual([]);
+    expect(manifest.commands[0].http.bodyFrom).toBe('gmail_mime');
+  });
+
+  it('an unknown name — or not a name at all — costs the command its place', () => {
+    for (const bad of ['gmail_mim', 'Gmail_Mime', 42, { name: 'gmail_mime' }, '']) {
+      const badSend = { ...SEND_WITH_BUILDER, http: { ...SEND_WITH_BUILDER.http, bodyFrom: bad } };
+      const { manifest, errors } = cm.parseManifest(manifestWith([badSend]));
+      expect(manifest.commands).toEqual([]);
+      expect(errors.join(' ')).toContain('bodyFrom');
+    }
+  });
+
+  it('a bodyless method may not name a builder — the building could never run', () => {
+    const get = { ...SEND_WITH_BUILDER, effect: 'read', http: { method: 'GET', path: '/messages/send', body: [], bodyFrom: 'gmail_mime' } };
+    const { manifest, errors } = cm.parseManifest(manifestWith([get]));
+    expect(manifest.commands).toEqual([]);
+    expect(errors.join(' ')).toContain('bodyFrom');
+  });
+
+  it('absent is null, and the field list assembles as before', () => {
+    const plain = { name: 'post_note', action: 'notes.post', effect: 'write', http: { method: 'POST', path: '/notes', body: ['title'] } };
+    expect(commandOf(manifestWith([plain]), 'post_note').http.bodyFrom).toBeNull();
+  });
+
+  it('the three name lists agree: the grammar’s, the registry’s, the web twin’s', () => {
+    expect([...cm.BODY_BUILDER_NAMES].sort()).toEqual([...mt.BODY_BUILDER_NAMES].sort());
+    // The twin accepts exactly the registry's names in its projection,
+    // and drops a command naming anything else, as the server does.
+    for (const name of mt.BODY_BUILDER_NAMES) {
+      const content = { name: 'Gmail', endpoint: 'https://gmail.googleapis.com', auth_type: 'oauth', auth_header: null, guide: null, manifest: manifestWith([{ ...SEND_WITH_BUILDER, http: { ...SEND_WITH_BUILDER.http, bodyFrom: name } }]) };
+      expect((cd.draftStructureOf(content).commands as { http: { bodyFrom: string } }[])[0].http.bodyFrom).toBe(name);
+      expect(draftStructureOfWeb(content as DraftContentLike)).toEqual(cd.draftStructureOf(content));
+    }
+    const bogus = { name: 'Gmail', endpoint: 'https://gmail.googleapis.com', auth_type: 'oauth', auth_header: null, guide: null, manifest: manifestWith([{ ...SEND_WITH_BUILDER, http: { ...SEND_WITH_BUILDER.http, bodyFrom: 'nope' } }]) };
+    expect(cd.draftStructureOf(bogus).commands).toEqual([]);
+    expect(draftStructureOfWeb(bogus as DraftContentLike)).toEqual(cd.draftStructureOf(bogus));
+  });
+});
+
+describe('the hashes and the drafting ban (P2)', () => {
+  const content = (manifest: unknown) => ({
+    name: 'Gmail', endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me',
+    auth_type: 'oauth', auth_header: null, guide: null, manifest,
+  });
+  const built = manifestWith([SEND_WITH_BUILDER]);
+  const bare = manifestWith([{ ...SEND_WITH_BUILDER, http: { method: 'POST', path: '/messages/send', body: [] } }]);
+
+  it('the reference is structure, never permission — on both sides of the twin', async () => {
+    expect(await cd.draftStructureHash(content(built))).not.toBe(await cd.draftStructureHash(content(bare)));
+    expect(await cd.draftPermissionHash(content(built))).toBe(await cd.draftPermissionHash(content(bare)));
+    expect(await draftStructureHashWeb(content(built) as DraftContentLike)).toBe(await cd.draftStructureHash(content(built)));
+    expect(await draftPermissionHashWeb(content(built) as DraftContentLike)).toBe(await cd.draftPermissionHash(content(built)));
+  });
+
+  it('a drafted candidate may not name a body builder, though the manifest parses', () => {
+    const candidate = {
+      name: 'Gmail', endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me',
+      authType: 'bearer', authHeader: null, manifest: built, guide: null, testInputs: {}, sources: [],
+    };
+    const { errors, manifest } = cd.validateDraftCandidate(candidate);
+    expect(manifest.commands.map((c: { name: string }) => c.name)).toEqual(['gmail_send']);
+    expect(errors.join(' ')).toContain('bodyFrom');
+    expect(errors.join(' ')).toContain('gmail_send');
+  });
+});
+
+describe('executeIntegrationTool: building at the seam (P2)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('the request body is the builder’s, not the field list’s', async () => {
+    let sentBody: unknown;
+    vi.stubGlobal('fetch', async (_url: unknown, init: { body?: string }) => {
+      sentBody = JSON.parse(init.body ?? '{}');
+      return jsonResponse({ id: 'm-new', threadId: 't-new', labelIds: ['SENT'] });
+    });
+    const { manifest: parsed } = cm.parseManifest(manifestWith([SEND_WITH_BUILDER]));
+    const tool = toolOf(manifestWith([SEND_WITH_BUILDER]), { command: parsed.commands[0] });
+    const r = await itools.executeIntegrationTool(tool, {
+      id: 'c5', name: 'gmail__gmail_send',
+      input: { to: 'boss@example.co.jp', subject: '確認のお願い', body: '本文です。' },
+    });
+    expect(r.isError).toBe(false);
+    // The wire body is exactly the built one: a raw message, and none
+    // of the call's fields riding as JSON fields of their own.
+    const body = sentBody as { raw: string };
+    expect(Object.keys(body)).toEqual(['raw']);
+    const message = Buffer.from(body.raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+    expect(message).toContain('To: boss@example.co.jp');
+    expect(message).toContain('Subject: =?UTF-8?B?');
+  });
+});

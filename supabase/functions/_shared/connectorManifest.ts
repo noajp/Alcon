@@ -35,8 +35,10 @@
 //     read-back state with the write's intent (verifyReads.ts):
 //       "verify": { "command": "get_file", "expect": { "title": "title" },
 //                   "delay_ms": 500 }
-//     `expect` maps a read-back field to a write-input field name (or a
-//     literal the read-back must carry). A verify must name a read
+//     `expect` maps a read-back field to a write-input field name, to
+//     a field of the state the write's result reported, or to a
+//     literal the read-back must carry (verifyReads.ts holds the
+//     exact reading and its order). A verify must name a read
 //     command of the same manifest — anything else is a parse error and
 //     the command is left out, because a verify that cannot run must
 //     never read as a verify that passed.
@@ -74,6 +76,20 @@
 //     read command that exists. First-party manifests carry these;
 //     a G4 draft never may (connectorDraft.ts refuses them outright),
 //     so a drafted manifest cannot invent a code reference.
+//   bodyFrom (P2): on an HTTP mapping — the name of a server-side
+//     pure builder that assembles the request body from the call's
+//     input, in place of the mapping's field list: the mirror of
+//     transform, on the way out. Some bodies are computed documents
+//     no field list can express (an RFC 822 message, base64url'd,
+//     with its threading headers). The same closed-registry
+//     discipline: an unknown name is a parse error and the command
+//     is left out, a bodyless method (GET / HEAD) may not carry one
+//     (a declaration that could never run must not survive as one
+//     that merely never fires), and a G4 draft never may. The field
+//     list stays in the mapping as documentation of what the
+//     builder's inputs are; the builder itself runs in the executor
+//     only (integrationTools.ts), over the call's input, and never
+//     does I/O of its own.
 
 export type Effect = "read" | "write";
 export type Permission = "allow" | "ask" | "deny";
@@ -134,6 +150,9 @@ export interface HttpMapping {
   query: string[];
   /** Input fields sent as the JSON body ("*" sends every field not used elsewhere). */
   body: string[];
+  /** The named body builder (P2) that assembles the body from the call's
+   *  input in place of the field list; null assembles from `body`. */
+  bodyFrom: string | null;
 }
 
 /** A permission bound to the call's arguments: every field in `when` must match. */
@@ -361,6 +380,32 @@ export function parseTransform(raw: unknown): string | null | undefined {
   return raw;
 }
 
+/**
+ * The body-builder names a manifest may reference (P2): the grammar's
+ * side of the same closed registry — the implementations live beside
+ * the transforms in manifestTransforms.ts (BODY_BUILDERS). Spelled
+ * here for the same reason (this module stays import-free), and the
+ * three lists — this one, the registry's keys, and the web twin's
+ * set in draftModel.ts — are pinned equal by
+ * manifestTransforms.test.ts: a builder is added in all three places,
+ * in code review, or it does not exist.
+ */
+export const BODY_BUILDER_NAMES: readonly string[] = ["gmail_mime"];
+
+/**
+ * Pure. An HTTP mapping's body-builder reference (P2): undefined when
+ * it carries none, null when what it carries cannot be one — not a
+ * string in the name shape, or a name the registry does not hold.
+ * Malformed is distinct from absent for the same reason as transform:
+ * the reference is code, not data, so a name that resolves to nothing
+ * must never survive as a building that merely never runs.
+ */
+export function parseBodyFrom(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "string" || !NAME.test(raw) || !BODY_BUILDER_NAMES.includes(raw)) return null;
+  return raw;
+}
+
 /** Pure. The rules stored on a command; one that cannot be read is left out. */
 export function parseRules(raw: unknown): CommandRule[] {
   const rules: CommandRule[] = [];
@@ -482,7 +527,13 @@ export function parseManifest(raw: unknown): { manifest: Manifest; errors: strin
       if (!METHODS.has(method) || !path.startsWith("/")) { errors.push(`${name}: http の method / path が読めません`); continue; }
       // A read must not be able to change anything.
       if (effect === "read" && method !== "GET" && method !== "HEAD") { errors.push(`${name}: read のコマンドは GET か HEAD にしてください`); continue; }
-      http = { method: method as HttpMapping["method"], path, query: strings(h.query), body: strings(h.body) };
+      const bodyFrom = parseBodyFrom(h.bodyFrom);
+      if (bodyFrom === null) { errors.push(`${name}: http.bodyFrom の名前が読めません（登録されたボディビルダーの名前だけが使えます）`); continue; }
+      // A builder assembles a request body; a bodyless method carries
+      // none, so the reference could never run — refused here rather
+      // than surviving as a building that merely never happens.
+      if (bodyFrom !== undefined && (method === "GET" || method === "HEAD")) { errors.push(`${name}: bodyFrom は本文を持つメソッドのコマンドにだけ宣言できます`); continue; }
+      http = { method: method as HttpMapping["method"], path, query: strings(h.query), body: strings(h.body), bodyFrom: bodyFrom ?? null };
     }
     const mcp = typeof x.mcp === "string" && x.mcp ? x.mcp : null;
     if (!http && !mcp) { errors.push(`${name}: http か mcp のどちらかが必要です`); continue; }
@@ -633,11 +684,29 @@ export function criticalClassForTokens(text: string, effect: Effect): CriticalCl
   return null;
 }
 
+/**
+ * Pure. The part of an HTTP path that speaks to a call's critical
+ * class: its last segment — the segment that names the operation
+ * (…/messages/send, …/charges, …/issues/{n}/comments). The resource
+ * segments a path passes through are nouns, and a resource's name is
+ * not the call's act: a label change on a message (POST
+ * /messages/{id}/modify) is not a send merely because its resource
+ * is one — read whole, the path would make it one, and B11's
+ * first-destination breaker, which keys on this class, would then
+ * hold the processed-marking of every newly-seen message as a first
+ * send to a new destination. The verb lives in the operation
+ * segment, in the command's names, or nowhere.
+ */
+function pathOperation(path: string): string {
+  const segments = path.split("/").filter(Boolean);
+  return segments.length ? segments[segments.length - 1] : "";
+}
+
 /** Pure. A command's critical class from its own fields; an HTTP DELETE is a delete whatever its names say. */
 export function criticalClassOf(command: Pick<ManifestCommand, "name" | "action" | "effect" | "http" | "mcp">): CriticalClass | null {
   if (command.effect !== "write") return null;
   if (command.http?.method === "DELETE") return "delete";
-  return criticalClassForTokens([command.action, command.name, command.mcp ?? "", command.http?.path ?? ""].join(" "), command.effect);
+  return criticalClassForTokens([command.action, command.name, command.mcp ?? "", pathOperation(command.http?.path ?? "")].join(" "), command.effect);
 }
 
 /**

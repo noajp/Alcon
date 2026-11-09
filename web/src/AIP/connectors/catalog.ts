@@ -69,7 +69,7 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
   },
   {
     id: 'gmail', name: 'Gmail', icon: '/integrations/gmail.svg', kind: 'http', endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me', auth: 'oauth',
-    description: 'Search and read messages in Gmail. Agents can read mail; they cannot send or change it.',
+    description: 'Search, read and send Gmail messages, reply in threads, and mark messages with labels. Agents cannot delete mail.',
     credentialLabel: 'Google account', category: 'communication', source: 'official', builtBy: 'Google', featured: false, custom: false,
     bundledManifest: GMAIL_MANIFEST,
   },
@@ -241,7 +241,13 @@ export function criticalClassOfManifestCommand(command: { name?: unknown; action
   if (command.effect !== 'write') return null;
   const http = command.http && typeof command.http === 'object' && !Array.isArray(command.http) ? command.http as Record<string, unknown> : null;
   if (typeof http?.method === 'string' && http.method.toUpperCase() === 'DELETE') return 'delete';
-  const text = [command.action, command.name, command.mcp, typeof http?.path === 'string' ? http.path : '']
+  // The path speaks through its last segment only — the operation —
+  // as the server's criticalClassOf reads it: a resource's name is
+  // not the call's act (a label change on a message is not a send).
+  const path = typeof http?.path === 'string' ? http.path : '';
+  const segments = path.split('/').filter(Boolean);
+  const operation = segments.length ? segments[segments.length - 1] : '';
+  const text = [command.action, command.name, command.mcp, operation]
     .filter((v): v is string => typeof v === 'string').join(' ');
   const tokens = new Set(text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
   for (const [cls, words] of CRITICAL_TOKENS) if (words.some((w) => tokens.has(w))) return cls;
@@ -403,7 +409,7 @@ export function buildIntegrationRow(preset: IntegrationPreset, spaceId: string, 
 export interface IntegrationTestTool { name: string; readOnly: boolean }
 
 export interface IntegrationTestResult {
-  /** connected | reachable | auth_failed | http_error | unreachable | blocked | oauth_required | oauth_expired | error */
+  /** connected | reachable | auth_failed | http_error | unreachable | blocked | oauth_required | oauth_expired | oauth_scope_missing | error */
   code: string;
   ok: boolean;
   at: string | null;
@@ -448,7 +454,7 @@ export function integrationStatus(i: { enabled: boolean; last_test: unknown }): 
   if (!i.enabled) return 'off';
   const last = readLastTest(i.last_test);
   if (!last) return 'not-tested';
-  if (!last.ok && (last.code === 'auth_failed' || last.code === 'oauth_expired' || last.code === 'oauth_required')) return 'action-needed';
+  if (!last.ok && (last.code === 'auth_failed' || last.code === 'oauth_expired' || last.code === 'oauth_required' || last.code === 'oauth_scope_missing')) return 'action-needed';
   if (last.code === 'connected') return 'connected';
   if (last.ok) return 'reachable';
   return 'action-needed';
@@ -473,6 +479,7 @@ export function testOutcomeLabel(code: string): string {
     case 'blocked': return 'Only https addresses on public hosts can be used.';
     case 'oauth_required': return 'Not connected — sign in with Google';
     case 'oauth_expired': return 'Google sign-in expired — reconnect';
+    case 'oauth_scope_missing': return 'No permission to send — read-only access';
     default: return 'Failed';
   }
 }
