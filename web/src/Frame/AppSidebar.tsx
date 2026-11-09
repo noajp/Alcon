@@ -11,13 +11,13 @@ import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
-import { NavAutomationIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
+import { NavAutomationIcon, NavCalendarIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from '@/ui/icons';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp, PanelLeft } from '@/ui/icons';
 import { updateDomain, deleteDomain, leaveDomain, useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
@@ -78,6 +78,8 @@ interface AppSidebarProps {
   overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
   onSearch?: () => void;
+  /** Hides the sidebar (⌘\\ shows it again). */
+  onToggleSidebar?: () => void;
 }
 
 /** The tools under Strategy at the top of the sidebar. */
@@ -111,6 +113,7 @@ export function AppSidebar({
   overlay,
   onCreateNew,
   onSearch,
+  onToggleSidebar,
 }: AppSidebarProps) {
   const { openCreate } = useWorkspaceActions();
   const { t } = useI18n();
@@ -336,6 +339,12 @@ export function AppSidebar({
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
+            {onToggleSidebar && (
+              <button type="button" onClick={onToggleSidebar} title={`${t('Hide sidebar')} (⌘\\)`} aria-label={t('Hide sidebar')}
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground">
+                <PanelLeft size={15} />
+              </button>
+            )}
             {onSearch && (
               <button
                 type="button"
@@ -385,6 +394,8 @@ export function AppSidebar({
             <SidebarRow active={activeView === 'inbox'} icon={<NavInboxIcon size={16} />} label={t('Inbox')}
               meta={unreadCount > 0 ? unreadCount : undefined}
               onClick={() => onViewChange('inbox')} />
+            <SidebarRow active={railMode === 'calendar'} icon={<NavCalendarIcon size={16} />} label={t('Calendar')}
+              onClick={() => { if (railMode !== 'calendar') onViewChange('calendar'); }} />
             <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
               onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
             <SidebarRow active={activeView === 'automation'} icon={<NavAutomationIcon size={16} />} label={t('Automation')}
