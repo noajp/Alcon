@@ -2,7 +2,7 @@
 import { formatError } from '@/Function/shared/formatError';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import type { AgentAction, AgentOutput, AgentRun, AgentRunMode, AgentRunStatus, AgentRunStep, QuestionTicket } from '@/types/database';
-import { parseProposedReadings, parseRunVerdict, type ProposedReading, type RunVerdict } from '@/Function/audit/auditModel';
+import { parseChainScope, parseProposedReadings, parseRunVerdict, type ChainScope, type ProposedReading, type RunVerdict } from '@/Function/audit/auditModel';
 
 /**
  * An agent run as components see it: the row, with its verdict and proposed
@@ -16,6 +16,8 @@ export type ParsedAgentRun = AgentRun & {
   verdict: RunVerdict | null;
   /** The readings the finish proposed, and whether each landed; null when it proposed none. */
   proposed_readings: ProposedReading[] | null;
+  /** The chain scope minted at this run's birth (B10), parsed; null for an unscoped root. */
+  chainScope: ChainScope | null;
 };
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -57,7 +59,7 @@ const STUCK_QUEUED_MS = 30_000;
 // the continuation token, which stay with the Edge Function (they can hold
 // data read with the starter's permissions).
 const AGENT_RUN_COLUMNS =
-  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count, verdict, proposed_readings, plan_mode';
+  'id, element_id, domain_id, worker_id, status, model, triggered_from, triggered_by, summary, result, error, step_count, started_at, finished_at, created_at, mode, prompt, reply_to, input_tokens, output_tokens, cost_usd, activity_space_id, continuation_count, verdict, proposed_readings, plan_mode, chain_scope';
 
 /** A run row at the fetch boundary: its verdict / readings jsonb is narrowed
  *  to the parsed shapes here, so raw Json never reaches a component. */
@@ -68,6 +70,7 @@ function parseAgentRun(row: unknown): ParsedAgentRun | null {
     ...(r as unknown as AgentRun),
     verdict: parseRunVerdict(r.verdict),
     proposed_readings: parseProposedReadings(r.proposed_readings),
+    chainScope: parseChainScope(r.chain_scope),
   };
 }
 

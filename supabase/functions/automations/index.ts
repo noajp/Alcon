@@ -62,6 +62,7 @@ import { evaluateCalibration } from "../_shared/verifierCalibration.ts";
 import { evaluateAutonomy } from "../_shared/autonomy.ts";
 import { deriveConstraintDrafts, evaluateConstraintEffects, type ConstraintCluster } from "../_shared/constraintDrafts.ts";
 import { claimExpiredQuestionTickets, settleRunBlockedByQuestions, type QuestionTicketRow } from "../_shared/questionTickets.ts";
+import { deriveScopeFromDefinition, loadDerivationIntegrations, rootChainScope, strategyIdForObject } from "../_shared/chainScope.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -264,9 +265,36 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
     if (elError || !el) return await fail(`Element を作れませんでした: ${elError?.message ?? "unknown"}`);
     const { error: asError } = await owner.db.from("element_assignees").insert({ element_id: el.id, worker_id: workerId, role: "assignee" });
     if (asError) return await fail(`AI Worker を割り当てられませんでした: ${asError.message}`);
-    const { data: run, error: runError } = await owner.db.from("agent_runs")
-      .insert({ element_id: el.id, domain_id: obj.domain_id, worker_id: workerId, triggered_from: "automation", triggered_by: a.owner_id, status: "queued", mode: "execute" })
+    // B10 (D4): a fired run is born scoped. The automation's harness
+    // is the standing permission a person set — nobody is present at
+    // a schedule's fire to widen it — so the run's chain scope is
+    // derived from that harness here, server-side, against the
+    // Space's settled connection rows, and written at the insert by
+    // the service role (the only writer a scope allows). A person's
+    // own start of the same work stays an unscoped root.
+    const firedRunId = crypto.randomUUID();
+    const firedScope = rootChainScope({
+      runId: firedRunId,
+      derived: deriveScopeFromDefinition({
+        connectors: parseDefinition(def.body ?? "").connectors,
+        integrations: await loadDerivationIntegrations(env.admin, a.activity_space_id).catch(() => []),
+        strategyId: null,
+      }),
+      strategyId: await strategyIdForObject(env.admin, obj.id),
+    });
+    let runRes = await env.admin.from("agent_runs")
+      .insert({ id: firedRunId, element_id: el.id, domain_id: obj.domain_id, worker_id: workerId, triggered_from: "automation", triggered_by: a.owner_id, status: "queued", mode: "execute", chain_scope: firedScope })
       .select("id").single();
+    if (runRes.error || !runRes.data) {
+      // A database whose chain_scope column has not landed yet (the
+      // production catch-up is still behind): the run starts
+      // unscoped — pre-B10 behaviour — rather than not starting.
+      console.error("automations: chain scope insert failed; starting unscoped", runRes.error?.message);
+      runRes = await owner.db.from("agent_runs")
+        .insert({ element_id: el.id, domain_id: obj.domain_id, worker_id: workerId, triggered_from: "automation", triggered_by: a.owner_id, status: "queued", mode: "execute" })
+        .select("id").single();
+    }
+    const { data: run, error: runError } = runRes;
     if (runError || !run) return await fail(`実行を作れませんでした: ${runError?.message ?? "unknown"}`);
     await startRun(env, owner.jwt, run.id);
 

@@ -7,6 +7,7 @@ import { FONT } from '@/shared/designTokens';
 import { ToolPage, type ToolView } from '@/Function/shared/tool/ToolPage';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { hasUnconfirmed } from '@/Function/audit/auditModel';
+import { chainChildrenOf } from '@/Function/audit/chainScopeModel';
 import { AGENT_AUDIT_RUN_LIMIT, AUDIT_RUN_LIMIT, AUDIT_WINDOW_DAYS } from '@/hooks/useAudit';
 import type { useAuditScope } from './auditScope';
 import type { AuditSource } from './auditSource';
@@ -49,7 +50,7 @@ export function AuditLog({ source, scoped, status, attention, runId, onAttention
   }));
   const panel = ledgerRun
     ? <RunPanel source={source} run={ledgerRun} deployment={scoped.deploymentOf.get(ledgerRun.deployment_id) ?? null} onClose={onCloseRun} />
-    : agentRun ? <AgentRunPanel run={agentRun} onClose={onCloseRun} /> : undefined;
+    : agentRun ? <AgentRunPanel run={agentRun} chainChildren={chainChildrenOf(source.agentRuns, agentRun.id)} onClose={onCloseRun} /> : undefined;
   return (
     <ToolPage crumbs={[{ id: 'tool', label: t('Audit') }, { id: 'page', label: t('Audit log') }]} storageKey="audit-log" home="all"
       views={views} activeView={attention ? 'attention' : 'all'} onSelectView={id => onAttention(id === 'attention')}

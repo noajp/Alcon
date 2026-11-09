@@ -250,3 +250,39 @@ describe('agent run finish detail migration', () => {
     expect(migration).not.toContain('create table');
   });
 });
+
+describe('verdict chain accounting (B10)', () => {
+  it('seals the denial count only when the fence refused something', () => {
+    const refused = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, chainDenied: 3 });
+    expect(refused.chain).toEqual({ denied: 3 });
+    const quiet = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, chainDenied: 0 });
+    expect(quiet.chain).toBeUndefined();
+    const unscoped = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true });
+    expect(unscoped.chain).toBeUndefined();
+    // The block rides unchecked records too — a refusal count
+    // describes the run's calls, not the verifier's answer.
+    const unchecked = buildRunVerdict({ ...BASE, checkAttempted: true, chainDenied: 1 });
+    expect(unchecked.chain).toEqual({ denied: 1 });
+  });
+
+  it('server and web parse the block identically; a malformed block refuses the record on both', () => {
+    const built = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, chainDenied: 2 });
+    expect(webParseRunVerdict(built)).toEqual(parseRunVerdict(built));
+    expect(parseRunVerdict(built)?.chain).toEqual({ denied: 2 });
+    for (const bad of [
+      { ...built, chain: { denied: -1 } },
+      { ...built, chain: { denied: 1.5 } },
+      { ...built, chain: { denied: '2' } },
+      { ...built, chain: {} },
+      { ...built, chain: [] },
+      { ...built, chain: 2 },
+    ]) {
+      expect(parseRunVerdict(bad)).toBeNull();
+      expect(webParseRunVerdict(bad)).toBeNull();
+    }
+    // Older records carry no block and read unchanged.
+    const older = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true });
+    expect(parseRunVerdict(older)?.chain).toBeUndefined();
+    expect(webParseRunVerdict(older)).toEqual(parseRunVerdict(older));
+  });
+});

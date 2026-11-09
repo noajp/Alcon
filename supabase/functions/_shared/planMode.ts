@@ -306,7 +306,7 @@ export async function settlePlanApproval(
   admin: SupabaseClient,
   actionId: string,
   ok: boolean,
-  opts?: { verify?: VerifyCheck; drift?: DiffMismatch[] },
+  opts?: { verify?: VerifyCheck; drift?: DiffMismatch[]; chainDenied?: boolean },
 ): Promise<void> {
   await admin
     .from("agent_actions")
@@ -317,6 +317,7 @@ export async function settlePlanApproval(
         total: 1,
         ...(opts?.verify ? { verify: opts.verify } : {}),
         ...(opts?.drift ? { drift: opts.drift } : {}),
+        ...(opts?.chainDenied ? { chainDenied: true } : {}),
       },
     })
     .eq("id", actionId);

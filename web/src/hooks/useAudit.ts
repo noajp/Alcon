@@ -11,7 +11,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { useWorkersByIds } from '@/hooks/teamData';
 import { addDays } from '@/Function/shared/dateUtils';
 import {
-  agentRunEvents, mergeAuditTimeline, parseFinishDetail, parseProposedReadings, parseRunVerdict,
+  agentRunEvents, mergeAuditTimeline, parseChainScope, parseFinishDetail, parseProposedReadings, parseRunVerdict,
   type AgentRunRecord, type StepEvent,
 } from '@/Function/audit/auditModel';
 import type {
@@ -70,7 +70,7 @@ interface AgentRunRow {
   id: string; element_id: string; domain_id: string | null; worker_id: string | null;
   status: AgentRunStatus; mode: AgentRunRecord['mode']; summary: string | null; error: string | null;
   started_at: string | null; finished_at: string | null; created_at: string; cost_usd: number | string;
-  verdict: unknown; proposed_readings: unknown; finish_detail: unknown;
+  verdict: unknown; proposed_readings: unknown; finish_detail: unknown; chain_scope: unknown;
 }
 
 /**
@@ -88,7 +88,7 @@ interface AgentRunRow {
  */
 async function loadAgentRuns(spaceId: string, since: string, signal: AbortSignal): Promise<{ runs: AgentRunRecord[]; truncated: boolean }> {
   const { data, error } = await supabase.from('agent_runs')
-    .select('id, element_id, domain_id, worker_id, status, mode, summary, error, started_at, finished_at, created_at, cost_usd, verdict, proposed_readings, finish_detail')
+    .select('id, element_id, domain_id, worker_id, status, mode, summary, error, started_at, finished_at, created_at, cost_usd, verdict, proposed_readings, finish_detail, chain_scope')
     .eq('activity_space_id', spaceId)
     .not('element_id', 'is', null)
     .or(`created_at.gte.${since},status.in.(${OPEN_AGENT_STATUSES.join(',')})`)
@@ -113,10 +113,24 @@ async function loadAgentRuns(spaceId: string, since: string, signal: AbortSignal
   const pendingOf = new Map<string, number>();
   for (const row of pending) pendingOf.set(row.run_id, (pendingOf.get(row.run_id) ?? 0) + 1);
 
+  // Chain scopes (B10): parsed at the boundary like the verdict, and
+  // their fenced integrations resolved to names — the audit shows a
+  // chain's reach in names, not ids. A name the read cannot resolve
+  // stands as its id rather than vanishing.
+  const parsedScopes = rows.map(r => parseChainScope(r.chain_scope));
+  const scopedIds = [...new Set(parsedScopes.flatMap(s => (s ? s.integrations : [])))];
+  const integrationRows = scopedIds.length
+    ? await selectIn<{ id: string; name: string }>(
+      scopedIds,
+      chunk => supabase.from('integrations').select('id, name').in('id', chunk).abortSignal(signal) as never)
+    : [];
+  const integrationNameOf = new Map(integrationRows.map(r => [r.id, r.name]));
+
   return {
     truncated: rows.length >= AGENT_AUDIT_RUN_LIMIT,
-    runs: rows.map(row => {
+    runs: rows.map((row, i) => {
       const element = elementOf.get(row.element_id);
+      const scope = parsedScopes[i];
       return {
         id: row.id, element_id: row.element_id, domain_id: row.domain_id, worker_id: row.worker_id,
         status: row.status, mode: row.mode, summary: row.summary, error: row.error,
@@ -125,6 +139,8 @@ async function loadAgentRuns(spaceId: string, since: string, signal: AbortSignal
         verdict: parseRunVerdict(row.verdict),
         finishDetail: parseFinishDetail(row.finish_detail),
         proposed_readings: parseProposedReadings(row.proposed_readings),
+        chainScope: scope,
+        chainIntegrationNames: scope ? scope.integrations.map(id => integrationNameOf.get(id) ?? id) : [],
         elementTitle: element?.title ?? '',
         elementStatus: element?.status ?? null,
         objectName: element?.object_id ? objectNameOf.get(element.object_id) ?? null : null,

@@ -20,7 +20,32 @@ export const DELEGATED_JWT_TTL_SECONDS = 300;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type DelegatedVia = "pat" | "oauth";
+export type DelegatedVia = "pat" | "oauth" | "chain";
+
+/**
+ * The carriage form of a chain scope (B10, _shared/chainScope.ts):
+ * the scope itself, plus the one run this token may drive. The
+ * scope's truth is the run's row — the claim only carries it, so a
+ * token can be checked against the row it claims to serve and a
+ * mismatch refuses the drive. Structurally identical to ChainScope
+ * with `runId` added; declared here so this module keeps no import
+ * of the scope machinery.
+ */
+export interface ChainClaim {
+  v: 1;
+  rootRunId: string;
+  parentRunId: string;
+  strategyId: string | null;
+  depth: number;
+  maxDepth: number;
+  actions: string[];
+  integrations: string[];
+  /** The one run this token may drive. */
+  runId: string;
+}
+
+/** A chain scope as a claim carries it: the scope, before its run is named. */
+export type ChainScopeClaims = Omit<ChainClaim, "runId">;
 
 export interface DelegatedSubject {
   userId: string;
@@ -29,6 +54,8 @@ export interface DelegatedSubject {
   patId?: string;
   /** The OAuth client the grant was issued to, for via 'oauth'. */
   clientId?: string;
+  /** The chain claim this token carries, for via 'chain'. */
+  chain?: ChainClaim;
 }
 
 export interface UserClaims {
@@ -40,6 +67,7 @@ export interface UserClaims {
   alcon_via: DelegatedVia;
   pat_id?: string;
   client_id?: string;
+  alcon_chain?: ChainClaim;
 }
 
 /** Pure. True for a bearer value that claims to be an Alcon personal access token. */
@@ -86,6 +114,22 @@ export function oauthClientIdOf(token: string): string | null {
 }
 
 /**
+ * Pure. The chain claim a bearer JWT carries (its `alcon_chain`),
+ * read from the unverified payload — carriage inspection only, the
+ * oauthClientIdOf precedent: serve() compares it against the run's
+ * row (chainScope's chainClaimMatches) and refuses the drive on any
+ * disagreement, so nothing here is trusted. Null when the token
+ * carries no chain claim shaped like one (an object naming a UUID
+ * run) — a person's bare session, a PAT/OAuth token, a non-JWT.
+ */
+export function chainClaimOf(token: string): ChainClaim | null {
+  const claim = unverifiedPayload(token)?.alcon_chain;
+  if (!claim || typeof claim !== "object" || Array.isArray(claim)) return null;
+  const runId = (claim as Record<string, unknown>).runId;
+  return typeof runId === "string" && UUID.test(runId) ? claim as ChainClaim : null;
+}
+
+/**
  * Pure. True when an OAuth access token carries the role the access token
  * hook gives (alcon_oauth_client). Checked after the token is verified: a
  * token without it means the hook is not enabled, and such a token would also
@@ -124,6 +168,13 @@ export function buildUserClaims(subject: DelegatedSubject, nowSeconds: number = 
   } else if (subject.via === "oauth") {
     if (!subject.clientId) throw new Error("an OAuth-delegated JWT needs the client id");
     claims.client_id = subject.clientId;
+  } else if (subject.via === "chain") {
+    // The chain claim rides ONLY this via, and this via REQUIRES it:
+    // a chain token without its scope would be a person's token in
+    // disguise. The scope itself is never judged here — the run's
+    // row is the truth and serve() compares the two (chainScope.ts).
+    if (!subject.chain || !UUID.test(subject.chain.runId)) throw new Error("a chain-delegated JWT needs its chain claim");
+    claims.alcon_chain = subject.chain;
   } else {
     throw new Error("unknown delegation");
   }
@@ -173,4 +224,20 @@ export async function mintUserJwt(subject: DelegatedSubject, rawKey?: string | n
     return await jwt.setProtectedHeader({ alg: "ES256", typ: "JWT", ...(key.kid ? { kid: key.kid } : {}) }).sign(privateKey);
   }
   return await jwt.setProtectedHeader({ alg: "HS256", typ: "JWT" }).sign(new TextEncoder().encode(key.secret));
+}
+
+/**
+ * A short-lived JWT carrying one run's chain scope (B10): the SAME
+ * signing path as every delegated token (no second path — #7),
+ * minted by the server at the moment it drives a chained run, and
+ * good for DELEGATED_JWT_TTL_SECONDS like the rest. The claim is
+ * carriage only: the run's row holds the truth, serve() refuses a
+ * drive whose claim disagrees with it, and the gate enforces from
+ * the row whoever's token arrives. A caller that cannot mint (no
+ * signing key) must NOT fall back to driving unscoped in silence —
+ * it drives with the person's own JWT and lets the row enforce,
+ * saying the mint failed (chainScope.ts's drivers do exactly that).
+ */
+export async function mintChainJwt(args: { userId: string; scope: ChainScopeClaims; runId: string }, rawKey?: string | null): Promise<string> {
+  return mintUserJwt({ userId: args.userId, via: "chain", chain: { ...args.scope, runId: args.runId } }, rawKey);
 }

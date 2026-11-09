@@ -13,6 +13,7 @@ import {
   type WorkflowDeploymentRecord,
 } from '@/Function/audit/auditModel';
 import { useAgentRunEvents } from '@/hooks/useAudit';
+import type { ChainChildRow } from '@/Function/audit/chainScopeModel';
 import { createPromotionDraftFromRun } from '@/AIP/harness/promotionData';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
 import { useChainLinks, useRunSteps, sha256Hex, type AuditSource } from './auditSource';
@@ -255,7 +256,7 @@ const VERDICT_UNCHECKED_REASON: Record<string, string> = {
  * record lives in the app database and is not part of the sealed ledger.
  * The live Workpad and its approvals live on the Element itself.
  */
-export function AgentRunPanel({ run, onClose }: { run: AgentRunRecord; onClose: () => void }) {
+export function AgentRunPanel({ run, chainChildren, onClose }: { run: AgentRunRecord; chainChildren?: ChainChildRow[]; onClose: () => void }) {
   const { t, locale } = useI18n();
   const detail = useAgentRunEvents(run.id);
   // The promotion path's run door (condition 5, source B): a finished
@@ -374,6 +375,31 @@ export function AgentRunPanel({ run, onClose }: { run: AgentRunRecord; onClose: 
                 {run.finishDetail.unconfirmed.map((u, i) => <li key={i}>{u}</li>)}
               </ul>
             </>
+          )}
+        </div>
+      )}
+      {(run.chainScope || (chainChildren && chainChildren.length > 0)) && (
+        <div className="px-4 pb-4">
+          <p className={`${FONT.sm} text-foreground`}>{t('Chained runs')}</p>
+          {run.chainScope && (
+            <p className={`${FONT.sm} mt-0.5 text-muted-foreground`}>
+              {t('Scope: depth {d} of {max} · {n} integrations · {m} actions', { d: run.chainScope.depth, max: run.chainScope.maxDepth, n: run.chainScope.integrations.length, m: run.chainScope.actions.length })}
+              {run.chainIntegrationNames.length > 0 ? ` — ${run.chainIntegrationNames.join(', ')}` : ''}
+            </p>
+          )}
+          {chainChildren && chainChildren.length > 0 && (
+            <ul className={`${FONT.sm} mt-1 space-y-1`}>
+              {chainChildren.map(child => (
+                <li key={child.runId}>
+                  <span className="text-foreground">{child.elementTitle || child.runId}</span>{' '}
+                  <span className="text-muted-foreground">
+                    {t(AGENT_OUTCOME_LABEL[child.outcome])} · {t('Scope: depth {d} of {max} · {n} integrations · {m} actions', { d: child.depth, max: child.maxDepth, n: child.integrationNames.length, m: child.actionCount })}
+                    {child.integrationNames.length > 0 ? ` — ${child.integrationNames.join(', ')}` : ''}
+                    {child.denied !== null && child.denied > 0 ? ` · ${t('{n} refused by the chain scope', { n: child.denied })}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

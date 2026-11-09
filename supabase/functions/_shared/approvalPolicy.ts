@@ -10,6 +10,15 @@ import type { CriticalClass, Permission } from "./connectorManifest.ts";
 //
 // The verdict's order (today's semantics, unchanged):
 //
+//   0. A chain scope (B10): a call outside the fence its run was born
+//      with is denied before anything else is consulted — before
+//      the catalog's entry policy, before the manifest's own rules.
+//      No mode, delegation, standing rule, autonomy grant or plan
+//      approval composes over it, because every one of those reads
+//      the verdict this function returns, and applyMode never moves
+//      a deny. The fact is composed only for integration calls of a
+//      scoped run (chainScope's chainFactFor); every other call
+//      carries no fact and is judged exactly as before.
 //   1. Alcon's own tools follow their entry policy.
 //   2. A call that is not a write never asks.
 //   3. A manifest command: a denial is not asked about (it is refused);
@@ -60,6 +69,15 @@ export interface ApprovalFacts {
    *  loaded from autonomy_grants, judged by verdictWithAutonomy
    *  below. It is data, not a branch: the floors never read it. */
   autonomyGrant?: { lane: 1 | 2; clean: number } | null;
+  /** Capability attenuation (B10): this call's standing inside the
+   *  chain scope its run was born with — a pre-composed fact like
+   *  the grant beside it (chainScope's chainFactFor), present only
+   *  when the run carries a scope and the call is an integration
+   *  call. Unlike the grant, the floors DO read it: it is the first
+   *  rule of approvalVerdict, a deny nothing downstream can lift —
+   *  a grant composes over an ask, and an out-of-scope call's base
+   *  is never an ask (D5: grants live inside the fence). */
+  chain?: { inScope: boolean } | null;
 }
 
 /** What the floors below the mode say about one call. */
@@ -84,6 +102,14 @@ export function approvalModeOf(value: unknown): ApprovalMode {
  * === "ask")` for every input — the tests pin exactly that.
  */
 export function approvalVerdict(facts: ApprovalFacts): ApprovalVerdict {
+  // Rule 0 (B10): the chain fence. Judged first, before the catalog
+  // and the manifest, so the recorded reason for a doubly-refused
+  // call is the fence's; and a deny here is terminal — applyMode
+  // never moves a deny in any mode, verdictWithAutonomy lifts only
+  // an ask, the decision path re-checks manifest rules but never
+  // needs to re-check this (a scope cannot change after mint, which
+  // the row's trigger guarantees).
+  if (facts.chain && !facts.chain.inScope) return "deny";
   if (facts.catalogDecision !== undefined) {
     return facts.catalogDecision === "approve" ? "ask" : facts.catalogDecision;
   }
