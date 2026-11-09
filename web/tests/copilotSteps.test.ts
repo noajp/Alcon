@@ -109,4 +109,18 @@ describe('toKeptMessages', () => {
       { role: 'assistant', content: '' },
     ]);
   });
+
+  it('carries a person’s chart colors through — the next cut must not strip them', () => {
+    const shown: CopilotMessage[] = [
+      {
+        role: 'assistant', content: 'グラフです', done: true, at: 200,
+        chartColors: { 0: { '売上': '#ef4444' }, 2: { '12月': '#8b8d98' } },
+      },
+      { role: 'assistant', content: '色なし', done: true, chartColors: {} },
+    ];
+    expect(toKeptMessages(shown)).toEqual([
+      { role: 'assistant', content: 'グラフです', chartColors: { 0: { '売上': '#ef4444' }, 2: { '12月': '#8b8d98' } } },
+      { role: 'assistant', content: '色なし' },
+    ]);
+  });
 });
