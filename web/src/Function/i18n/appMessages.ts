@@ -399,7 +399,8 @@ const APP_MESSAGES: Record<string, Row> = {
   "Removed connection": ["削除された接続", "삭제된 연결", "Connexion supprimée", "Conexión eliminada"],
   "Anthropic (Alcon default)": ["Anthropic（Alcon 標準）", "Anthropic(Alcon 기본)", "Anthropic (par défaut dans Alcon)", "Anthropic (predeterminado de Alcon)"],
   "Model for {name}": ["{name} のモデル", "{name}의 모델", "Modèle de {name}", "Modelo de {name}"],
-  "Runs on Anthropic by default. Add a model connection in Settings › AI to run this agent on another provider.": ["標準では Anthropic で動きます。別の会社のモデルで動かすには、設定 › AI で AI モデルの接続を追加してください。", "기본적으로 Anthropic에서 실행됩니다. 다른 제공자로 실행하려면 설정 › AI에서 모델 연결을 추가하세요.", "S’exécute par défaut sur Anthropic. Ajoutez une connexion de modèle dans Réglages › IA pour l’exécuter chez un autre fournisseur.", "Se ejecuta en Anthropic por defecto. Añade una conexión de modelo en Ajustes › IA para ejecutarlo en otro proveedor."],
+  "Runs on Anthropic by default. Add a model connection in Team settings, under Models.": ["標準では Anthropic で動きます。モデル接続は、チーム設定の「モデル」で追加してください。", "기본적으로 Anthropic에서 실행됩니다. 모델 연결은 팀 설정의 모델에서 추가하세요.", "S’exécute par défaut sur Anthropic. Ajoutez une connexion de modèle dans Réglages › Équipe, sous Modèles.", "Se ejecuta en Anthropic por defecto. Añade una conexión de modelo en Ajustes › Equipo, en Modelos."],
+  'Add a model provider': ['モデル接続先を追加', '모델 제공자 추가', 'Ajouter un fournisseur de modèles', 'Añadir un proveedor de modelos'],
   "Provider": ["接続先", "제공자", "Fournisseur", "Proveedor"],
   "Model": ["モデル", "모델", "Modèle", "Modelo"],
   "The model name in the provider's docs": ["接続先のドキュメントにあるモデル名", "제공자 문서에 있는 모델 이름", "Le nom du modèle dans la documentation du fournisseur", "El nombre del modelo en la documentación del proveedor"],
@@ -531,8 +532,9 @@ const APP_MESSAGES: Record<string, Row> = {
   '{work} is waiting on this connection': ['この接続を待っている仕事：{work}', '이 연결을 기다리는 작업: {work}', 'Travail en attente de cette connexion : {work}', 'Trabajo en espera de esta conexión: {work}'],
   'Only a Space owner can connect it.': ['接続できるのは Space のオーナーだけです。', '연결할 수 있는 사람은 Space 소유자뿐입니다.', 'Seul un propriétaire du Space peut le connecter.', 'Solo un propietario del Space puede conectarlo.'],
   'Find and connect it from the MCP Registry in Settings › Customize': ['Settings › Customize の MCP Registry から探して接続できます', 'Settings › Customize의 MCP Registry에서 찾아 연결할 수 있습니다', 'Recherchez-le et connectez-le depuis le MCP Registry dans Settings › Customize', 'Búscalo y conéctalo desde el MCP Registry en Settings › Customize'],
-  // The Space's approval mode (Settings › AI).
+  // The Space's approval mode (Settings › Activity space).
   'Approval mode': ['承認モード', '승인 모드', 'Mode d’approbation', 'Modo de aprobación'],
+  'Change in Space settings': ['Space 設定で変更', 'Space 설정에서 변경', 'Modifier dans les réglages du Space', 'Cambiar en los ajustes del Space'],
   'Ask every time': ['都度承認', '매번 승인', 'Demander à chaque fois', 'Preguntar cada vez'],
   'Auto': ['おまかせ', '자동', 'Auto', 'Automático'],
   'Free action': ['自由行動', '자유 행동', 'Action libre', 'Acción libre'],

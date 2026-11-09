@@ -2,7 +2,7 @@
 
 import { appDialog } from '@/Function/shared/appDialogStore';
 
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Plus, Trash2, UserPlus, X } from '@/ui/icons';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,11 @@ import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/member
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT } from '@/shared/designTokens';
+import { useIntegrations } from '@/AIP/connectors/data';
+import { INTEGRATION_PRESETS, catalogGroups, installedPresetIds } from '@/AIP/connectors/catalog';
+import { ConnectDialogHost, openedForIntegration, openedForPreset, type OpenedConnection } from '@/AIP/connectors/ConnectDialogHost';
+import { ConnectedRow } from '@/AIP/connectors/ConnectedRow';
+import { PresetCard } from '@/AIP/connectors/PresetCard';
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -51,6 +56,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [showInvite, setShowInvite] = useState(false);
   const [connecting, setConnecting] = useState<Worker | null>(null);
   const [modelFor, setModelFor] = useState<Worker | null>(null);
+  const [openedConnection, setOpenedConnection] = useState<OpenedConnection | null>(null);
+  const [showAddProvider, setShowAddProvider] = useState(false);
   // Invited to this Domain but not yet accepted: listed, not a Worker here.
   const { invitees, refetch: refetchInvitees } = useScopeInvitations('domain', domainId);
 
@@ -182,6 +189,25 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   });
   const agents = workers.filter((w) => w.type !== 'human');
 
+  // Model connections are the Space's integrations of kind 'model'. They
+  // are added and managed here, where the agents that run on them are
+  // listed — the same dialog as everywhere else (ConnectDialogHost), so
+  // there is no second creation or management route.
+  const providerSpaceId = workerSpaceId ?? activeSpaceId;
+  const { data: spaceIntegrations } = useIntegrations(providerSpaceId);
+  const modelProviders = spaceIntegrations.filter((i) => i.kind === 'model');
+  // The model presets still on offer, with the catalog's own grouping
+  // rules (installed ones excluded, custom always offered); no model
+  // preset signs in, so the OAuth readiness record is all nulls.
+  const modelCards = useMemo(
+    () => catalogGroups(
+      INTEGRATION_PRESETS.filter((p) => p.kind === 'model'),
+      installedPresetIds(spaceIntegrations),
+      { google: null, github: null },
+    ).flatMap((g) => g.cards),
+    [spaceIntegrations],
+  );
+
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
@@ -258,18 +284,39 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       )}
 
       <SettingsSection title={t('Models ({n})', { n: agents.length })}>
-        {agents.length === 0 ? (
+        {agents.length === 0 && modelProviders.length === 0 ? (
           <div className="py-3 text-[13px] text-muted-foreground">{t('No models yet.')}</div>
         ) : (
-          agents.map((w) => (
-            <WorkerRow
-              key={w.id}
-              worker={w}
-              onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
-              onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
-              onEditModel={canToggle(w) && w.type === 'ai_agent' ? () => setModelFor(w) : undefined}
-            />
-          ))
+          <>
+            {agents.map((w) => (
+              <WorkerRow
+                key={w.id}
+                worker={w}
+                onDelete={canRemove(w) ? () => handleDelete(w.id) : undefined}
+                onToggleStatus={canToggle(w) ? () => handleStatusToggle(w) : undefined}
+                onEditModel={canToggle(w) && w.type === 'ai_agent' ? () => setModelFor(w) : undefined}
+              />
+            ))}
+            {modelProviders.map((p) => (
+              <ConnectedRow key={p.id} integration={p} onOpen={() => setOpenedConnection(openedForIntegration(p))} />
+            ))}
+          </>
+        )}
+        {isSpaceOwner && (
+          <div className="py-2">
+            <Button variant="ghost" onClick={() => setShowAddProvider((v) => !v)}>
+              <Plus size={12} />
+              {t('Add a model provider')}
+            </Button>
+            {showAddProvider && (
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {modelCards.map(({ preset, state }) => (
+                  <PresetCard key={preset.id} preset={preset} state={state}
+                    onOpen={() => setOpenedConnection(openedForPreset(preset, spaceIntegrations))} />
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </SettingsSection>
 
@@ -317,6 +364,17 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             setWorkers((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
             setConnecting(null);
           }}
+        />
+      )}
+
+      {openedConnection && providerSpaceId && (
+        <ConnectDialogHost
+          spaceId={providerSpaceId}
+          opened={openedConnection}
+          integrations={spaceIntegrations}
+          canEdit={isSpaceOwner}
+          onClose={() => setOpenedConnection(null)}
+          onCreated={(created) => setOpenedConnection({ preset: openedConnection.preset, integration: created })}
         />
       )}
     </div>

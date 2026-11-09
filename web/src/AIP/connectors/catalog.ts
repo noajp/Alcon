@@ -6,7 +6,8 @@
 //
 // A `model` connection is an AI model provider with a Messages API in
 // Anthropic's format. It is not an agent's tool: an AI Worker picks one as the
-// model it runs on (Settings › Team).
+// model it runs on, and the connections themselves are added where they are
+// consumed — Settings › Team, under Models.
 //
 // Pure — no React, no Supabase — so the rules are unit-tested in
 // tests/integrationsCatalog.test.ts. Display strings here are English source
