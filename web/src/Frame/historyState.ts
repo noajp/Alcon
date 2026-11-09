@@ -1,10 +1,10 @@
 import type { NavigationState } from '@/types/navigation';
 
 /** A screen the shell can return to: a tab's view and where it was inside
- *  that view — the OpenScreen core (openScreen.ts). A tab's Back stack is
- *  a list of these, most recent last. In-memory only: it dies with the
- *  browser tab, and a reload restores the current screen with an empty
- *  stack. */
+ *  that view — the OpenScreen core (openScreen.ts). A tab's Back and
+ *  Forward stacks are lists of these, most recent last. In-memory only:
+ *  they die with the browser tab, and a reload restores the current
+ *  screen with empty stacks. */
 export interface ScreenSnapshot {
   view: string;
   navigation: NavigationState;
@@ -105,4 +105,60 @@ export function popBack(
   const top = stack[stack.length - 1];
   if (!top) return null;
   return { screen: top, stack: stack.slice(0, -1) };
+}
+
+/** Pure. The Forward stack after a navigation from `before` to `after`:
+ *  a fresh navigation — a different route key, Settings excluded; the
+ *  moves recordNavigation records — clears it (the browser rule: going
+ *  somewhere new kills where Forward could return to). A same-key write
+ *  is in-surface browsing and leaves it standing, and the Settings
+ *  detour is ignored in both directions, as it is for recording. */
+export function forwardAfterNavigation(
+  forward: readonly ScreenSnapshot[],
+  before: ScreenSnapshot,
+  after: ScreenSnapshot,
+): ScreenSnapshot[] {
+  if (before.view === SETTINGS_VIEW || after.view === SETTINGS_VIEW) return [...forward];
+  if (routeKeyOf(before) === routeKeyOf(after)) return [...forward];
+  return [];
+}
+
+/** One step through a tab's history: the screen to show, and the tab's
+ *  two stacks after the step. */
+export interface HistoryStep {
+  screen: ScreenSnapshot;
+  back: ScreenSnapshot[];
+  forward: ScreenSnapshot[];
+}
+
+/** Pure. One step back from `current`: the most recent Back entry
+ *  becomes the screen, and the screen left moves onto the Forward
+ *  stack, so stepForward can undo the step. Null at the bottom of the
+ *  Back stack — and on Settings, whose own return owns leaving it, so
+ *  Settings never lands on either stack. */
+export function stepBack(
+  current: ScreenSnapshot,
+  back: readonly ScreenSnapshot[],
+  forward: readonly ScreenSnapshot[],
+): HistoryStep | null {
+  if (current.view === SETTINGS_VIEW) return null;
+  const popped = popBack(back);
+  if (!popped) return null;
+  return { screen: popped.screen, back: popped.stack, forward: [...forward, current] };
+}
+
+/** Pure. One step forward — the mirror of stepBack: the most recent
+ *  Forward entry becomes the screen, and the screen left is appended
+ *  to the Back stack raw. Not recordNavigation: returning somewhere is
+ *  not a fresh navigation, so nothing is consumed, filtered or capped
+ *  here. Null at the top of the Forward stack, and on Settings. */
+export function stepForward(
+  current: ScreenSnapshot,
+  back: readonly ScreenSnapshot[],
+  forward: readonly ScreenSnapshot[],
+): HistoryStep | null {
+  if (current.view === SETTINGS_VIEW) return null;
+  const popped = popBack(forward);
+  if (!popped) return null;
+  return { screen: popped.screen, back: [...back, current], forward: popped.stack };
 }

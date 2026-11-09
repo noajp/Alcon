@@ -68,10 +68,6 @@ interface AppSidebarProps {
    *  page.tsx's handleOpenSettings / handleCloseSettings. */
   onOpenSettings: () => void;
   onCloseSettings: () => void;
-  /** The shell's Back: shown in the header (the slot Settings' Back uses)
-   *  whenever the active tab has a screen to go back to. */
-  canGoBack?: boolean;
-  onGoBack?: () => void;
   onRefresh?: () => void;
   width: number;
   collapsed: boolean;
@@ -106,8 +102,6 @@ export function AppSidebar({
   onViewChange,
   onOpenSettings,
   onCloseSettings,
-  canGoBack,
-  onGoBack,
   collapsed,
   overlay,
   onCreateNew,
@@ -329,17 +323,6 @@ export function AppSidebar({
             </Button>
           ) : (
             <div className="flex w-full items-center gap-1">
-            {canGoBack && onGoBack && (
-              <button
-                type="button"
-                onClick={onGoBack}
-                title={t('Back')}
-                aria-label={t('Back')}
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
-              >
-                <ArrowLeft size={15} />
-              </button>
-            )}
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={onOpenSettings} />
             </div>

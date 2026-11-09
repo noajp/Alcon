@@ -12,12 +12,13 @@ import { DiscoverModal } from '@/Frame/DiscoverModal';
 import { MainContent } from '@/Frame/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/Frame/CreateView';
 import { CommandPalette } from '@/Frame/CommandPalette';
+import { ShellTabStrip } from '@/Frame/ShellTabStrip';
 import { QuickAddElementLauncher } from '@/Frame/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
 import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
 import { CopilotProvider } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
-import { popBack, recordNavigation } from '@/Frame/historyState';
+import { forwardAfterNavigation, recordNavigation, stepBack, stepForward, type HistoryStep } from '@/Frame/historyState';
 import { mergeNavigation, navigationAfterDomainChange, navigationForView } from '@/Frame/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
@@ -105,6 +106,7 @@ function makeNewTab(activeView = 'inbox', navigation: NavigationState = { object
     activeView,
     navigation,
     back: [],
+    forward: [],
   };
 }
 
@@ -113,6 +115,29 @@ const isShellView = (view: string) => Object.prototype.hasOwnProperty.call(VIEW_
 // Below this viewport width the left sidebar auto-collapses so list/board
 // content keeps a usable width (matches Linear's narrow-window behavior).
 const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
+
+// The person's own sidebar choice, once they make one, outranks the width
+// band: stored device-locally ('1' = collapsed, '0' = shown), like the
+// sidebar's width (alcon:sidebarWidth in AppSidebar). Which window on
+// which monitor has its sidebar closed is a device habit, not an account
+// preference, so it does not go through user_preferences.
+const SIDEBAR_COLLAPSED_KEY = 'alcon:sidebarCollapsed';
+
+function readSidebarCollapsedChoice(): boolean | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (stored === '1') return true;
+    if (stored === '0') return false;
+  } catch { /* storage unavailable — the width band decides */ }
+  return null;
+}
+
+function storeSidebarCollapsedChoice(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+  } catch { /* best-effort: the choice simply does not persist */ }
+}
 
 function AppContent() {
   // Settings > Preferences are cached per browser so the first tab can open
@@ -286,19 +311,22 @@ function WorkspaceContent({
   // Per-tab updaters — operate on the tab id that's passed in, not whichever
   // tab happens to be active. Each tab's MainContent gets a stable handler
   // bound to its own id so background tabs can keep their state correctly.
-  // Both updaters record the screen left on the tab's Back stack
-  // (historyState.ts). Route keys are computed from the tab's stored
-  // view/navigation, never the displayed activeTab. Restore paths (the
-  // OAuth return, a Domain switch's selection cleanup) write setTabs
-  // directly and never record.
+  // Both updaters record the screen left on the tab's Back stack and clear
+  // its Forward stack on a fresh navigation (historyState.ts). Route keys
+  // are computed from the tab's stored view/navigation, never the displayed
+  // activeTab. Restore paths (the OAuth return, a Domain switch's
+  // selection cleanup) write setTabs directly and never record.
   const updateTab = (id: string, partial: Partial<Omit<AppTab, 'id'>>) => {
     const next = partial;
     setTabs(prev => prev.map(t => {
       if (t.id !== id) return t;
       const merged = { ...t, ...next };
       const landed = next.activeView === undefined ? merged : { ...merged, navigation: navigationForView(merged.navigation, merged.activeView) };
-      const back = recordNavigation(t.back, { view: t.activeView, navigation: t.navigation }, { view: landed.activeView, navigation: landed.navigation });
-      return { ...landed, back };
+      const before = { view: t.activeView, navigation: t.navigation };
+      const after = { view: landed.activeView, navigation: landed.navigation };
+      const back = recordNavigation(t.back, before, after);
+      const forward = forwardAfterNavigation(t.forward, before, after);
+      return { ...landed, back, forward };
     }));
   };
   const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
@@ -309,40 +337,68 @@ function WorkspaceContent({
     setTabs(prev => prev.map(t => {
       if (t.id !== id) return t;
       const navigation = mergeNavigation(t.navigation, partial, activeDomainId);
-      const back = recordNavigation(t.back, { view: t.activeView, navigation: t.navigation }, { view: t.activeView, navigation });
-      return { ...t, navigation, back };
+      const before = { view: t.activeView, navigation: t.navigation };
+      const after = { view: t.activeView, navigation };
+      const back = recordNavigation(t.back, before, after);
+      const forward = forwardAfterNavigation(t.forward, before, after);
+      return { ...t, navigation, back, forward };
     }));
   };
 
-  // Back: restore the most recent screen this tab left. A raw write — going
-  // back is not itself a navigation to record — with the same Domain sync
-  // updateTabNavigation performs for an Object in another Domain. It
-  // restores shell-level screens only: a tab drilldown's transiently open
-  // Element never entered the navigation, so Back lands on that tab with
-  // its remembered content instead.
-  const goBack = () => {
-    const popped = popBack(storedTab.back);
-    if (!popped) return;
-    const { screen, stack } = popped;
+  // Back / Forward: restore a screen this tab visited. Raw writes —
+  // stepping through history is not itself a navigation to record — and
+  // symmetric: both go through applyScreen, with the same Domain sync
+  // updateTabNavigation performs for an Object in another Domain. They
+  // restore shell-level screens only: a tab drilldown's transiently open
+  // Element never entered the navigation, so a step lands on that tab
+  // with its remembered content instead.
+  const applyScreen = (step: HistoryStep) => {
+    const { screen } = step;
     if (screen.navigation.objectId && screen.navigation.objectDomainId && screen.navigation.objectDomainId !== activeDomainId) {
       onActiveDomainChange(screen.navigation.objectDomainId);
       setActiveDomainId(screen.navigation.objectDomainId);
     }
     setTabs(prev => prev.map(t => (
-      t.id === storedTab.id ? { ...t, activeView: screen.view, navigation: screen.navigation, back: stack } : t
+      t.id === storedTab.id
+        ? { ...t, activeView: screen.view, navigation: screen.navigation, back: step.back, forward: step.forward }
+        : t
     )));
   };
+  const goBack = () => {
+    const step = stepBack(
+      { view: storedTab.activeView, navigation: storedTab.navigation },
+      storedTab.back,
+      storedTab.forward,
+    );
+    if (step) applyScreen(step);
+  };
+  const goForward = () => {
+    const step = stepForward(
+      { view: storedTab.activeView, navigation: storedTab.navigation },
+      storedTab.back,
+      storedTab.forward,
+    );
+    if (step) applyScreen(step);
+  };
 
-  // ⌘[ / Alt+← go back, like a browser. Ignored while typing — the guard
-  // the app's other global keys use. Re-subscribed each render so goBack
-  // always reads the tab active now.
+  // History availability on the active tab, for the strip and the
+  // palette. Settings owns its return, so neither direction is offered
+  // while it is open (historyState keeps it off both stacks entirely).
+  const canGoBack = storedTab.activeView !== 'settings' && storedTab.back.length > 0;
+  const canGoForward = storedTab.activeView !== 'settings' && storedTab.forward.length > 0;
+
+  // ⌘[ / Alt+← go back and ⌘] / Alt+→ go forward, like a browser. Ignored
+  // while typing — the guard the app's other global keys use.
+  // Re-subscribed each render so the steps always read the tab active now.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!((e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft'))) return;
+      const back = (e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft');
+      const forward = (e.metaKey && e.key === ']') || (e.altKey && e.key === 'ArrowRight');
+      if (!back && !forward) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
       e.preventDefault();
-      goBack();
+      if (back) goBack(); else goForward();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -411,7 +467,8 @@ function WorkspaceContent({
   };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH,
+    () => readSidebarCollapsedChoice()
+      ?? (typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH),
   );
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the strip's reveal button) instead of pinning it back into flow.
@@ -502,7 +559,9 @@ function WorkspaceContent({
   // Narrow windows: auto-collapse the sidebar so list/board content keeps a
   // usable width; wide windows: pin it back. Only acts when the window
   // CROSSES the breakpoint, so a manual toggle still sticks within a given
-  // size band. `wasNarrow` lives in a ref (not a closure local) so it can't
+  // size band — and once a choice is stored, crossing no longer overrides
+  // it at all: the band only ever decides for someone who has not chosen.
+  // `wasNarrow` lives in a ref (not a closure local) so it can't
   // go stale across re-renders / HMR, and we sync once on mount so the
   // sidebar always matches the current width band on load.
   const wasNarrowRef = useRef<boolean | null>(null);
@@ -511,6 +570,7 @@ function WorkspaceContent({
       const narrow = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
       if (wasNarrowRef.current === narrow) return;
       wasNarrowRef.current = narrow;
+      if (readSidebarCollapsedChoice() !== null) return;
       setSidebarCollapsed(narrow);
       setSidebarOverlay(false);
     };
@@ -553,7 +613,7 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // PanelLeft button in the strip under the islands. The right behaviour
+  // PanelLeft button in the top strip. The right behaviour
   // depends on whether the window is wide enough to show the sidebar AND the
   // island side-by-side:
   // - Visible → hide it (island goes full-width).
@@ -562,17 +622,21 @@ function WorkspaceContent({
   // - Hidden + NARROW window → there isn't room for both, so reveal it as a
   //   floating drawer over a scrim (island dimmed behind, only sidebar
   //   interactive) instead of squishing the island.
+  // A change to the pinned state is the person's choice and is stored;
+  // the narrow drawer is a peek, not a choice, and stores nothing.
   const handleSidebarToggle = () => {
     const narrow = typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
     if (!sidebarCollapsed) {
       // Currently visible (pinned or overlay) → hide.
       setSidebarCollapsed(true);
       setSidebarOverlay(false);
+      storeSidebarCollapsedChoice(true);
     } else if (narrow) {
       setSidebarOverlay((v) => !v); // drawer reveal / dismiss
     } else {
       setSidebarCollapsed(false);   // wide → re-pin, both visible
       setSidebarOverlay(false);
+      storeSidebarCollapsedChoice(false);
     }
   };
   // Choosing anything from the sidebar dismisses the overlay, so the tap
@@ -635,8 +699,6 @@ function WorkspaceContent({
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
           onCloseSettings={handleCloseSettings}
-          canGoBack={storedTab.back.length > 0}
-          onGoBack={goBack}
           onRefresh={refetch}
           width={260}
           collapsed={sidebarCollapsed}
@@ -655,6 +717,17 @@ function WorkspaceContent({
         )}
 
         <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5`}>
+        {/* The top strip: the shell's history (‹ ›) and the sidebar's
+            toggle, over the whole content column. Item tabs join it in a
+            later change. */}
+        <ShellTabStrip
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          onGoBack={goBack}
+          onGoForward={goForward}
+          sidebarVisible={!sidebarCollapsed || sidebarOverlay}
+          onToggleSidebar={handleSidebarToggle}
+        />
         {/* MainContent + Copilot live side-by-side as two islands. When the
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
@@ -716,12 +789,11 @@ function WorkspaceContent({
       <StatusBar
         activeView={activeTab.activeView}
         onViewChange={handleSidebarViewChange}
-        sidebar={{ visible: !sidebarCollapsed || sidebarOverlay, onToggle: handleSidebarToggle }}
         ai={{ open: copilotOpen || aiScreen, onToggle: aiScreen ? handleMinimizeAi : () => handleCopilotOpenChange(!copilotOpen) }}
       />
 
       {/* Global ⌘K command palette */}
-      <CommandPalette returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} canGoBack={storedTab.back.length > 0} onGoBack={goBack} />
+      <CommandPalette returnTo={{ view: activeTab.activeView, objectId: activeTab.navigation.objectId ?? null, objectDomainId: activeTab.navigation.objectDomainId ?? null, domainId: activeDomainId || null }} onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} canGoBack={canGoBack} onGoBack={goBack} canGoForward={canGoForward} onGoForward={goForward} />
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
