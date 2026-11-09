@@ -8,8 +8,10 @@ import type { CopilotConnectionProposal, CopilotCredentialAsk, CreatedEntity, To
 // what the call created when it created Alcon entities),
 // 'draft' steps holding the answer as it grows, 'reply' steps for
 // each stretch of finished words, a 'connection_request' step per
-// connection proposal, and a 'credential_request' step per credential
-// capture the proposal created. Pure.
+// connection proposal, a 'credential_request' step per credential
+// capture the proposal created, and a 'pull_request' step for a
+// coding run's published PR (its detail is the created record).
+// Pure.
 
 export interface CopilotStepRow { type: string; title: string; detail: string | null }
 
@@ -41,14 +43,18 @@ function createdOf(parsed: unknown): CreatedEntity[] | undefined {
   const out: CreatedEntity[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue;
-    const { kind, id, title, displayId, status, objectId } = entry as Record<string, unknown>;
-    if (kind !== 'element' && kind !== 'object' && kind !== 'strategy') continue;
+    const { kind, id, title, displayId, status, objectId, url, repo, number, state } = entry as Record<string, unknown>;
+    if (kind !== 'element' && kind !== 'object' && kind !== 'strategy' && kind !== 'pull_request') continue;
     if (typeof id !== 'string' || !id || typeof title !== 'string' || !title) continue;
     out.push({
       kind, id, title,
       ...(typeof displayId === 'string' && displayId ? { displayId } : {}),
       ...(typeof status === 'string' && status ? { status } : {}),
       ...(typeof objectId === 'string' && objectId ? { objectId } : {}),
+      ...(typeof url === 'string' && url ? { url } : {}),
+      ...(typeof repo === 'string' && repo ? { repo } : {}),
+      ...(typeof number === 'number' && number > 0 ? { number } : {}),
+      ...(typeof state === 'string' && state ? { state } : {}),
     });
   }
   return out.length ? out : undefined;
@@ -106,6 +112,15 @@ export function liveTurnFromSteps(steps: readonly CopilotStepRow[]): { content: 
     } else if (step.type === 'credential_request') {
       const ask = credentialOf(step);
       if (ask) credentials.push(ask);
+    } else if (step.type === 'pull_request') {
+      // A coding run's publish landing (coding capability PR3): the
+      // step's detail is the created record alone — no call input,
+      // no rows — and the card under the answer is its surface.
+      let created: CreatedEntity[] | undefined;
+      try {
+        created = createdOf(JSON.parse(step.detail ?? ''));
+      } catch { /* a detail that is not the record's JSON is just a row */ }
+      if (created) toolEvents.push({ name: step.title, result: { ok: true }, created });
     } else if (step.type === 'reply') {
       const text = (step.detail ?? step.title).trim();
       if (text) segments.push(text);

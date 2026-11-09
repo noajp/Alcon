@@ -28,12 +28,20 @@ import { liveTurnFromSteps } from './copilotSteps';
  *  live by id; this is its fallback while that read loads, and its
  *  text if the row has since been deleted. */
 export interface CreatedEntity {
-  kind: 'element' | 'object' | 'strategy';
+  kind: 'element' | 'object' | 'strategy' | 'pull_request';
   id: string;
   title: string;
   displayId?: string;
   status?: string;
   objectId?: string;
+  /** A pull request's own facts (coding capability PR3): its id is
+   *  the code_changes row's — the durable record whose state the
+   *  card re-reads live — and these are the snapshot the card falls
+   *  back to while that read loads. */
+  url?: string;
+  repo?: string;
+  number?: number;
+  state?: string;
 }
 
 export interface ToolEvent {

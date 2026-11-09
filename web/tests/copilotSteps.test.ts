@@ -125,6 +125,29 @@ describe('liveTurnFromSteps', () => {
     expect(live.toolEvents[2].created).toBeUndefined();
   });
 
+  it('a pull_request step becomes the turn’s PR card record (coding PR3)', () => {
+    const live = liveTurnFromSteps([
+      step('message', '質問', '直して'),
+      step('pull_request', 'PR を開きました: acme/widgets#7', JSON.stringify({
+        created: [{
+          kind: 'pull_request', id: 'cc1', title: '請求画面の修正',
+          url: 'https://github.com/acme/widgets/pull/7', repo: 'acme/widgets', number: 7, state: 'open',
+        }],
+      })),
+      // The fallback detail (a plain URL, when the link row could not
+      // be read back) is not the record's JSON: no card is invented.
+      step('pull_request', 'PR を開きました: acme/widgets#8', 'https://github.com/acme/widgets/pull/8'),
+      step('reply', '直しました', '直しました'),
+    ]);
+    expect(live.toolEvents).toHaveLength(1);
+    expect(live.toolEvents[0].created).toEqual([{
+      kind: 'pull_request', id: 'cc1', title: '請求画面の修正',
+      url: 'https://github.com/acme/widgets/pull/7', repo: 'acme/widgets', number: 7, state: 'open',
+    }]);
+    expect(flattenCreated(live.toolEvents)).toHaveLength(1);
+    expect(live.content).toBe('直しました');
+  });
+
   it('maps connection_request steps to the turn’s proposals', () => {
     const live = liveTurnFromSteps([
       step('message', '質問', '質問'),

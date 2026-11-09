@@ -54,6 +54,28 @@ export type SavedPending = PendingApproval & {
     failureClass?: string;
     failurePolicy?: ResolvedFailurePolicy;
   };
+  /**
+   * The publish rest (coding capability PR3): this pending is not a
+   * turn's writes but a FINISHED coding run's publish — the branch,
+   * the tree commit and the PR its patch composes into — offered as
+   * one batch because at least one of its calls asked (or a breaker
+   * held it, or the target repository is outside the definition's
+   * declared set: the critical class). The finish it interrupted is
+   * carried with it, verdict already computed from the run's own
+   * facts, because the person's decision finalizes that settle
+   * instead of resuming the loop: there is no live turn to answer —
+   * the publish was never the model's call, it is the server's
+   * composition of the run's verified patch. Approving executes the
+   * batch and seals the finish; rejecting seals the finish without
+   * a PR (the work stands; its patch artifact remains).
+   */
+  publish?: {
+    finish: FinishPayload;
+    verdict: RunVerdict | null;
+    /** The composed batch's create_pull_request call id: the call
+     *  whose landing the finalize reports on. */
+    prCallId: string;
+  };
 };
 
 export interface Decision {

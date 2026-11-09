@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   objects: new Map<string, Record<string, unknown>>(),
   strategies: [] as { id: string; name: string }[],
   strategiesLoading: false,
+  changes: new Map<string, Record<string, unknown>>(),
+  changeSettled: true,
 }));
 
 vi.mock('@/hooks/elementData', () => ({
@@ -36,6 +38,13 @@ vi.mock('@/hooks/useObjectArchive', () => ({
 
 vi.mock('@/hooks/strategyData', () => ({
   useStrategies: () => ({ data: state.strategies, loading: state.strategiesLoading, error: null, refetch: vi.fn() }),
+}));
+
+vi.mock('@/hooks/codeChangeData', () => ({
+  useCodeChangeById: (id: string | null | undefined) => ({
+    change: id ? state.changes.get(id) ?? null : null,
+    settled: state.changeSettled,
+  }),
 }));
 
 import { CreatedEntities, CreatedEntityCard } from '@/AIP/ai/CreatedEntityCard';
@@ -57,6 +66,9 @@ afterEach(() => {
   state.strategies = [];
   state.elementSettled = true;
   state.strategiesLoading = false;
+  state.changes.clear();
+  state.changeSettled = true;
+  vi.restoreAllMocks();
 });
 
 const event = (created: ToolEvent['created']): ToolEvent => ({
@@ -174,5 +186,47 @@ describe('CreatedEntities', () => {
     expect(screen.getAllByText(/^要素 \d+$/)).toHaveLength(13);
     fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
     expect(screen.getAllByText(/^要素 \d+$/)).toHaveLength(12);
+  });
+});
+
+describe('the pull request card (coding capability PR3)', () => {
+  const prEntity = {
+    kind: 'pull_request' as const, id: 'cc1', title: '開かれた時のタイトル',
+    url: 'https://github.com/acme/widgets/pull/7', repo: 'acme/widgets', number: 7, state: 'open',
+  };
+
+  it('shows the live code_changes row — its title and state as they are now — and opens the PR on GitHub', () => {
+    state.changes.set('cc1', {
+      id: 'cc1', title: 'マージされた PR', repo: 'acme/widgets', number: 7,
+      url: 'https://github.com/acme/widgets/pull/7', state: 'merged',
+    });
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderBlock([event([prEntity])]);
+    expect(screen.getByText('マージされた PR')).toBeTruthy();
+    expect(screen.queryByText('開かれた時のタイトル')).toBeNull();
+    expect(screen.getByText(/acme\/widgets #7/)).toBeTruthy();
+    expect(screen.getByText('Merged')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /マージされた PR/ }));
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/acme/widgets/pull/7', '_blank', 'noopener,noreferrer');
+    // A PR opens on GitHub, never through the shell's item route.
+    expect(opened).toEqual([]);
+  });
+
+  it('while the live read is still out, the snapshot stands and the card still opens', () => {
+    state.changeSettled = false;
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderBlock([event([prEntity])]);
+    expect(screen.getByText('開かれた時のタイトル')).toBeTruthy();
+    expect(screen.getByText('Open PR')).toBeTruthy();
+    expect(screen.queryByText('Deleted')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /開かれた時のタイトル/ }));
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/acme/widgets/pull/7', '_blank', 'noopener,noreferrer');
+  });
+
+  it('a link row that no longer resolves renders its snapshot muted, unlinked, and says Deleted', () => {
+    renderBlock([event([prEntity])]);
+    expect(screen.getByText('開かれた時のタイトル')).toBeTruthy();
+    expect(screen.getByText('Deleted')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /開かれた時のタイトル/ })).toBeNull();
   });
 });

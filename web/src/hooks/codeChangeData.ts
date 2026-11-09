@@ -80,6 +80,31 @@ export function useCodeChanges(elementId: string | null) {
   return { data: query.data ?? EMPTY_CHANGES, loading: !!elementId && query.isPending, error: (query.error as Error | null) ?? null };
 }
 
+/** One code change by its own id — the created-entity card's live
+ *  read (coding capability PR3): the card's identity is the
+ *  code_changes row the publish linked, and the row carries the PR's
+ *  current state, so the card shows merged or closed as it happens
+ *  rather than open as it was when the run ended. `settled` follows
+ *  the by-id reads' discipline: true once the read has answered,
+ *  so a missing row reads as gone, not as still loading. */
+export function useCodeChangeById(id: string | null | undefined) {
+  const query = useQuery({
+    queryKey: ['code-change-by-id', id],
+    enabled: !!id,
+    staleTime: 30_000,
+    queryFn: async (): Promise<CodeChange | null> => {
+      const { data, error } = await supabase.from('code_changes').select(CHANGE_COLUMNS)
+        .eq('id', id!).maybeSingle();
+      if (error) throw error;
+      return (data as CodeChange | null) ?? null;
+    },
+  });
+  return {
+    change: query.data ?? null,
+    settled: !id || query.isFetched,
+  };
+}
+
 /** The code changes of many Elements at once — a Strategy's view of what
  *  its Objects' work has shipped. */
 export function useCodeChangesForElements(elementIds: readonly string[]) {
