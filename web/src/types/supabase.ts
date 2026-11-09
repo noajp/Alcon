@@ -1051,16 +1051,19 @@ export type Database = {
           attachment_id: string
           body: string
           extracted_at: string
+          status: string
         }
         Insert: {
           attachment_id: string
           body: string
           extracted_at?: string
+          status?: string
         }
         Update: {
           attachment_id?: string
           body?: string
           extracted_at?: string
+          status?: string
         }
         Relationships: [
           {

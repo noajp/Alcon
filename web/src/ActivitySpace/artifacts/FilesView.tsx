@@ -14,7 +14,7 @@ import { openAttachmentOwner } from '@/Function/shared/attachments/openOwner';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
-import { TRASH_DAYS, indexSpaceFiles, ownerOf, searchAttachments, trashDaysLeft, useAttachmentActions, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
+import { TRASH_DAYS, indexSpaceFiles, ownerOf, searchAttachments, textSearchCaptionOf, trashDaysLeft, useAttachmentActions, useAttachmentTextStatus, useSpaceAttachments, type AttachmentOwnerKind, type SpaceFile } from '@/hooks/attachmentData';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useWorkers } from '@/hooks/teamData';
 import type { NavigationState } from '@/types/navigation';
@@ -426,6 +426,7 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
   const { t } = useI18n();
   const owner = ownerOf(file);
   const trash = useTrashFile(file);
+  const textCaption = textSearchCaptionOf(useAttachmentTextStatus(file.id));
   const [ref, size] = useElementSize<HTMLDivElement>();
   // A file at the top of a tab sits in the tab's hidden root folder: say the
   // tab, not the root's name.
@@ -445,6 +446,7 @@ function FilePane({ file, who, onClose }: { file: SpaceFile; who: string; onClos
             <ArrowUpRight size={12} className="shrink-0 opacity-60 group-hover/owner:opacity-100" />
             <span className="shrink-0 text-muted-foreground/70">· {who} · {formatAge(file.created_at, true)}</span>
           </button>
+          {textCaption && <div className="mt-0.5 text-[12px] text-muted-foreground">{t(textCaption)}</div>}
         </div>
         {file.folder_id && (
           <DropdownMenu>

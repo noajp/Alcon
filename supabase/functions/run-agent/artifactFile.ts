@@ -7,6 +7,9 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const BUCKET = "element-files";
+/** How much of a file's text the index keeps — the same cap as the
+ *  browser extraction and saveTextFile (fileTools' TEXT_CAP). */
+const TEXT_CAP = 300_000;
 
 const EXT: Record<string, { ext: string; mime: string }> = {
   markdown: { ext: "md", mime: "text/markdown" },
@@ -49,6 +52,6 @@ export async function saveArtifactFile(db: SupabaseClient, elementId: string, ti
     return { error: error?.message ?? "could not list the file" };
   }
   // Its words, for search, as a person's upload would have them.
-  await db.from("attachment_texts").upsert({ attachment_id: data.id, body: content.slice(0, 500_000), extracted_at: new Date().toISOString() });
+  await db.from("attachment_texts").upsert({ attachment_id: data.id, body: content.slice(0, TEXT_CAP), status: "ok", extracted_at: new Date().toISOString() });
   return { id: data.id as string };
 }

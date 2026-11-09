@@ -345,15 +345,62 @@ export const attachmentSource = {
 
 // ── Finding a file by its words ─────────────────────────────────────────
 
-/** Takes a version's text out and stores it (an empty text when there is
- *  none to read, so it is not tried again). Best effort. */
+/** How taking a file's words went, kept beside the words themselves:
+ *  ok (words stored) · empty (read, and there are genuinely none — an
+ *  image, a PDF with no text layer) · failed (could not be read; the
+ *  backfill tries again) · too_large (over the size the indexing
+ *  reads). Until the state was kept, a failure and a wordless file were
+ *  the same '' and neither could be told apart or repaired. */
+export type AttachmentTextStatus = 'ok' | 'empty' | 'failed' | 'too_large';
+
+/** Pure. What a settled extraction means for the index: the words it
+ *  found, or the empty state when it found none. A read that threw is
+ *  the caller's 'failed', not this function's — it maps only a read
+ *  that finished. */
+export function textOutcomeOf(text: string | null): { body: string; status: AttachmentTextStatus } {
+  return text ? { body: text, status: 'ok' } : { body: '', status: 'empty' };
+}
+
+/** Pure. The one quiet line said about a file whose words are not
+ *  searchable (null: nothing to say — its words are in, or its state is
+ *  not known yet). A file with no row yet and one whose read failed say
+ *  the same thing: the backfill is still to reach it, or to try again. */
+export function textSearchCaptionOf(status: AttachmentTextStatus | null | undefined): string | null {
+  switch (status) {
+    case 'ok': return null;
+    case 'empty': return 'No readable text in this file';
+    case 'too_large': return 'Too large to search its contents';
+    case undefined: return null;
+    default: return 'Contents are not searchable yet';
+  }
+}
+
+/** A file's text state (undefined while it loads; null when no row
+ *  exists yet), for the pane's one quiet line about it. */
+export function useAttachmentTextStatus(fileId: string | null): AttachmentTextStatus | null | undefined {
+  const query = useQuery({
+    queryKey: ['attachment-text-status', fileId],
+    enabled: !!fileId,
+    queryFn: async (): Promise<AttachmentTextStatus | null> => {
+      const { data } = await supabase.from('attachment_texts').select('status').eq('attachment_id', fileId!).maybeSingle();
+      return ((data as { status: AttachmentTextStatus } | null)?.status) ?? null;
+    },
+  });
+  return query.data;
+}
+
+/** Takes a version's text out and stores it, with how the taking went
+ *  (an empty state when there is none to read, a failed one when it
+ *  could not be read — the backfill tries the failed again). Best
+ *  effort. */
 async function indexText(file: Pick<Attachment, 'id' | 'name' | 'mime_type'>, bytes: Blob): Promise<void> {
   try {
-    const body = (await fileText(await bytes.arrayBuffer(), file.name, file.mime_type)) ?? '';
-    await supabase.from('attachment_texts').upsert({ attachment_id: file.id, body, extracted_at: new Date().toISOString() });
+    const outcome = textOutcomeOf(await fileText(await bytes.arrayBuffer(), file.name, file.mime_type));
+    await supabase.from('attachment_texts').upsert({ attachment_id: file.id, body: outcome.body, status: outcome.status, extracted_at: new Date().toISOString() });
   } catch {
-    // An unreadable file (damaged, password-protected) is found by its name.
-    await supabase.from('attachment_texts').upsert({ attachment_id: file.id, body: '' });
+    // An unreadable file (damaged, password-protected) is a failure, not
+    // a file with no words: the state says so, and the backfill retries it.
+    await supabase.from('attachment_texts').upsert({ attachment_id: file.id, body: '', status: 'failed' });
   }
 }
 
@@ -361,14 +408,16 @@ const INDEX_MAX_BYTES = 20 * 1024 * 1024;
 const indexing = new Set<string>();
 
 /** Reads, in the background, the text of a Space's files that have none
- *  yet (attached before their words were kept), a few at a time. */
+ *  yet (attached before their words were kept) or whose read failed, a
+ *  few at a time. A file over the size the indexing reads is recorded
+ *  too_large instead — stated, and not tried again. */
 export async function indexSpaceFiles(spaceId: string): Promise<void> {
   if (indexing.has(spaceId)) return;
   indexing.add(spaceId);
   try {
     const { data } = await supabase.rpc('attachments_to_index', { p_space: spaceId, p_limit: 20 });
     for (const f of (data ?? []) as { id: string; path: string; name: string; mime_type: string | null; size: number }[]) {
-      if (f.size > INDEX_MAX_BYTES) { await supabase.from('attachment_texts').upsert({ attachment_id: f.id, body: '' }); continue; }
+      if (f.size > INDEX_MAX_BYTES) { await supabase.from('attachment_texts').upsert({ attachment_id: f.id, body: '', status: 'too_large' }); continue; }
       const { data: blob } = await supabase.storage.from(BUCKET).download(f.path);
       if (blob) await indexText(f, blob);
     }
@@ -402,7 +451,7 @@ export async function attachmentText(file: Pick<Attachment, 'id' | 'name' | 'mim
   if (stored) return stored;
   const { data: blob, error } = await supabase.storage.from(BUCKET).download(file.path);
   if (error || !blob) throw error ?? new Error('Could not read the file.');
-  const body = (await fileText(await blob.arrayBuffer(), file.name, file.mime_type)) ?? '';
-  void supabase.from('attachment_texts').upsert({ attachment_id: file.id, body });
-  return body;
+  const outcome = textOutcomeOf(await fileText(await blob.arrayBuffer(), file.name, file.mime_type));
+  void supabase.from('attachment_texts').upsert({ attachment_id: file.id, body: outcome.body, status: outcome.status });
+  return outcome.body;
 }

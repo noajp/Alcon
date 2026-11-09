@@ -150,6 +150,29 @@ describe('readFile states its no-text states honestly', () => {
     expect(r.ok).toBe(true);
     expect(r.data).toMatchObject({ id: FILE_ID, name: 'note.pdf', text: '本文テキスト', nextOffset: null, total: 6 });
   });
+
+  it('a row recorded empty (a scan, an image): the no-readable-text state, by its status', async () => {
+    const r = await files.runFileTool(readDb({ body: '', status: 'empty' }) as never, 'readFile', { id: FILE_ID });
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('読み取れる文字が入っていません');
+  });
+
+  it('a row recorded failed: the read failed and will be tried again — not a wordless file', async () => {
+    const r = await files.runFileTool(readDb({ body: '', status: 'failed' }) as never, 'readFile', { id: FILE_ID });
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('取り出しに失敗しています');
+    expect(r.error).toContain('もう一度試されます');
+    expect(r.error).not.toContain('読み取れる文字が入っていません');
+    expect(r.error).not.toContain('まだ取り出されていません');
+  });
+
+  it('a row recorded too_large: too large to have been read, findable by name', async () => {
+    const r = await files.runFileTool(readDb({ body: '', status: 'too_large' }) as never, 'readFile', { id: FILE_ID });
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('大きすぎるため');
+    expect(r.error).not.toContain('読み取れる文字が入っていません');
+    expect(r.error).not.toContain('まだ取り出されていません');
+  });
 });
 
 describe('the catalog registration', () => {

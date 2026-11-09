@@ -1060,6 +1060,9 @@ const APP_MESSAGES: Record<string, Row> = {
   '{n} exchanges': ['交換 {n} 件', '교환 {n}개', '{n} échanges', '{n} intercambios'],
   'No result yet': ['まだ結果がありません', '아직 결과가 없습니다', 'Aucun résultat pour le moment', 'Aún no hay resultado'],
   'Recorded as a test. Run it from the harness editor.': ['テストとして記録しました。ハーネスの編集画面から実行できます。', '테스트로 기록했습니다. 하네스 편집 화면에서 실행할 수 있습니다.', 'Enregistré comme test. Lancez-le depuis l’éditeur de harnais.', 'Registrado como prueba. Ejecútala desde el editor de arneses.'],
+  'Contents are not searchable yet': ['中身はまだ検索できません', '아직 내용을 검색할 수 없습니다', 'Le contenu n’est pas encore interrogeable', 'El contenido aún no se puede buscar'],
+  'No readable text in this file': ['このファイルには読み取れる文字が入っていません', '이 파일에는 읽을 수 있는 텍스트가 없습니다', 'Aucun texte lisible dans ce fichier', 'Este archivo no tiene texto legible'],
+  'Too large to search its contents': ['大きすぎて中身を検索できません', '너무 커서 내용을 검색할 수 없습니다', 'Trop volumineux pour en rechercher le contenu', 'Demasiado grande para buscar en su contenido'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

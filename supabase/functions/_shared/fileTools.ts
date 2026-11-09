@@ -13,6 +13,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** One read returns at most this many characters; offset reads on. */
 export const READ_CHARS = 60_000;
 const MAX_WRITE_CHARS = 2_000_000;
+/** How much of a file's text the index keeps — the browser extraction's
+ *  cap (fileText.ts MAX_CHARS), so one file holds the same words whoever
+ *  wrote it. */
+export const TEXT_CAP = 300_000;
 
 export type FileOwnerKind = "element" | "object" | "strategy" | "folder";
 const OWNER_KINDS: FileOwnerKind[] = ["element", "object", "strategy", "folder"];
@@ -265,7 +269,7 @@ export async function saveTextFile(
     return { error: error?.message ?? "ファイルを登録できませんでした" };
   }
   // Its words, for search, as a person's upload would have them.
-  await db.from("attachment_texts").upsert({ attachment_id: data.id, body: content.slice(0, 500_000), extracted_at: new Date().toISOString() });
+  await db.from("attachment_texts").upsert({ attachment_id: data.id, body: content.slice(0, TEXT_CAP), status: "ok", extracted_at: new Date().toISOString() });
   return { id: data.id as string, version: list.length + 1 };
 }
 
@@ -304,7 +308,7 @@ export async function runFileTool(db: SupabaseClient, name: string, input: Recor
           if (dl || !blob) return { ok: false, error: `読めませんでした: ${dl?.message ?? "no data"}` };
           text = new TextDecoder("utf-8").decode(await blob.arrayBuffer());
         } else {
-          const { data: stored } = await db.from("attachment_texts").select("body").eq("attachment_id", id).maybeSingle();
+          const { data: stored } = await db.from("attachment_texts").select("body, status").eq("attachment_id", id).maybeSingle();
           if (!stored) {
             // No row yet: extraction has not reached this file. It runs
             // when the Files view or search next visits the Space —
@@ -312,8 +316,18 @@ export async function runFileTool(db: SupabaseClient, name: string, input: Recor
             // not promise that it does.
             return { ok: false, error: `${file.name} の文字はまだ取り出されていません。Files 画面か検索がこの Space を訪れたときに取り出されます。急ぐ場合は、ファイルをメッセージに直接添付してもらえれば、その場で読めます。` };
           }
-          text = (stored as { body: string }).body;
+          const row = stored as { body: string; status?: string };
+          text = row.body;
           if (!text) {
+            // No words, and the kept state says why — each state gets its
+            // own message, so a failure is never mistaken for a file
+            // that simply has nothing to read.
+            if (row.status === "failed") {
+              return { ok: false, error: `${file.name} の文字の取り出しに失敗しています（壊れているか、パスワードがかかっているファイルのようです）。Files 画面か検索がこの Space を訪れたときに、もう一度試されます。` };
+            }
+            if (row.status === "too_large") {
+              return { ok: false, error: `${file.name} は大きすぎるため、文字が取り出されていません。中身では探せませんが、名前では探せます。` };
+            }
             return { ok: false, error: `${file.name} には読み取れる文字が入っていません（スキャンされた PDF や画像など、文字のないファイルです）。` };
           }
         }
