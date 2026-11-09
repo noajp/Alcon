@@ -12,6 +12,8 @@
 // strings; the screen passes them through t().
 
 import type { ApprovalMode } from './approvalModeModel';
+import type { Json } from '@/types/database';
+import { GMAIL_MANIFEST } from './gmailManifest';
 
 export type IntegrationKind = 'mcp' | 'http' | 'model';
 export type IntegrationAuthType = 'none' | 'bearer' | 'header' | 'oauth';
@@ -39,6 +41,12 @@ export interface IntegrationPreset {
   featured: boolean;
   /** True for Custom MCP / Custom API: name, endpoint and auth are typed. */
   custom: boolean;
+  /** The manifest a row created from this preset is born with, for a
+   *  preset whose commands are first-party declarations no drafting
+   *  route can produce (the gmail read pair). Absent: the row starts
+   *  with no manifest — an MCP server's is built by its first
+   *  connection test, a drafted connection's arrives by activation. */
+  bundledManifest?: Json;
   /** Why the preset cannot be connected yet; the connect button is disabled. */
   unavailableReason?: string;
 }
@@ -58,6 +66,12 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
     id: 'google-drive', name: 'Google Drive', icon: '/integrations/google-drive.svg', kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', auth: 'oauth',
     description: 'Search, read, create and update Google Drive files. Agents see only files Alcon created or that you chose.',
     credentialLabel: 'Google account', category: 'files', source: 'official', builtBy: 'Google', featured: true, custom: false,
+  },
+  {
+    id: 'gmail', name: 'Gmail', icon: '/integrations/gmail.svg', kind: 'http', endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me', auth: 'oauth',
+    description: 'Search and read messages in Gmail. Agents can read mail; they cannot send or change it.',
+    credentialLabel: 'Google account', category: 'communication', source: 'official', builtBy: 'Google', featured: false, custom: false,
+    bundledManifest: GMAIL_MANIFEST,
   },
   {
     id: 'github', name: 'GitHub', icon: '/integrations/github.svg', kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'oauth',
@@ -336,6 +350,8 @@ export interface IntegrationInsertRow {
   auth_header: string | null;
   delegation: IntegrationDelegation;
   enabled: boolean;
+  /** A preset's bundled first-party manifest, when it carries one. */
+  manifest: Json | null;
 }
 
 export type BuildResult = { ok: true; row: IntegrationInsertRow } | { ok: false; error: string };
@@ -354,6 +370,7 @@ export function buildIntegrationRow(preset: IntegrationPreset, spaceId: string, 
         activity_space_id: spaceId, preset: preset.id, kind: preset.kind, name: preset.name,
         description: preset.description, icon: preset.icon, endpoint: preset.endpoint!, auth_type: preset.auth,
         auth_header: null, delegation: draft.delegation, enabled: draft.enabled,
+        manifest: preset.bundledManifest ?? null,
       },
     };
   }
@@ -376,6 +393,7 @@ export function buildIntegrationRow(preset: IntegrationPreset, spaceId: string, 
     row: {
       activity_space_id: spaceId, preset: preset.id, kind: preset.kind, name, description: null, icon: null,
       endpoint, auth_type: auth, auth_header: authHeader, delegation: draft.delegation, enabled: draft.enabled,
+      manifest: null,
     },
   };
 }

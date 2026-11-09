@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTER, INTEGRATION_PRESETS, buildIntegrationRow, customPresetFor, darkIconFor, filterPresets, installedPresetIds,
-  integrationStatus, isSafeEndpoint, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
+  integrationStatus, isSafeEndpoint, oauthProviderOf, presetById, readLastTest, signsInWithOAuth, testOutcomeLabel, type IntegrationDraft,
 } from '@/AIP/connectors/catalog';
+import { GMAIL_MANIFEST } from '@/AIP/connectors/gmailManifest';
 
 import { existsSync } from 'node:fs';
 
@@ -34,8 +35,28 @@ describe('integration presets', () => {
     expect(presetById('google-drive')).toMatchObject({ kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', category: 'files' });
     expect(presetById('google-drive')!.unavailableReason).toBeUndefined();
     expect(signsInWithOAuth(presetById('google-drive')!)).toBe(true);
+    expect(presetById('gmail')).toMatchObject({ kind: 'http', endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me', auth: 'oauth', category: 'communication' });
+    expect(presetById('gmail')!.unavailableReason).toBeUndefined();
+    expect(signsInWithOAuth(presetById('gmail')!)).toBe(true);
+    expect(oauthProviderOf(presetById('gmail')!)).toBe('google');
     expect(signsInWithOAuth(presetById('linear')!)).toBe(false);
     expect(presetById('nope')).toBeNull();
+  });
+});
+
+describe('bundled manifests', () => {
+  it('a gmail row is born carrying the read pair; other presets start with none', () => {
+    const gmail = buildIntegrationRow(presetById('gmail')!, SPACE, draft);
+    expect(gmail.ok).toBe(true);
+    if (gmail.ok) expect(gmail.row.manifest).toEqual(GMAIL_MANIFEST);
+    for (const id of ['google-drive', 'github', 'linear']) {
+      const built = buildIntegrationRow(presetById(id)!, SPACE, draft);
+      expect(built.ok).toBe(true);
+      if (built.ok) expect(built.row.manifest).toBeNull();
+    }
+    const custom = buildIntegrationRow(customPresetFor('http'), SPACE, { ...draft, name: 'X', endpoint: 'https://api.example.com', auth: 'bearer' });
+    expect(custom.ok).toBe(true);
+    if (custom.ok) expect(custom.row.manifest).toBeNull();
   });
 });
 
