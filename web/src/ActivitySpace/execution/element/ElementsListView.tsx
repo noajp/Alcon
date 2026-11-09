@@ -1,6 +1,7 @@
 'use client';
 
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
@@ -710,6 +711,7 @@ function ElementsHierarchyHeader({
 }) {
   return (
     <div className="h-[50px] flex flex-shrink-0 items-center gap-1 border-b border-border/60 bg-card pl-6 pr-2">
+      <SidebarReveal />
       <button
         type="button"
         onClick={onDomainClick}

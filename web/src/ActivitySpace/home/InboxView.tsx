@@ -1,5 +1,6 @@
 'use client';
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { Archive, Check, Inbox } from '@/ui/icons';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -34,6 +35,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-card">
         <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+          <SidebarReveal />
           <Inbox size={12} aria-hidden="true" />
           <span className="text-[13px] font-medium text-foreground">{t('Inbox')}</span>
         </header>
@@ -47,6 +49,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-card">
       <header className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0 overflow-hidden">
+        <SidebarReveal />
         <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
           {selected.actor_name && <span className="font-medium text-foreground">{selected.actor_name}</span>}
           {selected.actor_name && ' · '}

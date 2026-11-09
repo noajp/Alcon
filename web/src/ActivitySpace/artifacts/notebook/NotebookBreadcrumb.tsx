@@ -1,5 +1,6 @@
 'use client';
 
+import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { ChevronRight, Plus } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -23,6 +24,7 @@ export function NotebookBreadcrumb({
   const { t } = useI18n();
   return (
     <div className="flex items-center gap-0.5 px-2 h-[50px] border-b border-border/60 bg-card flex-shrink-0">
+      <SidebarReveal />
       <button
         type="button"
         onClick={onBack}

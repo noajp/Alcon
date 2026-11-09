@@ -17,7 +17,7 @@ import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
-import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp, PanelLeft } from '@/ui/icons';
+import { ArrowLeft, Plus, Bot, Settings, Users, Search, FilePlus, FolderPlus, FileUp } from '@/ui/icons';
 import { updateDomain, deleteDomain, leaveDomain, useNotifications } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { domainHasObjectsMessage, useDomainRole, type DomainRole } from '@/hooks/domainData';
@@ -78,11 +78,15 @@ interface AppSidebarProps {
   overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
   onSearch?: () => void;
-  /** Hides the sidebar (⌘\\ shows it again). */
+  /** Hides the sidebar — reached by dragging its edge left past its least
+   *  width (each page's title row and ⌘\\ bring it back). */
   onToggleSidebar?: () => void;
 }
 
 /** The tools under Strategy at the top of the sidebar. */
+/** How far past its least width the edge is dragged before the sidebar closes. */
+const SIDEBAR_CLOSE_PULL = 72;
+
 const SIDEBAR_TOOLS: RailMode[] = ['files', 'reviews', 'audit', 'team', 'tables'];
 
 // The sidebar's top is fixed (Strategy and the tools); under it, the open
@@ -208,14 +212,25 @@ export function AppSidebar({
     // on every pointermove, which made the drag stutter — commit to state
     // just once on release (that re-sync also persists to localStorage).
     let next = startW;
+    // Dragged well past its least width, the island takes the sidebar's
+    // place: the sidebar closes, at the width it had.
+    let closing = false;
     const onMove = (ev: PointerEvent) => {
-      next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startW + (ev.clientX - startX)));
+      const raw = startW + (ev.clientX - startX);
+      closing = !!onToggleSidebar && raw < SIDEBAR_MIN_WIDTH - SIDEBAR_CLOSE_PULL;
+      next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, raw));
       const el = sidebarRef.current;
-      if (el) el.style.width = `${next}px`;
+      if (el) {
+        el.style.width = `${next}px`;
+        el.style.opacity = closing ? '0.5' : '';
+      }
     };
     const onUp = () => {
       setResizing(false);
-      setWidth(next);
+      const el = sidebarRef.current;
+      if (el) el.style.opacity = '';
+      if (closing) { if (el) el.style.width = `${startW}px`; onToggleSidebar?.(); }
+      else setWidth(next);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
@@ -339,12 +354,6 @@ export function AppSidebar({
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
-            {onToggleSidebar && (
-              <button type="button" onClick={onToggleSidebar} title={`${t('Hide sidebar')} (⌘\\)`} aria-label={t('Hide sidebar')}
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground">
-                <PanelLeft size={15} />
-              </button>
-            )}
             {onSearch && (
               <button
                 type="button"
