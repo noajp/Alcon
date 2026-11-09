@@ -12,13 +12,16 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import type { Integration } from '@/types/database';
 import {
-  CONNECTION_METHOD_ORDER, INTEGRATION_PRESETS, INTEGRATION_STATUS_LABELS, KIND_LABELS, OAUTH_PROVIDER_NAMES,
-  catalogGroups, connectionMethodOf, installedPresetIds, integrationStatus, oauthProviderOf, presetById, readLastTest, testOutcomeLabel,
-  type CatalogCardState, type ConnectionMethod, type IntegrationPreset, type OAuthProvider,
+  CONNECTION_METHOD_ORDER, INTEGRATION_PRESETS,
+  catalogGroups, installedPresetIds,
+  type ConnectionMethod, type IntegrationPreset, type OAuthProvider,
 } from './catalog';
 import { useIntegrationOAuthStatus, useIntegrations, useIsSpaceOwner } from './data';
-import { setSpaceApprovalMode, useSpaceApprovalMode } from './approvalModeData';
-import { APPROVAL_MODE_DESCRIPTIONS, APPROVAL_MODE_LABELS, APPROVAL_MODE_ORDER, approvalModeOf, type ApprovalMode } from './approvalModeModel';
+import { useSpaceApprovalMode } from './approvalModeData';
+import { APPROVAL_MODE_LABELS } from './approvalModeModel';
+import { PresetCard } from './PresetCard';
+import { ConnectedRow } from './ConnectedRow';
+import { setActiveSettingsSection } from '@/Function/settings/settingsNav';
 import { createDraft, useIntegrationDrafts } from './draftData';
 import { DRAFT_STATUS_LABELS, reconcileDraftWeb } from './draftModel';
 import { IntegrationDraftDialog } from './IntegrationDraftDialog';
@@ -85,12 +88,15 @@ function ExternalServicesPanel() {
   }, [oauthStatus, queryClient]);
 
   const installed = useMemo(() => installedPresetIds(integrations), [integrations]);
+  // Model connections live in Team settings, under Models — this page's
+  // Connected list is the Space's business connections.
+  const connectedRows = useMemo(() => integrations.filter((i) => i.kind !== 'model'), [integrations]);
   const oauthConfigured = useMemo<Record<OAuthProvider, boolean | null>>(
     () => ({ google: googleConfigured, github: githubConfigured }),
     [googleConfigured, githubConfigured],
   );
   const groups = useMemo(
-    () => catalogGroups(INTEGRATION_PRESETS, installed, oauthConfigured),
+    () => catalogGroups(INTEGRATION_PRESETS.filter((p) => p.kind !== 'model'), installed, oauthConfigured),
     [installed, oauthConfigured],
   );
 
@@ -135,19 +141,17 @@ function ExternalServicesPanel() {
         <p className="text-[12px] text-muted-foreground">{t('Only Space owners can connect or change integrations. You can see what is connected.')}</p>
       )}
 
-      {spaceId && <ApprovalModeSection spaceId={spaceId} isOwner={isOwner} />}
-
       <section className="space-y-3">
         <h3 className={FONT.label}>{t('Connected')}</h3>
         {error ? (
           <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
         ) : loading ? (
           <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
-        ) : integrations.length === 0 ? (
+        ) : connectedRows.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">{t('Nothing is connected to this Space yet.')}</p>
         ) : (
           <div>
-            {integrations.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
+            {connectedRows.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
           </div>
         )}
       </section>
@@ -212,6 +216,8 @@ function ExternalServicesPanel() {
         />
       )}
 
+      {spaceId && <ApprovalModePointerRow spaceId={spaceId} />}
+
       {openedDraft && spaceId && (
         <IntegrationDraftDialog
           draft={openedDraft}
@@ -237,78 +243,22 @@ function ExternalServicesPanel() {
   );
 }
 
-/** The Space's approval mode: how Athena's writes are held. A policy
- *  layer above every connection's own permissions and delegation — it
- *  changes how an ask is handled, never what is allowed (a "Not allowed"
- *  command stays refused in every mode, and a connection's test, its
- *  secret and a drafted connection's activation never read it). Owners
- *  change it through the one RPC, which records the change; a run keeps
- *  the mode it started under, and what already waits is never approved
- *  by a change. Under Free action, what would have asked runs and is
- *  recorded as a policy approval instead. */
-function ApprovalModeSection({ spaceId, isOwner }: { spaceId: string; isOwner: boolean }) {
+/** The approval mode itself lives in the Space settings page, with the
+ *  Space's other AI behaviours; this quiet row keeps the move
+ *  discoverable from here — the current mode, read-only, and the way
+ *  there. */
+function ApprovalModePointerRow({ spaceId }: { spaceId: string }) {
   const { t } = useI18n();
-  const { mode, changes, loading, error, refetch } = useSpaceApprovalMode(spaceId);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const choose = async (next: ApprovalMode) => {
-    if (!isOwner || saving || !mode || next === mode) return;
-    setSaving(true); setSaveError(null);
-    try {
-      await setSpaceApprovalMode(spaceId, next);
-      await refetch();
-    } catch (e) {
-      setSaveError(formatError(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  const { mode } = useSpaceApprovalMode(spaceId);
   return (
-    <section className="space-y-3">
-      <div>
-        <h3 className={FONT.label}>{t('Approval mode')}</h3>
-        <p className="mt-1 max-w-xl text-[12px] text-muted-foreground">
-          {t('How the AI’s writes in this Space are held, above each connection’s own permissions. A run keeps the mode it started under; changing the mode never approves what already waits.')}
-        </p>
-      </div>
-      {error ? (
-        <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load the approval mode: {error}", { error: error.message })}</p>
-      ) : loading || !mode ? (
-        <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <select value={mode} disabled={!isOwner || saving} onChange={(e) => void choose(e.target.value as ApprovalMode)}
-              aria-label={t('Approval mode')}
-              className="rounded border border-border/60 bg-transparent px-1 py-0.5 text-[13px] text-foreground">
-              {APPROVAL_MODE_ORDER.map((m) => <option key={m} value={m}>{t(APPROVAL_MODE_LABELS[m])}</option>)}
-            </select>
-            {saving && <span className="text-[12px] text-muted-foreground">{t('Saving…')}</span>}
-          </div>
-          <p className="max-w-xl text-[12px] text-muted-foreground">{t(APPROVAL_MODE_DESCRIPTIONS[mode])}</p>
-          {!isOwner && (
-            <p className="text-[12px] text-muted-foreground">{t('Only Space owners can change the approval mode.')}</p>
-          )}
-          {saveError && (
-            <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't change the approval mode: {error}", { error: saveError })}</p>
-          )}
-        </div>
-      )}
-      {changes.length > 0 && (
-        <div>
-          <h4 className={FONT.label}>{t('Approval mode history')}</h4>
-          <ul className="mt-1 space-y-1">
-            {changes.slice(0, 5).map((c) => (
-              <li key={c.id} className="text-[12px] text-muted-foreground">
-                {new Date(c.created_at).toLocaleString()} — {t(APPROVAL_MODE_LABELS[approvalModeOf(c.from_mode)])} → {t(APPROVAL_MODE_LABELS[approvalModeOf(c.to_mode)])}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+      <span className="font-medium text-foreground">{t('Approval mode')}</span>
+      {mode && <span>{t(APPROVAL_MODE_LABELS[mode])}</span>}
+      <button type="button" onClick={() => setActiveSettingsSection('workspace')}
+        className="underline underline-offset-2 transition-colors hover:text-foreground">
+        {t('Change in Space settings')}
+      </button>
+    </div>
   );
 }
 
@@ -318,50 +268,6 @@ const CONNECTION_METHOD_HEADINGS: Record<ConnectionMethod, string> = {
   'token': 'Connect with a token',
   'custom': 'Set up a custom connection',
 };
-
-/** A catalog card whose bottom line is the next action — how this
- *  connection is made — not provider metadata (Source and builder live
- *  in the detail dialog, the drill-down). A sign-in preset whose
- *  provider is not configured on the server reads as setup-needed,
- *  never as a broken connect; it still opens the dialog, which carries
- *  the full administrator copy. */
-function PresetCard({ preset, state, onOpen }: {
-  preset: IntegrationPreset; state: CatalogCardState; onOpen: () => void;
-}) {
-  const { t } = useI18n();
-  const method = connectionMethodOf(preset);
-  const provider = oauthProviderOf(preset);
-  const action = state === 'setup-needed'
-    ? t('Needs setup')
-    : method === 'sign-in'
-      ? t('Sign in with {provider}', { provider: OAUTH_PROVIDER_NAMES[provider!] })
-      : method === 'token'
-        ? t('Paste a token')
-        : t('Set up');
-  return (
-    <button type="button" onClick={onOpen}
-      className={cn(CARD_FLAT, CARD_HOVER, 'flex min-h-[156px] flex-col gap-3 p-4 text-left outline-none focus-visible:bg-[var(--surface-strong)]')}>
-      <div className="flex items-start justify-between gap-2">
-        <IntegrationIcon name={preset.name} icon={preset.icon} size={32} />
-        {state === 'setup-needed' && (
-          <span className="inline-flex h-5 items-center rounded-full bg-[var(--status-warning-subtle)] px-2 text-[11px] font-medium text-[var(--status-warning)]">
-            {t('Needs setup')}
-          </span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <div className="text-[13px] font-semibold text-foreground">{t(preset.name)}</div>
-        <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{t(preset.description)}</p>
-      </div>
-      <div className="mt-auto">
-        <div className="text-[12px] font-medium text-foreground">{action}</div>
-        {state === 'setup-needed' && (
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{t('Sign-in is not set up on this server yet.')}</p>
-        )}
-      </div>
-    </button>
-  );
-}
 
 /** The website sign-in entry (secure login's browser route): not a
  *  preset — it opens the Site logins section's add dialog, the one
@@ -378,29 +284,6 @@ function WebsiteSignInCard({ onOpen }: { onOpen: () => void }) {
         <p className="mt-1 line-clamp-2 text-[12px] text-muted-foreground">{t('For a website with no API: Athena signs in with a login you save.')}</p>
       </div>
       <div className="mt-auto text-[12px] font-medium text-foreground">{t('Add site login')}</div>
-    </button>
-  );
-}
-
-function ConnectedRow({ integration, onOpen }: { integration: Integration; onOpen: () => void }) {
-  const { t } = useI18n();
-  const last = readLastTest(integration.last_test);
-  return (
-    <button type="button" onClick={onOpen}
-      className="-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--surface-strong)] focus-visible:bg-[var(--surface-strong)]">
-      <IntegrationIcon name={integration.name} icon={integration.icon ?? presetById(integration.preset)?.icon ?? null} size={24} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-foreground">{integration.name}</span>
-        </div>
-        <div className="truncate text-[12px] text-muted-foreground">
-          {[
-            t(KIND_LABELS[integration.kind]),
-            last?.toolCount != null ? t('{count} tools', { count: last.toolCount }) : null,
-          ].filter(Boolean).join(' · ')}
-        </div>
-      </div>
-      <StatusChip integration={integration} />
     </button>
   );
 }
@@ -492,22 +375,5 @@ function DraftCreateSection({ spaceId, integrations, drafts, onCreated, onOpenDr
         {starting ? t('Starting…') : t('Start drafting')}
       </Button>
     </section>
-  );
-}
-
-/** The row's one status word (off / not tested / connected / reachable /
- *  action needed); the dialog carries the test's detail. */
-function StatusChip({ integration }: { integration: Integration }) {
-  const { t } = useI18n();
-  const status = integrationStatus(integration);
-  const last = readLastTest(integration.last_test);
-  return (
-    <span
-      title={last ? t(testOutcomeLabel(last.code)) : undefined}
-      className={cn('inline-flex shrink-0 items-center text-[11px]',
-        status === 'connected' ? 'text-[var(--status-success)]' : status === 'action-needed' ? 'text-[var(--status-danger)]' : 'text-muted-foreground')}
-    >
-      {t(INTEGRATION_STATUS_LABELS[status])}
-    </span>
   );
 }

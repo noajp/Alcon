@@ -12,6 +12,7 @@ import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 import { HeartbeatSettings } from './HeartbeatSettings';
 import { SpaceMemorySettings } from './MemorySettings';
+import { ApprovalModeSection } from '@/AIP/connectors/ApprovalModeSection';
 import { InviteUserDialog } from './InviteUserDialog';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
@@ -274,6 +275,8 @@ export function ActivitySpaceSettings() {
       <HeartbeatSettings spaceId={active.id} isOwner={isOwner} />
 
       <SpaceMemorySettings spaceId={active.id} isOwner={isOwner} userId={user?.id ?? null} />
+
+      <ApprovalModeSection spaceId={active.id} isOwner={isOwner} />
 
       <div className="mb-2 mt-6 flex items-end justify-between">
         <div>
