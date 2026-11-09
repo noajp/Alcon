@@ -31,7 +31,12 @@
 //                                      and the human systematically
 //                                      disagree, a revision candidate opens
 //                                      for a person — measurement and a
-//                                      queue, never an edit.
+//                                      queue, never an edit. The same
+//                                      tick reaps governed workspaces
+//                                      (coding PR1): sandboxes past
+//                                      their wall clock are destroyed,
+//                                      and bindings whose run already
+//                                      ended are closed.
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -63,6 +68,7 @@ import { evaluateCalibration } from "../_shared/verifierCalibration.ts";
 import { evaluateAutonomy } from "../_shared/autonomy.ts";
 import { deriveConstraintDrafts, evaluateConstraintEffects, type ConstraintCluster } from "../_shared/constraintDrafts.ts";
 import { claimExpiredQuestionTickets, settleRunBlockedByQuestions, type QuestionTicketRow } from "../_shared/questionTickets.ts";
+import { reapWorkspaces } from "../_shared/workspaceLifecycle.ts";
 import { deriveScopeFromDefinition, loadDerivationIntegrations, rootChainScope, strategyIdForObject } from "../_shared/chainScope.ts";
 
 const corsHeaders = {
@@ -714,6 +720,20 @@ async function tick(env: Env): Promise<Record<string, number>> {
   } catch (e) {
     console.error("automations: autonomy evaluation failed", e instanceof Error ? e.message : e);
   }
+  // Governed workspaces (coding PR1): the reaper destroys sandboxes
+  // whose wall clock ran out and closes the bindings of runs that
+  // already ended — run end destroys its own workspace where it can
+  // (run-agent), and this is the backstop for every path it cannot
+  // reach (a run stopped mid-slice, a deleted run, a destroy that
+  // failed and left the record live for exactly this retry).
+  let workspacesExpired = 0, workspacesRunEnded = 0;
+  try {
+    const reaped = await reapWorkspaces(env.admin, (k) => Deno.env.get(k), now);
+    workspacesExpired = reaped.expired;
+    workspacesRunEnded = reaped.runEnded;
+  } catch (e) {
+    console.error("automations: workspace reaping failed", e instanceof Error ? e.message : e);
+  }
   // Heartbeats whose wake is due. The tick's arrival is stamped on
   // every enabled Space first: the pg_cron registration is per
   // environment, and this stamp is how the settings screen can say
@@ -753,7 +773,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, workspacesExpired, workspacesRunEnded, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {
