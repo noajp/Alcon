@@ -4,7 +4,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { statusLabel } from '@/shared/designTokens';
 import { useEffect, useMemo, useState } from 'react';
-import { MoreHorizontal, Plus } from '@/ui/icons';
+import { MoreHorizontal, Plus, Tag } from '@/ui/icons';
 import {
   useDomains,
   useElementTemplates,
@@ -297,7 +297,7 @@ function TemplateDialog({
                         on ? 'bg-[var(--accent-subtle)] text-foreground' : 'bg-muted/40 text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: labelColor(name, domain.id) }} />
+                      <Tag aria-hidden size={10} className="shrink-0" style={{ color: labelColor(name, domain.id) }} />
                       {name}
                     </button>
                   );
