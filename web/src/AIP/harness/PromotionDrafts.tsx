@@ -13,9 +13,11 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import type { PromotionDraft, PromotionDraftStatus } from '@/types/database';
 import type { Definition } from '@/hooks/definitionData';
 import {
-  acceptUnverifiablePromotion, activatePromotionDraft, rejectPromotionDraft, rollbackPromotedDefinition,
+  acceptUnverifiablePromotion, activatePromotionDraft, rejectPromotionDraft, revisePromotionDraftBody,
+  rollbackPromotedDefinition,
   sendPromotionMessage, usePromotionDraftDetail, usePromotionDrafts, usePromotionObjectNames,
 } from './promotionData';
+import { deleteFlowStep, editFlowStepLine, moveFlowStep } from '@/Function/shared/flowEdit';
 import {
   draftPackageWeb, promotionDriftWeb, promotionStructureHashWeb, readRehearsalReportWeb,
 } from './promotionModel';
@@ -131,6 +133,51 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
   const detail = usePromotionDraftDetail(draft);
   const pkg = draftPackageWeb(draft);
   const report = readRehearsalReportWeb(draft.rehearsal_report);
+
+  // The canvas edits (P4, design §5.3): on the review, the owner can
+  // delete, move and rewrite Procedure steps on the flow view. The
+  // edits land in ONE working body that both views render — the text
+  // tab and the flow tab are two views of the same draft, never two
+  // drafts — and nothing reaches the record until "Save edits",
+  // which is the revision: the tested record clears and the draft
+  // returns to drafting for a new rehearsal (revisePromotionDraftBody).
+  // The edits are keyed to the draft and read only while it awaits
+  // review: a saved revision (or any other move out of the review)
+  // retires them by the record's own state, not by cleanup.
+  const [editState, setEditState] = useState<{ draftId: string; body: string } | null>(null);
+  const bodyEdits = editState && editState.draftId === draft.id && draft.status === 'awaiting_review'
+    ? editState.body : null;
+  const workingBody = bodyEdits ?? pkg?.body ?? null;
+  const canEditFlow = isOwner && draft.status === 'awaiting_review' && !!pkg;
+  const applyStepEdit = (next: string | null) => {
+    if (!pkg || next === null) return;
+    // Edited back to the tested text exactly: no revision is owed.
+    setEditState(next === pkg.body ? null : { draftId: draft.id, body: next });
+  };
+  const flowEdit = canEditFlow && workingBody ? {
+    onEditStepLine: (index: number, text: string) => applyStepEdit(editFlowStepLine(workingBody, index, text)),
+    onMoveStep: (index: number, dir: -1 | 1) => applyStepEdit(moveFlowStep(workingBody, index, dir)),
+    onDeleteStep: (index: number) => applyStepEdit(deleteFlowStep(workingBody, index)),
+  } : undefined;
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const saveEdits = async () => {
+    if (bodyEdits === null) return;
+    setSavingEdits(true); setEditError(null);
+    try {
+      await revisePromotionDraftBody(draft, bodyEdits);
+      setEditState(null);
+      onChanged?.();
+    } catch (e) {
+      setEditError(formatError(e));
+    } finally {
+      setSavingEdits(false);
+    }
+  };
+  // A revision the drafter has not yet answered: the draft sits in
+  // drafting with its tested record cleared, waiting to be sent back.
+  const revisedPending = draft.status === 'drafting'
+    && draft.events[draft.events.length - 1]?.kind === 'revised';
   const unverifiable = draft.status === 'rehearsing' && report.outcome === 'unverifiable';
   const target = draft.target_definition_id
     ? definitions.find((x) => x.id === draft.target_definition_id) ?? null : null;
@@ -151,8 +198,8 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
 
   const warnings = useMemo(() => {
     if (!pkg) return [];
-    return checkHarness(parseDefinition(pkg.body)).filter((d) => d.severity !== 'error').map((d) => d.message);
-  }, [pkg]);
+    return checkHarness(parseDefinition(bodyEdits ?? pkg.body)).filter((d) => d.severity !== 'error').map((d) => d.message);
+  }, [pkg, bodyEdits]);
   const nameConflict = pkg
     ? definitions.find((x) => x.id !== draft.target_definition_id
       && x.name.trim().toLowerCase() === pkg.name.trim().toLowerCase()) ?? null
@@ -177,8 +224,10 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
   const [deciding, setDeciding] = useState(false);
   const [decideError, setDecideError] = useState<string | null>(null);
   // The package reads two ways: the text itself, or its flow drawn
-  // from the text (DefinitionFlow, the read-only projection) — the
-  // reviewer picks per glance; the body stays the truth either way.
+  // from the text (DefinitionFlow) — the reviewer picks per glance;
+  // the body stays the truth either way. On the review the flow view
+  // also carries the step edits (P4), into the same working body the
+  // text view renders.
   const [packageView, setPackageView] = useState<'text' | 'flow'>('text');
   const decide = async (action: 'activate' | 'reject' | 'accept' | 'rollback') => {
     const confirmText = action === 'activate'
@@ -257,17 +306,30 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
               </div>
               {packageView === 'flow' ? (
                 <DefinitionFlow
-                  body={pkg.body}
+                  body={workingBody ?? pkg.body}
                   context={{
                     trigger: pkg.binding.trigger
                       ? { kind: 'schedule', cron: pkg.binding.trigger.cron, timezone: pkg.binding.trigger.timezone }
                       : { kind: 'manual' },
                     objectName,
                   }}
+                  edit={flowEdit}
                 />
               ) : (
                 <div className="max-h-[40vh] overflow-y-auto rounded-md bg-[var(--surface-strong)] p-3">
-                  <MarkdownLite text={pkg.body} />
+                  <MarkdownLite text={workingBody ?? pkg.body} />
+                </div>
+              )}
+              {bodyEdits !== null && (
+                <div className="rounded-md bg-[var(--surface-strong)] px-3 py-2">
+                  <p className="text-[12px] text-foreground">
+                    {t('Edited on the canvas — not saved yet. Saving clears the tested record, so the draft goes back through rehearsal before it can be activated.')}
+                  </p>
+                  {editError && <p className="mt-1 text-[12px] text-[var(--status-danger)]">{editError}</p>}
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setEditState(null)} disabled={savingEdits}>{t('Discard edits')}</Button>
+                    <Button size="sm" onClick={() => void saveEdits()} disabled={savingEdits}>{t('Save edits')}</Button>
+                  </div>
                 </div>
               )}
               {warnings.length > 0 && (
@@ -328,6 +390,12 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
                 </div>
               ))}
             </section>
+          )}
+
+          {revisedPending && (
+            <p className="rounded-md bg-[var(--surface-strong)] px-3 py-2 text-[12px] text-foreground">
+              {t('Your edits were saved and the tested record was cleared. Send this draft back through rehearsal — the drafter takes the edited text exactly as it stands.')}
+            </p>
           )}
 
           {(draft.status === 'drafting' || draft.status === 'awaiting_input') && draft.draft_run_id && (
