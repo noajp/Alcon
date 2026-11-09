@@ -37,7 +37,7 @@ import {
   type IntegrationRow, type RemoteTool,
 } from "./integrationClient.ts";
 import type { ReplayTransport } from "./definitionTests.ts";
-import { isGoogleDriveRow } from "./googleOAuth.ts";
+import { isGoogleDriveRow, isGoogleOAuthRow } from "./googleOAuth.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName } from "./connectorNeeds.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
@@ -582,6 +582,21 @@ export interface SpaceIntegrationTools {
 const MAX_INTEGRATION_TOOLS = 120;
 
 /**
+ * Pure. Whether an assembly may open this row at all: an OAuth row is
+ * openable only when a sign-in this engine can complete stands behind
+ * it — Google's (a profile's rows: the token resolveCredential refreshes
+ * serves every profile, Drive's typed surface aside) or GitHub's. Any
+ * other OAuth row has no way to authenticate, so both assemblies (a
+ * run's, in run-agent, and the chat's, below) close it rather than
+ * offer tools that could only fail. Non-OAuth rows pass.
+ */
+export function oauthRowOpens(
+  row: { auth_type?: string | null; preset?: string | null; endpoint?: string | null; kind?: string | null },
+): boolean {
+  return row.auth_type !== "oauth" || isGoogleOAuthRow(row) || isGithubOAuthRow(row);
+}
+
+/**
  * A Space's connected integrations as tools for a caller that is not a run
  * (the AI panel): the rows the person can see (their JWT, so membership
  * decides), enabled, MCP or HTTP, with the same closings a run applies —
@@ -653,8 +668,11 @@ export async function buildSpaceIntegrationTools(args: {
       down.push({ name: row.name, reason: "Alcon 自身を指しているため使いません（Alcon のデータは標準の道具で操作します）" });
       continue;
     }
-    // OAuth here is GitHub's sign-in; any other OAuth row has no way to authenticate.
-    if (row.auth_type === "oauth" && !isGithubOAuthRow(row)) continue;
+    // OAuth here is a sign-in this engine can complete (oauthRowOpens):
+    // GitHub's, or a Google profile's — a Gmail row's manifest commands
+    // run in chat like any other connection's. Drive rows never reach
+    // here (reported down above); any other OAuth row stays closed.
+    if (!oauthRowOpens(row)) continue;
     // An API with no manifest has no declared commands to offer here.
     if (row.kind === "http" && !manifest) {
       down.push({ name: row.name, reason: "コマンドの宣言（manifest）がないため、チャットではまだ使えません" });

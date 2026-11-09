@@ -65,6 +65,22 @@ const OAUTH_COPY: Record<OAuthProvider, {
   },
 };
 
+/**
+ * The gmail preset's own copy: it signs in with the same Google client
+ * as Drive, but what the consent grants is mail, read-only — the
+ * Drive-flavored sentences above would misstate it.
+ */
+const GMAIL_OAUTH_COPY: typeof OAUTH_COPY.google = {
+  opening: 'Opening Google…',
+  signIn: 'Sign in with Google',
+  notSetUp: 'Google sign-in is not set up yet. An administrator needs to register the Google OAuth client before this can be connected.',
+  howItConnects: 'Connect opens Google sign-in. Alcon asks only to read your mail — agents can search and open messages, and cannot send, change or delete any.',
+  whose: 'Access belongs to the Google account: if it is connected in another Space too, agents there read the same mailbox, and disconnecting either one disconnects both.',
+  actsAs: 'Mail is read as {account}.',
+  disconnect: "Disconnect {name}? Alcon's access is revoked at Google. If the same Google account is connected in another Space, that connection stops working too.",
+  revokeFailed: 'Alcon could not revoke its access at Google. Remove it from your Google Account under Security › Third-party access.',
+};
+
 const CUSTOM_AUTH_LABELS: Record<'none' | 'bearer' | 'header', string> = {
   none: 'None',
   bearer: 'Bearer token',
@@ -163,7 +179,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
   // A model provider is not a tool agents call.
   const isModel = preset.kind === 'model';
   const provider = oauthProviderOf(preset) ?? 'google';
-  const copy = OAUTH_COPY[provider];
+  const copy = preset.id === 'gmail' ? GMAIL_OAUTH_COPY : OAUTH_COPY[provider];
   const oauthStatus = useIntegrationOAuthStatus(oauth && canEdit, provider);
   const oauthReady = oauthStatus === true;
   const oauthAccount = integration?.external_account ?? null;

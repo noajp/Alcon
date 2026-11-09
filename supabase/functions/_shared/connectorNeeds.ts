@@ -7,7 +7,7 @@
 
 /** Preset display names (web/src/AIP/connectors/catalog.ts): a harness may name a connector by any of them. */
 export const CONNECTOR_PRESET_NAMES: Record<string, string> = {
-  linear: "Linear", asana: "Asana", "google-drive": "Google Drive", github: "GitHub", slack: "Slack",
+  linear: "Linear", asana: "Asana", "google-drive": "Google Drive", gmail: "Gmail", github: "GitHub", slack: "Slack",
   deepseek: "DeepSeek", kimi: "Kimi", "custom-mcp": "Custom MCP", "custom-http": "Custom API", "custom-model": "Custom model API",
   // A connection the AI drafted and a person activated (G4): the preset
   // marks its provenance, so settings, reconcile and audits can tell it
