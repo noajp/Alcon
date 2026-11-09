@@ -144,12 +144,17 @@ export interface AttachmentSearchRow {
   element_object_id: string | null;
   domain_id: string | null;
   snippet: string | null;
+  /** The host Element's quotable id (ELE_OBJ-017), projected by the RPC;
+   *  absent on a row read before that projection landed. */
+  element_display_id?: string | null;
 }
 
 export type SearchHostKind = FileOwnerKind | "portfolio" | "deal" | "company";
 
-/** Pure. The host a search hit hangs on: whichever owner column the row sets. */
-export function searchHostOf(row: AttachmentSearchRow): { kind: SearchHostKind; label: string | null } | null {
+/** Pure. The host a search hit hangs on: whichever owner column the row
+ *  sets. An Element host also carries its display_id — the quotable name
+ *  a citation uses — which only an Element has. */
+export function searchHostOf(row: AttachmentSearchRow): { kind: SearchHostKind; label: string | null; display_id: string | null } | null {
   const kind: SearchHostKind | null = row.element_id ? "element"
     : row.object_id ? "object"
     : row.strategy_id ? "strategy"
@@ -158,7 +163,7 @@ export function searchHostOf(row: AttachmentSearchRow): { kind: SearchHostKind; 
     : row.deal_id ? "deal"
     : row.company_id ? "company"
     : null;
-  return kind ? { kind, label: row.owner_label } : null;
+  return kind ? { kind, label: row.owner_label, display_id: kind === "element" ? row.element_display_id ?? null : null } : null;
 }
 
 /** Pure. What the query matched, in the RPC's own precedence: the file's
@@ -174,7 +179,7 @@ export interface SearchHit {
   id: string;
   name: string;
   mime_type: string | null;
-  host: { kind: SearchHostKind; label: string | null } | null;
+  host: { kind: SearchHostKind; label: string | null; display_id: string | null } | null;
   element_object_id: string | null;
   domain_id: string | null;
   snippet: string | null;

@@ -7398,6 +7398,7 @@ export type Database = {
         Returns: {
           domain_id: string
           element_id: string
+          element_display_id: string
           element_object_id: string
           folder_id: string
           id: string
@@ -7518,6 +7519,7 @@ export type Database = {
           deleted_at: string
           domain_id: string
           element_id: string
+          element_display_id: string
           element_object_id: string
           folder_id: string
           id: string

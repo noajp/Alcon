@@ -92,6 +92,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   for (const r of (notesRes.data || [])) {
     out.push({ kind: 'note', id: r.id, title: r.title || 'Untitled' });
   }
-  for (const f of files) out.push({ kind: 'file', id: f.id, title: f.name, snippet: f.snippet ?? f.owner_label, file: f });
+  for (const f of files) out.push({ kind: 'file', id: f.id, title: f.name, snippet: f.snippet ?? f.owner_label, displayId: f.element_display_id, file: f });
   return out;
 }
