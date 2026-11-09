@@ -14,7 +14,7 @@ import { CommandPalette } from '@/Frame/CommandPalette';
 import { QuickAddElementLauncher } from '@/Frame/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
 import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
-import { CopilotProvider } from '@/AIP/ai/CopilotProvider';
+import { CopilotProvider, useCopilotConversation } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
 import { forwardAfterNavigation, recordNavigation, routeKeyOf, stepBack, stepForward, type HistoryStep } from '@/Frame/historyState';
 import { isItemScreen, newTab, openScreen } from '@/Frame/tabState';
@@ -274,6 +274,28 @@ function AppContent() {
       onActiveDomainChange={setResolvedDomainId}
     />
   );
+}
+
+// Arrival at an AI surface starts a fresh conversation (the provider's
+// arriveAtAi decides; copilotArrival.ts holds the rule). This watcher
+// lives inside CopilotProvider and reports each change of "any AI
+// surface visible" (the AI screen, or the pop-up while the screen is
+// not up), consuming the one-transition carry flag the expand/minimize
+// handlers set: the two windows are one surface, so moving between
+// them is "keep talking", not an arrival.
+function CopilotArrivalWatcher({ visible, carryRef }: { visible: boolean; carryRef: { current: boolean } }) {
+  const { arriveAtAi } = useCopilotConversation();
+  const arriveRef = useRef(arriveAtAi);
+  useEffect(() => { arriveRef.current = arriveAtAi; }, [arriveAtAi]);
+  const wasVisibleRef = useRef(visible);
+  useEffect(() => {
+    const wasVisible = wasVisibleRef.current;
+    wasVisibleRef.current = visible;
+    const carry = carryRef.current;
+    carryRef.current = false;
+    arriveRef.current({ wasVisible, visible, carry });
+  }, [visible, carryRef]);
+  return null;
 }
 
 function WorkspaceContent({
@@ -571,11 +593,18 @@ function WorkspaceContent({
     strategyId: activeTab.navigation.strategyId ?? null,
     lastStrategyId,
   });
+  // Expand/minimize move between the pop-up and the AI screen — the
+  // two windows onto the one conversation. They mark the visibility
+  // change as a carry so arriving through them keeps the talk going
+  // (CopilotArrivalWatcher consumes the flag).
+  const aiCarryRef = useRef(false);
   const handleExpandAi = () => {
+    aiCarryRef.current = true;
     handleCopilotOpenChange(false);
     setActiveView('ai');
   };
   const handleMinimizeAi = () => {
+    aiCarryRef.current = true;
     setActiveView(lastViewRef.current);
     handleCopilotOpenChange(true);
   };
@@ -756,6 +785,7 @@ function WorkspaceContent({
     <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup} onOpenCreateNotebook={openNotebookPopup}>
     <SidebarRevealContext.Provider value={{ hidden: sidebarCollapsed && !sidebarOverlay, show: handleSidebarToggle }}>
     <CopilotProvider>
+    <CopilotArrivalWatcher visible={aiScreen || copilotOpen} carryRef={aiCarryRef} />
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
       style={{

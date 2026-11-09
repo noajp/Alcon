@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copilotTitleOf, toKeptMessages, useAlconCopilot, type CopilotMessage } from './useAlconCopilot';
+import { shouldResetOnArrival, type CopilotArrivalTransition } from './copilotArrival';
 import { useAiConversations } from '@/hooks/useAiConversations';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 
@@ -19,6 +20,13 @@ type Conversation = ReturnType<typeof useAlconCopilot> & {
   openSession: (id: string) => Promise<void>;
   /** A fresh conversation, kept in this folder once answered (none: loose). */
   newConversation: (folderId?: string | null) => void;
+  /**
+   * An arrival at an AI surface (page.tsx reports the visibility
+   * transition): starts a fresh conversation, unless the arrival
+   * decision exempts it — a carry between the two windows, a live
+   * turn streaming, or an already-fresh conversation.
+   */
+  arriveAtAi: (transition: CopilotArrivalTransition) => void;
 };
 
 const CopilotContext = createContext<Conversation | null>(null);
@@ -94,6 +102,16 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     adoptSession(null);
   }, [reset, adoptSession]);
 
+  // Coming to the AI chat lands on a fresh conversation (the previous
+  // one is never resumed automatically; it waits in the sidebar list).
+  // The reset is display-only: the kept session, its run and any
+  // pending approvals persist server-side, untouched.
+  const arriveAtAi = useCallback((transition: CopilotArrivalTransition) => {
+    const fresh = sessionId === null && messages.length === 0;
+    if (!shouldResetOnArrival({ ...transition, streaming, fresh })) return;
+    newConversation();
+  }, [sessionId, messages.length, streaming, newConversation]);
+
   const openSession = useCallback(async (id: string) => {
     const kept = await loadMessages(id);
     if (!kept) return;
@@ -121,7 +139,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
   }, [streaming, messages, sessionId, fileSession]);
 
   return (
-    <CopilotContext.Provider value={{ ...conversation, library, sessionId, openSession, newConversation }}>
+    <CopilotContext.Provider value={{ ...conversation, library, sessionId, openSession, newConversation, arriveAtAi }}>
       {children}
     </CopilotContext.Provider>
   );
