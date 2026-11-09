@@ -52,18 +52,34 @@ export function tallyVerify(tally: VerifyTally, check: VerifyCheck): VerifyTally
 }
 
 /**
- * Pure. The expected state a verify declaration promises, built from the
- * write's input: an expect value that is a string naming one of the
- * write's input fields takes that field's value; anything else (a string
- * naming no input field, a number, a boolean, null, an object) is a
- * literal the read-back must carry as-is.
+ * Pure. The expected state a verify declaration promises, built from
+ * the write's input ⊕ the state its result reported: an expect value
+ * that is a string naming one of the write's input fields takes that
+ * field's value (the intent wins — a reply's thread is the thread the
+ * caller named); a string naming no input field but one the write's
+ * result reported takes the result's value (an expectation about the
+ * thing the write created — a fresh send's thread — can only be read
+ * from what the write returned, and the read-back of that very thing
+ * then proves it exists as reported); anything else (a string naming
+ * neither, a number, a boolean, null, an object) is a literal the
+ * read-back must carry as-is. The input ⊕ result reading is the one
+ * verifyReadInput addresses the read by, and the one an undo's input
+ * mapping reads (compensation.ts) — one rule at every reader.
+ * Plan-time callers pass no result state: a plan has not run, so its
+ * expectations resolve from the input alone, as they always have.
  */
-export function expectedOfVerify(decl: VerifyDeclaration, writeInput: Record<string, unknown>): Record<string, unknown> {
+export function expectedOfVerify(
+  decl: VerifyDeclaration,
+  writeInput: Record<string, unknown>,
+  writeState: Record<string, unknown> = {},
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [field, spec] of Object.entries(decl.expect)) {
     out[field] = typeof spec === "string" && Object.prototype.hasOwnProperty.call(writeInput, spec)
       ? writeInput[spec]
-      : spec;
+      : typeof spec === "string" && Object.prototype.hasOwnProperty.call(writeState, spec)
+        ? writeState[spec]
+        : spec;
   }
   return out;
 }
@@ -128,7 +144,7 @@ export async function runVerifyRead(args: {
   if (missing.length) {
     return { ok: false, unverified: `確認用の読み取りに必要な項目がありません: ${missing.join(", ")}` };
   }
-  const expected = expectedOfVerify(declaration, writeInput);
+  const expected = expectedOfVerify(declaration, writeInput, stateOfResult(writeResultText));
   const attempt = async (): Promise<VerifyCheck> => {
     let r: { text: string; isError: boolean };
     try {

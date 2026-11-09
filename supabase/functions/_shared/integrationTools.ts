@@ -41,7 +41,7 @@ import { isGoogleDriveRow, isGoogleOAuthRow } from "./googleOAuth.ts";
 import { CONNECTOR_PRESET_NAMES, foldConnectorName } from "./connectorNeeds.ts";
 import { isGithubOAuthRow } from "./githubOAuth.ts";
 import { runVerifyRead, verifyDiffText, type VerifyCheck } from "./verifyReads.ts";
-import { applyResponseTransform } from "./manifestTransforms.ts";
+import { applyBodyBuilder, applyResponseTransform } from "./manifestTransforms.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "./integrationPlans.ts";
 import { takeStashedCredentialForIntegration } from "./credentialRequests.ts";
 import { recordIntegrationUse } from "./credentialUseAudit.ts";
@@ -436,6 +436,20 @@ export async function executeIntegrationTool(it: IntegrationTool, call: ToolCall
     const req = requestFor(it.command, call.input);
     if ("error" in req) return { text: req.error, isError: true };
     httpInput = req;
+    // A named body builder (P2; manifestTransforms.ts): the mapping
+    // names one, the builder assembles the body from the call's input
+    // in place of the field list — a computed document (an RFC 822
+    // message) no field mapping can express. It runs here, at the one
+    // point a declared command becomes a request, over the same input
+    // the approval was bound to. The other requestFor readers (the
+    // breaker's target key, the approval display, a plan) read the
+    // mapping only — a built body is content, never addressing, so
+    // nothing they decide can depend on it. A replayed call never
+    // reaches this point (it answered above, from the fixture).
+    if (it.command.http.bodyFrom) {
+      const built = applyBodyBuilder(it.command.http.bodyFrom, call.input);
+      if (built) httpInput = { ...req, body: built };
+    }
   }
   // The binding is resolved here, at the moment the call runs — never at
   // assembly, and never for the approval decision, which reads only the

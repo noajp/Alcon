@@ -243,9 +243,10 @@ export function validateGuide(guide: string | null, endpointHost: string | null)
  * no allow rule anywhere on it, a read's name must not carry a writing
  * verb, the endpoint must pass the same guard every request passes, the
  * auth is a key-shaped one (OAuth cannot be drafted), no command may
- * name a response transform (a code reference is first-party only),
- * the guide obeys validateGuide, and — when the person's own host is
- * known — the endpoint must sit in that host's registrable domain.
+ * name a response transform or a body builder (a code reference is
+ * first-party only), the guide obeys validateGuide, and — when the
+ * person's own host is known — the endpoint must sit in that host's
+ * registrable domain.
  * Errors are Japanese, in parseManifest's voice, because they go
  * straight back to the drafting model as its feedback.
  */
@@ -295,6 +296,9 @@ export function validateDraftCandidate(
     // a command at one (design §3.4). An unknown name has already
     // failed in parseManifest; a known one fails here.
     if (cmd.transform) errors.push(`${cmd.name}: transform（名前付きのレスポンス整形）は起草では使えません（第一者のマニフェスト専用です）`);
+    // A named body builder is a code reference the same way (P2):
+    // first-party equipment, for the same reason, refused the same way.
+    if (cmd.http?.bodyFrom) errors.push(`${cmd.name}: bodyFrom（名前付きのボディビルダー）は起草では使えません（第一者のマニフェスト専用です）`);
     if (cmd.effect === "write") {
       if (cmd.permission !== "ask") errors.push(`${cmd.name}: 書き込みの permission は ask にしてください（起草では allow にも deny にもできません）`);
       if (cmd.rules.some((r) => r.permission === "allow")) errors.push(`${cmd.name}: 書き込みに allow の rule は付けられません（永続許可は人が後から設定します）`);
@@ -384,7 +388,10 @@ export async function draftContentHash(c: DraftContent): Promise<string> {
  *  too (P1T), on the same reasoning: how an answer is shaped is what
  *  the command is. (A draft itself may never carry one —
  *  validateDraftCandidate refuses; the projection still reads it, so
- *  a first-party manifest's structure is hashed the same way.) */
+ *  a first-party manifest's structure is hashed the same way.) A
+ *  bodyFrom reference rides inside the http mapping it belongs to
+ *  (P2), on the same reasoning again: how a request body is built is
+ *  what the command is. */
 export function draftStructureOf(c: DraftContent): unknown {
   const { manifest } = parseManifest(c.manifest);
   return {

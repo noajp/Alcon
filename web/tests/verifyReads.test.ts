@@ -29,6 +29,21 @@ describe('expectedOfVerify', () => {
     const decl = { command: 'get_file_contents', expect: { content: 'content', kind: 'file', n: 3 }, delayMs: 0 };
     expect(vr.expectedOfVerify(decl, { content: 'BODY', path: 'x.md' })).toEqual({ content: 'BODY', kind: 'file', n: 3 });
   });
+
+  it('falls back to the write’s result state, the input still winning (P2)', () => {
+    const decl = { command: 'gmail_read', expect: { threadId: 'threadId' }, delayMs: 0 };
+    // A fresh send: no threadId was an input, so the expectation is
+    // the created message’s own thread — the check reduces to the
+    // read-back of the created id existing in that thread.
+    expect(vr.expectedOfVerify(decl, { to: 'a@example.co.jp', body: 'b' }, { id: 'm1', threadId: 't-new' }))
+      .toEqual({ threadId: 't-new' });
+    // A reply: the caller named the thread, and the intent wins over
+    // whatever the result reported.
+    expect(vr.expectedOfVerify(decl, { threadId: 't-named' }, { id: 'm2', threadId: 't-other' }))
+      .toEqual({ threadId: 't-named' });
+    // Neither side names it: the value stays the literal it was.
+    expect(vr.expectedOfVerify(decl, {}, {})).toEqual({ threadId: 'threadId' });
+  });
 });
 
 describe('verifyReadInput', () => {

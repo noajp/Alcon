@@ -45,7 +45,7 @@ describe('integration presets', () => {
 });
 
 describe('bundled manifests', () => {
-  it('a gmail row is born carrying the read pair; other presets start with none', () => {
+  it('a gmail row is born carrying its manifest; other presets start with none', () => {
     const gmail = buildIntegrationRow(presetById('gmail')!, SPACE, draft);
     expect(gmail.ok).toBe(true);
     if (gmail.ok) expect(gmail.row.manifest).toEqual(GMAIL_MANIFEST);
@@ -189,7 +189,11 @@ describe('readLastTest', () => {
   it('words every outcome, and only a verified one as connected', () => {
     expect(testOutcomeLabel('connected')).toBe('Connected');
     expect(testOutcomeLabel('reachable')).toMatch(/not checked/);
-    for (const c of ['auth_failed', 'http_error', 'unreachable', 'blocked', 'oauth_required', 'oauth_expired', 'whatever']) expect(testOutcomeLabel(c)).not.toBe('Connected');
+    for (const c of ['auth_failed', 'http_error', 'unreachable', 'blocked', 'oauth_required', 'oauth_expired', 'oauth_scope_missing', 'whatever']) expect(testOutcomeLabel(c)).not.toBe('Connected');
+  });
+
+  it('a grant behind the widened scope set is worded as read-only access (P2)', () => {
+    expect(testOutcomeLabel('oauth_scope_missing')).toBe('No permission to send — read-only access');
   });
 });
 
@@ -226,7 +230,7 @@ describe('integrationStatus', () => {
   });
 
   it('a refused credential asks for action, ahead of the generic failure bucket', () => {
-    for (const code of ['auth_failed', 'oauth_expired', 'oauth_required']) {
+    for (const code of ['auth_failed', 'oauth_expired', 'oauth_required', 'oauth_scope_missing']) {
       expect(integrationStatus({ enabled: true, last_test: tested(code, false) })).toBe('action-needed');
     }
   });

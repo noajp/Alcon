@@ -10,9 +10,12 @@ const gm = await import(new URL('../../supabase/functions/_shared/gmailManifest.
 const oauth = await import(new URL('../../supabase/functions/_shared/googleOAuth.ts', import.meta.url).pathname);
 const it8 = await import(new URL('../../supabase/functions/_shared/integrationTools.ts', import.meta.url).pathname);
 
-// The Gmail read pair (Sim prototype P1; design §3): Sim's gmail_search /
-// gmail_read translated into manifest declarations and bundled with the
-// first-party gmail preset. The manifest exists twice — the browser
+// The Gmail manifest (Sim prototype P1, P2; design §3, §4): Sim's
+// gmail tools translated into manifest declarations and bundled with
+// the first-party gmail preset — the read pair (gmail_search /
+// gmail_read) and the writes (gmail_send, verified by read-back and
+// irreversible by declaration; gmail_modify_labels, the polling
+// flow's processed-mark). The manifest exists twice — the browser
 // writes it into the row at creation, the server declares the same
 // content — and the two must agree in every way that binds: the raw
 // content, and the structure / permission hashes a review compares.
@@ -47,20 +50,25 @@ describe('the gmail manifest twins', () => {
 describe('the translated read pair', () => {
   const { manifest, errors } = cm.parseManifest(gm.GMAIL_MANIFEST);
 
-  it('parses clean: two declared reads, both offered', () => {
+  it('parses clean: the read pair and the two writes, all offered', () => {
     expect(errors).toEqual([]);
-    expect(manifest.commands.map((c: { name: string }) => c.name)).toEqual(['gmail_search', 'gmail_read']);
-    expect(cm.offeredCommands(manifest)).toHaveLength(2);
-    for (const c of manifest.commands) {
+    expect(manifest.commands.map((c: { name: string }) => c.name)).toEqual(['gmail_search', 'gmail_read', 'gmail_send', 'gmail_modify_labels']);
+    expect(cm.offeredCommands(manifest)).toHaveLength(4);
+    for (const c of manifest.commands.slice(0, 2)) {
       expect(c.effect).toBe('read');
       expect(c.permission).toBe('allow');
+      expect(c.mcp).toBeNull();
+    }
+    for (const c of manifest.commands.slice(2)) {
+      expect(c.effect).toBe('write');
+      expect(c.permission).toBe('ask');
       expect(c.mcp).toBeNull();
     }
   });
 
   it('gmail_search is GET /messages with the query as q', () => {
     const search = manifest.commands[0];
-    expect(search.http).toEqual({ method: 'GET', path: '/messages', query: ['q', 'maxResults'], body: [] });
+    expect(search.http).toEqual({ method: 'GET', path: '/messages', query: ['q', 'maxResults'], body: [], bodyFrom: null });
     expect(search.required).toEqual(['q']);
     expect(search.transform).toBeNull();
     expect(cm.commandSchema(search)).toEqual({
@@ -76,13 +84,13 @@ describe('the translated read pair', () => {
 
   it('gmail_read is GET /messages/{id} shaped by gmail_message', () => {
     const read = manifest.commands[1];
-    expect(read.http).toEqual({ method: 'GET', path: '/messages/{id}', query: ['format'], body: [] });
+    expect(read.http).toEqual({ method: 'GET', path: '/messages/{id}', query: ['format'], body: [], bodyFrom: null });
     expect(read.required).toEqual(['id']);
     expect(read.transform).toBe('gmail_message');
   });
 
-  it('carries no write, so nothing in it can be critical', () => {
-    for (const c of manifest.commands) expect(cm.criticalClassOf(c)).toBeNull();
+  it('the read pair carries no critical class', () => {
+    for (const c of manifest.commands.slice(0, 2)) expect(cm.criticalClassOf(c)).toBeNull();
   });
 });
 
@@ -161,12 +169,12 @@ describe('the assembly OAuth gate', () => {
   });
 });
 
-describe('a connection test rebuild keeps the pair', () => {
-  it('manifestFromTools preserves the declared commands verbatim, transform included', () => {
+describe('a connection test rebuild keeps the manifest', () => {
+  it('manifestFromTools preserves the declared commands verbatim, transform and bodyFrom included', () => {
     const rebuilt = cm.manifestFromTools([], gm.GMAIL_MANIFEST);
     const before = (gm.GMAIL_MANIFEST as { commands: unknown[] }).commands;
     const after = (rebuilt as { commands: Record<string, unknown>[] }).commands;
-    expect(after.map((c) => c.name)).toEqual(['gmail_search', 'gmail_read']);
+    expect(after.map((c) => c.name)).toEqual(['gmail_search', 'gmail_read', 'gmail_send', 'gmail_modify_labels']);
     expect(canonicalJson(after)).toBe(canonicalJson(before));
   });
 

@@ -55,13 +55,23 @@ export function diffExpect(expected: Record<string, unknown>, actual: Record<str
  * the state itself; anything else that is not empty is a bare payload
  * (a file's content read back raw is the common case) and stands as the
  * state's `content`; an empty answer carries no state at all.
+ *
+ * An HTTP answer's `HTTP <status>` first line is the transport's
+ * framing, not state, and is stepped over before either reading —
+ * the same step draftTest.ts and manifestTransforms.ts take. Until
+ * the first HTTP-manifest verify (P2's gmail_send), every state
+ * reader's traffic was MCP or Drive answers, which carry no such
+ * line, so the step never mattered; with it missing, a created
+ * resource's id in an HTTP answer was invisible to the read-back
+ * addressing and the expectation alike.
  */
 export function stateOfResult(text: string): Record<string, unknown> {
-  const trimmed = text.trim();
+  const body = text.replace(/^HTTP \d{3}\n/, "");
+  const trimmed = body.trim();
   if (!trimmed) return {};
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
   } catch { /* not JSON: the payload itself is the state */ }
-  return { content: text };
+  return { content: body };
 }

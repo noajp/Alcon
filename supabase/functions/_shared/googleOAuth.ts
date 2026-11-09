@@ -12,6 +12,7 @@ export const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 export const GOOGLE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about?fields=user";
 export const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 /** The endpoint a google-drive integration row carries (catalog.ts). */
 export const GOOGLE_DRIVE_ENDPOINT = "https://www.googleapis.com/drive/v3";
 /** The endpoint a gmail integration row carries (catalog.ts). */
@@ -85,8 +86,15 @@ export const GOOGLE_DRIVE_PROFILE: GoogleProviderProfile = {
 export const GOOGLE_GMAIL_PROFILE: GoogleProviderProfile = {
   preset: "gmail",
   endpoint: GOOGLE_GMAIL_ENDPOINT,
-  // Stage one is read-only (D1); gmail.send joins on a second consent.
-  scopes: [GMAIL_READONLY_SCOPE],
+  // The staged consent (design D1): stage one asked for read-only;
+  // stage two (P2) adds gmail.send beside it. includeGrantedScopes
+  // keeps the earlier grant when a person consents again, and a
+  // stored grant from stage one no longer covers this set —
+  // grantsRequiredScopes says so, and the connection test turns that
+  // into the connection's reauth state (oauth_scope_missing), never
+  // a silent widening: the send scope exists only where a person
+  // granted it.
+  scopes: [GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE],
   includeGrantedScopes: true,
   accountCheck: {
     url: `${GOOGLE_GMAIL_ENDPOINT}/profile`,

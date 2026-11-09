@@ -214,7 +214,7 @@ interface TwinUndo { command: string; input: Record<string, unknown> }
 
 interface TwinCommand {
   name: string; action: string; effect: 'read' | 'write'; permission: 'allow' | 'ask' | 'deny';
-  http: { method: string; path: string; query: string[]; body: string[] } | null;
+  http: { method: string; path: string; query: string[]; body: string[]; bodyFrom: string | null } | null;
   mcp: string | null;
   input: Record<string, unknown>; required: string[];
   rules: { when: Record<string, string>; permission: 'allow' | 'ask' | 'deny' }[];
@@ -310,6 +310,22 @@ function parseTransformTwin(raw: unknown): string | null | undefined {
   return raw;
 }
 
+/** The body-builder names the server's registry holds
+ *  (manifestTransforms.ts BODY_BUILDERS): the twin of its keys, kept
+ *  in step for the same reason as the transform names above —
+ *  manifestTransforms.test.ts pins them against each other. */
+const BODY_BUILDER_NAMES = new Set(['gmail_mime']);
+
+/** An HTTP mapping's body-builder reference, read as the server's
+ *  parseBodyFrom reads it (P2): undefined when absent, null when it
+ *  cannot be one — not a string in the name shape, or a name the
+ *  registry does not hold — because the reference is code, not data. */
+function parseBodyFromTwin(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'string' || !NAME_RE.test(raw) || !BODY_BUILDER_NAMES.has(raw)) return null;
+  return raw;
+}
+
 /** A stored manifest read the way the server's parseManifest reads it —
  *  for manifests that were validated when drafted, so the loose cases
  *  here only mirror the server's refusals. */
@@ -336,7 +352,10 @@ function parseManifestTwin(raw: unknown): { commands: TwinCommand[]; aliases: Re
       const path = typeof h.path === 'string' ? h.path : '';
       if (!METHODS.has(method) || !path.startsWith('/')) continue;
       if (effect === 'read' && method !== 'GET' && method !== 'HEAD') continue;
-      http = { method, path, query: strings(h.query), body: strings(h.body) };
+      const bodyFrom = parseBodyFromTwin(h.bodyFrom);
+      if (bodyFrom === null) continue;
+      if (bodyFrom !== undefined && (method === 'GET' || method === 'HEAD')) continue;
+      http = { method, path, query: strings(h.query), body: strings(h.body), bodyFrom: bodyFrom ?? null };
     }
     const mcp = typeof x.mcp === 'string' && x.mcp ? x.mcp : null;
     if (!http && !mcp) continue;

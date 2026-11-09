@@ -18,7 +18,9 @@
 //     oauth Google: the stored token (refreshed when due, through
 //           resolveCredential) answers the profile's account check (Drive's
 //           about, Gmail's profile) → connected. No token → oauth_required;
-//           a refresh token Google refuses → oauth_expired.
+//           a refresh token Google refuses → oauth_expired; a stored grant
+//           that no longer covers the profile's scope set (a consent from
+//           before the set widened) → oauth_scope_missing.
 //           GitHub: the signed-in token opens the MCP server as above.
 //     model a one-token Messages request (Anthropic format) with the key →
 //           connected on success, auth_failed on 401 / 403. Any other answer
@@ -35,7 +37,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { McpSession, callHttp, isSafeEndpoint, readCapped, resolveCredential, type IntegrationRow, type RemoteTool } from "../_shared/integrationClient.ts";
-import { googleProfileOf } from "../_shared/googleOAuth.ts";
+import { googleProfileOf, grantsRequiredScopes, parseOAuthSecret } from "../_shared/googleOAuth.ts";
 import { isGithubOAuthRow } from "../_shared/githubOAuth.ts";
 import { manifestFromTools, parseManifest } from "../_shared/connectorManifest.ts";
 import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
@@ -59,7 +61,7 @@ interface LastTest {
   ok: boolean;
   at: string;
   /** What happened, for the client to word in the viewer's language. */
-  code: "connected" | "reachable" | "auth_failed" | "http_error" | "unreachable" | "blocked" | "oauth_required" | "oauth_expired" | "error";
+  code: "connected" | "reachable" | "auth_failed" | "http_error" | "unreachable" | "blocked" | "oauth_required" | "oauth_expired" | "oauth_scope_missing" | "error";
   /** A technical note for errors (already scrubbed of the secret); empty otherwise. */
   detail: string;
   tools?: { name: string; readOnly: boolean }[];
@@ -168,6 +170,19 @@ async function runOAuthTest(admin: SupabaseClient, row: IntegrationRow & { prese
     const { data } = await admin.from("integrations").select("last_test").eq("id", row.id).maybeSingle();
     const expired = (data?.last_test as { code?: string } | null)?.code === "oauth_expired";
     return { ok: false, at, code: expired ? "oauth_expired" : "oauth_required", detail: "" };
+  }
+  // A grant from before the profile's scope set widened (P2 added
+  // gmail.send beside gmail.readonly) still signs in and still reads —
+  // the token is fine; the consent is behind what the profile now
+  // promises. That is a state of the connection, not a detail of this
+  // test: it rides last_test's code, so the row reads action-needed,
+  // the connector counts as needing reauth, and the dialog words it
+  // as what it is (read-only access). Re-consenting runs the ordinary
+  // sign-in again, which asks for the profile's set as it now stands
+  // and keeps the earlier grants (include_granted_scopes).
+  const stored = parseOAuthSecret(raw);
+  if (stored && !grantsRequiredScopes(stored.scope, profile)) {
+    return { ok: false, at, code: "oauth_scope_missing", detail: "" };
   }
   try {
     const ctl = new AbortController();
