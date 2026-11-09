@@ -123,7 +123,7 @@ export function IntegrationIcon({ name, icon, size }: { name: string; icon: stri
   );
 }
 
-export function SourceChip({ source }: { source: IntegrationSource }) {
+function SourceChip({ source }: { source: IntegrationSource }) {
   const { t } = useI18n();
   return (
     <span className="inline-flex h-5 shrink-0 items-center rounded-[var(--control-tab-radius)] border border-[var(--border-default)] px-1.5 text-[11px] font-medium text-[var(--text-secondary)]">

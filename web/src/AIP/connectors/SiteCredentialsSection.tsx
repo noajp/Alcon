@@ -19,11 +19,15 @@ import { SiteCredentialDialog } from './SiteCredentialDialog';
 // have one; saving, replacing and deleting are the owner's acts, and
 // the password itself is never shown (no read path exists for it).
 
-export function SiteCredentialsSection({ spaceId, integrations, isOwner, ownerKnown }: {
+export function SiteCredentialsSection({ spaceId, integrations, isOwner, ownerKnown, addOpen = false, onAddOpenChange }: {
   spaceId: string;
   integrations: Integration[];
   isOwner: boolean;
   ownerKnown: boolean;
+  /** The catalog's website sign-in entry card opens the same add dialog
+   *  from outside the section; the section reports it closed. */
+  addOpen?: boolean;
+  onAddOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useI18n();
   const { data: credentials, loading, error, refetch } = useSiteCredentials(spaceId);
@@ -31,6 +35,7 @@ export function SiteCredentialsSection({ spaceId, integrations, isOwner, ownerKn
   const openedCred = opened && opened !== 'new'
     ? credentials.find((c) => c.id === opened.id) ?? opened
     : null;
+  const closeDialog = () => { setOpened(null); onAddOpenChange?.(false); };
 
   return (
     <section className="space-y-3">
@@ -67,13 +72,13 @@ export function SiteCredentialsSection({ spaceId, integrations, isOwner, ownerKn
         </div>
       )}
 
-      {opened && (
+      {(opened || addOpen) && (
         <SiteCredentialDialog
           spaceId={spaceId}
-          credential={opened === 'new' ? null : openedCred}
+          credential={opened && opened !== 'new' ? openedCred : null}
           integrations={integrations}
           canEdit={isOwner}
-          onClose={() => setOpened(null)}
+          onClose={closeDialog}
           onChanged={() => { void refetch(); }}
         />
       )}
