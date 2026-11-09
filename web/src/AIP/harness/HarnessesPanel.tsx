@@ -21,6 +21,8 @@ import { calibrationSummaryOf, candidateErrorCount, ratePercent } from './calibr
 import { activateConstraintDraft, deactivatePlanningConstraint, rejectConstraintDraft, useDefinitionConstraints, useSpaceConstraintQueue } from '@/hooks/constraintData';
 import { constraintEffectOf, constraintKpiOf, draftBaselineOf } from './constraintModel';
 import { useCatalog, useConnectorDirectory, type CatalogDefinition } from '@/hooks/customizeData';
+import { useExceptionInstalls } from '@/hooks/exceptionData';
+import { ExceptionCatalogSection } from './ExceptionCatalog';
 import { checkHarness, parseDefinition, type Diagnostic } from './harnessDefinition';
 import { catalogRelation, lineDiffCounts } from './installState';
 import { enabledConnectedNames, installReadiness, missingConnectors } from './installFlow';
@@ -65,6 +67,14 @@ export function HarnessesPanel() {
   const spaceId = useActiveSpaceId();
   const library = useDefinitions(spaceId);
   const catalog = useCatalog();
+  const exceptionInstalls = useExceptionInstalls(spaceId);
+  // The checker's exception knowledge (B13): what the catalog offers
+  // and what this Space has installed, so a definition's exceptions
+  // section is judged against both (F005 / F006).
+  const exceptionsCtx = useMemo(() => ({
+    catalog: catalog.exceptions.map((e) => e.id),
+    installed: exceptionInstalls.data.map((i) => i.catalogItemId),
+  }), [catalog.exceptions, exceptionInstalls.data]);
   const fallback = useSpaceDefaultHarness(spaceId);
   const isOwner = useIsSpaceOwner(spaceId) === true;
   const integrations = useIntegrations(spaceId);
@@ -322,7 +332,7 @@ export function HarnessesPanel() {
                         </div>
                         <div className="truncate text-[12px] text-muted-foreground">{firstLine(d.body)}</div>
                       </div>
-                      <CheckSummary diagnostics={checkHarness(parseDefinition(d.body), { connected })} />
+                      <CheckSummary diagnostics={checkHarness(parseDefinition(d.body), { connected, exceptions: exceptionsCtx })} />
                     </button>
                     {needs.length > 0 && (
                       <Button size="xs" variant="ghost" disabled={busy !== null}
@@ -359,6 +369,7 @@ export function HarnessesPanel() {
             </div>
           )
       ) : catalog.loading ? <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p> : (
+        <div className="space-y-6">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {catalog.definitions.map((item) => (
             <div key={item.id} className={`${CARD_FLAT} flex flex-col gap-2 p-4`}>
@@ -373,6 +384,8 @@ export function HarnessesPanel() {
               </div>
             </div>
           ))}
+        </div>
+        <ExceptionCatalogSection spaceId={spaceId} isOwner={isOwner} />
         </div>
       )}
 
@@ -424,6 +437,7 @@ export function HarnessesPanel() {
 
       {editing && spaceId && (
         <HarnessEditor spaceId={spaceId} definition={editing === 'new' ? null : editing} connected={connected} isOwner={isOwner}
+          exceptions={exceptionsCtx}
           onClose={() => setEditing(null)} onSaved={() => { void library.refetch(); setEditing(null); }} />
       )}
     </div>
@@ -545,15 +559,16 @@ function Diagnostics({ diagnostics }: { diagnostics: Diagnostic[] }) {
   );
 }
 
-function HarnessEditor({ spaceId, definition, connected, isOwner, onClose, onSaved }: {
-  spaceId: string; definition: Definition | null; connected: string[]; isOwner: boolean; onClose: () => void; onSaved: () => void;
+function HarnessEditor({ spaceId, definition, connected, isOwner, exceptions, onClose, onSaved }: {
+  spaceId: string; definition: Definition | null; connected: string[]; isOwner: boolean;
+  exceptions: { catalog: string[]; installed: string[] }; onClose: () => void; onSaved: () => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(definition?.name ?? '');
   const [body, setBody] = useState(definition?.body ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const diagnostics = useMemo(() => checkHarness(parseDefinition(body), { connected }), [body, connected]);
+  const diagnostics = useMemo(() => checkHarness(parseDefinition(body), { connected, exceptions }), [body, connected, exceptions]);
   // Errors block saving (CLAUDE.md: a harness is checked as it is saved);
   // warnings and hints are shown but left to the person's judgment.
   const hasErrors = diagnostics.some((d) => d.severity === 'error');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
   agentRunEvents, agentRunNeedsPerson, agentRunOutcome, auditShowsSample, exceptionReason, flowObservation, grantChanges, grantConnectors,
-  mergeAuditTimeline, parseChainScope, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
+  mergeAuditTimeline, parseChainScope, parseFailureDetail, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
   type AgentRunRecord, type ChainStep, type LedgerRun, type RunVerdict, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
 import { chainChildrenOf } from '@/Function/audit/chainScopeModel';
@@ -217,7 +217,7 @@ function agentRun(patch: Partial<AgentRunRecord>): AgentRunRecord {
   return {
     id: 'ar1', element_id: 'e1', domain_id: null, worker_id: null, status: 'running', mode: 'execute',
     summary: null, error: null, started_at: '2026-11-06T01:00:00Z', finished_at: null, created_at: '2026-11-06T01:00:00Z',
-    cost_usd: 0, verdict: null, finishDetail: null, proposed_readings: null, elementTitle: '経費処理', elementStatus: 'todo', objectName: null,
+    cost_usd: 0, verdict: null, finishDetail: null, failureDetail: null, proposed_readings: null, elementTitle: '経費処理', elementStatus: 'todo', objectName: null,
     chainScope: null, chainIntegrationNames: [],
     pendingActions: 0, ...patch,
   };
@@ -375,5 +375,39 @@ describe('chain scopes in the audit (B10)', () => {
     // A root is not its own child.
     const root = agentRun({ id: 'ar9', chainScope: scopeOf({ parentRunId: 'ar9', depth: 0 }) });
     expect(chainChildrenOf([root], 'ar9')).toEqual([]);
+  });
+});
+
+describe('parseFailureDetail (B13)', () => {
+  const good = {
+    class: 'auth_failed',
+    compensate: { policy: 'ask', source: 'catalog' },
+    escalate: { target: 'owner', source: 'catalog' },
+    retries: 2,
+    giveUp: null,
+    at: '2026-12-13T00:00:00.000Z',
+  };
+
+  it('reads a sealed settle record', () => {
+    expect(parseFailureDetail(good)).toEqual({
+      failureClass: 'auth_failed',
+      compensate: { policy: 'ask', source: 'catalog' },
+      escalate: { target: 'owner', source: 'catalog' },
+      retries: 2,
+      giveUp: null,
+      at: '2026-12-13T00:00:00.000Z',
+    });
+    expect(parseFailureDetail({ ...good, escalate: null, giveUp: { count: 5 } })?.giveUp).toEqual({ count: 5 });
+  });
+
+  it('refuses anything outside the record shape — the audit does not guess', () => {
+    expect(parseFailureDetail(null)).toBeNull();
+    expect(parseFailureDetail({ ...good, class: 'exploded' })).toBeNull();
+    expect(parseFailureDetail({ ...good, compensate: { policy: 'whenever', source: 'catalog' } })).toBeNull();
+    expect(parseFailureDetail({ ...good, compensate: { policy: 'ask', source: 'someone' } })).toBeNull();
+    expect(parseFailureDetail({ ...good, escalate: { target: 'everyone', source: 'catalog' } })).toBeNull();
+    expect(parseFailureDetail({ ...good, retries: -1 })).toBeNull();
+    expect(parseFailureDetail({ ...good, giveUp: { count: 0 } })).toBeNull();
+    expect(parseFailureDetail({ ...good, at: '' })).toBeNull();
   });
 });

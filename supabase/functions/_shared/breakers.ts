@@ -229,12 +229,23 @@ export function evaluateBreakers(facts: BreakerCallFacts, counts: BreakerCounts)
 export async function recordIntegrationCall(admin: SupabaseClient, row: {
   runId: string; spaceId: string; integrationId: string; commandName: string;
   isWrite: boolean; ok: boolean; targetKey: string | null;
+  /** The failure's class as B13 judged it (failurePolicy.ts), null on
+   *  a call that landed. One row per dispatched attempt: a retried
+   *  call leaves one row per try, each with its own judgement. */
+  failureClass?: string | null;
 }): Promise<void> {
+  const base = {
+    run_id: row.runId, activity_space_id: row.spaceId, integration_id: row.integrationId,
+    command_name: row.commandName, is_write: row.isWrite, ok: row.ok, target_key: row.targetKey,
+  };
   try {
-    await admin.from("integration_call_log").insert({
-      run_id: row.runId, activity_space_id: row.spaceId, integration_id: row.integrationId,
-      command_name: row.commandName, is_write: row.isWrite, ok: row.ok, target_key: row.targetKey,
+    const { error } = await admin.from("integration_call_log").insert({
+      ...base, failure_class: row.failureClass ?? null,
     });
+    // Where the failure_class column does not exist yet (the B13
+    // migration not yet applied), the class is what degrades — never
+    // the row itself, which is the breaker's own evidence.
+    if (error) await admin.from("integration_call_log").insert(base);
   } catch { /* the record is evidence, not the act */ }
 }
 

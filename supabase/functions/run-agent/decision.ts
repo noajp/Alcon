@@ -18,6 +18,7 @@ import { errorMessage } from "../_shared/boardTools.ts";
 import type { VerifyCheck } from "../_shared/verifyReads.ts";
 import type { RunVerdict } from "../_shared/runVerdict.ts";
 import type { CompensationReportData } from "../_shared/compensation.ts";
+import type { ResolvedFailurePolicy } from "../_shared/failurePolicy.ts";
 
 /** A turn's writes waiting for a person, as a transcript carries them. */
 export type SavedPending = PendingApproval & {
@@ -44,6 +45,14 @@ export type SavedPending = PendingApproval & {
       | { kind: "fail"; message: string };
     entries: { callId: string; rowId: string }[];
     report: CompensationReportData;
+    /** The failure's class and its policy as resolved when the
+     *  batch rested (B13): the decision that finalizes this settle
+     *  seals the failure record and fires the escalation under
+     *  exactly these. Absent on a rest parked before B13 — the
+     *  finalize then derives the catch-all class and the defaults,
+     *  which is the truth of a settle nobody classified. */
+    failureClass?: string;
+    failurePolicy?: ResolvedFailurePolicy;
   };
 };
 

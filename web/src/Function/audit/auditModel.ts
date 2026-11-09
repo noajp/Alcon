@@ -735,6 +735,78 @@ export function hasUnconfirmed(detail: FinishDetail | null): boolean {
   return !!detail && detail.unconfirmed.length > 0;
 }
 
+/** A failure settle's own record, sealed on the run (agent_runs.
+ *  failure_detail, B13): the class the failure settled under, the
+ *  compensation policy and the escalation with the layer that spoke
+ *  for each, the run's retry total, and the give-up that fired. The
+ *  server writes it in supabase/functions/_shared/failurePolicy.ts'
+ *  failureDetailOf; this parser is its strict reader. */
+export interface FailureDetail {
+  failureClass: string;
+  compensate: { policy: string; source: string };
+  escalate: { target: string; source: string } | null;
+  retries: number;
+  giveUp: { count: number } | null;
+  at: string;
+}
+
+const FAILURE_CLASSES: readonly string[] = [
+  'verify_mismatch', 'auth_failed', 'rate_limited', 'not_found', 'unavailable',
+  'read_failed', 'write_failed', 'revisions_exhausted', 'stale_claims',
+  'breaker_tripped', 'model_refusal', 'run_failure',
+];
+const FAILURE_POLICY_SOURCES: readonly string[] = ['definition', 'catalog', 'default'];
+const FAILURE_COMPENSATE_POLICIES: readonly string[] = ['auto', 'ask', 'never'];
+const FAILURE_ESCALATE_TARGETS: readonly string[] = ['owner', 'strategy', 'inbox'];
+
+/** Display labels for the record's vocabulary (i18n keys). */
+export const FAILURE_COMPENSATE_LABEL: Record<string, string> = {
+  auto: 'Roll back automatically', ask: 'Ask before rolling back', never: 'Never roll back',
+};
+export const FAILURE_ESCALATE_LABEL: Record<string, string> = {
+  owner: 'Space owners', strategy: 'the Strategy’s owner', inbox: 'the Inbox',
+};
+export const FAILURE_SOURCE_LABEL: Record<string, string> = {
+  definition: 'the definition’s failure section', catalog: 'the exception catalog', default: 'the engine default',
+};
+
+/** Strict narrowing of the jsonb: not exactly this shape, not a
+ *  failure detail — a record a person will judge by is not guessed at. */
+export function parseFailureDetail(raw: unknown): FailureDetail | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.class !== 'string' || !FAILURE_CLASSES.includes(r.class)) return null;
+  const comp = r.compensate as Record<string, unknown> | null;
+  if (!comp || typeof comp !== 'object' || Array.isArray(comp)
+    || typeof comp.policy !== 'string' || !FAILURE_COMPENSATE_POLICIES.includes(comp.policy)
+    || typeof comp.source !== 'string' || !FAILURE_POLICY_SOURCES.includes(comp.source)) return null;
+  let escalate: FailureDetail['escalate'] = null;
+  if (r.escalate !== null) {
+    const e = r.escalate as Record<string, unknown> | null;
+    if (!e || typeof e !== 'object' || Array.isArray(e)
+      || typeof e.target !== 'string' || !FAILURE_ESCALATE_TARGETS.includes(e.target)
+      || typeof e.source !== 'string' || !FAILURE_POLICY_SOURCES.includes(e.source)) return null;
+    escalate = { target: e.target, source: e.source };
+  }
+  if (typeof r.retries !== 'number' || !Number.isInteger(r.retries) || r.retries < 0) return null;
+  let giveUp: FailureDetail['giveUp'] = null;
+  if (r.giveUp !== null) {
+    const g = r.giveUp as Record<string, unknown> | null;
+    if (!g || typeof g !== 'object' || Array.isArray(g)
+      || typeof g.count !== 'number' || !Number.isInteger(g.count) || g.count < 1) return null;
+    giveUp = { count: g.count };
+  }
+  if (typeof r.at !== 'string' || !r.at) return null;
+  return {
+    failureClass: r.class,
+    compensate: { policy: comp.policy, source: comp.source },
+    escalate,
+    retries: r.retries,
+    giveUp,
+    at: r.at,
+  };
+}
+
 export type ProposedReadingHeldReason =
   | 'awaiting-acceptance'   // checked pass, manual Strategy: lands when the work is accepted
   | 'verdict-not-pass'      // fail or unchecked verdict: never lands from this run
@@ -781,6 +853,10 @@ export interface AgentRunRecord {
   verdict: RunVerdict | null;
   /** The finish as submitted, typed (claims + unconfirmed); null pre-B1. */
   finishDetail: FinishDetail | null;
+  /** The failure settle's record (B13), parsed; null for a run whose
+   *  failure never settled under the failure policy — every run
+   *  before B13, and every run that did not fail. */
+  failureDetail: FailureDetail | null;
   /** The chain scope minted at this run's birth (B10), parsed;
    *  null for an unscoped root — a person's own start, and every
    *  run born before scopes existed. */

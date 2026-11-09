@@ -138,6 +138,14 @@ import {
   runCompensationPass, settleWriteCompensation, type CompensationPassOutcome,
   type CompensationReportData,
 } from "../_shared/compensation.ts";
+import {
+  classifyCallFailure, classifySettledFailure, failureDetailOf, failurePolicySource,
+  FAILURE_RETRYABLE_CLASSES, FAILURE_RETRY_BACKOFF_MS, POLICY_LAYER_LABEL, ESCALATE_TARGET_LABEL,
+  narrowEntriesByExceptions, parseExceptionEntry,
+  resolveFailurePolicy, sealFailureDetail,
+  type CallFailureClass, type InstalledExceptionEntry, type ResolvedFailurePolicy,
+} from "../_shared/failurePolicy.ts";
+import { isFailureClass, type FailureClass } from "../_shared/definition.ts";
 import { applyDecision, makeRememberApproval, restorePendingApproval, type SavedPending } from "./decision.ts";
 import { buildCopilotTurn, foldCopilotContext, type CopilotContextLike, type CopilotTurn } from "../_shared/copilotTurn.ts";
 import { COPILOT_AGENT_NAME, persistCopilotApproval, updateCopilotSessionMessages } from "../_shared/copilotAnchor.ts";
@@ -263,6 +271,10 @@ type Transcript = {
    *  copied over on approval; consumption is marked on it as covered
    *  calls execute. */
   approvedPlan?: RunPlan;
+  /** The run's total of engine retries (B13), accumulated across
+   *  slices: the settle's failure record reports the run's own count,
+   *  not one slice's. */
+  failureRetries?: number;
 };
 type Run = {
   id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; promotion_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
@@ -1219,6 +1231,88 @@ async function execute(a: ExecArgs): Promise<void> {
   // own rows — a compensation never earns a compensation.
   const compensationOfCall = new Map<string, string>();
 
+  // ── Failure policy (B13) ─────────────────────────────────────────
+  // The Space's installed exception entries, read at assembly beside
+  // the integrations (§5.5): the enabled installs joined to their
+  // catalog items, in the catalog's order (sort, then install time),
+  // each payload read through parseExceptionEntry — an unreadable
+  // payload is no entry at all (fail closed; the breakage is Alcon's
+  // own content, so it is logged, never stepped onto the run). The
+  // definition's exceptions section narrows the consulted set here,
+  // once, so everything after — the call seam's retries, the
+  // compensation seam, the settle — resolves over the same set, and
+  // resolution from here to the settle is pure over it.
+  const failureEntries: readonly InstalledExceptionEntry[] = await (async (): Promise<InstalledExceptionEntry[]> => {
+    if (!run.activity_space_id) return [];
+    try {
+      const { data } = await admin.from("space_exception_installs")
+        .select("catalog_item_id, version, created_at, catalog_items!inner(id, name, payload, sort)")
+        .eq("activity_space_id", run.activity_space_id).eq("enabled", true);
+      type InstallRow = {
+        catalog_item_id: string; version: number; created_at: string;
+        catalog_items: { id: string; name: string; payload: unknown; sort: number };
+      };
+      const rows = ((data ?? []) as unknown as InstallRow[])
+        .sort((x, y) => (x.catalog_items.sort - y.catalog_items.sort) || x.created_at.localeCompare(y.created_at));
+      const entries: InstalledExceptionEntry[] = [];
+      for (const row of rows) {
+        const parsed = parseExceptionEntry(row.catalog_items.payload);
+        if (!parsed) {
+          console.warn(`failure policy: exception entry ${row.catalog_items.id} has an unreadable payload; treated as not installed`);
+          continue;
+        }
+        entries.push({
+          id: row.catalog_items.id, name: row.catalog_items.name, version: row.version,
+          match: parsed.match, rows: parsed.rows,
+        });
+      }
+      return narrowEntriesByExceptions(parsedAll, entries);
+    } catch {
+      return [];
+    }
+  })();
+  const failureSource = failurePolicySource({ definition: parsedAll, entries: failureEntries });
+
+  // The run's failure counts by class — the give-up judgement's
+  // material (§6.2). Seeded once from the call log's settled attempts
+  // (the log's rows are per attempt, so the counts are per attempt
+  // too) and grown in memory as each attempt settles, so a cap the
+  // definition declares is a cap on the RUN's failures, across turns
+  // and slices alike.
+  const failureCounts = new Map<FailureClass, number>();
+  {
+    try {
+      const { data } = await admin.from("integration_call_log")
+        .select("failure_class").eq("run_id", run.id).eq("ok", false).limit(1000);
+      for (const r of (data ?? []) as { failure_class: string | null }[]) {
+        if (isFailureClass(r.failure_class)) {
+          failureCounts.set(r.failure_class, (failureCounts.get(r.failure_class) ?? 0) + 1);
+        }
+      }
+    } catch { /* the counts are a judgement's material, never the run's life */ }
+  }
+  let giveUpFired: { failureClass: FailureClass; count: number } | null = null;
+  const currentGiveUp = (): { failureClass: string; detail: string } | null => {
+    if (giveUpFired) {
+      return {
+        failureClass: giveUpFired.failureClass,
+        detail: `失敗時の扱いにより諦めました: ${giveUpFired.failureClass} の失敗が ${giveUpFired.count} 回に達しました。`,
+      };
+    }
+    for (const [cls, count] of failureCounts) {
+      if (!count) continue;
+      const policy = resolveFailurePolicy({ class: cls, definition: parsedAll, entries: failureEntries });
+      if (policy.giveUpAfter != null && count >= policy.giveUpAfter) {
+        giveUpFired = { failureClass: cls, count };
+        return {
+          failureClass: cls,
+          detail: `失敗時の扱いにより諦めました: ${cls} の失敗が ${count} 回に達しました（上限 ${policy.giveUpAfter} 回 — ${POLICY_LAYER_LABEL[policy.source.giveUpAfter]}）。`,
+        };
+      }
+    }
+    return null;
+  };
+
   const callIntegration = async (call: ToolCall): Promise<{ content: string; is_error?: boolean; verify?: VerifyCheck }> => {
     const it = integrationTools.get(call.name);
     if (!it) return { content: "Unknown tool.", is_error: true };
@@ -1226,20 +1320,82 @@ async function execute(a: ExecArgs): Promise<void> {
     // moment it runs, declared commands mapped to their requests); linking
     // the GitHub pulls it opened to this run's Element stays the run's own
     // post-step.
-    const r = await executeIntegrationTool(it, call);
-    // The record stage (B11): every dispatched manifest-command call
-    // settles one row in the circuit breaker's evidence log — reads
-    // and writes, landed or failed — before any later gate reads it
-    // back. Verify read-backs never pass through here (they recurse
-    // inside the executor), so a declared write counts once, as
-    // itself. Best effort by construction (recordIntegrationCall
-    // swallows its failures): the record is evidence, not the act.
-    if (it.command && run.activity_space_id) {
-      await recordIntegrationCall(admin, {
-        runId: run.id, spaceId: run.activity_space_id, integrationId: it.integration.id,
-        commandName: it.command.name, isWrite: it.command.effect === "write", ok: !r.isError,
-        targetKey: it.command.effect === "write" ? targetKeyOf(it.command, call.input) : null,
+    //
+    // ── B13: the failure record, and the engine's own retry ────────
+    // Each attempt is dispatched, judged and recorded on its own: the
+    // call log's rows are per attempt, so a retried call costs its
+    // attempts against the breaker and the give-up count too. The
+    // side effects below this loop — the compensation record, the
+    // verify tally, the auth handling — belong to the call's OUTCOME:
+    // they run once, on the final attempt, exactly as they did when
+    // one dispatch was the whole story. The retry itself is floored
+    // by the engine under any declared number: reads only (a write is
+    // never re-run on a guess), never the connection's refusal, never
+    // a write that verifiably landed — duplicate submission is the
+    // failure a retry must never cause.
+    const callEffect: "read" | "write" = integrationCallIsRead(it, call) ? "read" : "write";
+    const failureMatch = {
+      destination: [
+        it.integration.name,
+        (() => { try { return new URL(it.integration.endpoint).host; } catch { return null; } })(),
+        it.command ? targetKeyOf(it.command, call.input) : null,
+      ],
+      tool: it.command?.name ?? it.remote?.name ?? null,
+    };
+    let r: { text: string; isError?: boolean; verify?: VerifyCheck; thrown?: boolean } = { text: "", isError: true, thrown: true };
+    let lastClass: CallFailureClass | null = null;
+    let attempts = 0;
+    while (true) {
+      attempts++;
+      try {
+        r = await executeIntegrationTool(it, call);
+      } catch (e) {
+        // executeIntegrationTool answers failures as results; a throw
+        // is a transport-level break (a refused binding, a rejected
+        // egress) — the call's own failure result, judged like any
+        // other. The result the model sees loses only the "Error: "
+        // prefix the throw used to add; the fact is the same.
+        r = { text: errorMessage(e), isError: true, thrown: true };
+      }
+      lastClass = classifyCallFailure({
+        effect: callEffect, isError: !!r.isError, verify: r.verify ?? null,
+        text: r.text, thrown: r.thrown === true,
       });
+      // The record stage (B11): every dispatched manifest-command call
+      // settles one row in the circuit breaker's evidence log — reads
+      // and writes, landed or failed — before any later gate reads it
+      // back. Verify read-backs never pass through here (they recurse
+      // inside the executor), so a declared write counts once, as
+      // itself. Best effort by construction (recordIntegrationCall
+      // swallows its failures): the record is evidence, not the act.
+      if (it.command && run.activity_space_id) {
+        await recordIntegrationCall(admin, {
+          runId: run.id, spaceId: run.activity_space_id, integrationId: it.integration.id,
+          commandName: it.command.name, isWrite: it.command.effect === "write", ok: !r.isError,
+          targetKey: it.command.effect === "write" ? targetKeyOf(it.command, call.input) : null,
+          failureClass: lastClass,
+        });
+      }
+      if (lastClass) failureCounts.set(lastClass, (failureCounts.get(lastClass) ?? 0) + 1);
+      if (!r.isError || !lastClass) break;
+      const policy = resolveFailurePolicy({
+        class: lastClass, definition: parsedAll, entries: failureEntries, match: failureMatch,
+      });
+      const mayRetry = callEffect === "read"
+        && (FAILURE_RETRYABLE_CLASSES as readonly string[]).includes(lastClass)
+        && attempts - 1 < policy.retry;
+      if (!mayRetry) break;
+      failureRetriesTotal++;
+      if (attempts === 1) {
+        // One step per call that retried, not per attempt: the run
+        // reads as "this call was retried", the attempts live in the
+        // call log.
+        await addStep(admin, run.id, "action",
+          `失敗した読み取りを再試行します: ${operationOf(it, call.input)}`,
+          `失敗の種類: ${lastClass} — ${POLICY_LAYER_LABEL[policy.source.retry]}の再試行（最大 ${policy.retry} 回）に従い、もう一度試します。`);
+      }
+      const backoff = FAILURE_RETRY_BACKOFF_MS[Math.min(attempts - 1, FAILURE_RETRY_BACKOFF_MS.length - 1)];
+      await new Promise((res) => setTimeout(res, backoff));
     }
     // The compensation record (B9): a write that landed and whose
     // command declares an undo leaves its payload here, resolved
@@ -1315,7 +1471,15 @@ async function execute(a: ExecArgs): Promise<void> {
       const binding = await bindingOf(it).catch(() => null);
       await linkOpenedPulls(r.text, binding?.secret ?? null);
     }
-    return { content: r.text, ...(r.isError ? { is_error: true } : {}), ...(r.verify ? { verify: r.verify } : {}) };
+    // When retries happened and the call still failed, the model is
+    // told so in the result itself: it must not re-issue the same
+    // call on its own loop — the engine already spent the declared
+    // patience on it.
+    const retriesMade = attempts - 1;
+    const content = r.isError && retriesMade > 0 && lastClass
+      ? `${r.text}（失敗時の扱いにより ${retriesMade} 回再試行しました: ${lastClass}）`
+      : r.text;
+    return { content, ...(r.isError ? { is_error: true } : {}), ...(r.verify ? { verify: r.verify } : {}) };
   };
 
   // A pull request the agent opened (or updated) through GitHub becomes one of
@@ -1816,11 +1980,15 @@ async function execute(a: ExecArgs): Promise<void> {
     displayFor: (call: ToolCall) => approvalDisplayFor(call),
   };
 
-  const runFailureCompensation = async (): Promise<CompensationPassOutcome> => {
+  const runFailureCompensation = async (failureClass: FailureClass): Promise<CompensationPassOutcome> => {
     try {
       return await runCompensationPass(admin, {
         runId: run.id, elementId: run.element_id, definitionId: definition?.id ?? null,
         deps: compensationDeps,
+        // B13: the settle's class and the failure policy's resolution
+        // reach the pass through B9's seam — a definition row's or an
+        // installed entry's compensate word governs this rollback.
+        failureClass, policySource: failureSource,
       });
     } catch {
       // The pass failing must never take the failure settle down with
@@ -1832,6 +2000,91 @@ async function execute(a: ExecArgs): Promise<void> {
       }));
       return { kind: "settled", report };
     }
+  };
+
+  /**
+   * The escalation a settled failure fires (B13 §6.4) — once, at the
+   * moment the settle finalizes, never while a compensation batch
+   * still rests undecided (the run is not yet "failed" to report).
+   * owner: every Space owner is told; strategy: the Strategy's
+   * creator, falling back to the owners when they cannot be named —
+   * and the fallback is said on the run (D4); inbox: no notification
+   * at all — the heartbeat reads the run's failure_detail and raises
+   * its failure_escalation instead of the plain failure. A run with
+   * no Space tells the person who triggered it.
+   */
+  const fireFailureEscalation = async (failureClass: FailureClass, policy: ResolvedFailurePolicy): Promise<void> => {
+    const target = policy.escalate;
+    if (!target || target === "inbox") return;
+    let recipients: string[] = [];
+    let fellBack = false;
+    if (target === "strategy" && run.strategy_id) {
+      const { data: st } = await admin.from("strategies").select("created_by")
+        .eq("id", run.strategy_id).maybeSingle();
+      const createdBy = (st as { created_by: string | null } | null)?.created_by ?? null;
+      if (createdBy) recipients = [createdBy];
+    }
+    if (!recipients.length) {
+      if (target === "strategy") fellBack = true;
+      if (run.activity_space_id) {
+        const { data: owners } = await admin.from("activity_space_members")
+          .select("user_id").eq("activity_space_id", run.activity_space_id).eq("role", "owner");
+        recipients = ((owners ?? []) as { user_id: string }[]).map((o) => o.user_id);
+      }
+    }
+    if (!recipients.length && run.triggered_by) recipients = [run.triggered_by];
+    if (fellBack) {
+      await addStep(admin, run.id, "status", "エスカレーションの宛先を切り替えました",
+        "Strategy のオーナーを特定できなかったため、Space のオーナーに報告します。");
+    }
+    let elementTitle: string | null = null;
+    if (run.element_id) {
+      const { data: el } = await admin.from("elements").select("title").eq("id", run.element_id).maybeSingle();
+      elementTitle = (el as { title: string } | null)?.title ?? null;
+    }
+    const title = `実行が失敗しました: ${elementTitle ?? agentName}`;
+    const body = `失敗の種類: ${failureClass}（${POLICY_LAYER_LABEL[policy.source.escalate]}の規則によるエスカレーション）。実行の記録で詳細を確認できます。`;
+    for (const recipient of [...new Set(recipients)]) {
+      await admin.from("notifications").insert({
+        recipient_id: recipient, actor_name: agentName, kind: "status_change", element_id: run.element_id,
+        title, body,
+      }).then(() => {}, () => {});
+    }
+  };
+
+  /**
+   * A failure settle's own record (B13 §6.5), written when the settle
+   * FINALIZES — the finish sealed, the refusal sealed, or the
+   * person's decision on a rested batch: the failure_detail on the
+   * run (the audit's drill-down reads it), the step a person reads
+   * in the trace, and then the escalation. A rehearsal settles
+   * nothing here: a trial's failure is reported by its report, not
+   * escalated to people (§6.6).
+   */
+  const finalizeFailureSettle = async (args: {
+    failureClass: FailureClass;
+    policy?: ResolvedFailurePolicy;
+    giveUp?: { count: number } | null;
+  }): Promise<void> => {
+    if (run.rehearsal) return;
+    const policy = args.policy ?? resolveFailurePolicy({
+      class: args.failureClass, definition: parsedAll, entries: failureEntries,
+    });
+    await sealFailureDetail(admin, run.id, failureDetailOf({
+      failureClass: args.failureClass, policy, retries: failureRetriesTotal,
+      giveUp: args.giveUp ?? null, at: new Date(),
+    }));
+    const compensateText = policy.compensate === "auto" ? "自動で巻き戻しました"
+      : policy.compensate === "never" ? "巻き戻しません" : "確認のうえで判断します";
+    await addStep(admin, run.id, "failure", `失敗の扱い: ${args.failureClass}`, [
+      `補償は${compensateText}（${POLICY_LAYER_LABEL[policy.source.compensate]}）`,
+      policy.escalate
+        ? `エスカレーション: ${ESCALATE_TARGET_LABEL[policy.escalate]}（${POLICY_LAYER_LABEL[policy.source.escalate]}）`
+        : "エスカレーション: なし",
+      `この実行の再試行: ${failureRetriesTotal} 回`,
+      ...(args.giveUp ? [`諦め: ${args.failureClass} の失敗 ${args.giveUp.count} 回で上限に達しました`] : []),
+    ].join("。") + "。");
+    await fireFailureEscalation(args.failureClass, policy);
   };
 
   /** Posts the compensation report where the failure's own report
@@ -1906,10 +2159,18 @@ async function execute(a: ExecArgs): Promise<void> {
     outcome: Extract<CompensationPassOutcome, { kind: "rest" }>,
     failure: NonNullable<SavedPending["compensation"]>["failure"],
     failureSummary: string,
+    // The failure's class and its resolved policy (B13): rested with
+    // the batch, so the decision that finalizes this settle seals
+    // the failure record and fires the escalation under exactly
+    // these — never a re-resolution at decision time.
+    settle: { failureClass: FailureClass; policy: ResolvedFailurePolicy },
   ): Promise<void> => {
     const compPending: SavedPending = {
       calls: outcome.calls, partial: [],
-      compensation: { failure, entries: outcome.entries, report: outcome.report },
+      compensation: {
+        failure, entries: outcome.entries, report: outcome.report,
+        failureClass: settle.failureClass, failurePolicy: settle.policy,
+      },
     };
     await saveTranscript(compPending);
     const display = displaysUnderMode(outcome.displays, mode);
@@ -1920,7 +2181,7 @@ async function execute(a: ExecArgs): Promise<void> {
     if (!waiting) return; // cancelled meanwhile
     const { data: action } = await admin.from("agent_actions").insert({
       run_id: run.id, element_id: run.element_id, tool_use_id: outcome.calls[0].id, tool: "batch",
-      input: { calls: outcome.calls, display, compensation: { setSize: outcome.entries.length, failureSummary } },
+      input: { calls: outcome.calls, display, compensation: { setSize: outcome.entries.length, failureSummary, failureClass: settle.failureClass, escalate: settle.policy.escalate } },
       input_hash: inputHash, summary,
       integration_id: integrationTools.get(outcome.calls[0].name)?.integration.id ?? null,
     }).select("id").single();
@@ -2236,12 +2497,18 @@ async function execute(a: ExecArgs): Promise<void> {
   // whole correction history, not just this slice's.
   const corrections: CorrectionEnvelope[] = parseCorrectionHistory(run.transcript?.corrections);
 
+  // The run's total of engine retries (B13): accumulated here as the
+  // call seam retries, carried across slices on the transcript, and
+  // read by the settle's failure record — the run's own number.
+  let failureRetriesTotal = run.transcript?.failureRetries ?? 0;
+
   const saveTranscript = async (p?: SavedPending) => {
     const transcript: Transcript = {
       messages: state.messages, turns: state.turns, nudges: state.nudges, revisions: state.revisions ?? 0, turnBudget, tools,
       ...(p ? { pending: p } : {}),
       ...(question ? { question } : {}),
       ...(corrections.length ? { corrections } : {}),
+      ...(failureRetriesTotal ? { failureRetries: failureRetriesTotal } : {}),
       ...(run.rehearsal ? {
         rehearsal: rehearsalReport,
         ...(run.transcript?.rehearsalDefinition ? { rehearsalDefinition: run.transcript.rehearsalDefinition } : {}),
@@ -2442,6 +2709,13 @@ async function execute(a: ExecArgs): Promise<void> {
       await postCompensationReport(report);
       await failRun(admin, run, standingCompensation.failure.message);
     }
+    // The decision finalizes the failure settle too (B13): its
+    // record seals and its escalation fires now — under the class
+    // and the policy the rest carried, not a re-resolution.
+    await finalizeFailureSettle({
+      failureClass: isFailureClass(standingCompensation.failureClass) ? standingCompensation.failureClass : "run_failure",
+      ...(standingCompensation.failurePolicy ? { policy: standingCompensation.failurePolicy } : {}),
+    });
     return;
   }
 
@@ -2677,6 +2951,10 @@ async function execute(a: ExecArgs): Promise<void> {
     },
     kindOf,
     breakerHold,
+    // The give-up judgement (B13): the run's failure counts against
+    // the declared caps, asked at every loop head. A plan run's calls
+    // are records, not executions, so its patience is never spent.
+    ...(planRun ? {} : { giveUp: currentGiveUp }),
     // A rehearsal never asks: its writes are blocked, not approved, so
     // nothing waits for a person mid-trial. A plan run never asks either:
     // its writes are recorded, not approved, and the plan as a whole is
@@ -2942,13 +3220,26 @@ async function execute(a: ExecArgs): Promise<void> {
       // real writes, and a plan run's finish is a plan, not a failure
       // (its apply run compensates its own failures) — neither fires.
       if ((outcome.finish.outcome !== "completed" || verdict?.result === "fail") && !run.rehearsal && !planRun) {
-        const compOutcome = await runFailureCompensation();
+        // The settle's class (B13 §2.2): a failing verdict is judged
+        // by its claims; a finish that merely fell short reads the
+        // run's own call records. The class and its policy govern
+        // the pass, and — once the settle finalizes — its record
+        // and its escalation.
+        const failureClass = await classifySettledFailure(admin, {
+          runId: run.id, path: "finish",
+          verdictResult: verdict?.result ?? null,
+          claimsStale: checkClaimsOf(outcome.finish).counts.stale,
+        });
+        const failurePolicy = resolveFailurePolicy({ class: failureClass, definition: parsedAll, entries: failureEntries });
+        const compOutcome = await runFailureCompensation(failureClass);
         if (compOutcome.kind === "rest") {
           await restCompensationBatch(compOutcome,
-            { kind: "finish", finish: outcome.finish, verdict }, outcome.finish.summary);
+            { kind: "finish", finish: outcome.finish, verdict }, outcome.finish.summary,
+            { failureClass, policy: failurePolicy });
           return;
         }
         await settleFinish(outcome.finish, verdict, compOutcome.report);
+        await finalizeFailureSettle({ failureClass, policy: failurePolicy });
         return;
       }
       await settleFinish(outcome.finish, verdict);
@@ -3105,15 +3396,44 @@ async function execute(a: ExecArgs): Promise<void> {
       // other (B9): the pass fires before the run seals failed — or
       // rests the run on the rollback batch, and the refusal settles
       // when the person decides. A rehearsal landed nothing real.
+      // Its failure class is its own (B13): model_refusal.
+      const failurePolicy = resolveFailurePolicy({ class: "model_refusal", definition: parsedAll, entries: failureEntries });
       if (!run.rehearsal) {
-        const compOutcome = await runFailureCompensation();
+        const compOutcome = await runFailureCompensation("model_refusal");
         if (compOutcome.kind === "rest") {
-          await restCompensationBatch(compOutcome, { kind: "fail", message: refusalMessage }, refusalMessage);
+          await restCompensationBatch(compOutcome, { kind: "fail", message: refusalMessage }, refusalMessage,
+            { failureClass: "model_refusal", policy: failurePolicy });
           return;
         }
         await postCompensationReport(compOutcome.report);
       }
       await failRun(admin, run, refusalMessage);
+      await finalizeFailureSettle({ failureClass: "model_refusal", policy: failurePolicy });
+      return;
+    }
+
+    case "giveup": {
+      await saveTranscript();
+      // A give-up (B13): the declared patience for this failure class
+      // ran out — a terminal failure like a refusal, settled the
+      // same way, under the class that fired it; the message names
+      // the class and the count.
+      const failureClass: FailureClass = isFailureClass(outcome.failureClass) ? outcome.failureClass : "run_failure";
+      const failurePolicy = resolveFailurePolicy({ class: failureClass, definition: parsedAll, entries: failureEntries });
+      if (!run.rehearsal) {
+        const compOutcome = await runFailureCompensation(failureClass);
+        if (compOutcome.kind === "rest") {
+          await restCompensationBatch(compOutcome, { kind: "fail", message: outcome.detail }, outcome.detail,
+            { failureClass, policy: failurePolicy });
+          return;
+        }
+        await postCompensationReport(compOutcome.report);
+      }
+      await failRun(admin, run, outcome.detail);
+      await finalizeFailureSettle({
+        failureClass, policy: failurePolicy,
+        giveUp: giveUpFired ? { count: giveUpFired.count } : null,
+      });
       return;
     }
   }
@@ -4433,16 +4753,25 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
   // ── Runs waiting: for an answer, for review, on their readings,
   //    stopped on an error, or failed ──
   const runs = await guard(
-    userDb.from("agent_runs").select("id, status, element_id, summary, proposed_readings, verdict, updated_at, finished_at")
+    userDb.from("agent_runs").select("id, status, element_id, summary, proposed_readings, verdict, failure_detail, updated_at, finished_at")
       .eq("activity_space_id", spaceId)
       .in("status", ["awaiting_input", "awaiting_review", "paused", "failed", "completed"])
       .order("updated_at", { ascending: true }).limit(60),
-    [] as { id: string; status: string; element_id: string | null; summary: string | null; proposed_readings: unknown; verdict: unknown; updated_at: string; finished_at: string | null }[],
+    [] as { id: string; status: string; element_id: string | null; summary: string | null; proposed_readings: unknown; verdict: unknown; failure_detail: unknown; updated_at: string; finished_at: string | null }[],
   );
   const runTitles = await titleOf(runs.map((r) => r.element_id));
   const exhaustedFacts: ExhaustedRunFact[] = [];
   for (const r of runs) {
     const label = (r.element_id ? runTitles.get(r.element_id) : null) ?? r.summary ?? "実行";
+    // A settled failure whose rule escalated to the Inbox (B13): the
+    // heartbeat is its delivery — raised as failure_escalation,
+    // INSTEAD of the plain run_failed for a failed run, and also for
+    // a run that sealed completed or rests in review with a failed
+    // verdict, whose failure no other signal would carry.
+    const fd = r.failure_detail && typeof r.failure_detail === "object" && !Array.isArray(r.failure_detail)
+      ? r.failure_detail as { class?: unknown; escalate?: { target?: unknown } | null } : null;
+    const inboxEscalation = fd?.escalate?.target === "inbox" && typeof fd.class === "string"
+      ? { failureClass: fd.class } : null;
     if (r.status === "awaiting_input") {
       signals.push({ kind: "run_answer", id: r.id, since: r.updated_at, version: r.updated_at, label, place: "会話で答えられます" });
     } else if (r.status === "awaiting_review") {
@@ -4450,7 +4779,14 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
     } else if (r.status === "paused") {
       signals.push({ kind: "run_paused", id: r.id, since: r.updated_at, version: r.updated_at, label, place: "Element の実行パネルで再開できます" });
     } else if (r.status === "failed") {
-      signals.push({ kind: "run_failed", id: r.id, since: r.finished_at ?? r.updated_at, label, place: "Element の実行パネルで確認できます" });
+      if (inboxEscalation) {
+        signals.push({ kind: "failure_escalation", id: r.id, since: r.finished_at ?? r.updated_at, label: `${label}: ${inboxEscalation.failureClass}`, place: "Element の実行パネルで確認できます" });
+      } else {
+        signals.push({ kind: "run_failed", id: r.id, since: r.finished_at ?? r.updated_at, label, place: "Element の実行パネルで確認できます" });
+      }
+    }
+    if (inboxEscalation && (r.status === "completed" || r.status === "awaiting_review")) {
+      signals.push({ kind: "failure_escalation", id: r.id, since: r.finished_at ?? r.updated_at, label: `${label}: ${inboxEscalation.failureClass}`, place: "Element の実行パネルで確認できます" });
     }
     const held = parseProposedReadings(r.proposed_readings)
       ?.some((p) => !p.applied && p.heldReason === "awaiting-acceptance");

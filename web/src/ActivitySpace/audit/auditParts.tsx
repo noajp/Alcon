@@ -8,6 +8,7 @@ import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
   agentRunOutcome, exceptionReason, runOutcome, templateSteps, verifyChain,
+  FAILURE_COMPENSATE_LABEL, FAILURE_ESCALATE_LABEL, FAILURE_SOURCE_LABEL,
   type AgentOutcome, type AgentRunRecord, type AuditRunEntry, type ChainBreak, type ChainStep, type DeploymentState,
   type LedgerRun, type ProposedReading, type RunOutcome, type RunVerdict, type StepResult,
   type WorkflowDeploymentRecord,
@@ -375,6 +376,36 @@ export function AgentRunPanel({ run, chainChildren, onClose }: { run: AgentRunRe
                 {run.finishDetail.unconfirmed.map((u, i) => <li key={i}>{u}</li>)}
               </ul>
             </>
+          )}
+        </div>
+      )}
+      {run.failureDetail && (
+        <div className="px-4 pb-4">
+          <p className={`${FONT.sm} flex flex-wrap items-baseline gap-x-2`}>
+            <span className="text-foreground">{t('Failure handling')}</span>
+            <span className="text-muted-foreground">{run.failureDetail.failureClass}</span>
+          </p>
+          <p className={`${FONT.sm} mt-0.5 text-muted-foreground`}>
+            {t('Compensation: {policy} (decided by {source})', {
+              policy: t(FAILURE_COMPENSATE_LABEL[run.failureDetail.compensate.policy] ?? run.failureDetail.compensate.policy),
+              source: t(FAILURE_SOURCE_LABEL[run.failureDetail.compensate.source] ?? run.failureDetail.compensate.source),
+            })}
+          </p>
+          {run.failureDetail.escalate && (
+            <p className={`${FONT.sm} mt-0.5 text-muted-foreground`}>
+              {t('Escalated to {target} (decided by {source})', {
+                target: t(FAILURE_ESCALATE_LABEL[run.failureDetail.escalate.target] ?? run.failureDetail.escalate.target),
+                source: t(FAILURE_SOURCE_LABEL[run.failureDetail.escalate.source] ?? run.failureDetail.escalate.source),
+              })}
+            </p>
+          )}
+          {(run.failureDetail.retries > 0 || run.failureDetail.giveUp) && (
+            <p className={`${FONT.sm} mt-0.5 text-muted-foreground`}>
+              {[
+                run.failureDetail.retries > 0 ? t('{n} retries', { n: run.failureDetail.retries }) : null,
+                run.failureDetail.giveUp ? t('Gave up after {n} failures of this kind', { n: run.failureDetail.giveUp.count }) : null,
+              ].filter(Boolean).join(' · ')}
+            </p>
           )}
         </div>
       )}

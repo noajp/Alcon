@@ -15,18 +15,31 @@ import { supabase } from '@/lib/supabase';
 // catalog moved.
 
 export interface CatalogDefinition { id: string; kind: 'definition'; name: string; description: string; body: string; sort: number; version: number }
+
+/** A catalog exception entry (B13): what failures it speaks to and what
+ *  happens then, carried in its payload — the reader of the contract is
+ *  AIP/harness/exceptionCatalogModel.ts. Installing one is a Space-level
+ *  act recorded in space_exception_installs, not a copy into the library. */
+export interface CatalogException { id: string; kind: 'exception'; name: string; description: string; payload: unknown; sort: number; version: number }
 export function useCatalog() {
   const query = useQuery({
     queryKey: ['catalog-items'],
     staleTime: 10 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('catalog_items').select('id, kind, name, description, body, sort, version').order('sort');
+      const { data, error } = await supabase.from('catalog_items').select('id, kind, name, description, body, payload, sort, version').order('sort');
       if (error) throw error;
-      const rows = (data ?? []) as { id: string; kind: string; name: string; description: string; body: string | null; sort: number; version: number }[];
-      return rows.filter((r) => r.kind === 'definition').map((r): CatalogDefinition => ({ id: r.id, kind: 'definition', name: r.name, description: r.description, body: r.body ?? '', sort: r.sort, version: r.version }));
+      const rows = (data ?? []) as { id: string; kind: string; name: string; description: string; body: string | null; payload: unknown; sort: number; version: number }[];
+      return {
+        definitions: rows.filter((r) => r.kind === 'definition').map((r): CatalogDefinition => ({ id: r.id, kind: 'definition', name: r.name, description: r.description, body: r.body ?? '', sort: r.sort, version: r.version })),
+        exceptions: rows.filter((r) => r.kind === 'exception').map((r): CatalogException => ({ id: r.id, kind: 'exception', name: r.name, description: r.description, payload: r.payload, sort: r.sort, version: r.version })),
+      };
     },
   });
-  return { definitions: query.data ?? [], loading: query.isPending, error: (query.error as Error | null) ?? null };
+  return {
+    definitions: query.data?.definitions ?? [],
+    exceptions: query.data?.exceptions ?? [],
+    loading: query.isPending, error: (query.error as Error | null) ?? null,
+  };
 }
 
 /** A remote MCP server from the public registry, as adding it needs. */
