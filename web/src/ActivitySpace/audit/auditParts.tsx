@@ -16,6 +16,7 @@ import {
 import { useAgentRunEvents } from '@/hooks/useAudit';
 import type { ChainChildRow } from '@/Function/audit/chainScopeModel';
 import { createPromotionDraftFromRun } from '@/AIP/harness/promotionData';
+import { DefinitionTestCaptureDialog } from './DefinitionTestCapture';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
 import { useChainLinks, useRunSteps, sha256Hex, type AuditSource } from './auditSource';
 
@@ -264,6 +265,11 @@ export function AgentRunPanel({ run, chainChildren, onClose }: { run: AgentRunRe
   // run can be pointed at — "make this standing" — and drafting opens
   // in the Harnesses screen's promotion section.
   const [promoState, setPromoState] = useState<'idle' | 'busy' | 'done' | string>('idle');
+  // Definition tests (B14 §8.1): a finished run's record can be cut
+  // into a fixture — the capture dialog is where the person confirms
+  // the exchanges and marks the volatile keys.
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captured, setCaptured] = useState(false);
   const makeStanding = async () => {
     if (!run.domain_id) return;
     setPromoState('busy');
@@ -324,6 +330,24 @@ export function AgentRunPanel({ run, chainChildren, onClose }: { run: AgentRunRe
             <p className={`${FONT.sm} mt-1 text-[var(--status-danger)]`}>{promoState}</p>
           )}
         </div>
+      )}
+      {(run.status === 'completed' || run.status === 'failed') && (
+        <div className="px-4 pb-4">
+          {captured ? (
+            <p className={`${FONT.sm} text-muted-foreground`}>{t('Recorded as a test. Run it from the harness editor.')}</p>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setCaptureOpen(true)}>
+              {t('Record as test')}
+            </Button>
+          )}
+        </div>
+      )}
+      {captureOpen && (
+        <DefinitionTestCaptureDialog
+          runId={run.id}
+          onClose={() => setCaptureOpen(false)}
+          onSaved={() => { setCaptureOpen(false); setCaptured(true); }}
+        />
       )}
       {verdict && (
         <div className="px-4 pb-4">

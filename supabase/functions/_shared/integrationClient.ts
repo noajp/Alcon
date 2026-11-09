@@ -384,6 +384,23 @@ export function httpIsRead(input: Record<string, unknown>): boolean {
   return m === "GET" || m === "HEAD";
 }
 
+/** Pure. The pseudo-action a raw http_request call stands for in a
+ *  definition test's fixture (B14 §4.2): method + path, computed
+ *  from the call's own input. One implementation, used at capture
+ *  (definitionTests.ts) and at replay dispatch (integrationTools.ts)
+ *  alike, so the two ends can never spell it differently. */
+export function httpPseudoAction(input: Record<string, unknown>): string {
+  const method = (typeof input.method === "string" ? input.method : "GET").toUpperCase();
+  const url = typeof input.url === "string" ? input.url : "";
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    path = url.split(/[?#]/)[0];
+  }
+  return `http_request:${method}:${path}`;
+}
+
 export async function callHttp(row: IntegrationRow, secret: string | null, input: Record<string, unknown>): Promise<{ text: string; isError: boolean }> {
   if (!isSafeEndpoint(row.endpoint)) throw new Error("integration endpoint is not allowed");
   const method = String(input.method ?? "GET").toUpperCase();

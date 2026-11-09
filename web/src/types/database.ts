@@ -1163,6 +1163,7 @@ export type NotificationKind =
   | 'heartbeat'
   | 'promotion'
   | 'question'
+  | 'definition_test'
 
 export interface Notification {
   id: string
@@ -1194,6 +1195,8 @@ export interface Notification {
   promotion_draft_id?: string | null
   /** The question ticket a 'question' notification is about (B12). */
   question_ticket_id?: string | null
+  /** The definition test a 'definition_test' notification is about (B14). */
+  definition_test_id?: string | null
   title: string
   body: string | null
   is_read: boolean
@@ -1225,6 +1228,34 @@ export interface QuestionTicket {
   answered_at: string | null
   expires_at: string
   created_at: string
+}
+
+/** A definition test (B14): a fixture a person cut from a real run's
+ *  record — its integration exchanges as the model saw them, each
+ *  resolved to a canonical action and hashed by its full arguments —
+ *  plus the expectation a replay must reproduce, derived once at
+ *  capture. `fixture` / `expected` / `last_result` are the jsonb
+ *  shapes the engine wrote; readers parse them defensively
+ *  (AIP/harness/definitionTestModel.ts). The last_* columns are the
+ *  latest replay's verdict, written by the engine's settle alone —
+ *  the table grants members no update at all. */
+export interface DefinitionTest {
+  id: string
+  definition_id: string
+  activity_space_id: string
+  name: string
+  fixture: unknown
+  expected: unknown
+  source_run_id: string | null
+  source_run_label: string | null
+  source_run_status: string | null
+  tainted: boolean
+  captured_by: string | null
+  captured_at: string
+  last_result: unknown
+  last_run_id: string | null
+  last_run_at: string | null
+  last_body_hash: string | null
 }
 
 // =====================================================

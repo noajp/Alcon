@@ -71,7 +71,7 @@ import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type R
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
 import {
-  adoptPlannedTools, approvalDisplayForCall, bindingOf, connectorMatches, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, integrationCallIsRead, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools,
+  adoptPlannedTools, approvalDisplayForCall, bindingOf, connectorMatches, criticalOfTool, executeIntegrationTool, integrationApprovalFacts, integrationCallIsRead, lazyBinding, manifestDenyRefusal, operationOf, planManifestTools, replayActionFor,
   type ApprovalDisplay, type IntegrationBinding, type IntegrationTool, type PlannedIntegrationTool,
 } from "../_shared/integrationTools.ts";
 import { loadToolPlans, planCacheState, planFingerprint, saveToolPlan } from "../_shared/integrationPlans.ts";
@@ -171,6 +171,12 @@ import {
   type PromotionDraftRow, type PromotionMaterialSource,
 } from "../_shared/promotionDrafts.ts";
 import { connectedConnectorNames, evaluatePromotionPackage, freezePromotionPackage, launchPromotionRehearsal, settlePromotionRehearsal } from "../_shared/promotionTest.ts";
+import {
+  DEFINITION_TEST_COLUMNS, launchDefinitionTest, parseFixture, parseTranscriptTest,
+  previewDefinitionTestCapture, ReplayTransport,
+  saveDefinitionTestCapture, settleDefinitionTest,
+  type DefinitionTestRow, type TranscriptTestState,
+} from "../_shared/definitionTests.ts";
 import { draftRounds, materializeDraft, runDraftTestRound, summarizeRound } from "../_shared/draftTest.ts";
 import { REGISTRY_URL, entriesOf } from "../_shared/connectorDirectory.ts";
 import { draftDue } from "./draft.ts";
@@ -275,6 +281,17 @@ type Transcript = {
    *  slices: the settle's failure record reports the run's own count,
    *  not one slice's. */
   failureRetries?: number;
+  /** A definition-test run's fixture reference (B14): the test row
+   *  whose fixture this run replays. The fixture body itself is NOT
+   *  carried — the server loads the row when the run executes, so a
+   *  fixture deleted mid-run ends the test honestly. */
+  testFixture?: { testId: string; definitionId: string };
+  /** A definition-test run's replay state as it accumulates (B14):
+   *  the transport's consumed seqs and divergences, restored on a
+   *  continuation so consumption survives slices; `escalation` is
+   *  where the run's failure would have escalated, resolved but
+   *  never delivered (§6.2). */
+  test?: TranscriptTestState & { escalation?: string | null };
 };
 type Run = {
   id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; promotion_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
@@ -351,6 +368,10 @@ Deno.serve(async (req: Request) => {
     decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] };
     answer?: { ticketId?: string; option?: string; text?: string };
     context?: CopilotContextLike; attachments?: Attachment[];
+    definitionTest?: {
+      action?: string; runId?: string; testId?: string; name?: string;
+      marks?: { seq: number; keys: string[] }[]; body?: string;
+    };
   };
   try { body = await req.json(); } catch { return json({ error: "invalid JSON body" }, 400); }
 
@@ -362,7 +383,7 @@ Deno.serve(async (req: Request) => {
   const jwt = authHeader.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!jwt || jwt === anonKey) return json({ error: "sign-in required" }, 401);
   const runId = body.runId;
-  if (!runId && !body.advance) return json({ error: "runId is required" }, 400);
+  if (!runId && !body.advance && !body.definitionTest) return json({ error: "runId is required" }, 400);
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const userDb = createClient(supabaseUrl, anonKey, {
@@ -388,6 +409,52 @@ Deno.serve(async (req: Request) => {
     if (!["done", "cancelled"].includes(el.status ?? "") || (await elementDelegation(userDb, el.id)) !== "auto") return json({ started: [] });
     const { started } = await advanceFrom({ admin, userDb, user: { id: user.id, email: user.email ?? null }, jwt, supabaseUrl }, el.id);
     return json({ started });
+  }
+  // Definition tests (B14): a person's capture / launch / settle
+  // actions. None of them drives the run they name — capture reads a
+  // FINISHED run's record, launch creates a new run, settle closes a
+  // finished test run out — so they stand beside advance, outside
+  // the run-drive path and its starter-only rule: membership is the
+  // shells' own check, through the caller's session (RLS).
+  if (body.definitionTest) {
+    if (!user) return json({ error: "session expired or invalid" }, 401);
+    const dt = body.definitionTest;
+    const startRun = async (id: string) => {
+      await fetch(`${supabaseUrl}/functions/v1/run-agent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ runId: id }),
+      }).catch(() => {});
+    };
+    if (dt.action === "capturePreview" && dt.runId) {
+      return json(await previewDefinitionTestCapture(admin, userDb, dt.runId));
+    }
+    if (dt.action === "captureSave" && dt.runId) {
+      const marks = new Map<number, string[]>();
+      for (const m of dt.marks ?? []) {
+        if (typeof m?.seq === "number" && Array.isArray(m.keys)) {
+          marks.set(m.seq, m.keys.filter((k): k is string => typeof k === "string"));
+        }
+      }
+      return json(await saveDefinitionTestCapture(admin, userDb, {
+        runId: dt.runId, name: typeof dt.name === "string" ? dt.name : "", marks, userId: user.id,
+      }));
+    }
+    if ((dt.action === "launch" || dt.action === "settle") && dt.testId) {
+      const { data: t } = await userDb.from("definition_tests")
+        .select(DEFINITION_TEST_COLUMNS).eq("id", dt.testId).maybeSingle();
+      if (!t) return json({ ok: false, reason: "test_not_found" });
+      // The catch-up settle (promotion's pattern): whoever drives a
+      // test action first closes out its finished run, so the result
+      // a person sees is never stale behind a tick.
+      await settleDefinitionTest(admin, t as unknown as DefinitionTestRow).catch(() => {});
+      if (dt.action === "settle") return json({ ok: true, settled: true });
+      return json(await launchDefinitionTest({
+        admin, userDb, userId: user.id, testId: dt.testId,
+        bodyOverride: typeof dt.body === "string" ? dt.body : undefined, startRun,
+      }));
+    }
+    return json({ error: "unknown definitionTest action" }, 400);
   }
   if (!runId) return json({ error: "runId is required" }, 400);
   if (!user) {
@@ -775,6 +842,28 @@ async function execute(a: ExecArgs): Promise<void> {
     }
   }
 
+  // ── Definition test replay (B14) ──────────────────────────────────
+  // A test run carries only the fixture's reference; the fixture
+  // itself is loaded here, at execution, from its row — a fixture
+  // deleted or gone unreadable since launch ends the test before it
+  // starts, rather than letting the run improvise live calls. The
+  // transport is rebuilt per slice and restored from the
+  // transcript's test block, so consumption survives continuations.
+  const testFixtureRef = run.rehearsal ? run.transcript?.testFixture : undefined;
+  let testTransport: ReplayTransport | null = null;
+  let testEscalation: string | null = run.transcript?.test?.escalation ?? null;
+  if (testFixtureRef) {
+    const { data: testRow } = await admin.from("definition_tests")
+      .select(DEFINITION_TEST_COLUMNS).eq("id", testFixtureRef.testId).maybeSingle();
+    const fixture = testRow ? parseFixture((testRow as unknown as DefinitionTestRow).fixture) : null;
+    if (!fixture) {
+      await refuse("定義テストの記録（fixture）が読めなかったため、テストを実行できません。テストを記録し直してください。");
+      return;
+    }
+    testTransport = new ReplayTransport(fixture, parseTranscriptTest(run.transcript?.test));
+  }
+  const isTestRun = testTransport !== null;
+
   // ── Model provider ──────────────────────────────────────────────────────
   // Anthropic with the server's key, or the Worker's model integration in
   // this run's Space with that integration's own key from Vault. The row is
@@ -914,6 +1003,24 @@ async function execute(a: ExecArgs): Promise<void> {
       const cached = cachedPlans.get(row.id);
       try {
         if (isGoogleDriveRow(row)) {
+          if (isTestRun) {
+            // A definition test (B14) never resolves a real binding:
+            // Drive's tools are offered unbound — the assembly attach
+            // below replaces every tool with the replay transport and
+            // a refusing bind — so no Vault read, no credential-use
+            // record and no sign-in ask can come out of a test run.
+            for (const t of DRIVE_TOOLS) {
+              if (integrationDefs.length >= MAX_TOOLS) break;
+              const name = uniqueToolName(`${prefix}${INTEGRATION_SEPARATOR}${t.name}`, integrationTools);
+              integrationTools.set(name, {
+                integration: row, secret: null, session: null, drive: true,
+                remote: { name: t.name, description: t.description, inputSchema: t.input_schema, readOnly: t.readOnly },
+              });
+              integrationDefs.push({ name, description: `[${row.name}] ${t.description}`.slice(0, 1024), input_schema: t.input_schema });
+            }
+            integrationSummary.push({ name: row.name, kind: "Google Drive", delegation: row.delegation, tools: DRIVE_TOOLS.length });
+            continue;
+          }
           // Drive's typed tools stay the run's own path, bound eagerly as
           // before: they are not manifest commands, and a Drive row whose
           // token cannot be resolved is reported here, not at call time.
@@ -1068,6 +1175,26 @@ async function execute(a: ExecArgs): Promise<void> {
         element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
         content: `**接続待ち** — 定義が使うコネクタ「${missingNamed.join("」「")}」がこの Space で未接続のため、その道具なしで実行しています。接続すると次回から使えます（Settings › Customize、または Strategy の会話から接続できます）。`,
       }).then(() => {}, () => {});
+    }
+  }
+
+  // A definition test run's tools (B14 §4.1, the assembly-side second
+  // defence): every integration tool is re-pointed at the replay
+  // transport, and its binding is replaced with a named refusal — so
+  // even a path that resolved a binding outside the executor would
+  // fail loudly instead of spending a credential. The executor's own
+  // replay branch (integrationTools.ts) is the seam every dispatch
+  // actually crosses; this attach makes the run's whole toolset
+  // replay-shaped, eagerly held secrets included.
+  if (testTransport) {
+    const transport = testTransport;
+    const replayOnlyBinding = (): Promise<never> =>
+      Promise.reject(new Error("replay-only binding: a definition test run never resolves a real binding"));
+    for (const [name, it] of integrationTools) {
+      integrationTools.set(name, {
+        ...it, replay: transport, bind: replayOnlyBinding,
+        secret: undefined, session: undefined, binding: undefined,
+      });
     }
   }
 
@@ -1342,7 +1469,7 @@ async function execute(a: ExecArgs): Promise<void> {
       ],
       tool: it.command?.name ?? it.remote?.name ?? null,
     };
-    let r: { text: string; isError?: boolean; verify?: VerifyCheck; thrown?: boolean } = { text: "", isError: true, thrown: true };
+    let r: { text: string; isError?: boolean; verify?: VerifyCheck; thrown?: boolean; replayed?: boolean } = { text: "", isError: true, thrown: true };
     let lastClass: CallFailureClass | null = null;
     let attempts = 0;
     while (true) {
@@ -1368,7 +1495,11 @@ async function execute(a: ExecArgs): Promise<void> {
       // inside the executor), so a declared write counts once, as
       // itself. Best effort by construction (recordIntegrationCall
       // swallows its failures): the record is evidence, not the act.
-      if (it.command && run.activity_space_id) {
+      // A replayed answer (B14) records NOTHING here: the fixture's
+      // exchanges are another run's past, and counting them would
+      // feed the breakers, the autonomy track records and B13's
+      // classification tallies a call that never reached a service.
+      if (it.command && run.activity_space_id && !r.replayed) {
         await recordIntegrationCall(admin, {
           runId: run.id, spaceId: run.activity_space_id, integrationId: it.integration.id,
           commandName: it.command.name, isWrite: it.command.effect === "write", ok: !r.isError,
@@ -1405,8 +1536,10 @@ async function execute(a: ExecArgs): Promise<void> {
     // compensation (its id is in compensationOfCall) leaves the
     // rollback's own record instead. A payload that could not be
     // recorded is said on the run, not silenced: a write its run
-    // believes rollback-able must not quietly be otherwise.
-    if (it.command && it.command.effect === "write") {
+    // believes rollback-able must not quietly be otherwise. A
+    // replayed result (B14) records nothing either: a test run lands
+    // no writes, so its compensation set is empty by construction.
+    if (it.command && it.command.effect === "write" && !r.replayed) {
       const compOf = compensationOfCall.get(call.id);
       if (compOf) {
         await recordCompensationExecution(admin, {
@@ -1428,13 +1561,16 @@ async function execute(a: ExecArgs): Promise<void> {
         }
       }
     }
-    if (r.isError && isAuthFailure(r.text)) {
+    if (!r.replayed && r.isError && isAuthFailure(r.text)) {
       // A credential refused at call time is the connection's state,
       // not just this call's: record it on the row (assembly does the
       // same for its own refusals) and raise the capture need from
       // that fact — later calls to this connection fail the same way
       // until a person answers the card. The creator dedups, so a
-      // run full of failing calls raises one ask.
+      // run full of failing calls raises one ask. A REPLAYED auth
+      // failure (B14) is none of this: it is a recorded past fact
+      // about the source run, not the connection's current state —
+      // acting on it would raise a live password ask out of a test.
       await admin.from("integrations").update({ last_test: { ok: false, at: new Date().toISOString(), code: "auth_failed", detail: r.text.slice(0, 300) } }).eq("id", it.integration.id);
       await noteCredentialNeed(it.integration as unknown as CaptureIntegrationRow, { ok: false, code: "auth_failed" });
       if (run.activity_space_id) {
@@ -2066,7 +2202,33 @@ async function execute(a: ExecArgs): Promise<void> {
     policy?: ResolvedFailurePolicy;
     giveUp?: { count: number } | null;
   }): Promise<void> => {
-    if (run.rehearsal) return;
+    if (run.rehearsal) {
+      // A definition test run (B14 §6.2): the escalation is RESOLVED
+      // — the same policy resolution a real run would deliver on —
+      // and recorded as data on the run's test block, never
+      // delivered. A test's failure reaching the real owner would be
+      // noise; the resolution is the evidence the settle reports.
+      // The terminal paths save the transcript before this settle,
+      // so the resolution persists itself with a targeted merge.
+      if (testTransport) {
+        const resolved = args.policy ?? resolveFailurePolicy({
+          class: args.failureClass, definition: parsedAll, entries: failureEntries,
+        });
+        if (resolved.escalate) {
+          testEscalation = resolved.escalate;
+          const { data: cur } = await admin.from("agent_runs")
+            .select("transcript").eq("id", run.id).maybeSingle();
+          const stored = (cur?.transcript ?? {}) as Transcript;
+          await admin.from("agent_runs").update({
+            transcript: {
+              ...stored,
+              test: { ...testTransport.state(), ...(stored.test ?? {}), escalation: resolved.escalate },
+            },
+          }).eq("id", run.id);
+        }
+      }
+      return;
+    }
     const policy = args.policy ?? resolveFailurePolicy({
       class: args.failureClass, definition: parsedAll, entries: failureEntries,
     });
@@ -2265,6 +2427,19 @@ async function execute(a: ExecArgs): Promise<void> {
         const required = ((def?.input_schema as { required?: unknown } | undefined)?.required ?? []) as string[];
         const missing = required.filter((f) => call.input[f] === undefined || call.input[f] === null || call.input[f] === "");
         if (missing.length) problem = `${missing.join("、")} が必要です`;
+      }
+      // A definition test's planned write (B14 §4.6) must also match
+      // the fixture: a match consumes the recorded write exchange; a
+      // mismatch names the divergence in the plan's problem — the
+      // classification reads it as write_plan_invalid, and the
+      // transport's record carries it as data for the settle.
+      if (testTransport) {
+        const action = replayActionFor(it, call);
+        const matched = await testTransport.matchWrite(action, call.input);
+        if (!matched.valid) {
+          const divergence = `write-divergence: ${action}（記録された書き込みと一致しません）`;
+          problem = problem ? `${divergence} / ${problem}` : divergence;
+        }
       }
       return await plan(label, !problem, problem);
     }
@@ -2512,6 +2687,15 @@ async function execute(a: ExecArgs): Promise<void> {
       ...(run.rehearsal ? {
         rehearsal: rehearsalReport,
         ...(run.transcript?.rehearsalDefinition ? { rehearsalDefinition: run.transcript.rehearsalDefinition } : {}),
+      } : {}),
+      // A test run's replay state (B14 §6.3): consumption and
+      // divergences as the transport holds them now, the fixture
+      // reference carried so a continuation rebuilds the transport
+      // from the row, and the escalation resolution when the run's
+      // failure settled one (data only — §6.2).
+      ...(testTransport ? {
+        test: { ...testTransport.state(), ...(testEscalation ? { escalation: testEscalation } : {}) },
+        ...(run.transcript?.testFixture ? { testFixture: run.transcript.testFixture } : {}),
       } : {}),
       // The sealed plan supersedes the draft that produced it.
       ...(planRun ? (sealedPlan ? { plan: sealedPlan } : { planDraft }) : {}),
