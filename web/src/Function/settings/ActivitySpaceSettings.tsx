@@ -9,7 +9,7 @@ import { useActivitySpaces, updateActivitySpace, deleteActivitySpace } from '@/h
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { SettingsSection, SettingsRow } from './SettingsSection';
+import { SettingsIsland, SettingRow } from './SettingsControls';
 import { HeartbeatSettings } from './HeartbeatSettings';
 import { SpaceMemorySettings } from './MemorySettings';
 import { ApprovalModeSection } from '@/AIP/connectors/ApprovalModeSection';
@@ -211,9 +211,9 @@ export function ActivitySpaceSettings() {
   );
 
   return (
-    <>
-      <SettingsSection title={t('General')}>
-        <SettingsRow label={t('Logo')} className="flex items-center justify-between gap-4 py-1.5">
+    <div className="space-y-10">
+      <SettingsIsland title={t('General')}>
+        <SettingRow label={t('Logo')} desc={t('The emoji or image that stands for this Space in the sidebar.')}>
           <Popover open={logoOpen} onOpenChange={setLogoOpen}>
             <PopoverTrigger asChild>
               <button type="button" aria-label={t('Change logo')} className="block w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity">
@@ -258,8 +258,8 @@ export function ActivitySpaceSettings() {
               </div>
             </PopoverContent>
           </Popover>
-        </SettingsRow>
-        <SettingsRow label={t('Name')}>
+        </SettingRow>
+        <SettingRow label={t('Name')} desc={t('The name shown in the sidebar and in invitations for this Space.')}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -269,8 +269,8 @@ export function ActivitySpaceSettings() {
             className="w-56 px-3 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
             disabled={saving}
           />
-        </SettingsRow>
-      </SettingsSection>
+        </SettingRow>
+      </SettingsIsland>
 
       <HeartbeatSettings spaceId={active.id} isOwner={isOwner} />
 
@@ -278,65 +278,69 @@ export function ActivitySpaceSettings() {
 
       <ApprovalModeSection spaceId={active.id} isOwner={isOwner} />
 
-      <div className="mb-2 mt-6 flex items-end justify-between">
-        <div>
-          <h2 className={`${FONT.lg} text-foreground`}>{t('Members ({n})', { n: members.length })}</h2>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
-            {t('Space members can see every Workspace Domain. Invite people to a single Domain instead to add them as a Guest.')}
-          </p>
+      <div>
+        <div className="mb-2 flex items-end justify-between">
+          <div>
+            <h2 className={`${FONT.lg} text-foreground`}>{t('Members ({n})', { n: members.length })}</h2>
+            <p className="text-[12px] text-muted-foreground mt-0.5">
+              {t('Space members can see every Workspace Domain. Invite people to a single Domain instead to add them as a Guest.')}
+            </p>
+          </div>
+          {isOwner && (
+            <Button variant="ghost" onClick={() => setShowInvite(true)}>
+              <UserPlus size={12} />
+              {t('Invite to Space')}
+            </Button>
+          )}
         </div>
-        {isOwner && (
-          <Button variant="ghost" onClick={() => setShowInvite(true)}>
-            <UserPlus size={12} />
-            {t('Invite to Space')}
-          </Button>
-        )}
-      </div>
 
-      <SettingsSection title="">
-        {members.length === 0 ? (
-          <div className="py-3 text-[13px] text-muted-foreground">{t('No members yet.')}</div>
-        ) : (
-          members.map((m) => (
-            <div key={m.user_id} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
-              <WorkerAvatar
-                worker={{ name: m.display_name, avatar_url: m.avatar_url }}
-                size={32}
-                className="ring-border/70"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-foreground truncate">
-                  {m.display_name || t('Unnamed')}
-                  {m.user_id === user?.id && (
-                    <span className="ml-1.5 text-[11px] text-muted-foreground">{t('(you)')}</span>
+        <SettingsIsland>
+          <div className="px-3 py-2">
+            {members.length === 0 ? (
+              <div className="px-2 py-1 text-[13px] text-muted-foreground">{t('No members yet.')}</div>
+            ) : (
+              members.map((m) => (
+                <div key={m.user_id} className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
+                  <WorkerAvatar
+                    worker={{ name: m.display_name, avatar_url: m.avatar_url }}
+                    size={32}
+                    className="ring-border/70"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-medium text-foreground truncate">
+                      {m.display_name || t('Unnamed')}
+                      {m.user_id === user?.id && (
+                        <span className="ml-1.5 text-[11px] text-muted-foreground">{t('(you)')}</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">{t(ROLE_LABEL[m.role] ?? m.role)}</div>
+                  </div>
+                  {isOwner && m.role !== 'owner' && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMember(m)}
+                      className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
+                      title={t('Remove from Space')}
+                      aria-label={t('Remove from Space')}
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   )}
                 </div>
-                <div className="text-[11px] text-muted-foreground">{t(ROLE_LABEL[m.role] ?? m.role)}</div>
-              </div>
-              {isOwner && m.role !== 'owner' && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveMember(m)}
-                  className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
-                  title={t('Remove from Space')}
-                  aria-label={t('Remove from Space')}
-                >
-                  <Trash2 size={13} />
-                </button>
-              )}
-            </div>
-          ))
-        )}
-        <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
-      </SettingsSection>
+              ))
+            )}
+            <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
+          </div>
+        </SettingsIsland>
+      </div>
 
-      <SettingsSection title={t('Danger zone')}>
-        <SettingsRow label={t('Delete Activity space')} hint={t('Schedule this space to be permanently deleted')}>
+      <SettingsIsland title={t('Danger zone')}>
+        <SettingRow label={t('Delete Activity space')} desc={t('Schedule this space to be permanently deleted')}>
           <Button variant="danger" onClick={handleDelete}>
             {t('Delete')}
           </Button>
-        </SettingsRow>
-      </SettingsSection>
+        </SettingRow>
+      </SettingsIsland>
 
       {showInvite && (
         <InviteUserDialog
@@ -350,6 +354,6 @@ export function ActivitySpaceSettings() {
           }}
         />
       )}
-    </>
+    </div>
   );
 }

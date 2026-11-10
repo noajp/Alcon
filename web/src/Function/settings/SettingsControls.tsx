@@ -102,9 +102,10 @@ export function Switch({
  *  every choice at once is the clarity win (the dropdown stays for longer
  *  lists). Radio-group semantics: arrow keys move the selection. */
 export function SegmentedControl({
-  label, value, options, onChange,
+  label, value, options, onChange, disabled = false,
 }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   const { t } = useI18n();
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -117,7 +118,7 @@ export function SegmentedControl({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5"
+      className={`inline-flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5 ${disabled ? 'opacity-50' : ''}`}
     >
       {options.map((opt, i) => {
         const selected = opt === value;
@@ -129,6 +130,7 @@ export function SegmentedControl({
             type="button"
             role="radio"
             aria-checked={selected}
+            disabled={disabled}
             tabIndex={tabbable ? 0 : -1}
             onClick={() => onChange(opt)}
             onKeyDown={(e) => {
@@ -152,42 +154,43 @@ export function SegmentedControl({
 }
 
 export function SegmentedRow({
-  label, desc, caption, value, options, onChange,
+  label, desc, caption, value, options, onChange, disabled = false,
 }: {
   label: string; desc?: string; caption?: string; value: string; options: string[];
-  onChange: (v: string) => void;
+  onChange: (v: string) => void; disabled?: boolean;
 }) {
   return (
     <SettingRow label={label} desc={desc} caption={caption}>
-      <SegmentedControl label={label} value={value} options={options} onChange={onChange} />
+      <SegmentedControl label={label} value={value} options={options} onChange={onChange} disabled={disabled} />
     </SettingRow>
   );
 }
 
 export function SelectRow({
-  label, desc, caption, value, options, onChange,
+  label, desc, caption, value, options, onChange, disabled = false,
 }: {
   label: string; desc?: string; caption?: string; value: string; options: string[];
-  onChange: (v: string) => void;
+  onChange: (v: string) => void; disabled?: boolean;
 }) {
   return (
     <SettingRow label={label} desc={desc} caption={caption}>
-      <SelectControl value={value} options={options} onChange={onChange} />
+      <SelectControl value={value} options={options} onChange={onChange} disabled={disabled} />
     </SettingRow>
   );
 }
 
 /** The select of a settings row on its own, for rows laid out by SettingsRow. */
 export function SelectControl({
-  value, options, onChange,
-}: { value: string; options: string[]; onChange: (v: string) => void }) {
+  value, options, onChange, disabled = false,
+}: { value: string; options: string[]; onChange: (v: string) => void; disabled?: boolean }) {
   const { t } = useI18n();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors"
+          disabled={disabled}
+          className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors disabled:opacity-50 disabled:pointer-events-none"
         >
           {t(value)}
           <ChevronDown size={12} className="opacity-60" />

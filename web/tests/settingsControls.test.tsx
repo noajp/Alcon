@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '@/Function/i18n/I18nProvider';
 import {
-  SettingRow, SettingsIsland, SegmentedControl, Switch,
+  SettingRow, SettingsIsland, SegmentedControl, SelectControl, Switch,
 } from '@/Function/settings/SettingsControls';
 
 afterEach(() => { cleanup(); });
@@ -65,6 +65,20 @@ describe('SegmentedControl', () => {
     fireEvent.keyDown(screen.getByRole('radio', { name: 'Now' }), { key: 'ArrowLeft' });
     expect(onChange).toHaveBeenCalledWith('Calendar');
   });
+
+  it('disabled renders every option disabled and fires nothing', () => {
+    const onChange = vi.fn();
+    render(
+      <I18nProvider>
+        <SegmentedControl label="Default home view" value="Now" options={options} onChange={onChange} disabled />
+      </I18nProvider>,
+    );
+    for (const r of screen.getAllByRole('radio')) {
+      expect((r as HTMLButtonElement).disabled).toBe(true);
+    }
+    fireEvent.click(screen.getByRole('radio', { name: 'Calendar' }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 describe('SettingRow', () => {
@@ -97,5 +111,17 @@ describe('SettingsIsland', () => {
     );
     expect(screen.getByRole('heading', { name: 'General' })).toBeTruthy();
     expect(container.querySelector('[class*="shadow-[var(--shadow-island)]"]')).toBeTruthy();
+  });
+});
+
+describe('SelectControl', () => {
+  it('disabled renders its trigger disabled', () => {
+    render(
+      <I18nProvider>
+        <SelectControl value="Every hour" options={['Every hour', 'Every day']} onChange={vi.fn()} disabled />
+      </I18nProvider>,
+    );
+    const trigger = screen.getByRole('button', { name: /Every hour/ }) as HTMLButtonElement;
+    expect(trigger.disabled).toBe(true);
   });
 });

@@ -2,8 +2,9 @@
 
 import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
-import { FONT } from '@/shared/designTokens';
+import { ChevronDown, ChevronRight } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { SegmentedRow, SettingsIsland } from '@/Function/settings/SettingsControls';
 import { setSpaceApprovalMode, useSpaceApprovalMode } from './approvalModeData';
 import { APPROVAL_MODE_DESCRIPTIONS, APPROVAL_MODE_LABELS, APPROVAL_MODE_ORDER, approvalModeOf, type ApprovalMode } from './approvalModeModel';
 
@@ -15,12 +16,18 @@ import { APPROVAL_MODE_DESCRIPTIONS, APPROVAL_MODE_LABELS, APPROVAL_MODE_ORDER, 
  *  change it through the one RPC, which records the change; a run keeps
  *  the mode it started under, and what already waits is never approved
  *  by a change. Under Free action, what would have asked runs and is
- *  recorded as a policy approval instead. */
+ *  recorded as a policy approval instead.
+ *
+ *  Presentation (settings redesign PR3): the three modes are segments —
+ *  every choice visible at once — and the selected mode's own words sit
+ *  in the row's caption slot, where state belongs. The data layer is
+ *  untouched; only the control changed. */
 export function ApprovalModeSection({ spaceId, isOwner }: { spaceId: string; isOwner: boolean }) {
   const { t } = useI18n();
   const { mode, changes, loading, error, refetch } = useSpaceApprovalMode(spaceId);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const choose = async (next: ApprovalMode) => {
     if (!isOwner || saving || !mode || next === mode) return;
@@ -35,49 +42,63 @@ export function ApprovalModeSection({ spaceId, isOwner }: { spaceId: string; isO
     }
   };
 
+  // The caption is the row's state: what the selected mode promises,
+  // then the transient and gating facts that belong to this row.
+  const caption = mode
+    ? [
+        t(APPROVAL_MODE_DESCRIPTIONS[mode]),
+        saving ? t('Saving…') : null,
+        !isOwner ? t('Only Space owners can change the approval mode.') : null,
+      ].filter(Boolean).join(' ')
+    : undefined;
+
   return (
-    <section className="space-y-3">
-      <div>
-        <h3 className={FONT.label}>{t('Approval mode')}</h3>
-        <p className="mt-1 max-w-xl text-[12px] text-muted-foreground">
-          {t('How the AI’s writes in this Space are held, above each connection’s own permissions. A run keeps the mode it started under; changing the mode never approves what already waits.')}
-        </p>
-      </div>
+    <SettingsIsland title={t('Approval mode')}>
       {error ? (
-        <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load the approval mode: {error}", { error: error.message })}</p>
+        <p className="px-5 py-3.5 text-[12px] text-[var(--status-danger)]">{t("Couldn't load the approval mode: {error}", { error: error.message })}</p>
       ) : loading || !mode ? (
-        <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
+        <p className="px-5 py-3.5 text-[12px] text-muted-foreground">{t('Loading…')}</p>
       ) : (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <select value={mode} disabled={!isOwner || saving} onChange={(e) => void choose(e.target.value as ApprovalMode)}
-              aria-label={t('Approval mode')}
-              className="rounded border border-border/60 bg-transparent px-1 py-0.5 text-[13px] text-foreground">
-              {APPROVAL_MODE_ORDER.map((m) => <option key={m} value={m}>{t(APPROVAL_MODE_LABELS[m])}</option>)}
-            </select>
-            {saving && <span className="text-[12px] text-muted-foreground">{t('Saving…')}</span>}
-          </div>
-          <p className="max-w-xl text-[12px] text-muted-foreground">{t(APPROVAL_MODE_DESCRIPTIONS[mode])}</p>
-          {!isOwner && (
-            <p className="text-[12px] text-muted-foreground">{t('Only Space owners can change the approval mode.')}</p>
-          )}
+        <>
+          <SegmentedRow
+            label={t('Approval mode')}
+            desc={t('How the AI’s writes in this Space are held, above each connection’s own permissions. A run keeps the mode it started under; changing the mode never approves what already waits.')}
+            caption={caption}
+            value={APPROVAL_MODE_LABELS[mode]}
+            options={APPROVAL_MODE_ORDER.map((m) => APPROVAL_MODE_LABELS[m])}
+            onChange={(label) => {
+              const next = APPROVAL_MODE_ORDER.find((m) => APPROVAL_MODE_LABELS[m] === label);
+              if (next) void choose(next);
+            }}
+            disabled={!isOwner || saving}
+          />
           {saveError && (
-            <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't change the approval mode: {error}", { error: saveError })}</p>
+            <p role="alert" className="px-5 py-3 text-[12px] text-[var(--status-danger)]">{t("Couldn't change the approval mode: {error}", { error: saveError })}</p>
           )}
-        </div>
+        </>
       )}
       {changes.length > 0 && (
-        <div>
-          <h4 className={FONT.label}>{t('Approval mode history')}</h4>
-          <ul className="mt-1 space-y-1">
-            {changes.slice(0, 5).map((c) => (
-              <li key={c.id} className="text-[12px] text-muted-foreground">
-                {new Date(c.created_at).toLocaleString()} — {t(APPROVAL_MODE_LABELS[approvalModeOf(c.from_mode)])} → {t(APPROVAL_MODE_LABELS[approvalModeOf(c.to_mode)])}
-              </li>
-            ))}
-          </ul>
+        <div className="px-5 py-3.5">
+          <button
+            type="button"
+            aria-expanded={historyOpen}
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-[13px] font-medium text-foreground"
+          >
+            {historyOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {t('Approval mode history')}
+          </button>
+          {historyOpen && (
+            <ul className="mt-2 space-y-1">
+              {changes.slice(0, 5).map((c) => (
+                <li key={c.id} className="text-[12px] text-muted-foreground">
+                  {new Date(c.created_at).toLocaleString()} — {t(APPROVAL_MODE_LABELS[approvalModeOf(c.from_mode)])} → {t(APPROVAL_MODE_LABELS[approvalModeOf(c.to_mode)])}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
-    </section>
+    </SettingsIsland>
   );
 }

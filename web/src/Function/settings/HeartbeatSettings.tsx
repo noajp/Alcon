@@ -4,7 +4,7 @@ import { formatError } from '@/Function/shared/formatError';
 import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { SettingsSection, SettingsRow } from './SettingsSection';
+import { SelectControl, SettingRow, SettingsIsland, ToggleRow } from './SettingsControls';
 import { setSpaceHeartbeat, useHeartbeatSteps, wakeHeartbeatNow, useSpaceHeartbeat } from '@/hooks/heartbeatData';
 import {
   HEARTBEAT_CADENCES, HEARTBEAT_TIMEZONES, tickState, type HeartbeatSettings as Settings,
@@ -15,6 +15,12 @@ import {
 // saying. Changing it is an owner's act (the RPC names the caller as
 // the wake's actor); members read the settings and the wake history —
 // the record is the Space's, the notification is the owner's.
+//
+// Presentation (settings redesign PR3): one island of SettingRows — the
+// enabled checkbox is the shared Switch, cadence and timezone ride the
+// shared SelectControl, and the loose state paragraphs (spent-vs-cap,
+// the tick's health, the owner gate) live in the caption slots of the
+// rows they describe. Save semantics are unchanged.
 export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwner: boolean }) {
   const { t, locale } = useI18n();
   const { settings, wakes, monthSpent, loading, error, refetch } = useSpaceHeartbeat(spaceId);
@@ -30,9 +36,9 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
 
   if (loading || !settings) {
     return (
-      <SettingsSection title={t('Heartbeat')}>
-        <p className="py-2 text-[12px] text-muted-foreground">{error ? t("Couldn't load the heartbeat settings: {error}", { error: error.message }) : t('Loading…')}</p>
-      </SettingsSection>
+      <SettingsIsland title={t('Heartbeat')}>
+        <p className="px-5 py-3.5 text-[12px] text-muted-foreground">{error ? t("Couldn't load the heartbeat settings: {error}", { error: error.message }) : t('Loading…')}</p>
+      </SettingsIsland>
     );
   }
 
@@ -85,59 +91,56 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
 
   const tick = tickState(settings, new Date());
   const inputCls = 'w-24 px-2 py-1 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70 disabled:opacity-50';
-  const selectCls = 'rounded border border-border/60 bg-transparent px-1 py-0.5 text-[13px] text-foreground disabled:opacity-50';
+  const cadence = HEARTBEAT_CADENCES.find((c) => c.minutes === settings.cadenceMinutes) ?? HEARTBEAT_CADENCES[0];
+  const capReached = monthSpent >= settings.monthlyBudgetUsd;
 
   return (
-    <SettingsSection
+    <SettingsIsland
       title={t('Heartbeat')}
       description={t('Athena wakes on a cadence, looks at what has been left waiting in this Space, and speaks only when there is something worth saying. A wake never acts — it only notifies.')}
     >
-      <SettingsRow label={t('Heartbeat')}>
-        <label className="flex items-center gap-2 text-[13px] text-foreground">
-          <input
-            type="checkbox"
-            checked={settings.enabled}
-            disabled={!isOwner || saving}
-            onChange={(e) => void save({ ...settings, enabled: e.target.checked })}
-          />
-          {settings.enabled ? t('On') : t('Off')}
-          {saving && <span className="text-[12px] text-muted-foreground">{t('Saving…')}</span>}
-        </label>
-      </SettingsRow>
-      {!isOwner && <p className="text-[12px] text-muted-foreground">{t('Only Space owners can change the heartbeat.')}</p>}
-      {saveError && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{t("Couldn't save the heartbeat settings: {error}", { error: saveError })}</p>}
+      <ToggleRow
+        label={t('Heartbeat')}
+        value={settings.enabled}
+        disabled={!isOwner || saving}
+        onChange={(v) => void save({ ...settings, enabled: v })}
+        caption={!isOwner
+          ? t('Only Space owners can change the heartbeat.')
+          : saving ? t('Saving…') : undefined}
+      />
+      {saveError && <p role="alert" className="px-5 py-3 text-[12px] text-[var(--status-danger)]">{t("Couldn't save the heartbeat settings: {error}", { error: saveError })}</p>}
 
       {settings.enabled && (
         <>
-          <SettingsRow label={t('Next wake')}>
-            <div className="text-[13px] text-foreground">
+          <SettingRow
+            label={t('Next wake')}
+            caption={tick === 'arriving'
+              ? t('Scheduled checks are arriving.')
+              : t('Scheduled checks have not arrived lately. The every-minute drive may not be set up in this environment.')}
+          >
+            <span className="text-[13px] text-foreground">
               {settings.nextAt ? new Date(settings.nextAt).toLocaleString(locale) : '—'}
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
-                {tick === 'arriving'
-                  ? t('Scheduled checks are arriving.')
-                  : t('Scheduled checks have not arrived lately. The every-minute drive may not be set up in this environment.')}
-              </p>
-            </div>
-          </SettingsRow>
+            </span>
+          </SettingRow>
           {isOwner && (
-            <SettingsRow label={t('Wake now')}>
+            <SettingRow label={t('Wake now')}>
               <Button variant="secondary" disabled={waking} onClick={() => void wakeNow()}>
                 {waking ? t('Waking…') : t('Wake now')}
               </Button>
-            </SettingsRow>
+            </SettingRow>
           )}
-          <SettingsRow label={t('Cadence')}>
-            <select
-              value={settings.cadenceMinutes}
+          <SettingRow label={t('Cadence')} desc={t('How often Athena wakes to inspect what has been left waiting.')}>
+            <SelectControl
+              value={cadence.label}
+              options={HEARTBEAT_CADENCES.map((c) => c.label)}
               disabled={!isOwner || saving}
-              aria-label={t('Cadence')}
-              className={selectCls}
-              onChange={(e) => void save({ ...settings, cadenceMinutes: Number(e.target.value) })}
-            >
-              {HEARTBEAT_CADENCES.map((c) => <option key={c.minutes} value={c.minutes}>{t(c.label)}</option>)}
-            </select>
-          </SettingsRow>
-          <SettingsRow label={t('Notify threshold (hours)')} hint={t('A wait older than this is worth raising.')}>
+              onChange={(label) => {
+                const next = HEARTBEAT_CADENCES.find((c) => c.label === label);
+                if (next) void save({ ...settings, cadenceMinutes: next.minutes });
+              }}
+            />
+          </SettingRow>
+          <SettingRow label={t('Notify threshold (hours)')} desc={t('A wait older than this is worth raising.')}>
             <input
               key={settings.notifyAfterHours}
               type="number" min={1} defaultValue={settings.notifyAfterHours} disabled={!isOwner}
@@ -146,44 +149,43 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
               onBlur={(e) => saveThreshold(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
             />
-          </SettingsRow>
-          <SettingsRow label={t('Quiet hours')} hint={t('No wakes inside this window, in the Space’s timezone.')}>
+          </SettingRow>
+          <SettingRow label={t('Quiet hours')} desc={t('No wakes inside this window, in the Space’s timezone.')}>
             <div className="flex items-center gap-2">
               <input key={`qs-${settings.quietStart ?? ''}`} ref={quietStartRef} type="time" defaultValue={settings.quietStart ?? ''} disabled={!isOwner} aria-label={t('Quiet hours start')} className={inputCls}
                 onBlur={saveQuiet} />
               <span className="text-muted-foreground">–</span>
               <input key={`qe-${settings.quietEnd ?? ''}`} ref={quietEndRef} type="time" defaultValue={settings.quietEnd ?? ''} disabled={!isOwner} aria-label={t('Quiet hours end')} className={inputCls}
                 onBlur={saveQuiet} />
-              <select
-                value={settings.timezone} disabled={!isOwner || saving} aria-label={t('Timezone')} className={selectCls}
-                onChange={(e) => void save({ ...settings, timezone: e.target.value })}
-              >
-                {HEARTBEAT_TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-              </select>
-            </div>
-          </SettingsRow>
-          <SettingsRow label={t('Monthly cap (USD)')} hint={t('The heartbeat’s own ceiling inside the Space’s AI budget.')}>
-            <div className="flex items-center gap-3">
-              <input
-                key={settings.monthlyBudgetUsd}
-                type="number" min={0} step="0.5" defaultValue={settings.monthlyBudgetUsd} disabled={!isOwner}
-                aria-label={t('Monthly cap (USD)')}
-                className={inputCls}
-                onBlur={(e) => saveCap(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+              <SelectControl
+                value={settings.timezone}
+                options={[...HEARTBEAT_TIMEZONES]}
+                disabled={!isOwner || saving}
+                onChange={(tz) => void save({ ...settings, timezone: tz })}
               />
-              <span className="text-[12px] text-muted-foreground">
-                {t('Spent this month: {spent} of {cap}', { spent: `$${monthSpent.toFixed(2)}`, cap: `$${settings.monthlyBudgetUsd.toFixed(2)}` })}
-              </span>
             </div>
-          </SettingsRow>
-          {monthSpent >= settings.monthlyBudgetUsd && (
-            <p className="text-[12px] text-muted-foreground">{t('This month’s wakes are inspection only: the monthly cap is reached.')}</p>
-          )}
+          </SettingRow>
+          <SettingRow
+            label={t('Monthly cap (USD)')}
+            desc={t('The heartbeat’s own ceiling inside the Space’s AI budget.')}
+            caption={[
+              t('Spent this month: {spent} of {cap}', { spent: `$${monthSpent.toFixed(2)}`, cap: `$${settings.monthlyBudgetUsd.toFixed(2)}` }),
+              capReached ? t('This month’s wakes are inspection only: the monthly cap is reached.') : null,
+            ].filter(Boolean).join(' ')}
+          >
+            <input
+              key={settings.monthlyBudgetUsd}
+              type="number" min={0} step="0.5" defaultValue={settings.monthlyBudgetUsd} disabled={!isOwner}
+              aria-label={t('Monthly cap (USD)')}
+              className={inputCls}
+              onBlur={(e) => saveCap(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+            />
+          </SettingRow>
         </>
       )}
 
-      <div className="pt-2">
+      <div className="px-5 py-3.5">
         <h4 className="text-[12px] font-medium text-foreground">{t('Wake history')}</h4>
         {wakes.length === 0 ? (
           <p className="mt-1 text-[12px] text-muted-foreground">{t('No wakes yet.')}</p>
@@ -209,7 +211,7 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
           </ul>
         )}
       </div>
-    </SettingsSection>
+    </SettingsIsland>
   );
 }
 
