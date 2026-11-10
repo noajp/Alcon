@@ -14,7 +14,7 @@ import type { CodeChange, CodeChangeComment, CodeChangeReview, Json } from '@/ty
 // Verdicts and line comments are written by their author, then posted to the
 // pull request.
 
-const CHANGE_COLUMNS = 'id, element_id, activity_space_id, provider, repo, number, url, title, body, state, base_ref, head_ref, head_sha, author_login, additions, deletions, changed_files, intent_check, guide, linked_via, run_id, linked_by, synced_at, created_at, updated_at';
+const CHANGE_COLUMNS = 'id, element_id, activity_space_id, provider, repo, number, url, title, body, state, base_ref, head_ref, head_sha, author_login, additions, deletions, changed_files, intent_check, guide, linked_via, run_id, linked_by, synced_at, created_at, updated_at, ci_state, ci_url, ci_at, amend_rounds, amend_exhausted_at';
 
 const changesKey = (elementId: string) => ['code-changes', elementId] as const;
 const reviewsKey = (changeId: string) => ['code-change-reviews', changeId] as const;

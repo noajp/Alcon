@@ -360,16 +360,19 @@ export interface BaseFile { content: string; blobSha: string }
  * names its reason in the run's own words; a partial tree is never
  * composed as if it were the whole change.
  */
-export function composePublish(input: {
-  target: CodingTarget;
-  branch: string;
+/** The writes and deletes one change set resolves to against the
+ *  base files it names — the composition every publish shape shares
+ *  (the first publish and an iteration's amend alike, PR4): the
+ *  patch's integrity proven first, then each file applied exactly or
+ *  the whole thing refused. `noun` is the act the refusal names
+ *  (公開 for the first publish, 修正 for an amend). */
+export function resolvePublishWrites(input: {
   changeSet: ChangeSet;
   patchFiles: PatchFile[];
   baseFiles: ReadonlyMap<string, BaseFile | null>;
-  commitMessage: string;
-  prTitle: string;
-  prBody: string;
-}): { ok: true; plan: PublishPlan } | { ok: false; reason: string } {
+  noun?: string;
+}): { ok: true; writes: { path: string; content: string }[]; deletes: { path: string; sha: string }[] } | { ok: false; reason: string } {
+  const noun = input.noun ?? "公開";
   const integrity = patchIntegrity(input.changeSet, input.patchFiles);
   if (!integrity.ok) return { ok: false, reason: integrity.problems.join("。") + "。" };
   const byNewPath = new Map(input.patchFiles.map((f) => [f.newPath ?? f.oldPath ?? "", f]));
@@ -386,10 +389,10 @@ export function composePublish(input: {
     }
     const baseFile = pf.oldPath ? input.baseFiles.get(pf.oldPath) ?? null : null;
     if (!baseFile) {
-      return { ok: false, reason: `${pf.oldPath ?? cf.path} のベース内容を取得できなかったため、公開できません（ベースが動いたか、読み取りに失敗しました）` };
+      return { ok: false, reason: `${pf.oldPath ?? cf.path} のベース内容を取得できなかったため、${noun}できません（ベースが動いたか、読み取りに失敗しました）` };
     }
     if (baseFile.content.includes("\u0000")) {
-      return { ok: false, reason: `${pf.oldPath} はバイナリファイルのため、この公開では扱えません` };
+      return { ok: false, reason: `${pf.oldPath} はバイナリファイルのため、この${noun}では扱えません` };
     }
     const applied = applyPatchFile(baseFile.content, pf);
     if (!applied.ok) return applied;
@@ -410,20 +413,67 @@ export function composePublish(input: {
   deletes.sort((a, b) => a.path.localeCompare(b.path));
   const total = writes.reduce((n, w) => n + w.content.length, 0);
   if (total > MAX_PUBLISH_CONTENT_CHARS) {
-    return { ok: false, reason: `変更の合計が ${total} 文字と大きく、一度の公開に収まりません。変更を分けてください` };
+    return { ok: false, reason: `変更の合計が ${total} 文字と大きく、一度の${noun}に収まりません。変更を分けてください` };
   }
   if (!writes.length && !deletes.length) {
-    return { ok: false, reason: "公開できる内容の変更がありません（ファイルのモードのみの変更などは、内容として公開できません）" };
+    return { ok: false, reason: `${noun}できる内容の変更がありません（ファイルのモードのみの変更などは、内容として${noun}できません）` };
   }
+  return { ok: true, writes, deletes };
+}
+
+export function composePublish(input: {
+  target: CodingTarget;
+  branch: string;
+  changeSet: ChangeSet;
+  patchFiles: PatchFile[];
+  baseFiles: ReadonlyMap<string, BaseFile | null>;
+  commitMessage: string;
+  prTitle: string;
+  prBody: string;
+}): { ok: true; plan: PublishPlan } | { ok: false; reason: string } {
+  const resolved = resolvePublishWrites(input);
+  if (!resolved.ok) return resolved;
   return {
     ok: true,
     plan: {
       branch: input.branch,
-      writes, deletes,
+      writes: resolved.writes, deletes: resolved.deletes,
       commitMessage: input.commitMessage,
       pr: { title: input.prTitle, body: input.prBody, head: input.branch, base: input.target.baseBranch },
     },
   };
+}
+
+/** What an iteration's amend carries (coding capability PR4): the
+ *  same resolution as a publish — the same integrity law, the same
+ *  exact application — but no branch and no PR: the writes and
+ *  deletes land as one added commit on the PR's existing branch,
+ *  through the same manifest calls the first publish used. */
+export interface AmendPlan {
+  writes: { path: string; content: string }[];
+  deletes: { path: string; sha: string }[];
+}
+
+/**
+ * Pure. The amend plan for one follow-up finish: its patch applied
+ * to the PR head's files it names (the caller reads those at the
+ * delivered head SHA, exactly as the first publish read its base).
+ */
+export function composeAmend(input: {
+  changeSet: ChangeSet;
+  patchFiles: PatchFile[];
+  baseFiles: ReadonlyMap<string, BaseFile | null>;
+}): { ok: true; plan: AmendPlan } | { ok: false; reason: string } {
+  const resolved = resolvePublishWrites({ ...input, noun: "修正" });
+  if (!resolved.ok) return resolved;
+  return { ok: true, plan: { writes: resolved.writes, deletes: resolved.deletes } };
+}
+
+/** Pure. The amend commit's message: the work's own name, marked as
+ *  the follow-up it is. */
+export function amendCommitMessage(elementTitle: string | null, prNumber: number): string {
+  const t = (elementTitle ?? "").trim() || "コード変更";
+  return `${t}（PR #${prNumber} への修正）`.slice(0, 200);
 }
 
 /** The manifest commands the publish is composed of, in order. */

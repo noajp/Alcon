@@ -109,6 +109,22 @@ export function CodeChangeRow({ change, onOpen, onUnlink, context }: {
       <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">{change.repo.split('/')[1]}#{change.number}</span>
       <LineCounts additions={change.additions} deletions={change.deletions} />
       {check && <Pill tone={INTENT_META[check.verdict].tone}>{t(INTENT_META[check.verdict].label)}</Pill>}
+      {change.ci_state && (
+        change.ci_url ? (
+          <a
+            href={change.ci_url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => { e.stopPropagation(); }}
+            title={t('Open the CI run')}
+            className="shrink-0"
+          >
+            <Pill tone={change.ci_state === 'passed' ? 'success' : 'danger'}>{t(change.ci_state === 'passed' ? 'CI passed' : 'CI failed')}</Pill>
+          </a>
+        ) : (
+          <Pill tone={change.ci_state === 'passed' ? 'success' : 'danger'}>{t(change.ci_state === 'passed' ? 'CI passed' : 'CI failed')}</Pill>
+        )
+      )}
       <StatePill state={change.state} />
       {onUnlink && (
         <button

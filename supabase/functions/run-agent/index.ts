@@ -64,7 +64,7 @@ import {
   McpSession, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow,
 } from "../_shared/integrationClient.ts";
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
-import { fetchPull, githubTokens, pullUrlsIn, upsertCodeChange, withGithubToken } from "../_shared/github.ts";
+import { fetchPull, githubTokens, pullUrlsIn, upsertCodeChange, withGithubToken, type GithubPull, type PullRef } from "../_shared/github.ts";
 import { DRIVE_TOOLS } from "../_shared/googleDrive.ts";
 import { RECORD_TOOLS } from "./records.ts";
 import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type RecordScope } from "./recordStore.ts";
@@ -133,11 +133,12 @@ import {
   parseDeliveryDetail, patchArtifactTitle, resolveCodingTarget, targetRefusalText, testEvidenceOf,
   type ChangeSet, type CodingTarget, type ShellCallRecord, type TestEvidence,
 } from "../_shared/codingLoop.ts";
-import { deliverTreeToWorkspace, fetchBaseSha, fetchRepoFileAtSha } from "../_shared/codingDelivery.ts";
+import { deliverTreeAtShaToWorkspace, deliverTreeToWorkspace, fetchBaseSha, fetchRepoFileAtSha } from "../_shared/codingDelivery.ts";
 import {
-  branchNameForRun, composePublish, parsePatchFiles, publishCommandKind, publishCriticalReason, publishIsCritical,
+  amendCommitMessage, branchNameForRun, composeAmend, composePublish, parsePatchFiles, publishCommandKind, publishCriticalReason, publishIsCritical,
   pullRequestBody, pullRequestTitle, type PublishCommand,
 } from "../_shared/codingPublish.ts";
+import { parseCodingAmend, type CodingAmendBrief } from "../_shared/codingIteration.ts";
 import { pullRequestCreatedOf } from "../_shared/createdEntities.ts";
 import {
   runLoop, canonicalCalls, appendDecisionResults,
@@ -295,6 +296,12 @@ type Transcript = {
    *  copied over on approval; consumption is marked on it as covered
    *  calls execute. */
   approvedPlan?: RunPlan;
+  /** The iteration brief this run was born with (coding PR4): the
+   *  PR a dev_event routed to it, written by the tick router before
+   *  the drive and carried across slices like an approved plan — it
+   *  decides where the tree comes from (the PR's head) and where the
+   *  patch goes (an added commit on the same branch). */
+  codingAmend?: CodingAmendBrief;
   /** The run's total of engine retries (B13), accumulated across
    *  slices: the settle's failure record reports the run's own count,
    *  not one slice's. */
@@ -2815,6 +2822,12 @@ async function execute(a: ExecArgs): Promise<void> {
   const planRun = run.plan_mode === true;
   const planDraft: PlanCall[] = planRun ? readPlanCalls(run.transcript?.planDraft) : [];
   const approvedPlan: RunPlan | null = !planRun ? readRunPlan(run.transcript?.approvedPlan) : null;
+  // The iteration brief (coding PR4), transcript-riding like the
+  // approved plan: parsed once here, re-spread by every save, and
+  // consulted at delivery (the tree comes from the PR's head) and
+  // at the finish (the patch goes back as an amend). A malformed
+  // brief is no brief — the run is then an ordinary coding run.
+  const codingAmendBrief: CodingAmendBrief | null = parseCodingAmend(run.transcript?.codingAmend);
   const planMatches = new Map<string, PlanCall>();
   let sealedPlan: RunPlan | null = null;
 
@@ -2927,6 +2940,7 @@ async function execute(a: ExecArgs): Promise<void> {
       // The sealed plan supersedes the draft that produced it.
       ...(planRun ? (sealedPlan ? { plan: sealedPlan } : { planDraft }) : {}),
       ...(approvedPlan ? { approvedPlan } : {}),
+      ...(codingAmendBrief ? { codingAmend: codingAmendBrief } : {}),
     };
     // jsonb refuses NUL; tool output can carry it.
     const clean = JSON.parse(JSON.stringify(transcript).replace(/\\u0000/g, ""));
@@ -3144,13 +3158,31 @@ async function execute(a: ExecArgs): Promise<void> {
   // publish's outcome said on the run and on the Element's thread:
   // the PR the batch opened (read back from the code_changes link
   // the seam wrote), the decline, or the failure that stopped it.
-  // The loop never resumes: the model is done, there is no live turn.
+  // An amend rest (PR4) settles the same way under its own words:
+  // the PR updated, the decline, or the failure. The loop never
+  // resumes: the model is done, there is no live turn.
   if (standingPublish && decisionOutcome.decided && !decisionOutcome.continued) {
     const decided = decisionOutcome.decided;
+    const amendRest = standingPublish.amend;
     if (decided.approved) {
       const prResult = decided.results.find((r) => r.tool_use_id === standingPublish.prCallId);
       const failed = decided.results.filter((r) => r.is_error).length;
-      if (prResult && !prResult.is_error) {
+      if (amendRest) {
+        // An amend has no PR call to land: the batch is the commit,
+        // and it landed whole or it did not (PR4).
+        if (failed === 0 && decided.results.length > 0) {
+          await noteAmendLanded(amendRest);
+        } else {
+          await addStep(admin, run.id, "error", "修正が完了しませんでした",
+            `承認された修正のうち ${failed} 件の呼び出しが失敗し、PR は更新されていません。パッチは成果物として残っています。`);
+          if (run.element_id) {
+            await admin.from("element_comments").insert({
+              element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+              content: "**修正が完了しませんでした** — 承認された修正の一部が失敗し、PR は更新されていません。変更パッチは実行の成果物として残っています。",
+            });
+          }
+        }
+      } else if (prResult && !prResult.is_error) {
         await notePublishLanded(prResult.content);
       } else {
         await addStep(admin, run.id, "error", "公開が完了しませんでした",
@@ -3161,6 +3193,14 @@ async function execute(a: ExecArgs): Promise<void> {
             content: "**公開が完了しませんでした** — 承認された公開の一部が失敗し、PR は開かれていません。変更パッチは実行の成果物として残っています。",
           });
         }
+      }
+    } else if (amendRest) {
+      await addStep(admin, run.id, "approval", "修正は却下されました", "PR は更新されていません。変更パッチは実行の成果物として残っています。");
+      if (run.element_id) {
+        await admin.from("element_comments").insert({
+          element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+          content: "**修正は却下されました** — PR は更新されていません。変更パッチは実行の成果物として残っています。",
+        });
       }
     } else {
       await addStep(admin, run.id, "approval", "公開は却下されました", "PR は開かれていません。変更パッチは実行の成果物として残っています。");
@@ -3395,7 +3435,10 @@ async function execute(a: ExecArgs): Promise<void> {
   // a tree (its machine calls are recorded, not run) and a plan run's
   // coding belongs to its apply run.
   const codingDecl = parsedAll?.coding ?? null;
-  let codingSession: { target: CodingTarget; baseSha: string; delivered: boolean } | null = null;
+  // A follow-up run (PR4) carries its amend brief on the session:
+  // the tree then comes from the PR's head, and the finish publishes
+  // back onto the same branch instead of opening a new PR.
+  let codingSession: { target: CodingTarget; baseSha: string; delivered: boolean; amend: CodingAmendBrief | null } | null = null;
 
   /** A server-issued shell call into the run's bound machine, on the
    *  same asset_calls queue the model's own calls travel — one path
@@ -3508,14 +3551,18 @@ async function execute(a: ExecArgs): Promise<void> {
    *  finalizes that settle instead of resuming a finished loop. */
   const restPublishBatch = async (
     calls: ToolCall[],
-    settle: { finish: FinishPayload; verdict: RunVerdict | null; prCallId: string },
+    settle: { finish: FinishPayload; verdict: RunVerdict | null; prCallId: string; amend?: { codeChangeId: string; repo: string; number: number; branch: string } },
     opts: { critical: boolean; trip: BreakerTrip | null },
   ): Promise<void> => {
     const pubPending: SavedPending = { calls, partial: [], publish: settle };
     await saveTranscript(pubPending);
     const display = displaysUnderMode(calls.map((c) => approvalDisplayFor(c)), mode);
     const trip = opts.trip;
-    const summary = trip ? trip.reason : `公開の承認待ち: ${approvalSummary(display)}`;
+    // An amend rests under its own name (PR4): the batch adds a
+    // commit to an existing PR rather than opening one, and the
+    // person judging it should read that, not "publish".
+    const amend = settle.amend;
+    const summary = trip ? trip.reason : `${amend ? "修正" : "公開"}の承認待ち: ${approvalSummary(display)}`;
     const inputHash = await sha256(canonicalCalls(calls));
     const { data: waiting } = await admin.from("agent_runs").update({ status: "awaiting_approval", summary })
       .eq("id", run.id).eq("status", "running").select("id").maybeSingle();
@@ -3526,6 +3573,7 @@ async function execute(a: ExecArgs): Promise<void> {
         calls, display,
         publish: {
           repo: codingSession?.target.repo ?? "", critical: opts.critical,
+          ...(amend ? { amend: { number: amend.number, branch: amend.branch } } : {}),
           ...(trip ? { breaker: { rule: trip.rule, target: trip.targetKey, evidence: trip.evidence } } : {}),
         },
       },
@@ -3549,16 +3597,30 @@ async function execute(a: ExecArgs): Promise<void> {
     if (run.element_id) {
       await admin.from("element_comments").insert({
         element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
-        content: `**公開の承認待ち** — ${summary}。承認すると、検証済みのパッチが GitHub 接続経由で適用され、PR が開かれます。`,
+        content: amend
+          ? `**修正の承認待ち** — ${summary}。承認すると、検証済みのパッチが GitHub 接続経由で PR ${amend.repo}#${amend.number} のブランチへ追加されます。`
+          : `**公開の承認待ち** — ${summary}。承認すると、検証済みのパッチが GitHub 接続経由で適用され、PR が開かれます。`,
       });
     }
     if (run.triggered_by) {
       await admin.from("notifications").insert({
         recipient_id: run.triggered_by, actor_name: agentName, kind: "approval_requested", element_id: run.element_id,
         agent_action_id: (action as { id: string } | null)?.id ?? null,
-        title: `${agentName} が公開の承認を求めています`, body: summary,
+        title: `${agentName} が${amend ? "修正" : "公開"}の承認を求めています`, body: summary,
       }).then(() => {}, () => {});
     }
+  };
+
+  /** The governed calls of a publish, resolved against the
+   *  connection's declared commands: a publish exists only as the
+   *  manifest declares it. Shared by the first publish and an
+   *  iteration's amend (PR4) — one resolver, one route (#7). */
+  const publishToolFor = (kind: PublishCommand) => {
+    for (const [name, it] of integrationTools) {
+      if (!isGithubRow(it.integration)) continue;
+      if (publishCommandKind(it.command) === kind) return { name, it };
+    }
+    return null;
   };
 
   /**
@@ -3641,17 +3703,10 @@ async function execute(a: ExecArgs): Promise<void> {
 
     // The governed calls, resolved against the connection's declared
     // commands: the publish exists only as the manifest declares it.
-    const toolFor = (kind: PublishCommand) => {
-      for (const [name, it] of integrationTools) {
-        if (!isGithubRow(it.integration)) continue;
-        if (publishCommandKind(it.command) === kind) return { name, it };
-      }
-      return null;
-    };
-    const branchTool = toolFor("create_branch");
-    const pushTool = plan.writes.length ? toolFor("push_files") : null;
-    const deleteTool = plan.deletes.length ? toolFor("delete_file") : null;
-    const prTool = toolFor("create_pull_request");
+    const branchTool = publishToolFor("create_branch");
+    const pushTool = plan.writes.length ? publishToolFor("push_files") : null;
+    const deleteTool = plan.deletes.length ? publishToolFor("delete_file") : null;
+    const prTool = publishToolFor("create_pull_request");
     if (!branchTool || !prTool || (plan.writes.length && !pushTool) || (plan.deletes.length && !deleteTool)) {
       return refuse("GitHub 接続の宣言に、公開に必要なコマンド（ブランチ作成・ファイルの一括反映・PR 作成）が揃っていません。接続テストでコマンドが宣言されているか確認してください");
     }
@@ -3750,6 +3805,202 @@ async function execute(a: ExecArgs): Promise<void> {
     return { kind: "landed" };
   };
 
+  /** Records an amend that landed: the code_changes row is read
+   *  back from GitHub (its head moved to the amend's commit, its
+   *  counts are the PR's new truth) and the run's step names the
+   *  update. A read-back that fails does not unland the commit —
+   *  the step then stands on the push's own result, and says so. */
+  const noteAmendLanded = async (brief: { repo: string; number: number; branch: string }): Promise<void> => {
+    const ref: PullRef = { repo: brief.repo, number: brief.number };
+    let refreshed = false;
+    if (run.element_id) {
+      try {
+        const tokens = await githubTokens(admin, run.activity_space_id).catch(() => [null] as (string | null)[]);
+        const pull = await withGithubToken(tokens, (t) => fetchPull(ref, t));
+        await upsertCodeChange(admin, run.element_id, ref, pull, { linkedBy: user.id, via: "agent", runId: run.id });
+        refreshed = true;
+      } catch (e) {
+        console.error("run-agent: amend read-back failed", errorMessage(e));
+      }
+    }
+    await addStep(admin, run.id, "pull_request", `PR を更新しました: ${brief.repo}#${brief.number}`,
+      refreshed
+        ? `検証済みのパッチを、PR のブランチ ${brief.branch} への追加コミットとして公開しました。PR の記録を読み戻して更新しています。`
+        : `検証済みのパッチを、PR のブランチ ${brief.branch} への追加コミットとして公開しました（PR の記録の読み戻しはできませんでした）。`);
+  };
+
+  /**
+   * Publishes one follow-up finish's patch as an added commit on
+   * its PR's existing branch (coding PR4). The same publish path as
+   * the first publish — the same patch-integrity composition
+   * (composeAmend shares resolvePublishWrites), the same manifest
+   * calls resolved the same way, the same judging (breaker before
+   * verdict, the critical law for a target outside the declared
+   * set), the same rest when a call must ask — with the differences
+   * the shape itself dictates: no branch is created and no PR is
+   * opened; the base the patch applies against is the PR head the
+   * tree was delivered at, and the head must not have moved since.
+   */
+  const publishCodingAmend = async (input: {
+    finish: FinishPayload; verdict: RunVerdict | null; changeSet: ChangeSet;
+  }): Promise<PublishOutcome> => {
+    const brief = codingSession?.amend ?? null;
+    if (!codingSession?.delivered || !codingDecl || !brief) return { kind: "refused" };
+    const target = codingSession.target;
+    const headSha = codingSession.baseSha;
+    // Once per run, as the first publish's guard: a step of any of
+    // these titles is the record an earlier attempt already left.
+    const { data: priorAmend } = await admin.from("agent_run_steps").select("id")
+      .eq("run_id", run.id)
+      .or("title.like.PR を更新しました:%,title.like.修正の承認待ち:%,title.like.修正を止めました:%")
+      .limit(1);
+    if (priorAmend?.length) return { kind: "landed" };
+    const refuse = async (reason: string): Promise<PublishOutcome> => {
+      await addStep(admin, run.id, "error", "修正を止めました", reason);
+      if (run.element_id) {
+        await admin.from("element_comments").insert({
+          element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+          content: `**PR は更新されていません** — ${reason}。変更パッチは実行の成果物として残っています。`,
+        });
+      }
+      return { kind: "refused" };
+    };
+    if (!run.element_id) return refuse("この実行には Element がないため、PR の紐付け先がありません");
+    if (input.changeSet.empty) return { kind: "refused" };
+
+    // The head must be where delivery left it: the patch was
+    // computed against the head's tree, and a head that moved (a
+    // person's own push, another amend) makes this patch a stranger
+    // to the branch it would land on.
+    const tokens = await githubTokens(admin, run.activity_space_id).catch(() => [null] as (string | null)[]);
+    const ref: PullRef = { repo: brief.repo, number: brief.number };
+    let pull: GithubPull;
+    try {
+      pull = await withGithubToken(tokens, (t) => fetchPull(ref, t));
+    } catch (e) {
+      return refuse(`PR の現在の状態を確認できませんでした: ${errorMessage(e)}`);
+    }
+    if (pull.state !== "open") {
+      return refuse(`PR ${brief.repo}#${brief.number} はすでに ${pull.state === "merged" ? "マージ" : "クローズ"}されているため、修正は追加しません`);
+    }
+    if (pull.head_sha !== headSha) {
+      return refuse(`PR のヘッドが、ツリーを届けた時点（${headSha.slice(0, 7)}）から ${pull.head_sha?.slice(0, 7) ?? "不明"} へ動いています。古いヘッドに対するパッチを新しいヘッドへは追加しません。実行し直してください`);
+    }
+    if (pull.head_ref !== brief.branch) {
+      return refuse(`PR のブランチが、届けた時点の ${brief.branch} から ${pull.head_ref ?? "不明"} へ変わっています`);
+    }
+    const patchFiles = parsePatchFiles(input.changeSet.patch);
+    const baseFiles = new Map<string, { content: string; blobSha: string } | null>();
+    for (const pf of patchFiles) {
+      if (!pf.oldPath || pf.kind === "add") continue;
+      const got = await fetchRepoFileAtSha(tokens, target, pf.oldPath, headSha).catch(() => null);
+      if (!got) return refuse(`${pf.oldPath} のヘッド内容を取得できませんでした`);
+      if (!got.ok) {
+        return refuse(got.code === "binary"
+          ? `${pf.oldPath} はバイナリファイルのため、この修正では扱えません`
+          : got.code === "too_large"
+            ? `${pf.oldPath} が大きすぎて読み取れず、パッチを適用できません`
+            : `${pf.oldPath} がヘッド（${headSha.slice(0, 7)}）に見つかりませんでした`);
+      }
+      baseFiles.set(pf.oldPath, { content: got.content, blobSha: got.blobSha });
+    }
+
+    const composed = composeAmend({ changeSet: input.changeSet, patchFiles, baseFiles });
+    if (!composed.ok) return refuse(composed.reason);
+    const plan = composed.plan;
+
+    const pushTool = plan.writes.length ? publishToolFor("push_files") : null;
+    const deleteTool = plan.deletes.length ? publishToolFor("delete_file") : null;
+    if ((plan.writes.length && !pushTool) || (plan.deletes.length && !deleteTool)) {
+      return refuse("GitHub 接続の宣言に、修正に必要なコマンド（ファイルの一括反映・削除）が揃っていません。接続テストでコマンドが宣言されているか確認してください");
+    }
+    const [owner, ...repoParts] = target.repo.split("/");
+    const repoName = repoParts.join("/");
+    const message = amendCommitMessage(await elementTitle(), brief.number);
+    const calls: ToolCall[] = [];
+    const addCall = (toolName: string, callInput: Record<string, unknown>) =>
+      calls.push({ id: `publish-${calls.length + 1}`, name: toolName, input: callInput });
+    if (pushTool) {
+      addCall(pushTool.name, {
+        owner, repo: repoName, branch: brief.branch, files: plan.writes, message,
+      });
+    }
+    if (deleteTool) {
+      for (const d of plan.deletes) {
+        addCall(deleteTool.name, { owner, repo: repoName, path: d.path, message, branch: brief.branch, sha: d.sha });
+      }
+    }
+    const firstCallId = calls[0].id;
+
+    // Judged exactly as the first publish is judged — the breaker
+    // before the verdict, the verdict the run's own composition,
+    // and the critical law over both.
+    const critical = publishIsCritical(codingDecl, target.repo);
+    let trip: BreakerTrip | null = null;
+    let mustRest = critical;
+    for (const call of calls) {
+      const hold = await breakerHold(call);
+      if (hold && !trip) trip = breakerTripsByCallId.get(call.id) ?? null;
+      const v = verdictForCall(call);
+      if (v.base === "deny") {
+        const it = integrationTools.get(call.name);
+        const refusal = chainDeniedCalls.has(call.id)
+          ? chainDenyRefusal(it?.integration.name ?? call.name, it ? operationOf(it, call.input) : call.name)
+          : it?.command ? manifestDenyRefusal(it.command.name) : "修正の呼び出しがポリシーで拒否されました";
+        return refuse(`修正の呼び出しが拒否されました: ${refusal}`);
+      }
+      if (v.final === "ask") mustRest = true;
+    }
+    if (trip) mustRest = true;
+    if (mustRest) {
+      await restPublishBatch(calls, {
+        finish: input.finish, verdict: input.verdict, prCallId: firstCallId,
+        amend: { codeChangeId: brief.codeChangeId, repo: brief.repo, number: brief.number, branch: brief.branch },
+      }, { critical, trip });
+      return { kind: "rested" };
+    }
+
+    const landed: string[] = [];
+    for (const call of calls) {
+      const it = integrationTools.get(call.name);
+      const v = verdictForCall(call);
+      let publishPolicyActionId: string | null = null;
+      if (v.base === "ask" && (mode === "free" || v.lift === "track-record")) {
+        const display = approvalDisplayFor(call);
+        publishPolicyActionId = await recordPolicyApproval(admin, {
+          runId: run.id, elementId: run.element_id, call, display, mode,
+          integrationId: it?.integration.id ?? null,
+          ...(v.lift === "track-record" ? { source: "track-record" as const } : {}),
+        });
+        await addStep(admin, run.id, "approval", `ポリシー承認で実行: ${approvalSummary([display])}`,
+          v.lift === "track-record"
+            ? "この修正の呼び出しは、これまで問題なく完了した実績により、承認を求めずに実行しました。記録はポリシー承認（実績）として残ります。"
+            : "Space の承認モード（自由行動）により、承認を求めずに実行しました。");
+      } else if (v.final === "allow" && liftOf(factsForCall(call)) === "delegation") {
+        liftedDisplays.push(approvalDisplayFor(call));
+      }
+      const r = await executeCall(call);
+      if (publishPolicyActionId) await settlePolicyApproval(admin, publishPolicyActionId, !r.is_error, r.verify);
+      if (r.is_error) {
+        await flushLifted();
+        const doneText = landed.length ? `すでに実行された呼び出し: ${landed.join("、")}。` : "";
+        await addStep(admin, run.id, "error", "修正が完了しませんでした",
+          `${it?.integration.name ?? ""}: ${operationOf(it, call.input)} が失敗しました: ${r.content.slice(0, 300)}。${doneText}パッチは成果物として残っています。`);
+        if (run.element_id) {
+          await admin.from("element_comments").insert({
+            element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: agentName,
+            content: `**修正が完了しませんでした** — ${operationOf(it, call.input)} が失敗しました。${doneText}変更パッチは実行の成果物として残っています。`,
+          });
+        }
+        return { kind: "failed" };
+      }
+      landed.push(operationOf(it, call.input));
+    }
+    await flushLifted();
+    await noteAmendLanded(brief);
+    return { kind: "landed" };
+  };
+
   if (codingDecl && machine && !run.rehearsal && !planRun) {
     try {
       const { data: priorSteps } = await admin.from("agent_run_steps").select("detail")
@@ -3757,7 +4008,32 @@ async function execute(a: ExecArgs): Promise<void> {
         .order("idx", { ascending: false }).limit(1);
       const prior = parseDeliveryDetail((priorSteps?.[0] as { detail?: string | null } | undefined)?.detail);
       if (prior) {
-        codingSession = { target: { repo: prior.repo, baseBranch: prior.baseBranch }, baseSha: prior.baseSha, delivered: true };
+        codingSession = { target: { repo: prior.repo, baseBranch: prior.baseBranch }, baseSha: prior.baseSha, delivered: true, amend: codingAmendBrief };
+      } else if (codingAmendBrief) {
+        // A follow-up run's delivery (PR4): the target is the brief's
+        // PR, the tree is its head's as the router recorded it — the
+        // declared set still governs (a definition changed since the
+        // PR opened narrows this run exactly as it would a first
+        // run), and the SHA is fixed, never re-resolved to wherever
+        // the branch has moved since.
+        const brief = codingAmendBrief;
+        const inSet = codingDecl.repositories.some((r) => r.toLowerCase() === brief.repo.toLowerCase());
+        if (!inSet) {
+          await addStep(admin, run.id, "error", "コードを届けられませんでした", targetRefusalText("repo_outside_set", codingDecl));
+        } else {
+          const target: CodingTarget = { repo: brief.repo, baseBranch: brief.branch };
+          const out = await deliverTreeAtShaToWorkspace({
+            admin, runId: run.id, spaceId: run.activity_space_id, target, sha: brief.headSha, runShell: runCodingShell,
+          });
+          if (out.ok) {
+            codingSession = { target, baseSha: out.baseSha, delivered: true, amend: brief };
+            await addStep(admin, run.id, "action", deliveryStepTitle(target, out.baseSha),
+              [`repo=${target.repo}`, `base=${target.baseBranch}`, `sha=${out.baseSha}`, `amend=${brief.codeChangeId}`, `pr=${brief.number}`, `event=${brief.eventKind}`, out.files != null ? `${out.files} ファイル` : ""].filter(Boolean).join("\n"));
+          } else {
+            await addStep(admin, run.id, "error", "コードを届けられませんでした",
+              `${target.repo}（${target.baseBranch}）のツリー取得に失敗しました（理由コード: ${out.code}）。${out.detail}`);
+          }
+        }
       } else {
         const texts: string[] = [];
         if (run.element_id) {
@@ -3772,7 +4048,7 @@ async function execute(a: ExecArgs): Promise<void> {
             admin, runId: run.id, spaceId: run.activity_space_id, target: resolved.target, runShell: runCodingShell,
           });
           if (out.ok) {
-            codingSession = { target: resolved.target, baseSha: out.baseSha, delivered: true };
+            codingSession = { target: resolved.target, baseSha: out.baseSha, delivered: true, amend: null };
             await addStep(admin, run.id, "action", deliveryStepTitle(resolved.target, out.baseSha),
               [`repo=${resolved.target.repo}`, `base=${resolved.target.baseBranch}`, `sha=${out.baseSha}`, out.files != null ? `${out.files} ファイル` : ""].filter(Boolean).join("\n"));
           } else {
@@ -4151,7 +4427,12 @@ async function execute(a: ExecArgs): Promise<void> {
       // result on the run; the finish seals regardless — the work
       // stands, its patch artifact remains.
       if (codingSession?.delivered && codingDecl && codingChangeSet && !codingChangeSet.empty) {
-        const pub = await publishCodingChange({ finish: outcome.finish, verdict, changeSet: codingChangeSet })
+        // A follow-up run's finish amends its PR instead (PR4): the
+        // same patch, the same governance, an added commit on the
+        // PR's branch rather than a new PR.
+        const pub = await (codingSession.amend
+          ? publishCodingAmend({ finish: outcome.finish, verdict, changeSet: codingChangeSet })
+          : publishCodingChange({ finish: outcome.finish, verdict, changeSet: codingChangeSet }))
           .catch((e) => {
             console.error("run-agent: publish failed", errorMessage(e));
             return null;
