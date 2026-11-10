@@ -32,10 +32,8 @@ const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/Domai
 const TableView = dynamic(() => import('@/ActivitySpace/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const FilesView = dynamic(() => import('@/ActivitySpace/artifacts').then(m => m.FilesView), { ssr: false, loading: viewLoading });
 const SlidesView = dynamic(() => import('@/ActivitySpace/artifacts/slides').then(m => m.SlidesView), { ssr: false, loading: viewLoading });
-const AuditView = dynamic(() => import('@/ActivitySpace/audit/AuditView').then(m => m.AuditView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/ActivitySpace/home/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/ActivitySpace/home/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
-const ReviewsView = dynamic(() => import('@/ActivitySpace/reviews/ReviewsView').then(m => m.ReviewsView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/Function/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 
 
@@ -128,12 +126,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onOpenTable={(tableId) => {
                   onNavigate({ tableId });
                   onViewChange?.('tables');
-                }}
-                onOpenRun={(runId) => {
-                  // The Audit log keys agent runs as `agent:{id}`
-                  // (AuditLog) — a bare id would open nothing.
-                  onNavigate({ audit: { view: 'log', runId: `agent:${runId}` } });
-                  onViewChange?.('audit');
                 }}
               />
             </div>
@@ -262,14 +254,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-
-          {activeActivity === 'reviews' && <ReviewsView navigation={navigation} onNavigate={onNavigate} onOpenSettings={onOpenSettings} />}
-
-          {activeActivity === 'audit' && (
-            <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <AuditView navigation={navigation} onNavigate={onNavigate} />
-            </div>
-          )}
 
           {(activeActivity === 'team' || activeActivity === 'workload') && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">

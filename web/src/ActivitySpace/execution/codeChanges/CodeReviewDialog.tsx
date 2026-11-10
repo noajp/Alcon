@@ -104,7 +104,7 @@ export function CodeReviewDialog({ change, open, onOpenChange }: { change: CodeC
 
 /** The review screen itself — in the Reviews mode's main pane, or in a
  *  dialog over an Element or a Strategy. */
-export function CodeReviewScreen({ change: given, inDialog = false }: { change: CodeChange; inDialog?: boolean }) {
+function CodeReviewScreen({ change: given, inDialog = false }: { change: CodeChange; inDialog?: boolean }) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   // What this screen learned since it opened (a new guide, a merge) stays on

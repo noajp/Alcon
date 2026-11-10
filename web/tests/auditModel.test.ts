@@ -5,8 +5,6 @@ import {
   mergeAuditTimeline, parseChainScope, parseFailureDetail, runOutcome, sealChain, summarizeDeployment, templateSteps, verifyChain,
   type AgentRunRecord, type ChainStep, type LedgerRun, type RunVerdict, type WorkflowRunRecord, type WorkflowStepRecord,
 } from '@/Function/audit/auditModel';
-import { chainChildrenOf } from '@/Function/audit/chainScopeModel';
-import { buildAuditSample } from '@/Function/audit/auditSample';
 
 const sha = async (text: string) => createHash('sha256').update(text).digest('hex');
 
@@ -172,42 +170,6 @@ describe('grants', () => {
   });
 });
 
-describe('the sample', () => {
-  const now = new Date('2026-10-27T09:00:00Z');
-  const sample = buildAuditSample(now, (m) => m);
-
-  it('shows every way a run can end, within the window', () => {
-    const outcomes = new Set(sample.runs.map(run => runOutcome(run.steps)));
-    for (const outcome of ['auto', 'approved', 'returned', 'exception', 'deviation', 'stopped', 'waiting'] as const) expect(outcomes).toContain(outcome);
-    const since = new Date(now.getTime() - 30 * 86_400_000).toISOString();
-    expect(sample.runs.every(run => run.started_at >= since && run.started_at <= now.toISOString())).toBe(true);
-  });
-
-  it('marks only what its grants leave out — the blocked attempt — as outside them', () => {
-    const outside = sample.steps.filter(s => s.outside_grant);
-    expect(outside.length).toBeGreaterThan(0);
-    expect(outside.every(s => s.result === 'blocked')).toBe(true);
-    for (const s of sample.steps.filter(x => x.operation !== 'none')) {
-      const version = sample.grants.find(v => v.deployment_id === s.deployment_id)!;
-      expect(s.grants_version).toBe(version.version);
-    }
-  });
-
-  it('seals into a chain per deployment that verifies like a real one', async () => {
-    for (const deployment of sample.deployments) {
-      const sealed = await sealChain(sample.steps.filter(s => s.deployment_id === deployment.id), sha);
-      expect(await verifyChain(sealed, sha)).toEqual([]);
-    }
-  });
-
-  it('keeps each run in step with its full steps', () => {
-    for (const run of sample.runs) {
-      const full = sample.steps.filter(s => s.run_id === run.id);
-      expect(run.steps.map(s => [s.seq, s.result])).toEqual(full.map(s => [s.seq, s.result]));
-    }
-  });
-});
-
 const verdictFixture = (result: 'pass' | 'fail' | 'unchecked'): RunVerdict => ({
   v: 1, result, source: result === 'unchecked' ? 'none' : 'verifier', model: 'claude-test', gaps: [], revisions: 0,
   checkedAt: '2026-11-07T01:00:00Z', outcome: 'completed', reason: null, evidence: { verifyStepIdx: 3, artifactIds: [] },
@@ -353,28 +315,6 @@ describe('chain scopes in the audit (B10)', () => {
       expect(scope?.actions).toEqual([]);
       expect(scope?.integrations).toEqual([]);
     }
-  });
-
-  it('chainChildrenOf lists a run\u2019s children in chain order, with their scope summaries and denial counts', () => {
-    const parent = agentRun({ id: 'ar1' });
-    const childB = agentRun({
-      id: 'ar3', created_at: '2026-11-06T03:00:00Z', elementTitle: '送信する',
-      chainScope: scopeOf({ depth: 2 }), chainIntegrationNames: ['GitHub'],
-      verdict: { v: 2, result: 'pass', source: 'verifier', model: 'm', gaps: [], revisions: 0, checkedAt: null, outcome: 'completed', reason: null, evidence: { verifyStepIdx: null, artifactIds: [] }, chain: { denied: 2 } } as RunVerdict,
-    });
-    const childA = agentRun({
-      id: 'ar2', created_at: '2026-11-06T02:00:00Z', elementTitle: '下書きを作る',
-      chainScope: scopeOf({ depth: 1 }), chainIntegrationNames: ['GitHub'],
-    });
-    const grandchild = agentRun({ id: 'ar4', chainScope: scopeOf({ parentRunId: 'ar2', depth: 2 }) });
-    const unscoped = agentRun({ id: 'ar5' });
-    const rows = chainChildrenOf([parent, childB, childA, grandchild, unscoped], 'ar1');
-    expect(rows.map(r => r.runId)).toEqual(['ar2', 'ar3']); // depth order; the grandchild belongs to ar2's panel
-    expect(rows[0]).toMatchObject({ elementTitle: '下書きを作る', depth: 1, actionCount: 1, integrationNames: ['GitHub'], denied: null });
-    expect(rows[1]).toMatchObject({ elementTitle: '送信する', depth: 2, denied: 2 });
-    // A root is not its own child.
-    const root = agentRun({ id: 'ar9', chainScope: scopeOf({ parentRunId: 'ar9', depth: 0 }) });
-    expect(chainChildrenOf([root], 'ar9')).toEqual([]);
   });
 });
 

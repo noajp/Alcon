@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { WorkflowApprovalRecord } from '@/Function/audit/auditModel';
 
-const EMPTY: never[] = [];
 const COLUMNS = 'id,activity_space_id,deployment_id,request_id,run_external_id,connector,operation,input_hash,summary,requested_at,expires_at,status,decided_by_name,decided_at,decision_note,consumed_at';
 
 /** One approval a gateway asked for (ADR 0047), the name of its workflow,
@@ -53,21 +52,4 @@ export function useWorkflowApproval(approvalId: string | null) {
     decide: mutation.mutateAsync,
     deciding: mutation.isPending,
   };
-}
-
-/** A workflow's latest approvals, newest first. */
-export function useDeploymentApprovals(deploymentId: string | null) {
-  const userId = useCurrentUserId();
-  const query = useQuery({
-    queryKey: ['workflow-approvals', userId, deploymentId],
-    queryFn: async ({ signal }) => {
-      const { data, error } = await supabase.from('workflow_approvals').select(COLUMNS)
-        .eq('deployment_id', deploymentId!).order('requested_at', { ascending: false }).limit(50).abortSignal(signal);
-      if (error) throw new Error(`Unable to read the approvals: ${error.message}`);
-      return (data ?? []) as WorkflowApprovalRecord[];
-    },
-    enabled: Boolean(userId && deploymentId),
-    staleTime: 15_000,
-  });
-  return { approvals: query.data ?? EMPTY, loading: query.isPending && Boolean(deploymentId), error: query.error };
 }

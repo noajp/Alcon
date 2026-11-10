@@ -359,46 +359,6 @@ export function readGuide(raw: unknown, filenames: readonly string[]): ReviewGui
   };
 }
 
-// ── The Reviews inbox ──────────────────────────────────────────────────────
-
-export type InboxBucket = 'review' | 'mine' | 'open' | 'done';
-
-export interface InboxChange {
-  id: string;
-  element_id: string;
-  state: 'open' | 'draft' | 'merged' | 'closed';
-  head_sha: string | null;
-  linked_by: string | null;
-}
-
-export interface InboxContext {
-  /** Elements the person owns or is assigned to (not as reviewer). */
-  myElements: ReadonlySet<string>;
-  /** Elements the person is assigned to review. */
-  reviewingElements: ReadonlySet<string>;
-  /** Elements someone is assigned to review. */
-  elementsWithReviewer: ReadonlySet<string>;
-  /** The head commits the person has given a verdict on, per change. */
-  myVerdictHeads: ReadonlyMap<string, ReadonlySet<string | null>>;
-}
-
-/**
- * Where a change sits for one person. Finished changes are done. A change of
- * theirs — they linked it, or its Element is theirs — is mine. An open change
- * waits on their review when they have no verdict on its head yet and they
- * are its Element's reviewer — or the Element has no reviewer, so anyone on
- * the team may take it. Everything else is open.
- */
-export function inboxBucket(change: InboxChange, userId: string, ctx: InboxContext): InboxBucket {
-  if (change.state === 'merged' || change.state === 'closed') return 'done';
-  if (change.linked_by === userId || ctx.myElements.has(change.element_id)) return 'mine';
-  const heads = ctx.myVerdictHeads.get(change.id);
-  const reviewedHead = !!heads && (heads.has(change.head_sha) || (!change.head_sha && heads.size > 0));
-  const mayReview = ctx.reviewingElements.has(change.element_id) || !ctx.elementsWithReviewer.has(change.element_id);
-  if (change.state === 'open' && !reviewedHead && mayReview) return 'review';
-  return 'open';
-}
-
 // ── Sending a change back to its agent ─────────────────────────────────────
 
 export interface IterateInput {

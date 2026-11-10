@@ -1,8 +1,7 @@
 /** @vitest-environment jsdom */
 // The Evaluation tab's render pins: the cold start is one honest empty
 // state (not six zeroes), rates are withheld below the model's n>=5
-// denominator threshold, the drill-down shows the verdict's own words,
-// and "Open in Audit" hands the run id to the caller's Audit route.
+// denominator threshold, and the drill-down shows the verdict's own words.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -92,7 +91,7 @@ describe('Strategy Evaluation tab', () => {
     expect(screen.getByText('1 finishes were not checked')).toBeTruthy();
   });
 
-  it('drills Object → Element → worst run: verdict gaps, claims, failure class, and Open in Audit', async () => {
+  it('drills Object → Element → worst run: verdict gaps, claims and failure class', async () => {
     const failed = outcome({ verdict_result: 'fail', human_signal: 'rework' });
     const verdict = parseRunVerdict({
       v: 2, result: 'fail', source: 'verifier', model: 'm', gaps: ['The deck has no numbers'], revisions: 1,
@@ -111,8 +110,7 @@ describe('Strategy Evaluation tab', () => {
     };
     fixture.outcomes = [failed];
     fixture.runs = [runRow];
-    const onOpenRun = vi.fn();
-    render(<StrategyEvaluationPanel objects={OBJECTS} onOpenRun={onOpenRun} />);
+    render(<StrategyEvaluationPanel objects={OBJECTS} />);
 
     fireEvent.click(screen.getByText('Alpha'));
     fireEvent.click(screen.getByText(/First Element/));
@@ -124,9 +122,6 @@ describe('Strategy Evaluation tab', () => {
     // Headline top-failure, the Object row and the run drill all name it.
     expect(screen.getAllByText(/verify_mismatch/).length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText(/the price/)).toBeTruthy();
-
-    fireEvent.click(screen.getByText('Open in Audit'));
-    expect(onOpenRun).toHaveBeenCalledWith(failed.run_id);
   });
 
   it('omits the Deliverables block when the period produced no artifacts', () => {

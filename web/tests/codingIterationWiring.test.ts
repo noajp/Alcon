@@ -14,7 +14,7 @@ const decision = readFileSync(new URL('../../supabase/functions/run-agent/decisi
 const automations = readFileSync(new URL('../../supabase/functions/automations/index.ts', import.meta.url), 'utf8');
 const iteration = readFileSync(new URL('../../supabase/functions/_shared/codingIteration.ts', import.meta.url), 'utf8');
 const delivery = readFileSync(new URL('../../supabase/functions/_shared/codingDelivery.ts', import.meta.url), 'utf8');
-const section = readFileSync(new URL('../src/ActivitySpace/reviews/CodeChangesSection.tsx', import.meta.url), 'utf8');
+const section = readFileSync(new URL('../src/ActivitySpace/execution/codeChanges/CodeChangesSection.tsx', import.meta.url), 'utf8');
 const data = readFileSync(new URL('../src/hooks/codeChangeData.ts', import.meta.url), 'utf8');
 
 describe('the tick routes the events', () => {

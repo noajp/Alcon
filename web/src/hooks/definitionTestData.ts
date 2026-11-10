@@ -88,21 +88,6 @@ async function invokeDefinitionTest<T>(payload: Record<string, unknown>): Promis
   return data as T;
 }
 
-/** The capture preview: the server derives the fixture from the
- *  run's record and returns the confirmation's material — never the
- *  fixture itself. */
-export async function previewTestCapture(runId: string): Promise<CapturePreview> {
-  return invokeDefinitionTest<CapturePreview>({ action: 'capturePreview', runId });
-}
-
-/** Saves a confirmed capture: the server re-derives everything with
- *  the person's name and volatile marks. */
-export async function saveTestCapture(args: {
-  runId: string; name: string; marks: { seq: number; keys: string[] }[];
-}): Promise<CaptureSave> {
-  return invokeDefinitionTest<CaptureSave>({ action: 'captureSave', ...args });
-}
-
 /** Launches one test run. `body` is the editor's unsaved body when
  *  the person runs the test against their edit (D6); absent, the
  *  saved body is tried. */

@@ -2,7 +2,6 @@
 
 import {
   GalleryHorizontal,
-  ShieldCheck,
   House,
   Grid2x2,
   Settings,
@@ -55,4 +54,3 @@ export const NavFilesIcon = FilesIcon;
 // AI — the conversation, as a pop-up or a screen of its own.
 export const NavAiIcon = ({ size = 20 }: { size?: number }) => <AiGraph size={size} />;
 // Audit — what an AI did, checked.
-export const NavAuditIcon = ({ size = 20 }: { size?: number }) => <ShieldCheck size={size} strokeWidth={2} />;

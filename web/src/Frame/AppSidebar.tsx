@@ -88,7 +88,7 @@ interface AppSidebarProps {
 /** How far past its least width the edge is dragged before the sidebar closes. */
 const SIDEBAR_CLOSE_PULL = 72;
 
-const SIDEBAR_TOOLS: RailMode[] = ['files', 'reviews', 'audit', 'team', 'tables'];
+const SIDEBAR_TOOLS: RailMode[] = ['files', 'team', 'tables'];
 
 // The sidebar's top is fixed (Strategy and the tools); under it, the open
 // surface's own list.

@@ -88,7 +88,7 @@ import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPick
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
-import { CodeChangesSection } from '@/ActivitySpace/reviews/CodeChangesSection';
+import { CodeChangesSection } from '@/ActivitySpace/execution/codeChanges/CodeChangesSection';
 import { ParentLine, SubElementsSection } from './SubElementsSection';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
@@ -104,7 +104,7 @@ import { FileImportActions, canImport } from './FileImportActions';
 import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/Frame/sidebar/NavIcons';
-import { CodeChangeIcon } from '@/ActivitySpace/reviews/codeChangeLabels';
+import { CodeChangeIcon } from '@/ActivitySpace/execution/codeChanges/codeChangeLabels';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';

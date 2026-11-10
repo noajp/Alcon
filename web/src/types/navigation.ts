@@ -1,4 +1,3 @@
-import type { AuditRoute } from '@/Function/audit/auditRoute';
 import type { FilesRoute } from '@/Function/files/filesRoute';
 import type { ObjectTabType } from '@/types/database';
 
@@ -12,8 +11,6 @@ export interface ElementReturn {
 }
 
 export interface NavigationState {
-  /** The Audit App's view and open deployment or run within this window tab. */
-  audit?: AuditRoute;
   /** The Files App's page and open file within this window tab. */
   files?: FilesRoute;
   /** The Table App's page when no Table is open: every Table in the Space,
@@ -60,8 +57,6 @@ export interface NavigationState {
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */
   homeSelection?: { type: 'note_folder' | 'domain'; id: string } | null;
-  /** The pull request open in the Reviews mode; null = the overview. */
-  codeChangeId?: string | null;
   documentId?: string | null;
   canvasId?: string | null;
 }

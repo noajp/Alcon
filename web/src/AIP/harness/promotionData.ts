@@ -288,18 +288,6 @@ export async function createBuilderDraft(spaceId: string, seed: {
   return made;
 }
 
-/** The run-screen door (source B): a finished run someone points at
- *  and says "make this standing". The Space comes from the run's
- *  Domain — the record the audit panel itself shows has no Space
- *  column, and the Domain is its home. */
-export async function createPromotionDraftFromRun(runId: string, domainId: string): Promise<PromotionDraft> {
-  const { data: dom, error } = await supabase.from('domains')
-    .select('activity_space_id').eq('id', domainId).maybeSingle();
-  if (error || !dom) throw new Error(error?.message ?? 'この実行の置き場が分かりませんでした');
-  const spaceId = (dom as { activity_space_id: string }).activity_space_id;
-  return createPromotionDraft({ spaceId, source: { kind: 'run', runId } });
-}
-
 export interface PromotionRun {
   id: string;
   status: string;

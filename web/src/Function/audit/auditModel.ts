@@ -90,8 +90,8 @@ export type StepEvent = Pick<WorkflowStepRecord, 'seq' | 'step_key' | 'kind' | '
 // leaves a numbered version, which the gateway is handed and its records
 // name.
 
-export const GRANT_OPERATIONS = ['read', 'draft', 'send', 'money'] as const;
-export type GrantOperation = typeof GRANT_OPERATIONS[number];
+type GrantOperationList = readonly ['read', 'draft', 'send', 'money'];
+export type GrantOperation = GrantOperationList[number];
 
 export interface DeploymentGrant {
   connector: string;
@@ -176,7 +176,7 @@ export type RunOutcome =
 const RUN_OUTCOMES: readonly RunOutcome[] = ['auto', 'approved', 'returned', 'exception', 'deviation', 'stopped', 'waiting', 'running'];
 
 /** Outcomes that ask something of a person now. */
-export const NEEDS_PERSON: ReadonlySet<RunOutcome> = new Set(['exception', 'deviation', 'stopped', 'waiting']);
+const NEEDS_PERSON: ReadonlySet<RunOutcome> = new Set(['exception', 'deviation', 'stopped', 'waiting']);
 
 /** Steps in chain order: the gateway's order, not the clock's. */
 function inChainOrder<T extends { seq: number }>(steps: readonly T[]): T[] {

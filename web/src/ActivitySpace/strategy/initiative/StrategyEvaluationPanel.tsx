@@ -27,7 +27,7 @@ import { EvaluationTrend } from './EvaluationTrend';
 // Aggregation is the pure evaluationModel's, by ELEMENT SET; this panel
 // is presentation only. The surface shows verdicts and evidence — the
 // minimum needed to judge — never raw error objects; a run's full step
-// record stays in the Audit app, reached through "Open in Audit" (#7).
+// record is on its Element.
 // The Overview's Evaluate panel (MissionEvaluatePanel) is untouched.
 // Deliverable size is labelled as size wherever it renders (character
 // counts, a "Short" flag) — never as quality, never a score (D8).
@@ -61,11 +61,9 @@ function rateValue(rate: Rate, counts: string): string {
   return pct(rate) ?? counts;
 }
 
-export function StrategyEvaluationPanel({ objects, onOpenRun }: {
+export function StrategyEvaluationPanel({ objects }: {
   /** The Strategy's Objects with their Elements (missionProps' shape). */
   objects: { id: string; name: string; elements?: { id: string; title: string; display_id?: string | null }[] }[];
-  /** Open one run in the Audit app's log (the existing route). */
-  onOpenRun?: (runId: string) => void;
 }) {
   const { t } = useI18n();
   const [period, setPeriod] = useState<EvaluationPeriod>(DEFAULT_EVALUATION_PERIOD);
@@ -206,7 +204,7 @@ export function StrategyEvaluationPanel({ objects, onOpenRun }: {
                   onToggleElement={(id) => setOpenElement(openElement === id ? null : id)}
                   openRun={openRun}
                   onToggleRun={(id) => setOpenRun(openRun === id ? null : id)}
-                  onOpenRun={onOpenRun} />
+                  />
               ))}
             </ul>
           </PageSection>
@@ -346,7 +344,7 @@ function DeliverableRow({ deliverable: d, open, onToggle }: {
   );
 }
 
-function ObjectRow({ object: o, open, onToggle, openElement, onToggleElement, openRun, onToggleRun, onOpenRun }: {
+function ObjectRow({ object: o, open, onToggle, openElement, onToggleElement, openRun, onToggleRun }: {
   object: ObjectEvaluation;
   open: boolean;
   onToggle: () => void;
@@ -354,7 +352,6 @@ function ObjectRow({ object: o, open, onToggle, openElement, onToggleElement, op
   onToggleElement: (id: string) => void;
   openRun: string | null;
   onToggleRun: (id: string) => void;
-  onOpenRun?: (runId: string) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -378,19 +375,18 @@ function ObjectRow({ object: o, open, onToggle, openElement, onToggleElement, op
         <ElementRow key={e.elementId} element={e}
           open={openElement === e.elementId}
           onToggle={() => onToggleElement(e.elementId)}
-          openRun={openRun} onToggleRun={onToggleRun} onOpenRun={onOpenRun} />
+          openRun={openRun} onToggleRun={onToggleRun} />
       ))}
     </li>
   );
 }
 
-function ElementRow({ element: e, open, onToggle, openRun, onToggleRun, onOpenRun }: {
+function ElementRow({ element: e, open, onToggle, openRun, onToggleRun }: {
   element: ElementEvaluation;
   open: boolean;
   onToggle: () => void;
   openRun: string | null;
   onToggleRun: (id: string) => void;
-  onOpenRun?: (runId: string) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -413,7 +409,7 @@ function ElementRow({ element: e, open, onToggle, openRun, onToggleRun, onOpenRu
             <WorstRunRow key={r.outcomeId} run={r}
               open={openRun === r.runId}
               onToggle={() => onToggleRun(r.runId)}
-              onOpenRun={onOpenRun} />
+              />
           ))}
         </ul>
       )}
@@ -424,11 +420,10 @@ function ElementRow({ element: e, open, onToggle, openRun, onToggleRun, onOpenRu
   );
 }
 
-function WorstRunRow({ run: r, open, onToggle, onOpenRun }: {
+function WorstRunRow({ run: r, open, onToggle }: {
   run: WorstRun;
   open: boolean;
   onToggle: () => void;
-  onOpenRun?: (runId: string) => void;
 }) {
   const { t } = useI18n();
   const verdict = r.run?.verdict;
@@ -508,12 +503,6 @@ function WorstRunRow({ run: r, open, onToggle, onOpenRun }: {
                 </div>
               ))}
             </div>
-          )}
-          {onOpenRun && (
-            <button type="button" onClick={() => onOpenRun(r.runId)}
-              className="text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground">
-              {t('Open in Audit')}
-            </button>
           )}
         </div>
       )}

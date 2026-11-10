@@ -35,7 +35,7 @@ import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
 import { setActiveSettingsSection, useActiveSettingsSection, useActiveSettingsTab } from '@/Function/settings/settingsNav';
 import { readOpenScreen, writeOpenScreen, type OpenScreen } from '@/Frame/openScreen';
 import { VIEW_REGISTRY } from '@/Frame/viewRegistry';
-import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn, takeOAuthReturnSettingsTab, takeOAuthReturnView } from '@/AIP/connectors/oauthReturn';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn, takeOAuthReturnSettingsTab } from '@/AIP/connectors/oauthReturn';
 import { finishIntegrationOAuth } from '@/AIP/connectors/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
@@ -538,20 +538,18 @@ function WorkspaceContent({
   };
   // Back from an integration sign-in (integration-oauth): drop the parameters
   // from the URL, confirm the sign-in as this person (POST /finish — nothing
-  // is stored before that) and open the screen it started from — Reviews, or
-  // Settings › AI — to show the outcome.
+  // is stored before that) and open Settings › AI to show the outcome.
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
     window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
-    const returnView = takeOAuthReturnView();
     // Settings' Back then returns to the view the app launched on. A sign-in
     // started from another Settings › AI tab (a harness install) returns there.
-    if (!returnView) setActiveSettingsSection('integrations', takeOAuthReturnSettingsTab() ?? 'external');
+    setActiveSettingsSection('integrations', takeOAuthReturnSettingsTab() ?? 'external');
     // The reload usually restored that screen already; a fresh tab opens it
     // once the sign-in is confirmed.
     void completeOAuthReturn(result, finishIntegrationOAuth).finally(() => {
-      setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: returnView ?? 'settings' } : t)));
+      setTabs(prev => prev.map(t => (t.id === activeTabId ? { ...t, activeView: 'settings' } : t)));
     });
   }, [activeTabId]);
   const handleCloseSettings = () => {

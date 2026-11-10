@@ -34,7 +34,7 @@ Alcon を、課題を解決できる道具にすること。そのために、Al
 |---|---|---|
 | **Strategy** | 何を達成し、どう勝つか | Strategy（際限なく入れ子にでき、最上位が Space の目指す姿、配下がそれを勝ち取る筋道）。Phase（期間の区切り）はナビに出さない |
 | **Execution** | 実際に行動する | Domain（活動の場）→ Object（Element をまとめる持ち場。プロジェクトに近い）→ Element（行動の最小単位） |
-| **Sustainment** | 活動を続ける道具 | Automation / Artifacts / Reviews / Audit / People / Table / Calendar |
+| **Sustainment** | 活動を続ける道具 | Artifacts / People / Table / Calendar |
 
 Strategy は目的・前提・意思決定・成功条件を持ち、担当や進捗は持たない。担当・期限・進捗・依存は Execution 側で扱う。Element は動詞（`judge` `decide` `approve` `answer` は人だけ、ほかは AI もできる）を持つ。Worker は `human | ai_agent`。外の世界のもの（顧客・候補・問い合わせ）は Object ではなく Table の行に置く。
 
@@ -57,7 +57,7 @@ cd web && npm run dispatch   # Element を Claude Code に渡す常駐（alcon �
 `web/src/` の下：
 
 - `Frame/` 外枠（ModeRail・サイドバー・CommandPalette・MainContent・`viewRegistry.ts`）
-- `ActivitySpace/` 画面。サイドバーの項目ごとに1フォルダ（`strategy` `automation` `artifacts` `reviews` `audit` `people` `table` `calendar` `execution` `home`）
+- `ActivitySpace/` 画面。サイドバーの項目ごとに1フォルダ（`strategy` `artifacts` `people` `table` `calendar` `execution` `home`）
 - `AIP/` AI の部品（`harness` `connectors` `ai`）
 - `Function/` 画面を支える仕組みと、画面をまたぐモデル（`widget` `property` `settings` `space` `shared` など）
 - `hooks/` Supabase の読み書きはすべてここ
