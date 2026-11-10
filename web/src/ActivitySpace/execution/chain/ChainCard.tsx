@@ -128,10 +128,10 @@ export function ChainLines({ element, busy, onHandOver, rounds, onOpenElement, l
  *  to another column or a pick on the Element's own view. Beside the
  *  verb, why it waits (when it waits) and only what the Status cannot
  *  say: an AI run going, waiting or failed. */
-export function ChainCard({ element, object, detail, busy = false, reason = null, rounds, latestRun, onRefresh, onOpen, onOpenElement, onHandOver, onExecute }: {
+export function ChainCard({ element, object, detail, busy = false, reason = null, rounds, latestRun, onRefresh, onOpen, onOpenElement, onHandOver, onExecute, onExecuteObject }: {
   element: FleetElement;
   /** The Object the card names; null for an Element that sits in none. */
-  object: { name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
+  object: { id?: string; name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
   detail: ElementWithDetails;
   busy?: boolean;
   reason?: WaitingReason | null;
@@ -146,9 +146,12 @@ export function ChainCard({ element, object, detail, busy = false, reason = null
   /** The card's execute rail press: the host opens its one
    *  ExecutePlanDialog for the Element (card hover-execute, PR1). */
   onExecute?: (element: ElementWithDetails) => void;
+  /** The Object chip's execute segment press: the host opens its one
+   *  ExecutePlanDialog for the Object (card hover-execute, PR2). */
+  onExecuteObject?: (objectId: string) => void;
 }) {
   return (
-    <ElementCard element={detail} onRefresh={onRefresh} object={object} onOpen={onOpen} onExecute={onExecute}
+    <ElementCard element={detail} onRefresh={onRefresh} object={object} onOpen={onOpen} onExecute={onExecute} onExecuteObject={onExecuteObject}
       badge={reason || runOnlyState(element.state, detail.status) ? (
         <span className="flex shrink-0 items-center gap-1">
           {reason && <WaitingChip reason={reason} />}

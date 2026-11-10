@@ -16,7 +16,7 @@ import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard, ChainLines } from '@/ActivitySpace/execution/chain/ChainCard';
-import { ExecutePlanDialog } from '@/ActivitySpace/execution/element/agent';
+import { ExecutePlanDialog, type ExecuteTarget, type ObjectExecuteTarget } from '@/ActivitySpace/execution/element/agent';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import { CARD_FLAT } from '@/shared/designTokens';
 import { Chip } from '@/ActivitySpace/execution/element/board/BoardColumn';
@@ -106,9 +106,10 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [aiWorkerId, setAiWorkerId] = useState('');
-  // The one Execute popup for this board (card hover-execute, PR1):
-  // a card's rail names its Element, the dialog does the rest.
-  const [executeTarget, setExecuteTarget] = useState<ElementWithDetails | null>(null);
+  // The one Execute popup for this board (card hover-execute, PR1/PR2):
+  // a card's rail names its Element, its Object chip's segment names
+  // the Object, the dialog does the rest.
+  const [executeTarget, setExecuteTarget] = useState<ExecuteTarget | null>(null);
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
   const aiWorker = aiWorkerId || aiWorkers[0]?.id || '';
@@ -283,10 +284,28 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     return columns;
   }, [fleet, details, reasonMap]);
 
+  // The Object popup's target, built at the press from what this board
+  // already reads: the Strategy's written Elements of the Object, every
+  // written Element as the blocker lookup's upstreams, the mission's
+  // edges and runs, and the same waiting map the cards' chips read.
+  // The Domain's name is this host's to know, from its Domains list.
+  const objectTargetFor = (objectId: string): ObjectExecuteTarget | null => {
+    const object = objects.find((x) => x.id === objectId);
+    if (!object) return null;
+    return {
+      id: object.id, name: object.name, icon: object.icon ?? null, color: object.color ?? null,
+      domainName: object.domain_id ? domains.find((d) => d.id === object.domain_id)?.name ?? null : null,
+      manifest: {
+        elements: ctx.elements.filter((e) => e.object_id === objectId),
+        upstreams: ctx.elements, edges: ctx.mission.edges, runs: ctx.mission.runs, waiting: reasonMap,
+      },
+    };
+  };
+
   const cardFor = (e: FleetElement, o: FleetObject, reason: WaitingReason | null = null) => (
     e.elementId && details.get(e.elementId) ? (
       <ChainCard element={e} detail={details.get(e.elementId)!}
-        object={{ name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft }}
+        object={{ id: o.objectId ?? undefined, name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft }}
         busy={busy !== null && (busy === 'all' || busy === e.elementId)}
         reason={reason}
         rounds={rounds.get(e.elementId)}
@@ -294,7 +313,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         onRefresh={ctx.refetch}
         onOpen={() => ctx.onOpenElement(e.elementId!)}
         onOpenElement={ctx.onOpenElement}
-        onExecute={(el) => setExecuteTarget(el)}
+        onExecute={(el) => setExecuteTarget({ kind: 'element', element: el })}
+        onExecuteObject={(objectId) => { const target = objectTargetFor(objectId); if (target) setExecuteTarget({ kind: 'object', object: target }); }}
         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />
     ) : (
       <DraftCard element={e} object={o} />
@@ -424,7 +444,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
           columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
           columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
-        <ExecutePlanDialog element={executeTarget} open={executeTarget !== null}
+        <ExecutePlanDialog target={executeTarget} open={executeTarget !== null}
           onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}
           onFinished={ctx.refetch} />
       </div>

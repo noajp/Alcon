@@ -123,6 +123,30 @@ describe('ElementCard — the execute rail', () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  it('the Object chip’s execute segment renders only with an Object id and onExecuteObject', () => {
+    renderCard({ object: { id: 'obj-1', name: 'Launch' } });
+    expect(screen.queryByRole('button', { name: 'Execute Object' })).toBeNull();
+    cleanup();
+    renderCard({ object: { name: 'Launch' }, onExecuteObject: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'Execute Object' })).toBeNull();
+    cleanup();
+    renderCard({ object: { id: 'obj-1', name: 'Launch' }, onExecuteObject: vi.fn() });
+    expect(screen.getByRole('button', { name: 'Execute Object' })).toBeTruthy();
+  });
+
+  it('the Object segment carries the thick arrow and its click executes the Object without opening the card', () => {
+    const onExecuteObject = vi.fn();
+    const onOpen = vi.fn();
+    renderCard({ object: { id: 'obj-1', name: 'Launch' }, onExecuteObject, onOpen });
+    const segment = screen.getByRole('button', { name: 'Execute Object' });
+    expect(segment.querySelector('svg')?.getAttribute('stroke-width')).toBe('3.2');
+    expect(segment.className).toContain('border-l');
+    fireEvent.click(segment);
+    expect(onExecuteObject).toHaveBeenCalledTimes(1);
+    expect(onExecuteObject).toHaveBeenCalledWith('obj-1');
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('the touch tab reveals on the first tap and activates on the second', () => {
     const onExecute = vi.fn();
     renderCard({ onExecute });

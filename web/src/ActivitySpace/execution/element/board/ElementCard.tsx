@@ -78,16 +78,23 @@ interface ElementCardProps {
    *  status cannot say (an AI run). */
   badge?: React.ReactNode;
   /** The Object the Element belongs to, shown as a chip under the title. */
-  object?: { name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
+  object?: { id?: string; name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
   /** Lines between the title and the footer, for what the host adds. */
   extra?: React.ReactNode;
   /** The hover-execute rail's press (card hover-execute, PR1): the host
    *  opens its ExecutePlanDialog for this Element. A host that passes
    *  nothing renders the card exactly as before — no rail, no tab. */
   onExecute?: (element: ElementWithDetails) => void;
+  /** The Object chip's execute segment press (card hover-execute, PR2):
+   *  the host opens its ExecutePlanDialog for the Object the chip
+   *  names. Rendered only when the chip's Object carries an id and the
+   *  host passes this — a pill cannot slide, so the affordance is a
+   *  trailing segment on the chip (§3.5), never a second meaning for
+   *  the chip's body. */
+  onExecuteObject?: (objectId: string) => void;
 }
 
-export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, onExecute }: ElementCardProps) {
+export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, onExecute, onExecuteObject }: ElementCardProps) {
   const { t } = useI18n();
   // Who can be assigned to THIS Element, read when the assignee menu opens;
   // the people already on it stay listed so they can be removed.
@@ -303,6 +310,23 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                   <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
                   <span className="truncate">{object.name}</span>
                   {object.isNew && <span className="shrink-0 text-muted-foreground/70">· {t('new')}</span>}
+                  {/* The Object's execute segment (PR2, §3.5): a trailing
+                      segment on the chip, apart from its body — the chip
+                      still only names the Object. It follows the rail's
+                      reveal discipline without the slide: shown while
+                      the card is armed, hovered or focused within, and
+                      always where there is no hover. */}
+                  {object.id && onExecuteObject && (
+                    <button type="button" aria-label={t('Execute Object')} title={t('Execute Object')}
+                      onPointerDown={stop}
+                      onClick={(e) => { stop(e); onExecuteObject(object.id!); }}
+                      className={cn(
+                        '-mr-0.5 ml-0.5 flex shrink-0 items-center border-l border-border/60 pl-1 transition-opacity hover:text-foreground',
+                        railRevealed ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100 [@media(hover:none)]:opacity-100',
+                      )}>
+                      <ThickArrowRight size={11} />
+                    </button>
+                  )}
                 </Chip>
               </div>
             )}
