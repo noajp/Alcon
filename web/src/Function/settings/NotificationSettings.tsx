@@ -1,6 +1,7 @@
 'use client';
 
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { Switch } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useNotificationPreferences } from './useNotificationPreferences';
 import { NOTIFICATION_KINDS, NOTIFICATION_KIND_META } from '@/Function/shared/notificationKinds';
@@ -15,30 +16,6 @@ const KIND_HINT: Partial<Record<string, string>> = {
   due_soon: "An Element you're involved with is due soon",
   invite: 'Someone invites you to a Space, Domain or Object. Invitations also wait in Settings > Profile',
 };
-
-function ToggleSwitch({
-  value, onChange, disabled, label,
-}: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!value)}
-      className={`relative inline-flex h-[18px] w-8 items-center rounded-full transition-colors disabled:opacity-50 ${
-        value ? 'bg-primary' : 'bg-muted-foreground/30'
-      }`}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-          value ? 'translate-x-[15px]' : 'translate-x-[3px]'
-        }`}
-      />
-    </button>
-  );
-}
 
 export function NotificationSettings() {
   const { t } = useI18n();
@@ -59,7 +36,7 @@ export function NotificationSettings() {
           const isEnabled = !muted.has(kind);
           return (
             <SettingsRow key={kind} label={t(meta.label)} hint={KIND_HINT[kind] ? t(KIND_HINT[kind]!) : undefined}>
-              <ToggleSwitch
+              <Switch
                 label={t(meta.label)}
                 value={isEnabled}
                 onChange={(v) => setKindMuted(kind, !v)}

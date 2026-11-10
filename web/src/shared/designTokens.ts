@@ -193,6 +193,10 @@ export const CARD_HOVER =
 /** A card without the island shadow — the install surfaces (harness and
  *  connector catalog cards, registry cards) sit flat inside Settings. */
 export const CARD_FLAT = 'rounded-lg bg-[var(--surface-rail)] border border-border/60';
+/** A settings property island: the #803 Chain-card float, for a group of
+ *  setting rows floating on the page ground (--surface-bg). */
+export const SETTINGS_ISLAND =
+  'rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-island)]';
 /** Shared geometry for Object and Element quick creation. */
 export const QUICK_CREATE = {
   panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-lg bg-popover/95 backdrop-blur-md border border-border p-4',

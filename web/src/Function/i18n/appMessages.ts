@@ -1063,6 +1063,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Contents are not searchable yet': ['中身はまだ検索できません', '아직 내용을 검색할 수 없습니다', 'Le contenu n’est pas encore interrogeable', 'El contenido aún no se puede buscar'],
   'No readable text in this file': ['このファイルには読み取れる文字が入っていません', '이 파일에는 읽을 수 있는 텍스트가 없습니다', 'Aucun texte lisible dans ce fichier', 'Este archivo no tiene texto legible'],
   'Too large to search its contents': ['大きすぎて中身を検索できません', '너무 커서 내용을 검색할 수 없습니다', 'Trop volumineux pour en rechercher le contenu', 'Demasiado grande para buscar en su contenido'],
+  'Language, appearance, and defaults for how Alcon works for you.': ['言語や見た目、あなたに合わせた Alcon の既定の動きを設定します。', '언어, 모양, 회원님에게 맞는 Alcon의 기본 동작을 설정합니다.', 'Langue, apparence et comportement par défaut d’Alcon pour vous.', 'Idioma, apariencia y comportamiento predeterminado de Alcon para ti.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));
