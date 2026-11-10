@@ -26,6 +26,9 @@ interface TabBarProps {
    *  pass a subset to hide entries (e.g. Overview / Resource) their
    *  addTab handler would silently ignore. */
   createOptions?: ObjectTabType[];
+  /** The "+" menu's name for a type, when the host names it its own way
+   *  (the list is Objects on a Domain, Elements on an Object). */
+  createTitle?: (type: ObjectTabType) => string;
 }
 
 // Single source of truth for ObjectTabType display metadata — the tab icon
@@ -49,13 +52,14 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   flow:        { title: 'Board',      Icon: Columns3 },
 };
 
-// Order of the "+" create-tab menu. 'summary'/'elements' are structural
-// (auto-created, not user-addable); 'resource' is People ('workers') now;
+// Order of the "+" create-tab menu. 'summary' is structural (auto-created,
+// not user-addable); 'elements' is the list (Objects on a Domain, Elements
+// on an Object); 'resource' is People ('workers') now;
 // 'note' is omitted because its UX flow
 // (open NotePicker → persist note_id → render embed) isn't wired here yet —
 // the type stays in the union for the Element detail's Note link.
 const CREATE_TAB_ORDER: ObjectTabType[] = [
-  'overview', 'flow', 'gantt', 'calendar', 'workers', 'custom_view',
+  'overview', 'elements', 'flow', 'gantt', 'calendar', 'workers', 'custom_view',
 ];
 
 interface ContextMenu {
@@ -65,12 +69,13 @@ interface ContextMenu {
   y: number;
 }
 
-export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions, onTabReorder }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions, createTitle, onTabReorder }: TabBarProps) {
   const { t } = useI18n();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  // A tab already in the strip is not offered again.
   const visibleCreateOptions = (createOptions
     ? CREATE_TAB_ORDER.filter((t) => createOptions.includes(t))
-    : CREATE_TAB_ORDER);
+    : CREATE_TAB_ORDER).filter((type) => !tabs.some((tab) => tab.tab_type === type));
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -136,7 +141,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
           </SortableContext>
         </DndContext>
         )}
-        trailing={(
+        trailing={visibleCreateOptions.length === 0 ? undefined : (
         <div className="relative flex items-center flex-shrink-0">
           <ButtonAppearanceProvider appearance="navigation">
             <Button
@@ -165,7 +170,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                       className="w-full flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm text-foreground hover:bg-accent transition-colors"
                     >
                       <span className="text-muted-foreground"><OptionIcon size={16} /></span>
-                      {t(meta.title)}
+                      {t(createTitle?.(type) ?? meta.title)}
                     </button>
                   );
                 })}

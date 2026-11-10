@@ -68,7 +68,7 @@ const OBJECT_TAB_PREFIX = 'domain:objectActiveTabType:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
 // A Domain always has its Overview, its Flow and its People; other views are added.
-const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'flow', 'gantt', 'workers'];
+const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'workers'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
@@ -126,11 +126,11 @@ function withObjectBoardOnce(objectId: string, types: ObjectTabType[]): ObjectTa
   }
 }
 
-/** The Domain's own two tabs lead, whatever else was added. */
+/** The Domain's own tabs lead — Overview, the Objects list, Board, Gantt,
+ *  People — whatever else was added. */
 function withDomainTabs(types: ObjectTabType[]): ObjectTabType[] {
-  // The Objects list is not a Domain tab (the sidebar's Objects row opens it),
-  // and Resource is People now.
-  return [...DEFAULT_DOMAIN_TAB_TYPES, ...types.filter((t) => !DEFAULT_DOMAIN_TAB_TYPES.includes(t) && t !== 'elements' && t !== 'resource')];
+  // Resource is People now.
+  return [...DEFAULT_DOMAIN_TAB_TYPES, ...types.filter((t) => !DEFAULT_DOMAIN_TAB_TYPES.includes(t) && t !== 'resource')];
 }
 
 function saveVisibleTabs(key: string, tabs: ObjectTabType[]) {
@@ -250,9 +250,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const rawVisibleTabTypes = selectedObject
     ? (objectVisibleTypesById[selectedObject.id] ?? DEFAULT_OBJECT_TAB_TYPES).map((t) => (t === 'resource' ? 'workers' : t))
       .filter((t, i, all) => all.indexOf(t) === i)
-    // On the All Objects tab (landed on, or remembered as this Domain's
-    // tab) the Domain shows its list too, though it is not a Domain tab.
-    : domainActiveType === 'elements' ? [...domainVisibleTypes, 'elements' as ObjectTabType] : domainVisibleTypes;
+    : domainVisibleTypes;
   const sanitizedVisibleTabTypes = rawVisibleTabTypes.filter((type) => ALL_TAB_TYPES.includes(type));
   const visibleTabTypes = sanitizedVisibleTabTypes.length > 0
     ? sanitizedVisibleTabTypes
@@ -460,6 +458,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
           }}
           onTabCreate={(type) => ensureVisibleTab(type)}
           createOptions={selectedObject ? OBJECT_CREATE_TAB_TYPES : undefined}
+          createTitle={(type) => titleForTab(type, !!selectedObject)}
           rightSlot={
             <>
               {objListControlsNode}
