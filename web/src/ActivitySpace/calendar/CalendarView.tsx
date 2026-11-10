@@ -69,7 +69,7 @@ const MONTH_LANE_TOP = 34;      // px from the row's top to the first lane (date
 // Time grid constants
 const GRID_START_HOUR = 0;
 const GRID_END_HOUR = 24;
-const HOUR_HEIGHT = 48; // px per hour
+const HOUR_HEIGHT = 64; // px per hour: a half hour holds a title and its time
 const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
 function getWeekDays(date: Date, weekStartsOn: number): Date[] {
