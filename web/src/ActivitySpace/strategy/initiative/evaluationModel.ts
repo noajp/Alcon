@@ -21,12 +21,22 @@
 // no numeric quality score anywhere in this model — a single number over a
 // judgement call would be fake precision (design D8).
 //
+// DELIVERABLE SIZE (PR2): agent_artifacts carries no size column, so
+// size is computed here from the content the hook reads — its length,
+// and for markdown a heading count — with the per-format floors in
+// artifactSizeOf. It is labelled as size everywhere it renders
+// (character counts, a "Short" flag): the cheap tripwire beside the
+// verifier's judgement, never merged with it into a score (D8).
+// Whether a deliverable is substantial or hollow as a JUDGEMENT —
+// depth classification — is PR3's verdict work, not this model's.
+//
 // Pure. `now` is a parameter; the caller owns the clock. The hook
 // (hooks/strategyEvaluationData.ts) reads the rows and parses the runs'
 // jsonb at its boundary (auditModel's parsers); this file decides what of
 // them is worth a person's eye.
 
 import type { DefinitionRevisionCandidate, DefinitionTest, VerifierCalibration } from '@/types/database';
+import type { RunVerdict } from '@/Function/audit/auditModel';
 import { calibrationSummaryOf, type CalibrationSummary } from '@/AIP/harness/calibrationModel';
 import { readTestVerdict, testFreshness } from '@/AIP/harness/definitionTestModel';
 // The data shapes live in the hook (hooks may not import this layer);
@@ -75,6 +85,73 @@ export function rateOf(numerator: number, denominator: number): Rate {
     denominator,
     rate: denominator >= RATE_MIN_N ? numerator / denominator : null,
   };
+}
+
+// ── Deliverable size ─────────────────────────────────────────────────
+
+export interface ArtifactSize {
+  /** Characters in the content, surrounding whitespace excluded — a
+   *  whitespace-only deliverable measures 0, not its padding. */
+  chars: number;
+  /** Markdown heading count (lines opening with #). Null for other
+   *  formats: a csv or a json has no sections to count. */
+  sections: number | null;
+  /** Below the format's size floor. A SIZE fact only — it renders as
+   *  "Short", never as a quality word: whether a short deliverable is
+   *  also a poor one is a judgement (the verifier's, PR3's depth),
+   *  not this flag's. */
+  short: boolean;
+}
+
+/** Size floors per format, in characters. Html carries its own markup,
+ *  so its floor sits higher; csv/json are dense — each character there
+ *  carries a field or a key — so theirs sit lower. An unlisted format
+ *  uses the plain-text floor. */
+const SHORT_BELOW_CHARS: Record<string, number> = {
+  markdown: 200,
+  text: 200,
+  html: 500,
+  csv: 100,
+  json: 100,
+};
+const DEFAULT_SHORT_BELOW_CHARS = 200;
+
+/** The deterministic size signal for one artifact's content, computed
+ *  by code (design §5.2). No model, no judgement — length, and for
+ *  markdown the heading count. */
+export function artifactSizeOf(content: string, format: string): ArtifactSize {
+  const trimmed = content.trim();
+  const chars = trimmed.length;
+  const sections = format === 'markdown'
+    ? trimmed.split('\n').filter((line) => /^#{1,6}(\s|$)/.test(line)).length
+    : null;
+  const floor = SHORT_BELOW_CHARS[format] ?? DEFAULT_SHORT_BELOW_CHARS;
+  return { chars, sections, short: chars < floor };
+}
+
+/** One deliverable with everything the tab shows about it: which
+ *  Element it belongs to, its size signal, and the verifier evidence
+ *  that actually names it. */
+export interface DeliverableEvaluation {
+  artifact: EvaluationArtifactRow;
+  elementTitle: string;
+  size: ArtifactSize;
+  /** The producing run's verdict, ONLY when that verdict's evidence
+   *  names this artifact (evidence.artifactIds): the verifier was
+   *  shown this deliverable, so its result and its gaps belong on
+   *  this row. Null when no verdict names it — absence is shown as
+   *  absence, never inferred from the run merely having a verdict
+   *  about other artifacts. */
+  verifier: Pick<RunVerdict, 'result' | 'gaps'> | null;
+}
+
+/** Worst-first for deliverables, as a named definition: short-by-size
+ *  first (the size tripwire), then most recently updated first; the
+ *  title breaks ties so the order is a definition, not an accident. */
+function compareDeliverables(a: DeliverableEvaluation, b: DeliverableEvaluation): number {
+  return Number(b.size.short) - Number(a.size.short)
+    || Date.parse(b.artifact.updated_at) - Date.parse(a.artifact.updated_at)
+    || a.artifact.title.localeCompare(b.artifact.title);
 }
 
 export interface EvaluationObjectScope {
@@ -191,7 +268,7 @@ export interface WorstRun {
   reasons: WorstRunReason[];
   /** The parsed run record, when the run row was readable. */
   run: EvaluationRunRow | null;
-  artifacts: EvaluationArtifactRow[];
+  artifacts: DeliverableEvaluation[];
 }
 
 export interface ElementEvaluation extends EvaluationTallies {
@@ -247,6 +324,9 @@ export interface EvaluationReport {
   headline: EvaluationHeadline;
   objects: ObjectEvaluation[];
   definitions: DefinitionEvaluation[];
+  /** The period's deliverables across the Strategy, worst-first by
+   *  size signal then recency (compareDeliverables). */
+  deliverables: DeliverableEvaluation[];
   trend: TrendBucket[];
   /** Outcomes in period whose element is outside the scope — should be
    *  zero from the hook's read; kept so a leak is visible, not silent. */
@@ -372,11 +452,25 @@ export function buildEvaluation(input: EvaluationInputs): EvaluationReport {
   }
 
   const runById = new Map(input.runs.map((r) => [r.id, r] as const));
-  const artifactsByRun = new Map<string, EvaluationArtifactRow[]>();
+  // One deliverable shape for both homes it renders in — the worst-run
+  // expansions and the standing Deliverables block — so its size and
+  // its verifier evidence can never be computed two ways.
+  const deliverableOf = (a: EvaluationArtifactRow): DeliverableEvaluation => {
+    const verdict = a.run_id ? runById.get(a.run_id)?.verdict ?? null : null;
+    return {
+      artifact: a,
+      elementTitle: elementInfo.get(a.element_id)?.title ?? a.element_id,
+      size: artifactSizeOf(a.content, a.format),
+      verifier: verdict && verdict.evidence.artifactIds.includes(a.id)
+        ? { result: verdict.result, gaps: verdict.gaps }
+        : null,
+    };
+  };
+  const artifactsByRun = new Map<string, DeliverableEvaluation[]>();
   for (const a of input.artifacts) {
     if (!a.run_id) continue;
     const list = artifactsByRun.get(a.run_id) ?? [];
-    list.push(a);
+    list.push(deliverableOf(a));
     artifactsByRun.set(a.run_id, list);
   }
   const scopedRuns = scoped.map((o) => runById.get(o.run_id)).filter((r): r is EvaluationRunRow => !!r);
@@ -491,6 +585,14 @@ export function buildEvaluation(input: EvaluationInputs): EvaluationReport {
     })
     .sort((a, b) => b.finishes - a.finishes || a.name.localeCompare(b.name));
 
+  // The Deliverables block: the period's artifacts — those of the
+  // scoped outcomes' runs, nothing the period did not produce.
+  const scopedRunIds = new Set(scoped.map((o) => o.run_id));
+  const deliverables = input.artifacts
+    .filter((a) => a.run_id !== null && scopedRunIds.has(a.run_id))
+    .map(deliverableOf)
+    .sort(compareDeliverables);
+
   const headlineTallies = tally(scoped);
   const mix = failureMixOf(scopedRuns);
   return {
@@ -503,6 +605,7 @@ export function buildEvaluation(input: EvaluationInputs): EvaluationReport {
     },
     objects: objectEvals,
     definitions,
+    deliverables,
     trend: trendBuckets(scoped, period, now),
     outOfScope,
   };

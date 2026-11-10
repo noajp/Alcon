@@ -43,14 +43,18 @@ export interface EvaluationRunRow {
   failureDetail: FailureDetail | null;
 }
 
-/** One deliverable a run produced (title and format — size/evidence
- *  judgement is a later piece). */
+/** One deliverable a run produced. Its content travels with the row:
+ *  agent_artifacts carries NO size column, so the pure model computes
+ *  the size signal from the content itself (evaluationModel's
+ *  artifactSizeOf), and the tab's Deliverables block expands to the
+ *  content, reusing the Overview panel's rendering. */
 export interface EvaluationArtifactRow {
   id: string;
   run_id: string | null;
   element_id: string;
   title: string;
   format: string;
+  content: string;
   updated_at: string;
 }
 
@@ -141,7 +145,7 @@ async function fetchEvaluation(elementIds: string[], period: EvaluationPeriod): 
       .select('id, element_id, status, finished_at, verdict, finish_detail, failure_detail')
       .in('id', c)),
     runIds.length === 0 ? [] : inChunks<EvaluationArtifactRow>(runIds, (c) => supabase.from('agent_artifacts')
-      .select('id, run_id, element_id, title, format, updated_at').in('run_id', c).order('updated_at', { ascending: false })),
+      .select('id, run_id, element_id, title, format, content, updated_at').in('run_id', c).order('updated_at', { ascending: false })),
     definitionIds.length === 0 ? [] : inChunks<VerifierCalibration>(definitionIds, (c) => supabase.from('verifier_calibration')
       .select('id, activity_space_id, definition_id, window_start, window_days, agree_pass, agree_fail, false_pass, false_fail, pairs, updated_at')
       .in('definition_id', c).order('window_start', { ascending: false })),

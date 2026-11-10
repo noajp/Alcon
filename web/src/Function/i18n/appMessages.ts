@@ -1121,7 +1121,9 @@ const APP_MESSAGES: Record<string, Row> = {
   'Grandparent Strategies': ['祖父母Strategy', '조부모 Strategy', 'Strategies grands-parents', 'Strategies abuelas'],
   'Ancestor Strategies': ['祖先Strategy', '조상 Strategy', 'Strategies ancêtres', 'Strategies ancestras'],
   // The Strategy Evaluation tab (PR1): tab labels, periods, headline
-  // cards, drill-down and the Definitions-at-work block.
+  // cards, drill-down and the Definitions-at-work block. (PR2 adds the
+  // deliverable size/evidence strings at the end of this block — size
+  // words only, never quality words.)
   'Cascade': ['カスケード', '캐스케이드', 'Cascade', 'Cascada'],
   'Evaluation': ['評価', '평가', 'Évaluation', 'Evaluación'],
   '7 days': ['7日間', '7일', '7 jours', '7 días'],
@@ -1163,6 +1165,10 @@ const APP_MESSAGES: Record<string, Row> = {
   'from {source}': ['{source} から', '{source}에서', 'de {source}', 'de {source}'],
   'Escalates to {target}': ['{target} へエスカレーション', '{target}(으)로 에스컬레이션', 'Escalade vers {target}', 'Escala a {target}'],
   'Open in Audit': ['Audit で開く', 'Audit에서 열기', 'Ouvrir dans Audit', 'Abrir en Audit'],
+  '{n} characters': ['{n} 文字', '{n}자', '{n} caractères', '{n} caracteres'],
+  '{n} sections': ['{n} セクション', '섹션 {n}개', '{n} sections', '{n} secciones'],
+  'Short': ['短い', '짧음', 'Court', 'Corto'],
+  'Shown to the verifier': ['検証者に提示済み', '검증자에게 제시됨', 'Présenté au vérificateur', 'Mostrado al verificador'],
   'Trend': ['推移', '추세', 'Tendance', 'Tendencia'],
 };
 
