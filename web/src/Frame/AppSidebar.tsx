@@ -13,6 +13,7 @@ import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgen
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { SegmentedControl, SettingField } from '@/Function/settings/SettingsControls';
 import { NavCalendarIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
+import { loadSidebarOrder, moveSidebarItem, saveSidebarOrder, type SidebarItem } from './sidebarOrder';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
@@ -84,14 +85,9 @@ interface AppSidebarProps {
   onToggleSidebar?: () => void;
 }
 
-/** The tools under Strategy at the top of the sidebar. */
 /** How far past its least width the edge is dragged before the sidebar closes. */
 const SIDEBAR_CLOSE_PULL = 72;
 
-const SIDEBAR_TOOLS: RailMode[] = ['files', 'team', 'tables'];
-
-// The sidebar's top is fixed (Strategy and the tools); under it, the open
-// surface's own list.
 
 // Workspace — Strategy and Execution in one sidebar, a section each.
 // Strategy is what we're trying to achieve and how we intend to win: one
@@ -137,6 +133,10 @@ export function AppSidebar({
   // Without this the list would snap back to the server order for the frame
   // between releasing and refetchDomains() resolving — a visible flicker.
   // Kept in sync with the hook's data whenever it changes.
+  // The fixed rows' order, this person's, kept in this browser.
+  const [sidebarOrder, setSidebarOrder] = useState<SidebarItem[]>(loadSidebarOrder);
+  const [draggedRow, setDraggedRow] = useState<SidebarItem | null>(null);
+  const [rowDrop, setRowDrop] = useState<{ item: SidebarItem; place: 'before' | 'after' } | null>(null);
   const [orderedDomains, setOrderedDomains] = useState<Domain[]>(domains);
   // Synced while rendering rather than in an effect: the mirror and the list
   // it mirrors then reach the screen in the same commit, instead of the list
@@ -394,24 +394,58 @@ export function AppSidebar({
               a list in the main island where their nesting shows), then
               Execution (the Domains, where
               the work is done). */}
-          {/* The fixed top of every sidebar: the AI, then Inbox, then
-              Strategy, then the tools. What sits under it is the open
-              surface's own list — the Domains for the Workspace, the
-              tables for Table, and so on. */}
+          {/* The fixed top of every sidebar, in the person's order (drag a
+              row to move it). What sits under it is the open surface's own
+              list — the Domains for the Workspace, and so on. */}
           <div className="mt-5">
-            <SidebarRow active={activeView === 'ai'} icon={<AiIcon size={16} />} label={t(aiLabel)}
-              onClick={() => onViewChange('ai')} />
-            <SidebarRow active={activeView === 'inbox'} icon={<NavInboxIcon size={16} />} label={t('Inbox')}
-              meta={unreadCount > 0 ? unreadCount : undefined}
-              onClick={() => onViewChange('inbox')} />
-            <SidebarRow active={railMode === 'calendar'} icon={<NavCalendarIcon size={16} />} label={t('Calendar')}
-              onClick={() => { if (railMode !== 'calendar') onViewChange('calendar'); }} />
-            <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
-              onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
-            {SIDEBAR_TOOLS.map((mode) => {
-              const { label, icon: Icon, defaultView } = MODE_META[mode];
-              return <SidebarRow key={mode} active={railMode === mode} icon={<Icon size={16} />} label={t(label)}
-                onClick={() => { if (railMode !== mode) onViewChange(defaultView); }} />;
+            {sidebarOrder.map((item) => {
+              const row = (() => {
+                switch (item) {
+                  case 'ai':
+                    return <SidebarRow active={activeView === 'ai'} icon={<AiIcon size={16} />} label={t(aiLabel)}
+                      onClick={() => onViewChange('ai')} />;
+                  case 'inbox':
+                    return <SidebarRow active={activeView === 'inbox'} icon={<NavInboxIcon size={16} />} label={t('Inbox')}
+                      meta={unreadCount > 0 ? unreadCount : undefined}
+                      onClick={() => onViewChange('inbox')} />;
+                  case 'calendar':
+                    return <SidebarRow active={railMode === 'calendar'} icon={<NavCalendarIcon size={16} />} label={t('Calendar')}
+                      onClick={() => { if (railMode !== 'calendar') onViewChange('calendar'); }} />;
+                  case 'strategy':
+                    return <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
+                      onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />;
+                  default: {
+                    const { label, icon: Icon, defaultView } = MODE_META[item];
+                    return <SidebarRow active={railMode === item} icon={<Icon size={16} />} label={t(label)}
+                      onClick={() => { if (railMode !== item) onViewChange(defaultView); }} />;
+                  }
+                }
+              })();
+              const over = rowDrop?.item === item && draggedRow !== null && draggedRow !== item ? rowDrop.place : null;
+              return (
+                <div key={item} draggable className="relative"
+                  onDragStart={(e) => { setDraggedRow(item); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', item); }}
+                  onDragEnd={() => { setDraggedRow(null); setRowDrop(null); }}
+                  onDragOver={(e) => {
+                    if (!draggedRow) return;
+                    e.preventDefault();
+                    const box = e.currentTarget.getBoundingClientRect();
+                    const place = e.clientY < box.top + box.height / 2 ? 'before' : 'after';
+                    if (rowDrop?.item !== item || rowDrop.place !== place) setRowDrop({ item, place });
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggedRow && rowDrop) {
+                      const next = moveSidebarItem(sidebarOrder, draggedRow, rowDrop.item, rowDrop.place);
+                      setSidebarOrder(next);
+                      saveSidebarOrder(next);
+                    }
+                    setDraggedRow(null); setRowDrop(null);
+                  }}>
+                  {over && <div aria-hidden className={`pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary ${over === 'before' ? '-top-px' : '-bottom-px'}`} />}
+                  {row}
+                </div>
+              );
             })}
           </div>
 
