@@ -508,7 +508,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                                     />
                                     <span
                                       className={`truncate flex-1 ${
-                                        element.status === 'done' ? 'line-through opacity-60' : ''
+                                        element.status === 'done' ? 'opacity-60' : ''
                                       }`}
                                     >
                                       {element.title}
@@ -591,9 +591,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     <div className="flex h-full items-center gap-1.5 min-w-0">
                       {element.object && <ObjectIcon size={12} />}
                       <span
-                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
-                          isDone ? 'line-through' : ''
-                        }`}
+                        className="text-[11px] font-medium leading-tight truncate flex-1"
                       >
                         {element.title}
                       </span>
@@ -893,9 +891,7 @@ function TimeGridView({
                   >
                     <div className="flex h-full items-center min-w-0">
                       <span
-                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
-                          isDone ? 'line-through' : ''
-                        }`}
+                        className="text-[11px] font-medium leading-tight truncate flex-1"
                       >
                         {el.title}
                       </span>
@@ -987,9 +983,7 @@ function TimeGridView({
                       title={`${el.title}\n${timeLabel}`}
                     >
                       <div
-                        className={`text-[11px] font-medium leading-tight truncate ${
-                          isDone ? 'line-through' : ''
-                        }`}
+                        className="text-[11px] font-medium leading-tight truncate"
                       >
                         {el.title}
                       </div>
