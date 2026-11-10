@@ -69,7 +69,7 @@ const MONTH_LANE_TOP = 34;      // px from the row's top to the first lane (date
 // Time grid constants
 const GRID_START_HOUR = 0;
 const GRID_END_HOUR = 24;
-const HOUR_HEIGHT = 64; // px per hour: a half hour holds a title and its time
+const HOUR_HEIGHT = 80; // px per hour: a half hour holds a title and its time
 const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
 function getWeekDays(date: Date, weekStartsOn: number): Date[] {
@@ -833,6 +833,13 @@ function TimeGridView({
   const showNowLine = nowMinutes >= gridStartMin && nowMinutes <= gridEndMin;
   const nowLineTop = ((nowMinutes - gridStartMin) / 60) * HOUR_HEIGHT;
   const todayColIdx = days.findIndex(d => isSameDay(d, today));
+  // The half hour under the pointer on the empty grid.
+  const [hoverSlot, setHoverSlot] = useState<{ col: number; minutes: number } | null>(null);
+  const slotAt = (e: React.MouseEvent<HTMLDivElement>) => {
+    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+    const minutes = GRID_START_HOUR * 60 + Math.floor((y / HOUR_HEIGHT) * 2) * 30;
+    return Math.max(0, Math.min(minutes, 23 * 60 + 30));
+  };
 
   const colWidthClass = 'flex-1 min-w-0';
 
@@ -848,19 +855,13 @@ function TimeGridView({
           return (
             <div
               key={i}
-              className={`${colWidthClass} px-2 py-2 text-center`}
+              className={`${colWidthClass} border-l border-t-2 border-l-[var(--border-subtle)] px-2.5 pb-1.5 pt-1 ${isTodayCol ? 'border-t-[var(--accent-default)] text-[var(--accent-default)]' : 'border-t-transparent text-foreground'}`}
             >
-              <div className="text-[10px] text-muted-foreground">
-                {weekdayLabel(locale, d.getDay())}
+              <div className={`text-[22px] leading-tight tabular-nums ${isTodayCol ? 'font-semibold' : 'font-light'}`}>
+                {String(d.getDate()).padStart(2, '0')}
               </div>
-              <div className="mt-0.5 inline-flex items-center justify-center">
-                {isTodayCol ? (
-                  <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 pt-0.5 rounded-full flex items-center justify-center text-[12px] font-semibold leading-none tabular-nums">
-                    {d.getDate()}
-                  </span>
-                ) : (
-                  <span className="text-[13px] font-medium text-foreground">{d.getDate()}</span>
-                )}
+              <div className={`truncate text-[11px] ${isTodayCol ? 'font-medium' : 'text-muted-foreground'}`}>
+                {d.toLocaleDateString(locale, { weekday: 'long' })}
               </div>
             </div>
           );
@@ -935,11 +936,11 @@ function TimeGridView({
         <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
           {/* Hour rail */}
           <div className="w-14 flex-shrink-0 relative">
-            {hours.filter(h => h !== GRID_START_HOUR).map(h => (
+            {hours.map(h => (
               <div
                 key={h}
-                className="absolute left-0 right-0 px-1 text-right text-[10px] text-muted-foreground"
-                style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT - 6, height: HOUR_HEIGHT }}
+                className="absolute left-0 right-0 px-2 text-[11px] text-muted-foreground"
+                style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + 4 }}
               >
                 {formatHourLabel(locale, h)}
               </div>
@@ -952,23 +953,48 @@ function TimeGridView({
             return (
               <div
                 key={colIdx}
-                className={`${colWidthClass} relative border-l border-[var(--border-subtle)] ${onSlotClick ? 'cursor-cell' : ''}`}
+                className={`${colWidthClass} relative border-l border-[var(--border-subtle)]`}
                 onClick={onSlotClick ? (e) => {
                   // Only the empty grid: a click on a card is the card's.
                   if (e.target !== e.currentTarget) return;
-                  const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-                  const minutes = GRID_START_HOUR * 60 + Math.floor((y / HOUR_HEIGHT) * 2) * 30;
-                  onSlotClick(days[colIdx], Math.max(0, Math.min(minutes, 23 * 60 + 30)));
+                  onSlotClick(days[colIdx], slotAt(e));
                 } : undefined}
+                onMouseMove={onSlotClick ? (e) => {
+                  if (e.target !== e.currentTarget) { if (hoverSlot) setHoverSlot(null); return; }
+                  const minutes = slotAt(e);
+                  if (hoverSlot?.col !== colIdx || hoverSlot.minutes !== minutes) setHoverSlot({ col: colIdx, minutes });
+                } : undefined}
+                onMouseLeave={onSlotClick ? () => setHoverSlot(null) : undefined}
               >
-                {/* Hour grid lines */}
+                {/* Hour lines, and a dashed line at each half hour */}
                 {hours.map(h => (
-                  <div
-                    key={h}
-                    className="absolute left-0 right-0 border-t border-[var(--border-subtle)]"
-                    style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
-                  />
+                  <div key={h} className="pointer-events-none">
+                    <div
+                      className="absolute left-0 right-0 border-t border-[var(--border-default)]"
+                      style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
+                    />
+                    <div
+                      className="absolute left-0 right-0 border-t border-dashed border-[var(--border-default)]"
+                      style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
+                    />
+                  </div>
                 ))}
+
+                {/* The half hour under the pointer: where a click makes an event */}
+                {hoverSlot?.col === colIdx && (
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 rounded-sm border border-foreground/70"
+                    style={{ top: ((hoverSlot.minutes - gridStartMin) / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 2 }}
+                  />
+                )}
+
+                {/* Now, on the days before and after today this week: dashed */}
+                {!isTodayCol && todayColIdx >= 0 && showNowLine && (
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 z-10 border-t border-dashed border-[var(--status-danger)] opacity-60"
+                    style={{ top: nowLineTop }}
+                  />
+                )}
 
                 {/* Now line */}
                 {isTodayCol && showNowLine && (

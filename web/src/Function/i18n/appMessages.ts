@@ -18,6 +18,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Unread': ['未読', '읽지 않음', 'Non lu', 'No leído'],
   'Notification actions': ['通知の操作', '알림 작업', 'Actions de la notification', 'Acciones de la notificación'],
   '{n}w': ['{n}週', '{n}주', '{n} sem.', '{n} sem.'],
+  'Add title': ['タイトルを追加', '제목 추가', 'Ajouter un titre', 'Añadir título'],
+  'Add related Elements': ['関連する Element を追加', '관련 Element 추가', 'Ajouter des Elements liés', 'Añadir Elements relacionados'],
   'New event': ['予定を作成', '새 일정', 'Nouvel événement', 'Nuevo evento'],
   'Edit event': ['予定を編集', '일정 편집', 'Modifier l’événement', 'Editar evento'],
   'Event title': ['予定のタイトル', '일정 제목', 'Titre de l’événement', 'Título del evento'],
