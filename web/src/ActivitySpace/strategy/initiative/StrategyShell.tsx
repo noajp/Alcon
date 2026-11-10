@@ -113,7 +113,7 @@ const BOARD_ZONES: Zone[] = ['band', 'main', 'rail'];
 type StrategyTab = 'overview' | 'chain' | 'evaluation';
 const STRATEGY_TABS: readonly { id: StrategyTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'chain', label: 'Execution' },
+  { id: 'chain', label: 'Board' },
   { id: 'evaluation', label: 'Evaluation' },
 ];
 
@@ -156,7 +156,7 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 // "Strategies" section. Selecting a row pushes into that Strategy's detail
 // page, in three tabs: Overview (title, description, files, Objects, Sub
 // Strategies, what the work produced, the discussion, and the Properties
-// island), Execution (the work of this Strategy and every Strategy under
+// island), Board (the work of this Strategy and every Strategy under
 // it, in columns by where it stands, each card naming the Strategy it
 // came by, and the Planner's draft in the first), and Evaluation (what the
 // finished runs' records say about the work's quality).

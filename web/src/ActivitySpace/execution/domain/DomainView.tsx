@@ -78,9 +78,9 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   // Resource and Workers are one view: People.
   workers: { domainTitle: 'People', objectTitle: 'People' },
   resource: { domainTitle: 'People', objectTitle: 'People' },
-  custom_view: { domainTitle: 'CustomView', objectTitle: 'CustomView' },
+  custom_view: { domainTitle: 'Custom view', objectTitle: 'Custom view' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
-  flow: { domainTitle: 'Execution Chain', objectTitle: 'Execution Chain' },
+  flow: { domainTitle: 'Board', objectTitle: 'Board' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
 // Flow is a Domain's view; an Object's tabs offer the rest.
