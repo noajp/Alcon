@@ -29,8 +29,6 @@ describe('what counts as a different screen', () => {
     expect(routeKeyOf(base)).not.toBe(routeKeyOf(screen('strategy', { objectId: 'o1', objectDomainId: 'd1' })));
     expect(routeKeyOf(screen('files', { files: { tab: 'space', fileId: 'f1' } })))
       .not.toBe(routeKeyOf(screen('files', { files: { tab: 'space', fileId: 'f2' } })));
-    expect(routeKeyOf(screen('home', { homeSelection: { type: 'domain', id: 'd1' } })))
-      .not.toBe(routeKeyOf(screen('home', { homeSelection: null })));
   });
 
   it('ignores one-shot requests, return addresses and in-surface browsing', () => {

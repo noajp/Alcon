@@ -273,7 +273,7 @@ function PreferencesPanel() {
           label={t('Default home view')}
           desc={t('Select which view to open when launching Alcon')}
           value={preferences.home_view}
-          options={['Now', 'My Elements', 'Inbox', 'Calendar']}
+          options={['My Elements', 'Inbox', 'Calendar']}
           onChange={(v) => savePreference('home_view', v as UserPreferences['home_view'])}
         />
         <SegmentedRow

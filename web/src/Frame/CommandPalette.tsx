@@ -4,7 +4,7 @@ import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, ArrowRight, FileText, Inbox, Home, ListTodo, Plus, Settings } from '@/ui/icons';
+import { ArrowLeft, ArrowRight, FileText, Inbox, ListTodo, Plus, Settings } from '@/ui/icons';
 import { ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { BAR_TOOLS, MODE_META, TOOL_MODES } from '@/Frame/railApps';
@@ -55,7 +55,6 @@ interface CommandPaletteProps {
 // labels; only the `view` target is shared, and it's typed against ViewId
 // so a typo'd destination is a compile error.
 const NAV_COMMANDS = [
-  { id: 'home',         label: 'Go to Now',         icon: Home,     view: 'home' },
   { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
   { id: 'calendar', label: 'Open Calendar', icon: MODE_META.calendar.icon, view: 'calendar' },
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },

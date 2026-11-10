@@ -28,7 +28,7 @@ export interface ModeMeta {
 }
 
 export const MODE_META: Record<RailMode, ModeMeta> = {
-  personal:  { label: 'Profile',   icon: NavPersonalIcon, defaultView: 'profile', views: ['home', 'my-elements', 'profile'] },
+  personal:  { label: 'Profile',   icon: NavPersonalIcon, defaultView: 'profile', views: ['my-elements', 'profile'] },
   inbox:     { label: 'Inbox',     icon: NavInboxIcon, defaultView: 'inbox', views: ['inbox'] },
   // Strategy and the Domains with their Objects and Elements. Strategy opens
   // first, the sidebar's top row; Phase stays routable but is not in the nav.

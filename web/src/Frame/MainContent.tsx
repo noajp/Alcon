@@ -22,7 +22,6 @@ const StrategyShell = dynamic(() => import('@/ActivitySpace/strategy/initiative/
 const PhaseView = dynamic(() => import('@/ActivitySpace/strategy/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
 const PeopleView = dynamic(() => import('@/ActivitySpace/people/PeopleView').then(m => m.PeopleView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/ActivitySpace/strategy/timeline/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
-const HomeScreen = dynamic(() => import('@/Frame/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
 const NotebookSurface = dynamic(() => import('@/ActivitySpace/artifacts/notebook/NotebookSurface').then(m => m.NotebookSurface), { ssr: false, loading: viewLoading });
 const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
 const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
@@ -50,7 +49,6 @@ interface MainContentProps {
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
   activeDomainId?: string | null;
-  activeSpaceId?: string | null;
   /** The AI screen's shrink button: back to the pop-up. */
   onMinimizeAi?: () => void;
   /** The AI screen's subject — the same one the pop-up carries (the
@@ -58,8 +56,8 @@ interface MainContentProps {
   aiSubject?: CopilotSubject;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenItem, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
-  const notebookVisible = activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder');
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenItem, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, onMinimizeAi, aiSubject }: MainContentProps) {
+  const notebookVisible = activeActivity === 'note';
   // The notebook stays mounted once opened (it keeps its editor state while
   // hidden), but it is not loaded until the user first opens it.
   const [notebookOpened, setNotebookOpened] = useState(notebookVisible);
@@ -79,7 +77,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             activeDomainId={activeDomainId}
           />}
 
-          {activeActivity === 'home' && navigation.homeSelection?.type !== 'note_folder' && <HomeScreen spaceId={activeSpaceId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />}
 
           {activeActivity === 'inbox' && (
             <div className="flex-1 overflow-hidden bg-card">

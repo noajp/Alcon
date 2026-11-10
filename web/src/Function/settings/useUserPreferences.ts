@@ -85,6 +85,8 @@ export function useUserPreferences() {
         setError(fetchError.message);
       } else if (data) {
         const next = { ...DEFAULTS, ...data } as UserPreferences;
+        // The retired 'Now' landing reads as the Inbox.
+        if (!['My Elements', 'Inbox', 'Calendar'].includes(next.home_view)) next.home_view = 'Inbox';
         setPreferences(next);
         (Object.keys(next) as (keyof UserPreferences)[]).forEach((k) => mirrorFieldToCache(k, next[k]));
       }

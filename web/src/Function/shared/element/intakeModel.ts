@@ -2,7 +2,7 @@ import type { ElementStatus, Worker } from '@/types/database';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { dayIndexOf } from '@/Function/shared/dateUtils';
 
-export const INTAKE_LIMIT = 100;
+const INTAKE_LIMIT = 100;
 export const INTAKE_TEXT_LIMIT = 500_000;
 export type IntakeFormat = 'auto' | 'csv' | 'tsv' | 'lines';
 export type IntakeField = 'title' | 'description' | 'status' | 'due_date' | 'assignee' | 'source_id' | 'source_url';
@@ -24,10 +24,6 @@ export interface ElementImportResult {
   saved: { rowKey: string; elementId: string }[];
   failed?: { rowKey: string; message: string }[];
 }
-/** The sender has evidence that no mutations from this attempt committed. */
-export class ElementImportRejectedError extends Error {
-  constructor(message: string) { super(message); this.name = 'ElementImportRejectedError'; }
-}
 export interface IntakeTable {
   format: Exclude<IntakeFormat, 'auto'>;
   headers: string[];
@@ -38,7 +34,7 @@ export interface IntakeTable {
 }
 export interface IntakePreview { rows: ElementImportRow[]; errors: string[] }
 
-export const INTAKE_FIELDS: { id: IntakeField; label: string }[] = [
+const INTAKE_FIELDS: { id: IntakeField; label: string }[] = [
   { id: 'title', label: 'Title' }, { id: 'description', label: 'Description' },
   { id: 'status', label: 'Status' }, { id: 'due_date', label: 'Due date' },
   { id: 'assignee', label: 'Assignee' }, { id: 'source_id', label: 'Original ID' },

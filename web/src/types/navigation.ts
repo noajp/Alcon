@@ -53,10 +53,6 @@ export interface NavigationState {
    *  last used in that Domain instead. Not a place: excluded from history
    *  route keys and stripped on reload restore, like `strategyCreate`. */
   landOnTab?: ObjectTabType | null;
-  /** What the Home main island is showing, when on the Home view. A pinned
-   *  item's content renders in place (no layer/view switch) instead of the
-   *  welcome. null = the welcome landing. */
-  homeSelection?: { type: 'note_folder' | 'domain'; id: string } | null;
   documentId?: string | null;
   canvasId?: string | null;
 }
