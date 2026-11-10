@@ -11,6 +11,8 @@ import {
   buildEvaluation,
   DEFAULT_EVALUATION_PERIOD,
   EVALUATION_PERIODS,
+  type ArtifactSize,
+  type DeliverableEvaluation,
   type ElementEvaluation,
   type EvaluationPeriod,
   type ObjectEvaluation,
@@ -27,6 +29,8 @@ import { EvaluationTrend } from './EvaluationTrend';
 // minimum needed to judge — never raw error objects; a run's full step
 // record stays in the Audit app, reached through "Open in Audit" (#7).
 // The Overview's Evaluate panel (MissionEvaluatePanel) is untouched.
+// Deliverable size is labelled as size wherever it renders (character
+// counts, a "Short" flag) — never as quality, never a score (D8).
 
 const PERIOD_LABEL: Record<EvaluationPeriod, string> = {
   '7d': '7 days',
@@ -79,6 +83,7 @@ export function StrategyEvaluationPanel({ objects, onOpenRun }: {
   const [openObject, setOpenObject] = useState<string | null>(null);
   const [openElement, setOpenElement] = useState<string | null>(null);
   const [openRun, setOpenRun] = useState<string | null>(null);
+  const [openArtifact, setOpenArtifact] = useState<string | null>(null);
 
   const h = report.headline;
   const signalled = h.accepted + h.rejected + h.rework;
@@ -204,9 +209,82 @@ export function StrategyEvaluationPanel({ objects, onOpenRun }: {
               </ul>
             </PageSection>
           )}
+
+          {/* Deliverables — the period's artifacts across the Strategy,
+              worst-first by size signal then recency (the model's named
+              order). The block is omitted when the period produced
+              none. Size is stated as size; the verifier's judgement
+              appears only where its evidence names the artifact. */}
+          {report.deliverables.length > 0 && (
+            <PageSection title={t('Deliverables')}>
+              <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+                {report.deliverables.map((d) => (
+                  <DeliverableRow key={d.artifact.id} deliverable={d}
+                    open={openArtifact === d.artifact.id}
+                    onToggle={() => setOpenArtifact(openArtifact === d.artifact.id ? null : d.artifact.id)} />
+                ))}
+              </ul>
+            </PageSection>
+          )}
         </>
       )}
     </div>
+  );
+}
+
+/** The size signal as text: characters, the markdown section count
+ *  when there is one, and the Short flag when the size is below the
+ *  format's floor. Size words only — never a quality word. */
+function ArtifactSizeText({ size }: { size: ArtifactSize }) {
+  const { t } = useI18n();
+  return (
+    <span className="shrink-0 tabular-nums">
+      {t('{n} characters', { n: size.chars.toLocaleString() })}
+      {size.sections !== null ? ` · ${t('{n} sections', { n: size.sections })}` : ''}
+      {size.short ? <> · <span className="text-foreground/80">{t('Short')}</span></> : ''}
+    </span>
+  );
+}
+
+/** The verifier evidence linked to one artifact: the verdict of the
+ *  run whose evidence names it, with that verdict's gaps — the
+ *  verifier's own words about a deliverable it actually read. Renders
+ *  nothing when no verdict names the artifact. */
+function ArtifactVerifier({ deliverable: d }: { deliverable: DeliverableEvaluation }) {
+  const { t } = useI18n();
+  if (!d.verifier) return null;
+  return (
+    <div>
+      <div className="text-foreground">{t('Shown to the verifier')} · {t('Verdict')}: {d.verifier.result}</div>
+      {d.verifier.gaps.map((g, i) => <div key={i}>• {g}</div>)}
+    </div>
+  );
+}
+
+function DeliverableRow({ deliverable: d, open, onToggle }: {
+  deliverable: DeliverableEvaluation;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li className="px-3 py-2">
+      <button type="button" onClick={onToggle} aria-expanded={open}
+        className="flex w-full items-center gap-2 text-left">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{d.artifact.title}</span>
+        <span className="shrink-0 truncate text-[11px] text-muted-foreground">{d.elementTitle}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">{d.artifact.format}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground"><ArtifactSizeText size={d.size} /></span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">{formatRelative(d.artifact.updated_at)}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5 text-[12px] text-muted-foreground">
+          <ArtifactVerifier deliverable={d} />
+          {/* The content itself, rendered as the Overview's Deliverables
+              panel renders it (#7: one rendering, two homes). */}
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-[var(--surface-muted)] p-2.5 text-[12px] text-foreground">{d.artifact.content}</pre>
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -348,7 +426,16 @@ function WorstRunRow({ run: r, open, onToggle, onOpenRun }: {
           {r.artifacts.length > 0 && (
             <div>
               <div className="text-foreground">{t('Deliverables')}</div>
-              {r.artifacts.map((a) => <div key={a.id}>• {a.title} ({a.format})</div>)}
+              {r.artifacts.map((d) => (
+                <div key={d.artifact.id}>
+                  • {d.artifact.title} ({d.artifact.format}) · <ArtifactSizeText size={d.size} />
+                  {/* The run's gaps render at run level above; here the
+                      row only marks that the verifier was shown THIS
+                      artifact and what it returned. The Deliverables
+                      block carries the gaps on the artifact row. */}
+                  {d.verifier ? ` · ${t('Shown to the verifier')}: ${d.verifier.result}` : ''}
+                </div>
+              ))}
             </div>
           )}
           {onOpenRun && (

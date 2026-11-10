@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { StrategyEvaluationData } from '@/hooks/strategyEvaluationData';
-import type { EvaluationOutcomeRow, EvaluationRunRow } from '@/ActivitySpace/strategy/initiative/evaluationModel';
+import type { EvaluationArtifactRow, EvaluationOutcomeRow, EvaluationRunRow } from '@/ActivitySpace/strategy/initiative/evaluationModel';
 import { parseRunVerdict, parseFailureDetail, parseFinishDetail } from '@/Function/audit/auditModel';
 
 let fixture: StrategyEvaluationData = {
@@ -45,6 +45,13 @@ function outcome(over: Partial<EvaluationOutcomeRow> = {}): EvaluationOutcomeRow
 const OBJECTS = [
   { id: 'obj1', name: 'Alpha', elements: [{ id: 'e1', title: 'First Element', display_id: 'ELE-1' }] },
 ];
+
+function artifactRow(over: Partial<EvaluationArtifactRow> & { id: string }): EvaluationArtifactRow {
+  return {
+    run_id: null, element_id: 'e1', title: 'Deliverable', format: 'markdown',
+    content: '', updated_at: iso(NOW - DAY), ...over,
+  };
+}
 
 beforeEach(() => {
   seq = 0;
@@ -120,5 +127,69 @@ describe('Strategy Evaluation tab', () => {
 
     fireEvent.click(screen.getByText('Open in Audit'));
     expect(onOpenRun).toHaveBeenCalledWith(failed.run_id);
+  });
+
+  it('omits the Deliverables block when the period produced no artifacts', () => {
+    fixture.outcomes = [outcome({ verdict_result: 'pass' })];
+    render(<StrategyEvaluationPanel objects={OBJECTS} />);
+    expect(screen.getByText('Verifier pass rate')).toBeTruthy();
+    expect(screen.queryByText('Deliverables')).toBeNull();
+  });
+
+  it('Deliverables block: short first and labelled as size; expansion shows content and the linked verifier gaps', async () => {
+    const o = outcome({ verdict_result: 'fail' });
+    const verdict = parseRunVerdict({
+      v: 2, result: 'fail', source: 'verifier', model: 'm', gaps: ['No numbers anywhere'], revisions: 0,
+      checkedAt: iso(NOW - DAY), outcome: 'completed', reason: null,
+      evidence: { verifyStepIdx: 2, artifactIds: ['a-tiny'] },
+      claims: { total: 0, sourced: 0, stale: 0 }, claimGaps: [],
+    });
+    fixture.outcomes = [o];
+    fixture.runs = [{
+      id: o.run_id, element_id: 'e1', status: 'completed', finished_at: o.finished_at,
+      verdict, finishDetail: null, failureDetail: null,
+    }];
+    fixture.artifacts = [
+      artifactRow({ id: 'a-full', run_id: o.run_id, title: 'Full report', content: `# Report\n\n${'x'.repeat(300)}`, updated_at: iso(NOW - DAY) }),
+      artifactRow({ id: 'a-tiny', run_id: o.run_id, title: 'Tiny report', format: 'text', content: 'Too short', updated_at: iso(NOW - 2 * DAY) }),
+    ];
+    render(<StrategyEvaluationPanel objects={OBJECTS} />);
+
+    expect(screen.getByText('Deliverables')).toBeTruthy();
+    // Worst-first by size: the short one leads despite being older.
+    const tiny = screen.getByText('Tiny report');
+    const full = screen.getByText('Full report');
+    expect(tiny.compareDocumentPosition(full) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Size stated as size: character count + the Short flag, no score.
+    expect(screen.getByText(/9 characters/)).toBeTruthy();
+    expect(screen.getByText('Short')).toBeTruthy();
+
+    fireEvent.click(tiny);
+    // The content itself, and the gaps of the verdict that was shown it.
+    expect(await screen.findByText('Too short')).toBeTruthy();
+    expect(screen.getByText(/Shown to the verifier/)).toBeTruthy();
+    expect(screen.getByText(/No numbers anywhere/)).toBeTruthy();
+  });
+
+  it('worst-run artifact rows carry the size signal too', async () => {
+    const failed = outcome({ verdict_result: 'fail' });
+    fixture.outcomes = [failed];
+    fixture.runs = [{
+      id: failed.run_id, element_id: 'e1', status: 'completed', finished_at: failed.finished_at,
+      verdict: null, finishDetail: null, failureDetail: null,
+    }];
+    fixture.artifacts = [
+      artifactRow({ id: 'a1', run_id: failed.run_id, title: 'Heading only', content: '# Only a heading' }),
+    ];
+    render(<StrategyEvaluationPanel objects={OBJECTS} />);
+    fireEvent.click(screen.getByText('Alpha'));
+    // The display-id label picks the Element drill row — the plain
+    // title also appears on the artifact's Deliverables row.
+    fireEvent.click(screen.getByText(/ELE-1 First Element/));
+    fireEvent.click(screen.getByText(/fail · none/));
+    // The size text renders twice for this one artifact: once in the
+    // standing Deliverables block, once on the worst-run row.
+    expect(await screen.findAllByText(/16 characters · 1 sections/)).toHaveLength(2);
+    expect(screen.getAllByText('Short')).toHaveLength(2);
   });
 });

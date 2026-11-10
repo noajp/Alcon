@@ -13,14 +13,16 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  artifactSizeOf,
   buildEvaluation,
   rateOf,
   trendBuckets,
+  type EvaluationArtifactRow,
   type EvaluationInputs,
   type EvaluationOutcomeRow,
   type EvaluationRunRow,
 } from '@/ActivitySpace/strategy/initiative/evaluationModel';
-import type { FailureDetail } from '@/Function/audit/auditModel';
+import type { FailureDetail, RunVerdict } from '@/Function/audit/auditModel';
 import type { DefinitionRevisionCandidate, DefinitionTest, VerifierCalibration } from '@/types/database';
 
 const NOW = Date.parse('2026-11-10T12:00:00.000Z');
@@ -66,6 +68,28 @@ function run(over: Partial<EvaluationRunRow> & { id: string }): EvaluationRunRow
     verdict: null,
     finishDetail: null,
     failureDetail: null,
+    ...over,
+  };
+}
+
+function artifact(over: Partial<EvaluationArtifactRow> & { id: string }): EvaluationArtifactRow {
+  return {
+    run_id: null,
+    element_id: 'e1',
+    title: 'Deliverable',
+    format: 'markdown',
+    content: '',
+    updated_at: iso(NOW - DAY),
+    ...over,
+  };
+}
+
+function verdict(over: Partial<RunVerdict> = {}): RunVerdict {
+  return {
+    v: 2, result: 'fail', source: 'verifier', model: 'm', gaps: ['gap one'], revisions: 0,
+    checkedAt: iso(NOW - DAY), outcome: 'completed', reason: null,
+    evidence: { verifyStepIdx: 1, artifactIds: [] },
+    claims: { total: 0, sourced: 0, stale: 0 }, claimGaps: [],
     ...over,
   };
 }
@@ -309,6 +333,111 @@ describe('trend bucketing', () => {
     const all = trendBuckets(outcomes, 'all', NOW);
     expect(all[0].key).toBe(iso(NOW - 20 * DAY).slice(0, 10));
     expect(all.reduce((n, b) => n + b.finishes, 0)).toBe(2);
+  });
+});
+
+describe('deliverable size signal (PR2)', () => {
+  it('applies the per-format size floors at their boundaries — a size fact, computed from content', () => {
+    const chars = (n: number) => 'x'.repeat(n);
+    // markdown / text: floor 200
+    expect(artifactSizeOf(chars(199), 'markdown').short).toBe(true);
+    expect(artifactSizeOf(chars(200), 'markdown').short).toBe(false);
+    expect(artifactSizeOf(chars(199), 'text').short).toBe(true);
+    expect(artifactSizeOf(chars(200), 'text').short).toBe(false);
+    // html: floor 500 (its own markup inflates the length)
+    expect(artifactSizeOf(chars(499), 'html').short).toBe(true);
+    expect(artifactSizeOf(chars(500), 'html').short).toBe(false);
+    // csv / json: floor 100 (dense formats)
+    expect(artifactSizeOf(chars(99), 'csv').short).toBe(true);
+    expect(artifactSizeOf(chars(100), 'csv').short).toBe(false);
+    expect(artifactSizeOf(chars(99), 'json').short).toBe(true);
+    expect(artifactSizeOf(chars(100), 'json').short).toBe(false);
+    // an unlisted format falls back to the plain-text floor
+    expect(artifactSizeOf(chars(199), 'docx').short).toBe(true);
+    expect(artifactSizeOf(chars(200), 'docx').short).toBe(false);
+  });
+
+  it('measures trimmed content: whitespace padding is not size, and whitespace-only is empty', () => {
+    expect(artifactSizeOf('  abc  ', 'text')).toEqual({ chars: 3, sections: null, short: true });
+    expect(artifactSizeOf('  \n \n ', 'markdown')).toEqual({ chars: 0, sections: 0, short: true });
+  });
+
+  it('counts markdown headings as sections; other formats have no sections to count', () => {
+    const md = '# Title\n\nbody\n## Part one\n#nospace is not a heading\n### Part two\n';
+    expect(artifactSizeOf(md, 'markdown').sections).toBe(3);
+    expect(artifactSizeOf(md, 'text').sections).toBeNull();
+    expect(artifactSizeOf('a,b\n1,2', 'csv').sections).toBeNull();
+  });
+});
+
+describe('deliverables block and verifier evidence (PR2)', () => {
+  it('lists only the period runs’ artifacts — run-less and out-of-period artifacts stay out', () => {
+    const inPeriod = outcome({ element_id: 'e1' });
+    const report = build({
+      outcomes: [inPeriod],
+      artifacts: [
+        artifact({ id: 'a-in', run_id: inPeriod.run_id, element_id: 'e2' }),
+        artifact({ id: 'a-other-run', run_id: 'some-other-run' }),
+        artifact({ id: 'a-runless', run_id: null }),
+      ],
+    });
+    expect(report.deliverables.map((d) => d.artifact.id)).toEqual(['a-in']);
+    // The Element title resolves from the Strategy's scope, not the row.
+    expect(report.deliverables[0].elementTitle).toBe('Second');
+  });
+
+  it('orders worst-first by size signal, then recency', () => {
+    const o = outcome({ element_id: 'e1' });
+    const report = build({
+      outcomes: [o],
+      artifacts: [
+        artifact({ id: 'long', run_id: o.run_id, content: 'x'.repeat(400), updated_at: iso(NOW - DAY) }),
+        artifact({ id: 'short-old', run_id: o.run_id, content: 'tiny', updated_at: iso(NOW - 3 * DAY) }),
+        artifact({ id: 'short-new', run_id: o.run_id, content: 'small', updated_at: iso(NOW - 2 * DAY) }),
+      ],
+    });
+    expect(report.deliverables.map((d) => d.artifact.id)).toEqual(['short-new', 'short-old', 'long']);
+    expect(report.deliverables.map((d) => d.size.short)).toEqual([true, true, false]);
+  });
+
+  it('links the verdict to an artifact only when the verdict’s evidence names it', () => {
+    const judged = outcome({ element_id: 'e1', verdict_result: 'fail' });
+    const unjudged = outcome({ element_id: 'e1' });
+    const report = build({
+      outcomes: [judged, unjudged],
+      runs: [
+        run({ id: judged.run_id, verdict: verdict({ evidence: { verifyStepIdx: 2, artifactIds: ['a-seen'] } }) }),
+        run({ id: unjudged.run_id, verdict: null }),
+      ],
+      artifacts: [
+        artifact({ id: 'a-seen', run_id: judged.run_id, content: 'x'.repeat(300) }),
+        artifact({ id: 'a-unseen', run_id: judged.run_id, content: 'x'.repeat(300) }),
+        artifact({ id: 'a-no-verdict', run_id: unjudged.run_id, content: 'x'.repeat(300) }),
+      ],
+    });
+    const byId = new Map(report.deliverables.map((d) => [d.artifact.id, d]));
+    // Shown to the verifier: its result AND its gaps ride on the artifact.
+    expect(byId.get('a-seen')!.verifier).toEqual({ result: 'fail', gaps: ['gap one'] });
+    // Same run, but the evidence does not name it: no link is inferred.
+    expect(byId.get('a-unseen')!.verifier).toBeNull();
+    // A run with no verdict at all: absence, not a judgement.
+    expect(byId.get('a-no-verdict')!.verifier).toBeNull();
+  });
+
+  it('worst runs carry the same deliverable evaluations: size and evidence included', () => {
+    const failed = outcome({ element_id: 'e1', verdict_result: 'fail' });
+    const report = build({
+      outcomes: [failed],
+      runs: [run({ id: failed.run_id, verdict: verdict({ evidence: { verifyStepIdx: 1, artifactIds: ['a1'] } }) })],
+      artifacts: [artifact({ id: 'a1', run_id: failed.run_id, content: '# Only a heading' })],
+    });
+    const el = report.objects.flatMap((o) => o.elements).find((e) => e.elementId === 'e1')!;
+    expect(el.worstRuns).toHaveLength(1);
+    const d = el.worstRuns[0].artifacts[0];
+    expect(d.size).toEqual({ chars: 16, sections: 1, short: true });
+    expect(d.verifier).toEqual({ result: 'fail', gaps: ['gap one'] });
+    // And it is the same deliverable the standing block lists.
+    expect(report.deliverables.map((x) => x.artifact.id)).toEqual(['a1']);
   });
 });
 
