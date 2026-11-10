@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { ancestorLevels, cascadeLevels, cascadeLineage, type CascadeNode } from '@/ActivitySpace/strategy/initiative/cascadeModel';
+import {
+  ancestorLevels,
+  cascadeLevels,
+  cascadeLineage,
+  cascadeObjectChips,
+  CASCADE_OBJECT_CHIP_CAP,
+  type CascadeNode,
+  type CascadeObjectRef,
+} from '@/ActivitySpace/strategy/initiative/cascadeModel';
 
 const node = (id: string, parentIds: string[] = []): CascadeNode => ({ id, parentIds });
+
+const objectRef = (id: string): CascadeObjectRef => ({ id, name: `Object ${id}`, icon: null, color: null, domain_id: 'dom-1' });
+const objectsById = (ids: string[]) => new Map(ids.map((id) => [id, objectRef(id)] as const));
 
 describe('cascadeLevels', () => {
   it('reads a linear chain one level at a time', () => {
@@ -111,5 +122,54 @@ describe('cascadeLineage', () => {
 
   it('is empty for a root the input does not contain', () => {
     expect(cascadeLineage('missing', [node('a')])).toEqual([]);
+  });
+});
+
+describe('cascadeObjectChips', () => {
+  it('resolves the chips in the junction order, not the rows order', () => {
+    const byId = objectsById(['a', 'b', 'c']);
+    const { chips, overflow } = cascadeObjectChips(['c', 'a', 'b'], byId);
+    expect(chips.map((o) => o.id)).toEqual(['c', 'a', 'b']);
+    expect(overflow).toBe(0);
+  });
+
+  it('skips an Object id with no matching row, silently', () => {
+    const byId = objectsById(['a', 'b']);
+    const { chips, overflow } = cascadeObjectChips(['a', 'gone', 'b'], byId);
+    expect(chips.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(overflow).toBe(0);
+  });
+
+  it('stands a repeated id once, at its first place', () => {
+    const byId = objectsById(['a', 'b']);
+    const { chips, overflow } = cascadeObjectChips(['a', 'b', 'a'], byId);
+    expect(chips.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(overflow).toBe(0);
+  });
+
+  it('caps at the default and counts the rest as overflow', () => {
+    const ids = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7', 'o8'];
+    const { chips, overflow } = cascadeObjectChips(ids, objectsById(ids));
+    expect(CASCADE_OBJECT_CHIP_CAP).toBe(6);
+    expect(chips.map((o) => o.id)).toEqual(ids.slice(0, CASCADE_OBJECT_CHIP_CAP));
+    expect(overflow).toBe(2);
+  });
+
+  it('counts no overflow at exactly the cap', () => {
+    const ids = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6'];
+    const { chips, overflow } = cascadeObjectChips(ids, objectsById(ids));
+    expect(chips).toHaveLength(6);
+    expect(overflow).toBe(0);
+  });
+
+  it('honours a caller-given cap', () => {
+    const byId = objectsById(['a', 'b', 'c']);
+    const { chips, overflow } = cascadeObjectChips(['a', 'b', 'c'], byId, 2);
+    expect(chips.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(overflow).toBe(1);
+  });
+
+  it('is empty when the Strategy holds no Objects', () => {
+    expect(cascadeObjectChips([], objectsById(['a']))).toEqual({ chips: [], overflow: 0 });
   });
 });

@@ -1017,7 +1017,7 @@ function StrategyDetailView({
           // here — it lives on the Overview and the Chain, one mount only.
           <div className="flex h-full flex-col px-8 py-6">
             <StrategyCascade strategy={strategy} allStrategies={allStrategies} onOpenStrategy={onOpenStrategy}
-              orientation={boardOrientation} />
+              orientation={boardOrientation} objects={allObjects} onOpenObject={onOpenObject} />
           </div>
         ) : (
         <div className="max-w-7xl mx-auto px-8 py-8">

@@ -5,13 +5,14 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { BoardColumn, BoardLane, CHAIN_COLUMN_WIDTH } from '@/ActivitySpace/execution/element/board/BoardColumn';
+import { BoardColumn, BoardLane, CHAIN_COLUMN_WIDTH, Chip } from '@/ActivitySpace/execution/element/board/BoardColumn';
+import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import { formatMeasureValue } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import { CARD_FLAT } from '@/shared/designTokens';
-import type { Intent, StrategyWithObjects } from '@/types/database';
-import { cascadeLineage } from './cascadeModel';
+import type { AlconObject, Intent, StrategyWithObjects } from '@/types/database';
+import { cascadeLineage, cascadeObjectChips } from './cascadeModel';
 
 // The Cascade tab: this Strategy's whole lineage, drawn with the
 // Execution Chain's own columns and card ground. The Strategy itself
@@ -22,9 +23,11 @@ import { cascadeLineage } from './cascadeModel';
 // description) and the first of its success conditions. Read-only:
 // nesting is written on the Overview and in the Strategy list; this tab
 // is where the shape of it is read. A card opens its Strategy, so the
-// lineage can be walked up as well as down. Like every board, it stands
-// vertical or lies horizontal — the page's tabs-row toggle decides, on
-// the one shared orientation preference.
+// lineage can be walked up as well as down. Under each card stand the
+// Objects that Strategy holds, as the pill chips the Chain teaches —
+// descent goes right, contents stay home — and a pill opens its Object.
+// Like every board, it stands vertical or lies horizontal — the page's
+// tabs-row toggle decides, on the one shared orientation preference.
 
 /** The column a generation stands in, by its signed depth from this
  *  Strategy: negative is up (parents, grandparents, and every higher
@@ -77,7 +80,44 @@ function CascadeCard({ strategy, measures, onOpen }: {
   );
 }
 
-export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orientation }: {
+/** The Objects one Strategy holds, as pills under its card: descent
+ *  goes right, contents stay home. The pill is the Object's face
+ *  everywhere else — the Chain's cards name their Object with it — so
+ *  the kind difference needs no caption: a card is a Strategy, a pill
+ *  is an Object. Capped, with the rest counted on a plain chip (the
+ *  full list stands on the Strategy's Overview); a Strategy holding no
+ *  Objects grows no group at all. The pills are their own buttons,
+ *  siblings of the card's button, never nested inside it. */
+function CascadeObjectChips({ strategy, objectsById, onOpenObject }: {
+  strategy: StrategyWithObjects;
+  objectsById: ReadonlyMap<string, AlconObject>;
+  onOpenObject?: (objectId: string, domainId: string | null) => void;
+}) {
+  const { chips, overflow } = cascadeObjectChips(strategy.objectIds, objectsById);
+  if (chips.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {chips.map((object) => {
+        const chip = (
+          <Chip title={object.name} className="max-w-full transition-colors group-hover:bg-muted">
+            <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
+            <span className="truncate">{object.name}</span>
+          </Chip>
+        );
+        if (!onOpenObject) return <span key={object.id} className="inline-flex min-w-0">{chip}</span>;
+        return (
+          <button key={object.id} type="button" className="group inline-flex min-w-0"
+            onClick={() => onOpenObject(object.id, object.domain_id)}>
+            {chip}
+          </button>
+        );
+      })}
+      {overflow > 0 && <Chip>+{overflow}</Chip>}
+    </div>
+  );
+}
+
+export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orientation, objects, onOpenObject }: {
   /** The Strategy this page is about — the cascade's centre. */
   strategy: StrategyWithObjects;
   /** Every Strategy, so the lineage can be read off the nesting links. */
@@ -86,10 +126,19 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
   onOpenStrategy: (id: string) => void;
   /** The board's orientation, from the page's tabs-row toggle. */
   orientation: BoardOrientation;
+  /** Every Object, so each Strategy's held Objects can stand as chips
+   *  under its card. Omit to draw Strategies only. */
+  objects?: readonly AlconObject[];
+  /** Open an Object chip (the shell's Object view). */
+  onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   const { t } = useI18n();
   const lineage = useMemo(() => cascadeLineage(strategy.id, allStrategies), [strategy.id, allStrategies]);
   const byId = useMemo(() => new Map(allStrategies.map((s) => [s.id, s] as const)), [allStrategies]);
+  const objectsById = useMemo(
+    () => new Map((objects ?? []).map((o) => [o.id, o] as const)),
+    [objects],
+  );
   const visibleIds = useMemo(() => lineage.flat(), [lineage]);
   const { measures } = useInitiativeMeasures(visibleIds);
   const measuresByStrategy = useMemo(() => {
@@ -117,14 +166,20 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
     ? lineage
     : [...lineage.slice(0, rootAt + 1), [], ...lineage.slice(rootAt + 1)];
 
+  // The unit of a column is an entry: the Strategy's card with its
+  // Objects group as one block, so the column's rhythm separates
+  // entries — never a card from its own Objects.
   const cardsOf = (ids: string[]) => ids.flatMap((id) => {
     const s = byId.get(id);
     if (!s) return [];
     return [{
       id,
       node: (
-        <CascadeCard key={id} strategy={s} measures={measuresByStrategy.get(id) ?? []}
-          onOpen={() => onOpenStrategy(id)} />
+        <div key={id}>
+          <CascadeCard strategy={s} measures={measuresByStrategy.get(id) ?? []}
+            onOpen={() => onOpenStrategy(id)} />
+          <CascadeObjectChips strategy={s} objectsById={objectsById} onOpenObject={onOpenObject} />
+        </div>
       ),
     }];
   });
