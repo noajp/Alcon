@@ -67,6 +67,7 @@ import { requestPlan } from './mission/plannerRequest';
 import { useQueryClient } from '@tanstack/react-query';
 import { InitiativeCodeChanges } from '@/ActivitySpace/reviews/InitiativeCodeChanges';
 import { StrategyCascade } from './StrategyCascade';
+import { StrategyEvaluationPanel } from './StrategyEvaluationPanel';
 import { InitiativeMission } from './mission/InitiativeMission';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -110,11 +111,12 @@ const BOARD_ZONES: Zone[] = ['band', 'main', 'rail'];
 
 /** A Strategy's views: what it is, how it cascades down, and how its
  *  work is going. */
-type StrategyTab = 'overview' | 'cascade' | 'chain';
+type StrategyTab = 'overview' | 'cascade' | 'chain' | 'evaluation';
 const STRATEGY_TABS: readonly { id: StrategyTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'cascade', label: 'Cascade down' },
-  { id: 'chain', label: 'Execution Chain' },
+  { id: 'cascade', label: 'Cascade' },
+  { id: 'chain', label: 'Execution' },
+  { id: 'evaluation', label: 'Evaluation' },
 ];
 
 /** Each Strategy remembers its own open tab, like a Domain does — a
@@ -154,11 +156,12 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 // Strategy list — only TOP-LEVEL Strategies (no parent in strategy_children)
 // show there; a Strategy nested inside another only appears in its parent's
 // "Strategies" section. Selecting a row pushes into that Strategy's detail
-// page, in three tabs: Overview (title, description, files, Objects, Sub
+// page, in four tabs: Overview (title, description, files, Objects, Sub
 // Strategies, what the work produced, the discussion, and the Properties
-// island), Cascade down (the Strategies nested under this one, generation
-// by generation), and Execution Chain (the work in columns by where it
-// stands, and the Planner's draft in the first).
+// island), Cascade (the Strategies nested under this one, generation
+// by generation), Execution (the work in columns by where it stands,
+// and the Planner's draft in the first), and Evaluation (what the
+// finished runs' records say about the work's quality).
 // =============================================================
 
 export function StrategyShell({
@@ -167,6 +170,7 @@ export function StrategyShell({
   onOpenObject,
   onOpenDomain,
   onOpenTable,
+  onOpenRun,
   createRequested,
   onCreateHandled,
 }: {
@@ -182,6 +186,8 @@ export function StrategyShell({
   onOpenDomain?: (domainId: string) => void;
   /** Open one of the Strategy's Tables in the Table view. */
   onOpenTable?: (tableId: string) => void;
+  /** Open one run in the Audit app's log (the Evaluation tab's drill-down). */
+  onOpenRun?: (runId: string) => void;
   /** The sidebar's "+" asked for a new Strategy (navigation.strategyCreate).
    *  The dialog opens on the root list and `onCreateHandled` clears it. */
   createRequested?: boolean;
@@ -221,6 +227,7 @@ export function StrategyShell({
         onOpenObject={onOpenObject}
         onOpenDomain={onOpenDomain}
         onOpenTable={onOpenTable}
+        onOpenRun={onOpenRun}
       />
     );
   }
@@ -526,6 +533,7 @@ function StrategyDetailView({
   onOpenObject,
   onOpenDomain,
   onOpenTable,
+  onOpenRun,
 }: {
   strategy: StrategyWithObjects;
   /** Every Strategy, so this page can list/pick its nested children. */
@@ -537,6 +545,7 @@ function StrategyDetailView({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
   onOpenTable?: (tableId: string) => void;
+  onOpenRun?: (runId: string) => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(strategy.name);
@@ -1018,6 +1027,13 @@ function StrategyDetailView({
           <div className="flex h-full flex-col px-8 py-6">
             <StrategyCascade strategy={strategy} allStrategies={allStrategies} onOpenStrategy={onOpenStrategy}
               orientation={boardOrientation} objects={allObjects} onOpenObject={onOpenObject} />
+          </div>
+        ) : tab === 'evaluation' ? (
+          // A scrolling report page like the Overview, not a bounded
+          // board: the records of finished runs, aggregated by the
+          // Strategy's element set (StrategyEvaluationPanel).
+          <div className="max-w-7xl mx-auto px-8 py-8">
+            <StrategyEvaluationPanel objects={missionProps.objects} onOpenRun={onOpenRun} />
           </div>
         ) : (
         <div className="max-w-7xl mx-auto px-8 py-8">
