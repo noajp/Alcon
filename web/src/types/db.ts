@@ -145,7 +145,7 @@ interface ColumnOverrides {
   }
   promotion_drafts: {
     status: PromotionDraftStatus
-    source_kind: 'memory' | 'run'
+    source_kind: 'memory' | 'run' | 'builder'
     binding: PromotionBinding
     rehearsal_report: Record<string, unknown> | null
     material_sources: PromotionMaterialSource[]

@@ -887,6 +887,21 @@ const APP_MESSAGES: Record<string, Row> = {
   'Marks processed': ['処理済みにする', '처리됨으로 표시', 'Marque comme traité', 'Marca como procesado'],
   'Proposes a change — a person approves': ['変更の提案 — 人が承認します', '변경 제안 — 사람이 승인합니다', 'Propose un changement — une personne approuve', 'Propone un cambio: una persona lo aprueba'],
   'Element target': ['起票先', '생성 위치', 'Destination de l’Element', 'Destino del Element'],
+  // Structured editing on drafts (Automation builder PR4): the
+  // builder's Edit entry, its draft save/publish acts, the section
+  // editors, and the Build-with-Athena door.
+  'Build with Athena': ['Athena と組み立てる', 'Athena와 함께 만들기', 'Construire avec Athena', 'Construir con Athena'],
+  'From the Automation builder': ['自動化ビルダーから', '자동화 빌더에서', 'Depuis le constructeur d’automatisations', 'Desde el constructor de automatizaciones'],
+  'Start the draft': ['起草を始める', '초안 시작하기', 'Commencer le brouillon', 'Iniciar el borrador'],
+  'Athena drafts the harness from these picks. It goes live only after rehearsal and your review — nothing runs before that.': ['Athena がこの選択からハーネスを起草します。有効になるのは試走とあなたの審査のあとで、それまでは何も動きません。', 'Athena가 이 선택으로 하네스를 기안합니다. 리허설과 검토를 거친 뒤에만 활성화되며, 그 전에는 아무것도 실행되지 않습니다.', 'Athena rédige le harnais à partir de ces choix. Il ne devient actif qu’après la répétition et votre révision — rien ne s’exécute avant.', 'Athena redacta el arnés a partir de estas elecciones. Solo se activa tras el ensayo y tu revisión: nada se ejecuta antes.'],
+  'Edit the harness': ['ハーネスを編集', '하네스 편집', 'Modifier le harnais', 'Editar el arnés'],
+  'Only a Space owner can edit this harness.': ['このハーネスを編集できるのは Space の owner だけです。', '이 하네스를 편집할 수 있는 사람은 Space 소유자뿐입니다.', 'Seul un propriétaire du Space peut modifier ce harnais.', 'Solo un propietario del Space puede editar este arnés.'],
+  'Editing a draft of this harness — the live automation keeps running on the current body until the draft is reviewed and activated.': ['このハーネスのドラフトを編集中です — ドラフトが審査され有効化されるまで、稼働中の自動化は現在の本文で動き続けます。', '이 하네스의 초안을 편집 중입니다 — 초안이 검토되고 활성화될 때까지 운영 중인 자동화는 현재 본문으로 계속 실행됩니다.', 'Édition d’un brouillon de ce harnais — l’automatisation en service continue avec le texte actuel jusqu’à révision et activation du brouillon.', 'Editando un borrador de este arnés: la automatización en servicio sigue con el texto actual hasta que el borrador se revise y se active.'],
+  'This harness is also used by {names}.': ['このハーネスは {names} でも使われています。', '이 하네스는 {names}에서도 사용됩니다.', 'Ce harnais est aussi utilisé par {names}.', 'Este arnés también lo usan {names}.'],
+  'Edits saved to the draft.': ['ドラフトに編集を保存しました。', '초안에 편집을 저장했습니다.', 'Modifications enregistrées dans le brouillon.', 'Cambios guardados en el borrador.'],
+  'This draft is no longer at a stage where the builder can edit it.': ['このドラフトは、ビルダーで編集できる段階ではなくなりました。', '이 초안은 더 이상 빌더에서 편집할 수 있는 단계가 아닙니다.', 'Ce brouillon n’est plus à une étape où le constructeur peut le modifier.', 'Este borrador ya no está en una etapa en la que el constructor pueda editarlo.'],
+  'Add a line': ['行を追加', '줄 추가', 'Ajouter une ligne', 'Añadir una línea'],
+  'Add': ['追加', '추가', 'Ajouter', 'Añadir'],
   'Step': ['ステップ', '단계', 'Étape', 'Paso'],
   'Condition step': ['条件', '조건', 'Condition', 'Condición'],
   'Checks gate': ['点検', '점검', 'Contrôle', 'Control'],

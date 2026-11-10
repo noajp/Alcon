@@ -37,6 +37,7 @@ export function AutomationSettings({ onOpenElement }: {
   const spaceId = useActiveSpaceId();
   const automations = useAutomations(spaceId);
   const [creating, setCreating] = useState(false);
+  const [builderCreating, setBuilderCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const opened = openId ? automations.data.find((a) => a.id === openId) ?? null : null;
 
@@ -45,7 +46,7 @@ export function AutomationSettings({ onOpenElement }: {
     // its verbs) — no second breadcrumb above it.
     return (
       <div className={`${SETTINGS_ISLAND} flex flex-col overflow-hidden`}>
-        <AutomationsSection spaceId={spaceId} creating={false} onCreatingChange={setCreating} openId={opened.id} onOpen={setOpenId} onOpenElement={onOpenElement} />
+        <AutomationsSection spaceId={spaceId} creating={false} onCreatingChange={setCreating} builderCreating={false} onBuilderCreatingChange={setBuilderCreating} openId={opened.id} onOpen={setOpenId} onOpenElement={onOpenElement} />
       </div>
     );
   }
@@ -55,10 +56,15 @@ export function AutomationSettings({ onOpenElement }: {
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-[13px] font-medium text-foreground">{t('Automations')}</h3>
-          {!creating && <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setCreating(true)}>{t('New automation')}</Button>}
+          {!creating && !builderCreating && (
+            <span className="flex gap-2">
+              <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setBuilderCreating(true)}>{t('Build with Athena')}</Button>
+              <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setCreating(true)}>{t('New automation')}</Button>
+            </span>
+          )}
         </div>
         <div className={`${SETTINGS_ISLAND} overflow-hidden`}>
-          <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} openId={null} onOpen={setOpenId} onOpenElement={onOpenElement} />
+          <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} builderCreating={builderCreating} onBuilderCreatingChange={setBuilderCreating} openId={null} onOpen={setOpenId} onOpenElement={onOpenElement} />
         </div>
       </section>
       <StrategyRunSettings />

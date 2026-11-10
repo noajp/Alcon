@@ -13,15 +13,26 @@ import { NavAutomationIcon } from '@/Frame/sidebar/NavIcons';
 import { SETTINGS_ISLAND } from '@/shared/designTokens';
 import { CopyField } from '@/AIP/connectors/CopyField';
 import { describeCron, nextCronRun, parseCron } from '@/AIP/automation/cron';
-import { parseDefinition } from '@/AIP/harness/harnessDefinition';
+import { parseDefinition, type SectionKey } from '@/AIP/harness/harnessDefinition';
 import { DefinitionFlow } from '@/AIP/harness/DefinitionFlow';
+import { Textarea } from '@/ui/textarea';
+import {
+  builderUpdateBindingOf, createBuilderDraft, reviseDraftBody, revisePromotionDraftBody,
+  usePromotionDrafts,
+} from '@/AIP/harness/promotionData';
+import { PromotionReviewDialogForDraft } from '@/AIP/harness/PromotionDrafts';
+import type { Definition } from '@/hooks/definitionData';
+import type { PromotionDraft } from '@/types/database';
 import {
   deleteAutomation, issueWebhookToken, runAutomationNow, runWaitingOnApproval, setAutomationEnabled,
   updateAutomation, updateAutomationBinding,
   useAutomationEvents, webhookUrl, type Automation, type AutomationBindingInput, type AutomationKind,
 } from '@/hooks/automationData';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
-import { flowStepTitles } from '@/Function/shared/flowEdit';
+import { deleteFlowStep, editFlowStepLine, flowStepTitles, moveFlowStep } from '@/Function/shared/flowEdit';
+import {
+  SECTION_HEADINGS, addSectionBullet, removeSectionBullet, replaceOutputFence, replaceSectionBullet, sectionBullets,
+} from '@/Function/shared/flowEditSection';
 import { workflowFromGraph, type WorkflowGraph } from '@/Function/shared/workflowGraph';
 import {
   AUTOMATION_CRON_PRESETS, automationStatusOf, bindingInputOf, inputBlocksOf, outputBlocksOf, workflowGraphOf,
@@ -49,8 +60,20 @@ import { useIsSpaceOwner } from '@/AIP/connectors/data';
 // Output zone write the automations row through
 // `updateAutomationBinding` — the one binding seam — and the enable
 // switch in the header writes through `setAutomationEnabled`, as it
-// always has. The body is not edited here: a harness's body changes
-// only through the draft path (design §5.2, a later PR).
+// always has.
+//
+// PR4 adds body editing, on drafts only (design §5.2/§5.4, decision
+// D3): Edit opens (or creates) a promotion update draft against the
+// automation's definition — trigger-less binding, so activation
+// updates the definition in place and creates no second automation —
+// and every zone edit lands in ONE working body held here, through
+// the byte-preserving section editor (flowEditSection) for section
+// bullets and the output fence, and flowEdit's step ops on the
+// canvas. Save is the guarded revision write for the draft's stage
+// (reviseDraftBody while drafting, revisePromotionDraftBody from
+// review), which clears the tested record; Publish opens the
+// standing promotion review on the draft. The builder never saves a
+// body directly — there is no direct-save call in this file.
 
 /** A workflow that can be picked, as the list surface computes them. */
 export interface BuilderWorkflowSource { id: string; label: string; graph: WorkflowGraph }
@@ -66,11 +89,17 @@ const OUTPUT_LABEL: Record<OutputBlock['kind'], string> = {
   sends: 'Sends', 'marks-processed': 'Marks processed', strategy: 'Strategy',
 };
 
-export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, token, onToken, onBack, onChanged, onDeleted, onOpenElement }: {
+const DRAFT_OPEN_STATUSES = ['drafting', 'awaiting_input', 'rehearsing', 'awaiting_review'];
+
+export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, token, onToken, onBack, onChanged, onDeleted, onOpenElement, sharedDefinitionNames = [] }: {
   a: Automation;
   spaceId: string | null;
   harnesses: { id: string; name: string; body: string; enabled: boolean }[];
   objects: { id: string; name: string }[];
+  /** Names of other automations bound to the same harness: an update
+   *  draft is definition-scoped, so editing this body reaches them
+   *  too — surfaced at the Edit entry, never hidden (design §11). */
+  sharedDefinitionNames?: string[];
   sources: BuilderWorkflowSource[];
   token: string | null;
   onToken: (value: string) => void;
@@ -91,14 +120,34 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
   const harness = harnesses.find((d) => d.id === a.definition_id) ?? null;
   const objectName = objects.find((o) => o.id === a.object_id)?.name ?? null;
 
+  // The draft this builder is editing, and its one working body
+  // (design §5.2): zone edits, canvas step edits and the text tab are
+  // views/writers of this body, keyed to the draft and live only
+  // while the draft is open — the P4 state pattern. The live harness
+  // body is never the working body; it is what the draft was seeded
+  // from and what keeps firing until activation.
+  const isOwner = useIsSpaceOwner(spaceId) === true;
+  const drafts = usePromotionDrafts(spaceId);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const draft: PromotionDraft | null = draftId ? drafts.data.find((d) => d.id === draftId) ?? null : null;
+  const [editState, setEditState] = useState<{ draftId: string; body: string } | null>(null);
+  const workingBody = draft
+    ? (editState && editState.draftId === draft.id ? editState.body : draft.body ?? null)
+    : null;
+  const dirty = !!draft && workingBody !== null && workingBody !== (draft.body ?? null);
+  const [publishId, setPublishId] = useState<string | null>(null);
+
   // The steps Athena follows, in the order the run reads them: the
   // drawing's own order, or the harness's procedure when the drawing
   // is still empty.
   const steps = useMemo(() => {
     const fromGraph = flowStepTitles(workflowFromGraph(graph));
-    return fromGraph.length > 0 || !harness ? fromGraph : flowStepTitles(harness.body ?? '');
-  }, [graph, harness]);
-  const parsed = useMemo(() => (harness ? parseDefinition(harness.body ?? '') : null), [harness]);
+    return fromGraph.length > 0 || !harness ? fromGraph : flowStepTitles(workingBody ?? harness.body ?? '');
+  }, [graph, harness, workingBody]);
+  const parsed = useMemo(
+    () => (harness ? parseDefinition(workingBody ?? harness.body ?? '') : null),
+    [harness, workingBody],
+  );
   const inputs = useMemo(() => inputBlocksOf(a, steps, parsed), [a, steps, parsed]);
   const outputs = useMemo(() => outputBlocksOf(a, parsed, steps, objectName), [a, parsed, steps, objectName]);
   const status = automationStatusOf(a);
@@ -118,6 +167,43 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
     setGraph(next);
     updateAutomation(a.id, { workflow_graph: next, workflow: workflowFromGraph(next) }).then(onChanged, (e) => setError(formatError(e)));
   };
+
+  // ── Draft editing (PR4): the working body and its two writes ─────
+  const applyBodyEdit = (next: string | null) => {
+    if (!draft || next === null) return;
+    // Edited back to the draft's text exactly: no revision is owed.
+    setEditState(next === (draft.body ?? null) ? null : { draftId: draft.id, body: next });
+  };
+  const flowEdit = draft && workingBody !== null ? {
+    onEditStepLine: (index: number, text: string) => applyBodyEdit(editFlowStepLine(workingBody, index, text)),
+    onMoveStep: (index: number, dir: -1 | 1) => applyBodyEdit(moveFlowStep(workingBody, index, dir)),
+    onDeleteStep: (index: number) => applyBodyEdit(deleteFlowStep(workingBody, index)),
+  } : undefined;
+  const openDraftEditor = () => void act(async () => {
+    if (!harness || !spaceId) return;
+    const existing = drafts.data.find(
+      (d) => d.target_definition_id === harness.id && DRAFT_OPEN_STATUSES.includes(d.status),
+    );
+    const d = existing ?? await createBuilderDraft(spaceId, {
+      targetDefinitionId: harness.id,
+      seedName: harness.name,
+      seedBody: harness.body ?? '',
+      binding: builderUpdateBindingOf({
+        objectId: a.object_id, titleTemplate: a.title_template, descriptionTemplate: a.description_template,
+      }),
+    });
+    setDraftId(d.id);
+    setEditState(null);
+    await drafts.refetch();
+  });
+  const saveDraftEdits = () => void act(async () => {
+    if (!draft || workingBody === null) return;
+    if (draft.status === 'awaiting_review') await revisePromotionDraftBody(draft, workingBody);
+    else if (draft.status === 'drafting') await reviseDraftBody(draft, workingBody);
+    else throw new Error(t('This draft is no longer at a stage where the builder can edit it.'));
+    setEditState(null);
+    await drafts.refetch();
+  }, t('Edits saved to the draft.'));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -190,6 +276,12 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
               </li>
             ))}
           </ul>
+          {draft && workingBody !== null && (
+            <div className="mt-3 border-t border-border/50 pt-2">
+              <p className="text-[11px] font-medium text-muted-foreground"># {SECTION_HEADINGS.input}</p>
+              <SectionBulletsEditor body={workingBody} section="input" busy={busy} onEdit={applyBodyEdit} />
+            </div>
+          )}
         </section>
 
         {/* ── Athena: the work itself — the automation's own canvas,
@@ -214,18 +306,57 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
                     {t('Also follows the harness “{name}”.', { name: harness.name })}
                     <Button size="xs" variant="ghost" disabled={busy} onClick={() => void act(() => updateAutomation(a.id, { definition_id: null }))}>{t('Remove')}</Button>
                   </p>
-                  <DefinitionFlow body={harness.body ?? ''}
+                  {draft ? (
+                    <div className="mb-2 space-y-1.5">
+                      <p className="text-[12px] text-muted-foreground">
+                        {t('Editing a draft of this harness — the live automation keeps running on the current body until the draft is reviewed and activated.')}
+                      </p>
+                      {sharedDefinitionNames.length > 0 && (
+                        <p className="text-[11px] text-[var(--status-warning)]">
+                          {t('This harness is also used by {names}.', { names: sharedDefinitionNames.join(', ') })}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="xs" variant="primary" disabled={busy || !dirty} onClick={saveDraftEdits}>{t('Save edits')}</Button>
+                        {dirty && <Button size="xs" variant="ghost" disabled={busy} onClick={() => setEditState(null)}>{t('Discard edits')}</Button>}
+                        <Button size="xs" variant="secondary" disabled={busy} onClick={() => setPublishId(draft.id)}>{t('Review')}</Button>
+                      </div>
+                    </div>
+                  ) : isOwner ? (
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Button size="xs" variant="secondary" disabled={busy} onClick={openDraftEditor}>{t('Edit the harness')}</Button>
+                      {sharedDefinitionNames.length > 0 && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {t('This harness is also used by {names}.', { names: sharedDefinitionNames.join(', ') })}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mb-2 text-[11px] text-muted-foreground">{t('Only a Space owner can edit this harness.')}</p>
+                  )}
+                  <DefinitionFlow body={workingBody ?? harness.body ?? ''}
                     context={{
                       trigger: a.kind === 'schedule' ? { kind: 'schedule', cron: a.cron ?? '', timezone: a.timezone } : { kind: 'webhook' },
                       objectName,
-                    }} />
+                    }}
+                    edit={flowEdit} />
                 </div>
               )}
             </div>
           ) : (
             <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap pt-3 text-[12px] leading-relaxed text-foreground">
-              {(harness?.body ?? '').trim() || workflowFromGraph(graph)}
+              {(workingBody ?? harness?.body ?? '').trim() || workflowFromGraph(graph)}
             </pre>
+          )}
+          {draft && workingBody !== null && (
+            <div className="space-y-3 pt-3">
+              {(['connectors', 'checks', 'stop'] as SectionKey[]).map((section) => (
+                <div key={section}>
+                  <p className="text-[11px] font-medium text-muted-foreground"># {SECTION_HEADINGS[section]}</p>
+                  <SectionBulletsEditor body={workingBody} section={section} busy={busy} onEdit={applyBodyEdit} />
+                </div>
+              ))}
+            </div>
           )}
         </section>
 
@@ -257,11 +388,104 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
               </li>
             ))}
           </ul>
+          {draft && workingBody !== null && parsed?.output && (
+            <div className="mt-3 border-t border-border/50 pt-2">
+              <p className="text-[11px] font-medium text-muted-foreground"># {SECTION_HEADINGS.output}</p>
+              <OutputFenceEditor key={`${draft.id}:${parsed.output.body}`} body={workingBody}
+                format={parsed.output.format} initial={parsed.output.body} busy={busy} onEdit={applyBodyEdit} />
+            </div>
+          )}
         </section>
       </div>
 
       <div className="px-6 pb-6">
         <RecentStarts automationId={a.id} spaceId={spaceId} onOpenElement={onOpenElement} />
+      </div>
+
+      {publishId && (
+        <PromotionReviewDialogForDraft draftId={publishId} spaceId={spaceId}
+          definitions={harnesses as unknown as Definition[]}
+          onClose={() => setPublishId(null)}
+          onChanged={() => { void drafts.refetch(); onChanged(); }} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * One bullet section of the working body, as a list editor (PR4):
+ * each row is one bullet of the section — rewrite its line, or
+ * remove its block — and the field under the list appends one. Every
+ * act is a flowEditSection op on the working body, so an edit here
+ * touches exactly this section and nothing else; the section is
+ * named by its own heading in the body, because that heading is
+ * what the edit writes under.
+ */
+function SectionBulletsEditor({ body, section, busy, onEdit }: {
+  body: string;
+  section: SectionKey;
+  busy: boolean;
+  onEdit: (next: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const bullets = sectionBullets(body, section);
+  const [adding, setAdding] = useState('');
+  const [editing, setEditing] = useState<{ index: number; text: string } | null>(null);
+  return (
+    <div className="mt-1.5 space-y-1">
+      {bullets.map((b, i) => (
+        <div key={i} className="flex items-center gap-1">
+          {editing && editing.index === i ? (
+            <>
+              <Input value={editing.text} onChange={(e) => setEditing({ index: i, text: e.target.value })}
+                aria-label={t('Edit')} className="min-w-0 flex-1" disabled={busy} />
+              <Button size="xs" variant="primary" disabled={busy || !editing.text.trim()}
+                onClick={() => { onEdit(replaceSectionBullet(body, section, i, editing.text)); setEditing(null); }}>{t('Save')}</Button>
+              <Button size="xs" variant="ghost" disabled={busy} onClick={() => setEditing(null)}>{t('Cancel')}</Button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="min-w-0 flex-1 truncate text-left text-[12px] text-muted-foreground hover:text-foreground"
+                title={b} disabled={busy} onClick={() => setEditing({ index: i, text: b })}>{b}</button>
+              <Button size="xs" variant="ghost" disabled={busy}
+                onClick={() => onEdit(removeSectionBullet(body, section, i))}>{t('Delete')}</Button>
+            </>
+          )}
+        </div>
+      ))}
+      <div className="flex gap-1">
+        <Input value={adding} onChange={(e) => setAdding(e.target.value)} placeholder={t('Add a line')}
+          aria-label={t('Add a line')} className="min-w-0 flex-1" disabled={busy} />
+        <Button size="xs" variant="secondary" disabled={busy || !adding.trim()}
+          onClick={() => { onEdit(addSectionBullet(body, section, adding)); setAdding(''); }}>{t('Add')}</Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The output section's fence editor (PR4): the artifact shape as
+ * text, applied as one span swap (replaceOutputFence) into the
+ * working body — the fence is replaced where it stands, and the
+ * rest of the body keeps its bytes.
+ */
+function OutputFenceEditor({ body, format, initial, busy, onEdit }: {
+  body: string;
+  format: string;
+  initial: string;
+  busy: boolean;
+  onEdit: (next: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const [text, setText] = useState(initial);
+  const changed = text.trim() !== initial.trim();
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
+        aria-label={t('Output shape')} className="font-mono text-[12px]" disabled={busy} />
+      <div className="flex justify-end">
+        <Button size="xs" variant="primary" disabled={busy || !changed || !text.trim()}
+          onClick={() => onEdit(replaceOutputFence(body, text, format))}>{t('Save')}</Button>
       </div>
     </div>
   );

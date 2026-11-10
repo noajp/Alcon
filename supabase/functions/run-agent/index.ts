@@ -5107,6 +5107,21 @@ async function assemblePromotionMaterial(
     return { text: parts.join("\n\n"), sources, sourceLine: `記憶「${m.title}」（手順の durable 記憶）` };
   }
 
+  if (d.source_kind === "builder") {
+    // A builder draft (Automation builder PR4) has no memory or run
+    // behind it: its material is the seed the builder wrote on the
+    // row — the name, the body the zone picks filled, the binding —
+    // and the drafter drafts around that seed, taking a hand-edited
+    // body verbatim when it freezes (the standing revised rule).
+    if (!d.body || !d.name) return { missing: "ビルダーの下書きに、名前と本文の種がありません。" };
+    parts.push("## ビルダーで組み立てた種");
+    take("person", d.requester_id ?? d.id, "ビルダーの種（名前と本文）", `${d.name}\n\n${d.body}`);
+    return {
+      text: parts.join("\n\n"), sources,
+      sourceLine: `自動化ビルダーで組み立てた「${d.name}」（種は本人が置いた）`,
+    };
+  }
+
   if (!d.source_run_id) return { missing: "元の実行が指定されていません。" };
   const { data: srcRun } = await admin.from("agent_runs")
     .select("id, element_id, summary, result, status").eq("id", d.source_run_id).maybeSingle();
