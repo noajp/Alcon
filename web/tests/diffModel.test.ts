@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildFileTree, changeSize, fileKind, inboxBucket, isCheckStale, iteratePrompt, matchFile, parsePatch, parsePullUrl, readGuide,
+  buildFileTree, changeSize, fileKind, isCheckStale, iteratePrompt, matchFile, parsePatch, parsePullUrl, readGuide,
   readIntentCheck, reviewState, splitPath, splitRows, treeOrder, unchangedBefore,
-  type InboxChange, type InboxContext, type ReviewRecord,
+  type ReviewRecord,
 } from '@/Function/codeReview/diffModel';
 
 const server = await import(new URL('../../supabase/functions/_shared/github.ts', import.meta.url).pathname);
@@ -200,29 +200,6 @@ describe('readGuide', () => {
     expect(readGuide(null, files)).toBeNull();
     expect(readGuide({ sections: '[]' }, files)).toBeNull();
     expect(readGuide({ sections: [{ title: 'x', files: ['zzz'] }] }, files)).toBeNull();
-  });
-});
-
-describe('inboxBucket', () => {
-  const ctx = (over: Partial<InboxContext> = {}): InboxContext => ({
-    myElements: new Set(), reviewingElements: new Set(), elementsWithReviewer: new Set(), myVerdictHeads: new Map(), ...over,
-  });
-  const change = (over: Partial<InboxChange> = {}): InboxChange => ({ id: 'c', element_id: 'e', state: 'open', head_sha: 'h2', linked_by: 'other', ...over });
-
-  it('puts finished changes in done and the person’s own in mine', () => {
-    expect(inboxBucket(change({ state: 'merged' }), 'me', ctx())).toBe('done');
-    expect(inboxBucket(change({ linked_by: 'me' }), 'me', ctx())).toBe('mine');
-    expect(inboxBucket(change(), 'me', ctx({ myElements: new Set(['e']) }))).toBe('mine');
-  });
-  it('waits on a review until a verdict is given on the current head', () => {
-    expect(inboxBucket(change(), 'me', ctx())).toBe('review');
-    expect(inboxBucket(change(), 'me', ctx({ myVerdictHeads: new Map([['c', new Set(['h1'])]]) }))).toBe('review');
-    expect(inboxBucket(change(), 'me', ctx({ myVerdictHeads: new Map([['c', new Set(['h2'])]]) }))).toBe('open');
-  });
-  it('leaves a change with someone else as reviewer to them, and drafts open', () => {
-    expect(inboxBucket(change(), 'me', ctx({ elementsWithReviewer: new Set(['e']) }))).toBe('open');
-    expect(inboxBucket(change(), 'me', ctx({ elementsWithReviewer: new Set(['e']), reviewingElements: new Set(['e']) }))).toBe('review');
-    expect(inboxBucket(change({ state: 'draft' }), 'me', ctx())).toBe('open');
   });
 });
 

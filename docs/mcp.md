@@ -96,7 +96,7 @@ Google Drive は資格情報を貼り付けず、owner が Google にサイン�
 
 ### GitHub（OAuth）
 
-GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Customize か、Reviews の「GitHub を接続」から。Reviews から始めたサインインは Reviews に戻る）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Reviews（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Alcon を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
+GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Customize から）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Element のコード変更（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Alcon を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
 
 ### サインインの流れ（共通）
 

@@ -45,21 +45,6 @@ export function stripOAuthReturn(href: string): string {
   return `${u.pathname}${u.search}${u.hash}`;
 }
 
-/** sessionStorage: the view a sign-in was started from, when it is not Settings. */
-export const OAUTH_RETURN_VIEW_KEY = 'alcon.integrationOAuth.returnView';
-const RETURN_VIEWS = new Set(['reviews']);
-
-/** The view to come back to, read once; null means Settings › AI. */
-export function takeOAuthReturnView(): string | null {
-  try {
-    const view = sessionStorage.getItem(OAUTH_RETURN_VIEW_KEY);
-    sessionStorage.removeItem(OAUTH_RETURN_VIEW_KEY);
-    return view && RETURN_VIEWS.has(view) ? view : null;
-  } catch {
-    return null;
-  }
-}
-
 /** sessionStorage: the Settings › AI tab a sign-in was started from, when it is not Connectors (a harness install returns to Harnesses). */
 const OAUTH_RETURN_SETTINGS_TAB_KEY = 'alcon.integrationOAuth.returnTab';
 const RETURN_TABS = new Set(['definitions', 'external']);

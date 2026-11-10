@@ -27,8 +27,6 @@ describe('what counts as a different screen', () => {
     expect(routeKeyOf(base)).toBe(routeKeyOf(screen('objects', { objectId: 'o1', objectDomainId: 'd1' })));
     expect(routeKeyOf(base)).not.toBe(routeKeyOf(screen('objects', { objectId: 'o2', objectDomainId: 'd1' })));
     expect(routeKeyOf(base)).not.toBe(routeKeyOf(screen('strategy', { objectId: 'o1', objectDomainId: 'd1' })));
-    expect(routeKeyOf(screen('audit', { audit: { view: 'workflow', deploymentId: 'w1' } })))
-      .not.toBe(routeKeyOf(screen('audit', { audit: { view: 'workflow', deploymentId: 'w2' } })));
     expect(routeKeyOf(screen('files', { files: { tab: 'space', fileId: 'f1' } })))
       .not.toBe(routeKeyOf(screen('files', { files: { tab: 'space', fileId: 'f2' } })));
     expect(routeKeyOf(screen('home', { homeSelection: { type: 'domain', id: 'd1' } })))

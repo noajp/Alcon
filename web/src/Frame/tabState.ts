@@ -38,9 +38,6 @@ export function isItemScreen(screen: ScreenSnapshot): boolean {
     || n.noteId
     || n.documentId
     || n.canvasId
-    || n.codeChangeId
-    || n.audit?.deploymentId
-    || n.audit?.runId
     || n.files?.fileId
     || n.files?.folderId,
   );

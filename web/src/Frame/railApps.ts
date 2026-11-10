@@ -1,9 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { GitCompare } from '@/ui/icons';
 import {
-  NavAuditIcon,
   NavInboxIcon,
   NavTeamsIcon as NavPersonalIcon,
   NavNoteIcon,
@@ -20,7 +18,7 @@ import type { ViewId } from '@/Frame/viewRegistry';
 // The app's top-level modes. Strategy and the tools sit at the top of the
 // sidebar; Inbox, Calendar and the AI at the right of the status bar, the
 // avatar (Profile) at its left. Notebook and Slides open from Artifacts.
-export type RailMode = 'personal' | 'inbox' | 'workspace' | 'reviews' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'audit' | 'ai';
+export type RailMode = 'personal' | 'inbox' | 'workspace' | 'notebook' | 'tables' | 'files' | 'slides' | 'team' | 'calendar' | 'ai';
 
 export interface ModeMeta {
   label: string;
@@ -36,7 +34,6 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   // first, the sidebar's top row; Phase stays routable but is not in the nav.
   workspace: { label: 'Workspace', icon: NavStrategyModeIcon, defaultView: 'strategy',
     views: ['strategy', 'phase', 'objects', 'domain-elements', 'domains', 'domain-overview'] },
-  reviews:   { label: 'Reviews',   icon: GitCompare, defaultView: 'reviews', views: ['reviews'] },
   notebook:  { label: 'Notebook',  icon: NavNoteIcon, defaultView: 'note', views: ['note'] },
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
   files:     { label: 'Artifacts', icon: NavFilesIcon, defaultView: 'files', views: ['files'] },
@@ -44,7 +41,6 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   // People holds the team's load too ('workload' still opens it).
   team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team', 'workload'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
-  audit:     { label: 'Audit',     icon: NavAuditIcon, defaultView: 'audit', views: ['audit'] },
   ai:        { label: 'AI',        icon: NavAiIcon, defaultView: 'ai', views: ['ai'] },
 };
 
@@ -58,4 +54,4 @@ export function railModeOf(view: string): RailMode | null {
 export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
 
 /** The tools the command palette offers besides the document tools. */
-export const TOOL_MODES: RailMode[] = ['tables', 'files', 'team', 'audit', 'reviews'];
+export const TOOL_MODES: RailMode[] = ['tables', 'files', 'team'];

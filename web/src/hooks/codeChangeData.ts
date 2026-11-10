@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { selectIn } from '@/hooks/chunkedIn';
-import { inboxBucket, type InboxBucket } from '@/Function/codeReview/diffModel';
 import type { CodeChange, CodeChangeComment, CodeChangeReview, Json } from '@/types/database';
 
 // An Element's code changes — the pull requests that carry it out — and the
@@ -295,64 +294,6 @@ export function useCodeCommentActions(changeId: string) {
     onSettled: refresh,
   });
   return { add, resolve, remove };
-}
-
-// ── The Reviews inbox ──────────────────────────────────────────────────────
-
-export interface InboxEntry {
-  change: CodeChange;
-  element: { id: string; display_id: string | null; title: string } | null;
-  bucket: InboxBucket;
-}
-
-const EMPTY_INBOX: InboxEntry[] = [];
-
-/** The Space's code changes, each placed for the signed-in person: waiting on
- *  their review, theirs, other open ones, and finished ones (see inboxBucket). */
-export function useReviewInbox(spaceId: string | null, userId: string | null) {
-  const query = useQuery({
-    queryKey: [INBOX_KEY, spaceId, userId],
-    enabled: !!spaceId && !!userId,
-    staleTime: 30_000,
-    queryFn: async (): Promise<InboxEntry[]> => {
-      const { data, error } = await supabase.from('code_changes').select(CHANGE_COLUMNS)
-        .eq('activity_space_id', spaceId!).order('updated_at', { ascending: false }).limit(200);
-      if (error) throw error;
-      const changes = (data ?? []) as CodeChange[];
-      if (changes.length === 0) return [];
-      const elementIds = [...new Set(changes.map((c) => c.element_id))];
-      const [elements, assignees, workers, verdicts] = await Promise.all([
-        selectIn<{ id: string; display_id: string | null; title: string; owner_id: string | null }>(elementIds, (chunk) =>
-          supabase.from('elements').select('id, display_id, title, owner_id').in('id', chunk)),
-        selectIn<{ element_id: string; worker_id: string; role: string | null }>(elementIds, (chunk) =>
-          supabase.from('element_assignees').select('element_id, worker_id, role').in('element_id', chunk)),
-        supabase.from('workers').select('id').eq('user_id', userId!),
-        selectIn<{ code_change_id: string; head_sha: string | null; verdict: string }>(changes.map((c) => c.id), (chunk) =>
-          supabase.from('code_change_reviews').select('code_change_id, head_sha, verdict').eq('reviewer_id', userId!).in('code_change_id', chunk)),
-      ]);
-      const mine = new Set(((workers.data ?? []) as { id: string }[]).map((w) => w.id));
-      const myElements = new Set(elements.filter((e) => e.owner_id === userId).map((e) => e.id));
-      const reviewingElements = new Set<string>();
-      const elementsWithReviewer = new Set<string>();
-      for (const a of assignees) {
-        if (a.role === 'reviewer') {
-          elementsWithReviewer.add(a.element_id);
-          if (mine.has(a.worker_id)) reviewingElements.add(a.element_id);
-        } else if (mine.has(a.worker_id)) {
-          myElements.add(a.element_id);
-        }
-      }
-      const myVerdictHeads = new Map<string, Set<string | null>>();
-      for (const v of verdicts) {
-        if (v.verdict === 'comment') continue;
-        myVerdictHeads.set(v.code_change_id, (myVerdictHeads.get(v.code_change_id) ?? new Set()).add(v.head_sha));
-      }
-      const byId = new Map(elements.map((e) => [e.id, { id: e.id, display_id: e.display_id, title: e.title }]));
-      const ctx = { myElements, reviewingElements, elementsWithReviewer, myVerdictHeads };
-      return changes.map((change) => ({ change, element: byId.get(change.element_id) ?? null, bucket: inboxBucket(change, userId!, ctx) }));
-    },
-  });
-  return { data: query.data ?? EMPTY_INBOX, loading: !!spaceId && !!userId && query.isPending, error: (query.error as Error | null) ?? null, refetch: query.refetch };
 }
 
 // ── The intent a change is read against ────────────────────────────────────

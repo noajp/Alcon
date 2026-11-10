@@ -35,8 +35,6 @@ describe('what counts as an item screen', () => {
     expect(isItemScreen(screen('strategy', { strategyId: 's1' }))).toBe(true);
     expect(isItemScreen(screen('tables', { tableId: 't1' }))).toBe(true);
     expect(isItemScreen(screen('note', { noteId: 'n1' }))).toBe(true);
-    expect(isItemScreen(screen('reviews', { codeChangeId: 'c1' }))).toBe(true);
-    expect(isItemScreen(screen('audit', { audit: { view: 'workflow', deploymentId: 'w1' } }))).toBe(true);
     expect(isItemScreen(screen('files', { files: { tab: 'space', fileId: 'f1' } }))).toBe(true);
   });
 
@@ -45,7 +43,6 @@ describe('what counts as an item screen', () => {
     expect(isItemScreen(screen('objects', { objectId: null }))).toBe(false);
     expect(isItemScreen(screen('strategy', { strategyId: null, strategyCreate: true }))).toBe(false);
     expect(isItemScreen(screen('note', { noteFolderId: 'f1' }))).toBe(false);
-    expect(isItemScreen(screen('audit', { audit: { view: 'overview' } }))).toBe(false);
   });
 });
 

@@ -1,8 +1,6 @@
 import type React from 'react';
-import { GitCompare } from '@/ui/icons';
 import {
   NavAiIcon,
-  NavAuditIcon,
   NavHomeIcon,
   NavInboxIcon,
   NavCalendarIcon,
@@ -43,12 +41,10 @@ export type ViewId =
   | 'note'
   | 'domain-overview'
   | 'domains'
-  | 'reviews'
   | 'tables'
   | 'files'
   | 'slides'
   | 'team'
-  | 'audit'
   | 'settings'
   | 'profile'
   | 'account'
@@ -76,12 +72,10 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   note:          { label: 'Notebook',    icon: NavNoteIcon },
   'domain-overview': { label: 'Domain overview', icon: NavDomainIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
-  reviews:       { label: 'Reviews',     icon: GitCompare },
   tables:        { label: 'Table',       icon: NavTableIcon },
   files:         { label: 'Artifacts',   icon: NavFilesIcon },
   slides:        { label: 'Slides',      icon: NavSlidesIcon },
   team:          { label: 'People',      icon: NavTeamsIcon },
-  audit:         { label: 'Audit',       icon: NavAuditIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },

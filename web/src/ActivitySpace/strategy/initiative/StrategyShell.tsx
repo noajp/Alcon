@@ -65,7 +65,7 @@ import { StrategyCommentsPanel } from '@/ActivitySpace/strategy/initiative/Strat
 import { StrategyConversation } from './StrategyConversation';
 import { requestPlan } from './mission/plannerRequest';
 import { useQueryClient } from '@tanstack/react-query';
-import { InitiativeCodeChanges } from '@/ActivitySpace/reviews/InitiativeCodeChanges';
+import { InitiativeCodeChanges } from '@/ActivitySpace/execution/codeChanges/InitiativeCodeChanges';
 import { StrategyEvaluationPanel } from './StrategyEvaluationPanel';
 import { InitiativeMission } from './mission/InitiativeMission';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
@@ -168,7 +168,6 @@ export function StrategyShell({
   onOpenObject,
   onOpenDomain,
   onOpenTable,
-  onOpenRun,
   createRequested,
   onCreateHandled,
 }: {
@@ -184,8 +183,6 @@ export function StrategyShell({
   onOpenDomain?: (domainId: string) => void;
   /** Open one of the Strategy's Tables in the Table view. */
   onOpenTable?: (tableId: string) => void;
-  /** Open one run in the Audit app's log (the Evaluation tab's drill-down). */
-  onOpenRun?: (runId: string) => void;
   /** The sidebar's "+" asked for a new Strategy (navigation.strategyCreate).
    *  The dialog opens on the root list and `onCreateHandled` clears it. */
   createRequested?: boolean;
@@ -225,7 +222,6 @@ export function StrategyShell({
         onOpenObject={onOpenObject}
         onOpenDomain={onOpenDomain}
         onOpenTable={onOpenTable}
-        onOpenRun={onOpenRun}
       />
     );
   }
@@ -531,7 +527,6 @@ function StrategyDetailView({
   onOpenObject,
   onOpenDomain,
   onOpenTable,
-  onOpenRun,
 }: {
   strategy: StrategyWithObjects;
   /** Every Strategy, so this page can list/pick its nested children. */
@@ -543,7 +538,6 @@ function StrategyDetailView({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onOpenDomain?: (domainId: string) => void;
   onOpenTable?: (tableId: string) => void;
-  onOpenRun?: (runId: string) => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState(strategy.name);
@@ -1034,7 +1028,7 @@ function StrategyDetailView({
           // board: the records of finished runs, aggregated by the
           // Strategy's element set (StrategyEvaluationPanel).
           <div className="max-w-7xl mx-auto px-8 py-8">
-            <StrategyEvaluationPanel objects={missionProps.objects} onOpenRun={onOpenRun} />
+            <StrategyEvaluationPanel objects={missionProps.objects} />
           </div>
         ) : (
         <div className="max-w-7xl mx-auto px-8 py-8">

@@ -1,10 +1,8 @@
 'use client';
 
-import { ReviewsSidebar } from '@/ActivitySpace/reviews/ReviewsSidebar';
 import { NotebookTree } from './sidebar/NotebookTree';
 import { railModeOf } from '@/Frame/railApps';
 import { SidebarSectionLabel } from '@/Function/shared/SidebarRow';
-import { AuditSidebar } from '@/ActivitySpace/audit/AuditSidebar';
 import { AiSidebar } from '@/AIP/ai/AiSidebar';
 import { SlidesSidebar } from '@/ActivitySpace/artifacts/slides/SlidesSidebar';
 import { InboxList } from '@/ActivitySpace/home/InboxList';
@@ -13,8 +11,7 @@ import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ButtonAppearanceProvider } from '@/ui/button';
 
-// A tool's own list — the audit log's sections, the reviews, the inbox, the
-// notebooks — as a column inside the main pane, left of what it opens. The
+// A tool's own list — the inbox, the calendar, the notebooks — as a column inside the main pane, left of what it opens. The
 // app's sidebar stays the Workspace on every screen; this column is the tool's.
 
 /** The open tool's list, or nothing for the Workspace and personal pages. */
@@ -40,12 +37,6 @@ export function ModePanel({ activeView, navigation, onNavigate, onViewChange }: 
       body = <><SidebarSectionLabel>{t('Calendar')}</SidebarSectionLabel><CalendarSidebar /></>;
       break;
     // Artifacts, People and Table need no list beside them: the page itself is the list.
-    case 'reviews':
-      body = <ReviewsSidebar navigation={navigation} onNavigate={onNavigate} onOpen={() => { if (activeView !== 'reviews') onViewChange('reviews'); }} />;
-      break;
-    case 'audit':
-      body = <AuditSidebar navigation={navigation} onNavigate={onNavigate} />;
-      break;
     case 'ai':
       body = <AiSidebar onOpen={() => { if (activeView !== 'ai') onViewChange('ai'); }} />;
       break;

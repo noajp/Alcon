@@ -126,7 +126,7 @@ function StrategyCreatedCard({ entity }: { entity: CreatedEntity }) {
 const PR_STATES: readonly string[] = ['open', 'draft', 'merged', 'closed'];
 
 /** A PR state's mark and word, mirroring the code-changes surface's
- *  own table (ActivitySpace/reviews/codeChangeLabels): that module
+ *  own table (ActivitySpace/execution/codeChanges/codeChangeLabels): that module
  *  lives on the surface layer, which this layer may not import, so
  *  the four marks are restated here from the same glyphs and the
  *  same label strings — the translations resolve identically. */
