@@ -58,8 +58,10 @@ export function isExecuteEdgeZone(clientX: number, cardRight: number): boolean {
 }
 
 /** The rail's arrow, thick on purpose (owner addendum, 2026-11-10): a
- *  heavy stroke, not the hairline action glyph. */
-function ThickArrowRight({ size }: { size: number }) {
+ *  heavy stroke, not the hairline action glyph. Exported so every
+ *  execute affordance — the rail, the Object chip segments on the
+ *  Chain and in the Cascade — carries the same glyph, never a redraw. */
+export function ThickArrowRight({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
