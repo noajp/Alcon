@@ -45,8 +45,8 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   overview:    { title: 'Overview',   Icon: ClipboardList },
   gantt:       { title: 'Gantt',      Icon: GanttChart },
   calendar:    { title: 'Calendar',   Icon: Calendar },
-  workers:     { title: 'People',     Icon: Users },
-  resource:    { title: 'People',     Icon: Users },
+  workers:     { title: 'Team',       Icon: Users },
+  resource:    { title: 'Team',       Icon: Users },
   custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
   flow:        { title: 'Board',      Icon: Columns3 },
@@ -54,7 +54,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
 
 // Order of the "+" create-tab menu. 'summary' is structural (auto-created,
 // not user-addable); 'elements' is the list (Objects on a Domain, Elements
-// on an Object); 'resource' is People ('workers') now;
+// on an Object); 'resource' is Team ('workers') now;
 // 'note' is omitted because its UX flow
 // (open NotePicker → persist note_id → render embed) isn't wired here yet —
 // the type stays in the union for the Element detail's Note link.

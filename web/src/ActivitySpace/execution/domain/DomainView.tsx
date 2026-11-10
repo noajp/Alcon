@@ -67,7 +67,7 @@ const DOMAIN_VISIBLE_TABS_PREFIX = 'domain:visibleTabs:';
 const OBJECT_TAB_PREFIX = 'domain:objectActiveTabType:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
-// A Domain always has its Overview, its Flow and its People; other views are added.
+// A Domain always has its Overview, its Board and its Team; other views are added.
 const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'workers'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
@@ -76,9 +76,9 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   overview: { domainTitle: 'Overview', objectTitle: 'Overview' },
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
-  // Resource and Workers are one view: People.
-  workers: { domainTitle: 'People', objectTitle: 'People' },
-  resource: { domainTitle: 'People', objectTitle: 'People' },
+  // Resource and Workers are one view: Team.
+  workers: { domainTitle: 'Team', objectTitle: 'Team' },
+  resource: { domainTitle: 'Team', objectTitle: 'Team' },
   custom_view: { domainTitle: 'Custom view', objectTitle: 'Custom view' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
   flow: { domainTitle: 'Board', objectTitle: 'Board' },
@@ -127,9 +127,9 @@ function withObjectBoardOnce(objectId: string, types: ObjectTabType[]): ObjectTa
 }
 
 /** The Domain's own tabs lead — Overview, the Objects list, Board, Gantt,
- *  People — whatever else was added. */
+ *  Team — whatever else was added. */
 function withDomainTabs(types: ObjectTabType[]): ObjectTabType[] {
-  // Resource is People now.
+  // Resource is Team now.
   return [...DEFAULT_DOMAIN_TAB_TYPES, ...types.filter((t) => !DEFAULT_DOMAIN_TAB_TYPES.includes(t) && t !== 'resource')];
 }
 
@@ -637,11 +637,11 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     );
   }
 
-  // People: everyone working in the Domain, with their load.
+  // Team: everyone working in the Domain, with their load.
   if (activeType === 'resource' || activeType === 'workers') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="People" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
+        <ElementDrilldown key={domainId} label="Team" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
           {openElement => <ResourceView
             scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
             onElementClick={element => openElement(element.id)}

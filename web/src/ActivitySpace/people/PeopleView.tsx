@@ -35,18 +35,18 @@ export function PeopleView({ workerId, unitId, onNavigate, onViewChange }: {
   const openWorker = (id: string) => onNavigate({ workerId: id, unitId: unit?.id ?? null });
 
   const path: IslandCrumb[] = [
-    { id: 'people', label: t('People'), onClick: workerId || unit ? () => onNavigate({ workerId: null, unitId: null }) : undefined },
+    { id: 'people', label: t('Team'), onClick: workerId || unit ? () => onNavigate({ workerId: null, unitId: null }) : undefined },
     ...(unit ? unitPath(units, unit.id).map((u) => ({ id: u.id, label: u.name, onClick: u.id !== unit.id || workerId ? () => openUnit(u.id) : undefined })) : []),
     ...(workerId ? [{ id: 'worker', label: roster.workers.find((w) => w.id === workerId)?.name ?? '' }] : []),
   ];
 
   return (
-    <ElementDrilldown label="People" onNavigate={onNavigate} onViewChange={onViewChange}>
+    <ElementDrilldown label="Team" onNavigate={onNavigate} onViewChange={onViewChange}>
       {openElement => roster.error ? <div role="alert" className="flex items-center gap-2 px-4 py-3 text-sm text-destructive">
         {t('Could not load the team.')} <Button size="xs" onClick={() => void roster.refresh()}>{t('Retry')}</Button>
       </div> : roster.loading ? <p role="status" className="px-4 py-3 text-sm text-muted-foreground">{t('Loading team…')}</p> : (
         <ResourceView
-          title="People"
+          title="Team"
           path={path}
           roster={roster.workers}
           workerId={workerId ?? undefined}

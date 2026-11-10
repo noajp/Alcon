@@ -38,8 +38,8 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   tables:    { label: 'Table',     icon: NavTableIcon, defaultView: 'tables', views: ['tables'] },
   files:     { label: 'Artifacts', icon: NavFilesIcon, defaultView: 'files', views: ['files'] },
   slides:    { label: 'Slides',    icon: NavSlidesIcon, defaultView: 'slides', views: ['slides'] },
-  // People holds the team's load too ('workload' still opens it).
-  team:      { label: 'People',    icon: NavTeamsIcon, defaultView: 'team', views: ['team', 'workload'] },
+  // Team holds its load too ('workload' still opens it).
+  team:      { label: 'Team',      icon: NavTeamsIcon, defaultView: 'team', views: ['team', 'workload'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
   ai:        { label: 'AI',        icon: NavAiIcon, defaultView: 'ai', views: ['ai'] },
 };

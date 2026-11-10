@@ -205,7 +205,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
           { type: 'elements', title: 'All' },
-          { type: 'workers',  title: 'People' },
+          { type: 'workers',  title: 'Team' },
         ];
         for (let i = 0; i < defaults.length; i++) {
           await createObjectTab({
