@@ -4,7 +4,7 @@ import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { SettingsSection, SettingsRow } from './SettingsSection';
+import { SettingsIsland, ToggleRow } from './SettingsControls';
 import { canEditMemory, filterMemories, promotionCandidates, type Memory } from './memoryModel';
 import {
   deleteMemory, listMySpaces, promoteMemory, setMemoryPinned, setPersonalAutoCapture,
@@ -25,6 +25,12 @@ import { useDefinitions } from '@/hooks/definitionData';
 // both scopes; the wrappers differ only in whose rows and whose
 // toggle they hold. Everything works without AI: this screen is
 // plain record-keeping over the memories table.
+//
+// Presentation (settings redesign PR3): the view renders inside a
+// SettingsIsland on both surfaces — the auto-capture checkbox is a
+// ToggleRow on the shared Switch (the owner gate in its caption), the
+// filter bar stays a filter, and the list keeps its own rows under
+// the island's padding.
 
 interface ViewProps {
   state: MemoryListState;
@@ -85,30 +91,26 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
   const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale) : '');
 
   if (state.loading) {
-    return <p className="py-2 text-[12px] text-muted-foreground">{t('Loading…')}</p>;
+    return <p className="px-5 py-3.5 text-[12px] text-muted-foreground">{t('Loading…')}</p>;
   }
   if (state.error) {
-    return <p role="alert" className="py-2 text-[12px] text-[var(--status-danger)]">{t("Couldn't load the memories: {error}", { error: state.error.message })}</p>;
+    return <p role="alert" className="px-5 py-3.5 text-[12px] text-[var(--status-danger)]">{t("Couldn't load the memories: {error}", { error: state.error.message })}</p>;
   }
 
   return (
     <>
-      <SettingsRow label={t('Auto-capture')} hint={t('When work finishes, Athena distils what it taught into a memory. Turning this off stops new memories; the ones already kept stay.')}>
-        <label className="flex items-center gap-2 text-[13px] text-foreground">
-          <input
-            type="checkbox"
-            checked={state.autoCapture ?? true}
-            disabled={!captureEditable || busy}
-            onChange={(e) => void act(() => onToggleCapture(e.target.checked), "Couldn't change auto-capture: {error}")}
-          />
-          {(state.autoCapture ?? true) ? t('On') : t('Off')}
-        </label>
-      </SettingsRow>
-      {!captureEditable && <p className="text-[12px] text-muted-foreground">{t('Only the owner can change auto-capture here.')}</p>}
-      {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
-      {notice && <p className="text-[12px] text-muted-foreground">{notice}</p>}
+      <ToggleRow
+        label={t('Auto-capture')}
+        desc={t('When work finishes, Athena distils what it taught into a memory. Turning this off stops new memories; the ones already kept stay.')}
+        caption={!captureEditable ? t('Only the owner can change auto-capture here.') : undefined}
+        value={state.autoCapture ?? true}
+        disabled={!captureEditable || busy}
+        onChange={(v) => void act(() => onToggleCapture(v), "Couldn't change auto-capture: {error}")}
+      />
+      {error && <p role="alert" className="px-5 py-2.5 text-[12px] text-[var(--status-danger)]">{error}</p>}
+      {notice && <p className="px-5 py-2.5 text-[12px] text-muted-foreground">{notice}</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="px-5 py-3 flex flex-wrap items-center gap-2">
         {(['all', 'durable', 'episode'] as const).map((l) => (
           <button
             key={l} type="button" onClick={() => setLayer(l)}
@@ -136,7 +138,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
       </div>
 
       {candidates.length > 0 && layer !== 'episode' && (
-        <div className="mt-4 rounded-md border border-border/60 p-3">
+        <div className="px-5 py-3.5">
           <p className="text-[12px] font-medium text-foreground">{t('Promotion candidates')}</p>
           <p className="text-[12px] text-muted-foreground">{t('The procedures Athena reaches for most — where turning know-how into a harness would start.')}</p>
           <ul className="mt-1.5 space-y-1">
@@ -160,7 +162,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
         </div>
       )}
 
-      <div className="mt-3 divide-y divide-border/60">
+      <div className="px-5 divide-y divide-border/60">
         {rows.length === 0 && (
           <p className="py-3 text-[12px] text-muted-foreground">{state.memories.length === 0 ? t('No memories yet. When work finishes, what it taught appears here.') : t('No memories match.')}</p>
         )}
@@ -287,7 +289,7 @@ export function SpaceMemorySettings({ spaceId, isOwner, userId }: { spaceId: str
   const { t } = useI18n();
   const state = useSpaceMemories(spaceId);
   return (
-    <SettingsSection title={t('Memory')} description={t(DESCRIPTION)}>
+    <SettingsIsland title={t('Memory')} description={t(DESCRIPTION)}>
       <MemoryView
         state={state}
         userId={userId}
@@ -296,7 +298,7 @@ export function SpaceMemorySettings({ spaceId, isOwner, userId }: { spaceId: str
         onToggleCapture={(on) => setSpaceAutoCapture(spaceId, on)}
         shareSpaces={null}
       />
-    </SettingsSection>
+    </SettingsIsland>
   );
 }
 
@@ -310,7 +312,7 @@ export function PersonalMemorySettings({ userId }: { userId: string }) {
     return () => { live = false; };
   }, [userId]);
   return (
-    <SettingsSection title={t('Memory')} description={t('Your own memories: what Athena kept from your work outside a Space, and from your conversations. Only you can read them; sharing one into a Space is always your explicit act, from the opened memory.')}>
+    <SettingsIsland title={t('Memory')} description={t('Your own memories: what Athena kept from your work outside a Space, and from your conversations. Only you can read them; sharing one into a Space is always your explicit act, from the opened memory.')}>
       <MemoryView
         state={state}
         userId={userId}
@@ -319,6 +321,6 @@ export function PersonalMemorySettings({ userId }: { userId: string }) {
         onToggleCapture={(on) => setPersonalAutoCapture(userId, on)}
         shareSpaces={spaces}
       />
-    </SettingsSection>
+    </SettingsIsland>
   );
 }

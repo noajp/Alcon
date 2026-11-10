@@ -552,6 +552,10 @@ const APP_MESSAGES: Record<string, Row> = {
   'Risk thresholds': ['リスクしきい値', '위험 임계값', 'Seuils de risque', 'Umbrales de riesgo'],
   'Set under Strategy': ['Strategy で設定します', 'Strategy에서 설정합니다', 'Se définit sous Strategy', 'Se define en Strategy'],
   'Go to Strategy settings': ['Strategy 設定へ', 'Strategy 설정으로', 'Aller aux réglages Strategy', 'Ir a los ajustes de Strategy'],
+  // The Space area's row descriptions (Settings › Activity space, redesign PR3).
+  'The name shown in the sidebar and in invitations for this Space.': ['サイドバーと招待に表示される、この Space の名前。', '사이드바와 초대에 표시되는 이 Space의 이름.', 'Le nom de ce Space, affiché dans la barre latérale et les invitations.', 'El nombre de este Space, mostrado en la barra lateral y en las invitaciones.'],
+  'The emoji or image that stands for this Space in the sidebar.': ['サイドバーでこの Space を表す絵文字または画像。', '사이드바에서 이 Space를 나타내는 이모지 또는 이미지.', 'L’emoji ou l’image qui représente ce Space dans la barre latérale.', 'El emoji o la imagen que representa a este Space en la barra lateral.'],
+  'How often Athena wakes to inspect what has been left waiting.': ['Athena が放置された待ちを点検するために起きる頻度。', 'Athena가 방치된 대기를 점검하기 위해 깨어나는 빈도.', 'La fréquence à laquelle Athena se réveille pour inspecter ce qui attend.', 'La frecuencia con la que Athena despierta para inspeccionar lo que lleva esperando.'],
   // The Space's approval mode (Settings › Activity space).
   'Approval mode': ['承認モード', '승인 모드', 'Mode d’approbation', 'Modo de aprobación'],
   'Change in Space settings': ['Space 設定で変更', 'Space 설정에서 변경', 'Modifier dans les réglages du Space', 'Cambiar en los ajustes del Space'],
