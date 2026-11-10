@@ -275,7 +275,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
 
           {activeActivity === 'settings' && (
-            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <SettingsView />
             </div>
           )}

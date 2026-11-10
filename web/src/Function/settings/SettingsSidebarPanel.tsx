@@ -16,8 +16,10 @@ import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 interface NavHit { item: SettingsNavItem; tab?: string }
 
 // The Settings navigation rendered INSIDE the AppSidebar (it replaces the
-// Activity Space tree while Settings mode is active). Selecting an item just
-// updates the shared store; SettingsView reacts and swaps its content panel.
+// Activity Space tree while Settings mode is active). Settings is one page:
+// selecting an item reveals its area (SettingsView scrolls it into view),
+// and the highlighted row follows SettingsView's scroll-spy as the reader
+// moves down the page.
 export function SettingsSidebarPanel() {
   const { t } = useI18n();
   const stored = useActiveSettingsSection();
@@ -45,8 +47,7 @@ export function SettingsSidebarPanel() {
 
   return (
     <div className="pt-1">
-      {/* The search stays put; the settings scroll under it. */}
-      <div className="sticky top-0 z-10 -mt-1 bg-sidebar pb-2 pt-1">
+      <div className="pb-2">
         <div className="relative">
           <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
           <input

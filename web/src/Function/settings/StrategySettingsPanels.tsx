@@ -15,7 +15,8 @@ import { SelectControl } from './SettingsControls';
 // ── Strategy — how Strategies are judged ────────────────────────────
 // The thresholds are each Domain's risk_thresholds — the numbers the
 // Strategy list row, the Strategy page and the due-soon notifications
-// all read. One store, one editor (also reachable as Elements > SLAs).
+// all read. One store, one editor, one home: here. (Elements used to
+// render a second copy as its SLAs tab; it now points here instead.)
 export function InitiativeJudgementSettings() {
   return <SlaSettings />;
 }
