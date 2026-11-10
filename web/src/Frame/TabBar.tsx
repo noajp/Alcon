@@ -46,7 +46,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   resource:    { title: 'People',     Icon: Users },
   custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
-  flow:        { title: 'Execution Chain', Icon: Columns3 },
+  flow:        { title: 'Board',      Icon: Columns3 },
 };
 
 // Order of the "+" create-tab menu. 'summary'/'elements' are structural
@@ -162,7 +162,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                     <button
                       key={type}
                       onClick={() => handleCreate(type)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                      className="w-full flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm text-foreground hover:bg-accent transition-colors"
                     >
                       <span className="text-muted-foreground"><OptionIcon size={16} /></span>
                       {t(meta.title)}

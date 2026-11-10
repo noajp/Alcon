@@ -76,7 +76,7 @@ function DraftCard({ element, object }: { element: FleetElement; object: FleetOb
 }
 
 
-export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot, orientation }: {
+export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot, orientation, via }: {
   ctx: MissionContext;
   /** The board's orientation, from the page's tabs-row toggle. */
   orientation: BoardOrientation;
@@ -91,6 +91,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   people: Worker[];
   /** The Strategy's root intent; new objectives hang under it. */
   ensureRoot: () => Promise<string>;
+  /** Objects a Strategy under this one holds, by id, with that Strategy. */
+  via?: ReadonlyMap<string, { id: string; name: string }>;
 }) {
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
@@ -305,7 +307,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const cardFor = (e: FleetElement, o: FleetObject, reason: WaitingReason | null = null) => (
     e.elementId && details.get(e.elementId) ? (
       <ChainCard element={e} detail={details.get(e.elementId)!}
-        object={{ id: o.objectId ?? undefined, name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft }}
+        object={{ id: o.objectId ?? undefined, name: o.name, icon: o.icon ?? null, color: o.color ?? null, isNew: o.draft, via: o.objectId ? via?.get(o.objectId)?.name : undefined }}
         busy={busy !== null && (busy === 'all' || busy === e.elementId)}
         reason={reason}
         rounds={rounds.get(e.elementId)}

@@ -66,7 +66,6 @@ import { StrategyConversation } from './StrategyConversation';
 import { requestPlan } from './mission/plannerRequest';
 import { useQueryClient } from '@tanstack/react-query';
 import { InitiativeCodeChanges } from '@/ActivitySpace/reviews/InitiativeCodeChanges';
-import { StrategyCascade } from './StrategyCascade';
 import { StrategyEvaluationPanel } from './StrategyEvaluationPanel';
 import { InitiativeMission } from './mission/InitiativeMission';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
@@ -102,20 +101,19 @@ import {
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
-import { buildInitiativeTree, flattenInitiativeTree, inSpace, planInitiativeDrop, siblingOrder, type InitiativeDropPlace, type InitiativeNode } from './initiativeTree';
+import { buildInitiativeTree, descendantObjects, flattenInitiativeTree, inSpace, planInitiativeDrop, siblingOrder, type InitiativeDropPlace, type InitiativeNode } from './initiativeTree';
 import { useActiveObjectCount } from '@/hooks/useObjectArchive';
 
 /** The Overview's board: a band under the name, the document column, and
  *  the island beside it. */
 const BOARD_ZONES: Zone[] = ['band', 'main', 'rail'];
 
-/** A Strategy's views: what it is, how it cascades down, and how its
- *  work is going. */
-type StrategyTab = 'overview' | 'cascade' | 'chain' | 'evaluation';
+/** A Strategy's views: what it is, and how its work — its own and its
+ *  descendants' — is going. */
+type StrategyTab = 'overview' | 'chain' | 'evaluation';
 const STRATEGY_TABS: readonly { id: StrategyTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'cascade', label: 'Cascade' },
-  { id: 'chain', label: 'Execution' },
+  { id: 'chain', label: 'Board' },
   { id: 'evaluation', label: 'Evaluation' },
 ];
 
@@ -156,11 +154,11 @@ function InitiativeBoard({ surface, defaults, subjectId, host, zones, children }
 // Strategy list — only TOP-LEVEL Strategies (no parent in strategy_children)
 // show there; a Strategy nested inside another only appears in its parent's
 // "Strategies" section. Selecting a row pushes into that Strategy's detail
-// page, in four tabs: Overview (title, description, files, Objects, Sub
+// page, in three tabs: Overview (title, description, files, Objects, Sub
 // Strategies, what the work produced, the discussion, and the Properties
-// island), Cascade (the Strategies nested under this one, generation
-// by generation), Execution (the work in columns by where it stands,
-// and the Planner's draft in the first), and Evaluation (what the
+// island), Board (the work of this Strategy and every Strategy under
+// it, in columns by where it stands, each card naming the Strategy it
+// came by, and the Planner's draft in the first), and Evaluation (what the
 // finished runs' records say about the work's quality).
 // =============================================================
 
@@ -678,6 +676,17 @@ function StrategyDetailView({
     onOpenObject,
     orientation: boardOrientation,
   };
+  // The Execution board spans the subtree: the Objects of every Strategy
+  // under this one join its own, each remembered with the Strategy that
+  // holds it, so one board answers for the whole tree.
+  const descendantHolders = useMemo(() => descendantObjects(allStrategies, strategy.id), [allStrategies, strategy.id]);
+  const boardObjects = useMemo(
+    () => [
+      ...allObjects.filter((o) => selectedIds.has(o.id)),
+      ...allObjects.filter((o) => descendantHolders.has(o.id) && !selectedIds.has(o.id)),
+    ],
+    [allObjects, selectedIds, descendantHolders],
+  );
   const queryClient = useQueryClient();
   // The conversation hands the breakdown to the Planner, in the work below.
   const planFromConversation = (guidance: string) => {
@@ -990,7 +999,7 @@ function StrategyDetailView({
 
 
       <ViewTabs tabs={STRATEGY_TABS} active={tab} onSelect={setTab} label={t('Strategy views')}
-        actions={(tab === 'chain' || tab === 'cascade') ? (
+        actions={tab === 'chain' ? (
           <BoardOrientationToggle orientation={boardOrientation} onChange={setBoardOrientation} />
         ) : undefined} />
 
@@ -1018,15 +1027,7 @@ function StrategyDetailView({
                 </PageSection>
               </div>
             )}
-            <InitiativeMission tab="execution" {...missionProps} />
-          </div>
-        ) : tab === 'cascade' ? (
-          // A bounded board like the chain's: the columns take the height
-          // and scroll inside themselves. The conversation never mounts
-          // here — it lives on the Overview and the Chain, one mount only.
-          <div className="flex h-full flex-col px-8 py-6">
-            <StrategyCascade strategy={strategy} allStrategies={allStrategies} onOpenStrategy={onOpenStrategy}
-              orientation={boardOrientation} objects={allObjects} onOpenObject={onOpenObject} />
+            <InitiativeMission tab="execution" {...missionProps} objects={boardObjects} via={descendantHolders} />
           </div>
         ) : tab === 'evaluation' ? (
           // A scrolling report page like the Overview, not a bounded
