@@ -445,7 +445,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
           )}
 
           <div className="-my-1">
-            <ToggleRow label={t('Enabled')} desc={isModel ? t('When off, AI agents on this connection do not run.') : t('When off, agents do not see this connection.')} value={enabled}
+            <ToggleRow flush label={t('Enabled')} desc={isModel ? t('When off, AI agents on this connection do not run.') : t('When off, agents do not see this connection.')} value={enabled}
               disabled={readOnly} onChange={(v) => setLive({ enabled: v })} />
           </div>
 

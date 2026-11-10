@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/ui/button';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
-import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize } from './appearanceOptions';
+import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize, POINTER_CURSOR_KEY } from './appearanceOptions';
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { MemberSettings } from './MemberSettings';
@@ -17,7 +17,7 @@ import { IntegrationsSettings } from '@/AIP/connectors/IntegrationsSettings';
 import { useActiveSettingsSection, useActiveSettingsTab, setActiveSettingsSection, SETTINGS_ITEMS, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
-import { Group, Row, SelectRow, ToggleRow } from './SettingsControls';
+import { SettingsIsland, SettingRow, SelectRow, SegmentedRow, ToggleRow } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SettingsComingSoon } from './SettingsSection';
 import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySettingsPanels';
@@ -85,10 +85,13 @@ export function SettingsView() {
 }
 
 // =============================================================
-// Preferences — the rich General + Interface/theme panel. The General
-// group persists to `user_preferences` (owner_user-scoped) via
-// useUserPreferences; App sidebar customization and pointer cursors are
-// still local-only placeholders.
+// Preferences — the rich General + Interface/theme panel, and the pilot
+// for the settings redesign's primitives: groups render as property
+// islands, short enums as segmented controls, booleans on the shared
+// Switch. The General group persists to `user_preferences`
+// (owner_user-scoped) via useUserPreferences; Theme, Font size and
+// pointer cursors are device-local (next-themes / localStorage); the
+// App sidebar row is still a placeholder action.
 // =============================================================
 function PreferencesPanel() {
   const { t } = useI18n();
@@ -104,8 +107,14 @@ function PreferencesPanel() {
     try {
       const saved = window.localStorage.getItem(FONT_SIZE_KEY);
       if (saved && FONT_SIZES.some((f) => f.key === saved)) setFontKey(saved);
+      setPointerCursors(window.localStorage.getItem(POINTER_CURSOR_KEY) === '1');
     } catch { /* ignore */ }
   }, []);
+
+  const setPointerCursorsPersisted = (v: boolean) => {
+    setPointerCursors(v);
+    try { window.localStorage.setItem(POINTER_CURSOR_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+  };
 
   const themeLabel = mounted ? (THEME_OPTIONS.find((o) => o.value === theme)?.label ?? 'System') : 'System';
   const setThemeByLabel = (label: string) => {
@@ -123,7 +132,12 @@ function PreferencesPanel() {
 
   return (
     <div className="space-y-10">
-      <h1 className="text-[26px] font-semibold tracking-tight text-foreground">{t('Preferences')}</h1>
+      <div>
+        <h1 className="text-[26px] font-semibold tracking-tight text-foreground">{t('Preferences')}</h1>
+        <p className="text-[13px] text-muted-foreground mt-1.5">
+          {t('Language, appearance, and defaults for how Alcon works for you.')}
+        </p>
+      </div>
 
       {error && (
         <div className="text-[12px] text-destructive px-1 -mt-6">
@@ -131,25 +145,25 @@ function PreferencesPanel() {
         </div>
       )}
 
-      <Group title={t('General')}>
-        <Row label={t('Language')} desc={t('Choose the language used across Alcon')}>
+      <SettingsIsland title={t('General')}>
+        <SettingRow label={t('Language')} desc={t('Choose the language used across Alcon')}>
           <LanguageSelect />
-        </Row>
-        <SelectRow
+        </SettingRow>
+        <SegmentedRow
           label={t('Default home view')}
           desc={t('Select which view to open when launching Alcon')}
           value={preferences.home_view}
           options={['Now', 'My Elements', 'Inbox', 'Calendar']}
           onChange={(v) => savePreference('home_view', v as UserPreferences['home_view'])}
         />
-        <SelectRow
+        <SegmentedRow
           label={t('Display names')}
           desc={t('How names are shown across the interface')}
           value={preferences.display_names}
           options={['Full name', 'Short name', 'Username']}
           onChange={(v) => savePreference('display_names', v as UserPreferences['display_names'])}
         />
-        <SelectRow
+        <SegmentedRow
           label={t('First day of the week')}
           desc={t('Used for date pickers')}
           value={preferences.first_day_of_week}
@@ -162,16 +176,16 @@ function PreferencesPanel() {
           value={preferences.convert_emoticons}
           onChange={(v) => savePreference('convert_emoticons', v)}
         />
-        <SelectRow
+        <SegmentedRow
           label={t('Send comment on…')}
           desc={t('Which key press submits a comment')}
           value={preferences.send_comment_shortcut}
           options={['⌘+Enter', 'Enter']}
           onChange={(v) => savePreference('send_comment_shortcut', v as UserPreferences['send_comment_shortcut'])}
         />
-      </Group>
+      </SettingsIsland>
 
-      <Group title={t('Interface and theme')}>
+      <SettingsIsland title={t('Interface and theme')}>
         <SelectRow
           label={t('Theme')}
           desc={t('Match the system or pick a colour theme')}
@@ -179,11 +193,11 @@ function PreferencesPanel() {
           options={THEME_OPTIONS.map((o) => o.label)}
           onChange={setThemeByLabel}
         />
-        <Row label={t('App sidebar')} desc={t('Customize sidebar item visibility, ordering, and badge style')}>
+        <SettingRow label={t('App sidebar')} desc={t('Customize sidebar item visibility, ordering, and badge style')}>
           <button type="button" className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
             {t('Customize')}
           </button>
-        </Row>
+        </SettingRow>
         <SelectRow
           label={t('Font size')}
           desc={t('Adjust the size of text across the app')}
@@ -195,9 +209,9 @@ function PreferencesPanel() {
           label={t('Use pointer cursors')}
           desc={t('Change the cursor to a pointer over interactive elements')}
           value={pointerCursors}
-          onChange={setPointerCursors}
+          onChange={setPointerCursorsPersisted}
         />
-      </Group>
+      </SettingsIsland>
     </div>
   );
 }
