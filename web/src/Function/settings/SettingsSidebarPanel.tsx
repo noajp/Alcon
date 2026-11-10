@@ -45,7 +45,8 @@ export function SettingsSidebarPanel() {
 
   return (
     <div className="pt-1">
-      <div className="pb-2">
+      {/* The search stays put; the settings scroll under it. */}
+      <div className="sticky top-0 z-10 -mt-1 bg-sidebar pb-2 pt-1">
         <div className="relative">
           <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
           <input
