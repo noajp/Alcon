@@ -135,3 +135,29 @@ export function planInitiativeDrop<T extends InitiativeMember>(
     siblingIds: [...new Set(siblingIds)],
   };
 }
+
+/** The Objects a Strategy's descendants hold that it does not hold itself,
+ *  each with the nearest descendant that holds it — so one Board can show
+ *  the whole subtree's work, every card naming the Strategy it came by.
+ *  Breadth first, so a nearer Strategy wins; a loop is not followed. */
+export function descendantObjects<T extends InitiativeMember>(
+  strategies: T[],
+  rootId: string,
+): Map<string, { id: string; name: string }> {
+  const root = strategies.find((s) => s.id === rootId);
+  const own = new Set(root?.objectIds ?? []);
+  const out = new Map<string, { id: string; name: string }>();
+  const seen = new Set<string>([rootId]);
+  let frontier = [rootId];
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const s of [...strategies].sort(siblingOrder)) {
+      if (seen.has(s.id) || !s.parentIds.some((p) => frontier.includes(p))) continue;
+      seen.add(s.id);
+      next.push(s.id);
+      for (const oid of s.objectIds) if (!own.has(oid) && !out.has(oid)) out.set(oid, { id: s.id, name: s.name });
+    }
+    frontier = next;
+  }
+  return out;
+}

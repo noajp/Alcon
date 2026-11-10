@@ -25,6 +25,7 @@ import { ActionTag } from '@/Function/shared/elementAction';
 import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { Chip } from './BoardColumn';
 
 // The Element card: every Execution Chain draws the same one.
@@ -61,7 +62,7 @@ export function isExecuteEdgeZone(clientX: number, cardRight: number): boolean {
  *  heavy stroke, not the hairline action glyph. Exported so every
  *  execute affordance — the rail, the Object chip segments on the
  *  Chain and in the Cascade — carries the same glyph, never a redraw. */
-export function ThickArrowRight({ size }: { size: number }) {
+function ThickArrowRight({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -80,7 +81,7 @@ interface ElementCardProps {
    *  status cannot say (an AI run). */
   badge?: React.ReactNode;
   /** The Object the Element belongs to, shown as a chip under the title. */
-  object?: { id?: string; name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
+  object?: { id?: string; name: string; icon?: string | null; color?: string | null; isNew?: boolean; via?: string } | null;
   /** Lines between the title and the footer, for what the host adds. */
   extra?: React.ReactNode;
   /** The hover-execute rail's press (card hover-execute, PR1): the host
@@ -264,7 +265,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 />
               ) : (
                 <p
-                  className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
+                  className="min-w-0 flex-1 truncate text-[14px] font-normal text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
                   title={element.title}
                   onPointerDown={stop}
                   onClick={(e) => { stop(e); setEditingTitle(true); }}
@@ -308,6 +309,14 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 text line. */}
             {object && (
               <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+                {/* On a board that spans a Strategy's subtree: the
+                    Strategy under it that this work came by. */}
+                {object.via && (
+                  <Chip title={object.via} className="max-w-full">
+                    <NavStrategyIcon size={11} className="shrink-0" />
+                    <span className="truncate">{object.via}</span>
+                  </Chip>
+                )}
                 <Chip title={object.name} className="max-w-full">
                   <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
                   <span className="truncate">{object.name}</span>

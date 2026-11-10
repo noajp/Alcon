@@ -15,7 +15,7 @@ import { missionElementRow, type MissionElementRow, type MissionMeasureRow } fro
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
-export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, orientation }: {
+export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, orientation, via }: {
   tab: 'execution' | 'audit';
   initiativeId: string;
   initiativeName: string;
@@ -31,6 +31,9 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   /** The board's orientation, from the page's tabs-row toggle. */
   orientation: BoardOrientation;
+  /** Objects that came from a Strategy under this one, by id: the
+   *  Strategy that holds each, which its cards name. */
+  via?: ReadonlyMap<string, { id: string; name: string }>;
 }) {
   const intent = useInitiativeIntentContext();
   const { data: workers } = useWorkers();
@@ -72,7 +75,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
 
   if (tab === 'execution') {
     return (
-      <MissionExecutionPanel ctx={ctx} details={details} orientation={orientation}
+      <MissionExecutionPanel ctx={ctx} details={details} orientation={orientation} via={via}
         objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id, icon: o.icon ?? null, color: o.color ?? null }))}
         domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}

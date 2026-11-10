@@ -131,7 +131,7 @@ export function ChainLines({ element, busy, onHandOver, rounds, onOpenElement, l
 export function ChainCard({ element, object, detail, busy = false, reason = null, rounds, latestRun, onRefresh, onOpen, onOpenElement, onHandOver, onExecute, onExecuteObject }: {
   element: FleetElement;
   /** The Object the card names; null for an Element that sits in none. */
-  object: { id?: string; name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
+  object: { id?: string; name: string; icon?: string | null; color?: string | null; isNew?: boolean; via?: string } | null;
   detail: ElementWithDetails;
   busy?: boolean;
   reason?: WaitingReason | null;
