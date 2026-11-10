@@ -16,6 +16,7 @@ import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard, ChainLines } from '@/ActivitySpace/execution/chain/ChainCard';
+import { ExecutePlanDialog } from '@/ActivitySpace/execution/element/agent';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import { CARD_FLAT } from '@/shared/designTokens';
 import { Chip } from '@/ActivitySpace/execution/element/board/BoardColumn';
@@ -105,6 +106,9 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [aiWorkerId, setAiWorkerId] = useState('');
+  // The one Execute popup for this board (card hover-execute, PR1):
+  // a card's rail names its Element, the dialog does the rest.
+  const [executeTarget, setExecuteTarget] = useState<ElementWithDetails | null>(null);
   const [fallbackObjectId, setFallbackObjectId] = useState('');
   const [fallbackDomainId, setFallbackDomainId] = useState('');
   const aiWorker = aiWorkerId || aiWorkers[0]?.id || '';
@@ -290,6 +294,7 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         onRefresh={ctx.refetch}
         onOpen={() => ctx.onOpenElement(e.elementId!)}
         onOpenElement={ctx.onOpenElement}
+        onExecute={(el) => setExecuteTarget(el)}
         onHandOver={!draft && e.handable ? () => void handOver([e.elementId!]) : undefined} />
     ) : (
       <DraftCard element={e} object={o} />
@@ -419,6 +424,9 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
           onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
           columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
           columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
+        <ExecutePlanDialog element={executeTarget} open={executeTarget !== null}
+          onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}
+          onFinished={ctx.refetch} />
       </div>
     </div>
   );

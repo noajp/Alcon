@@ -10,6 +10,7 @@ import { useRunRounds } from '@/hooks/definitionData';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard } from '@/ActivitySpace/execution/chain/ChainCard';
+import { ExecutePlanDialog } from '@/ActivitySpace/execution/element/agent';
 import { waitingReason, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import {
   fleetCard, fleetCardContext, handOverLabels, latestRuns, missionElementRow, orderFleetCards,
@@ -43,6 +44,9 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
   const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The one Execute popup for this board (card hover-execute, PR1):
+  // a card's rail names its Element, the dialog does the rest.
+  const [executeTarget, setExecuteTarget] = useState<ElementWithDetails | null>(null);
   // The board's orientation — the one preference every board shares.
   const [orientation, setOrientation] = useBoardOrientation();
   // Ticks, so a lease that lapses while the tab is open stops reading as running.
@@ -135,6 +139,7 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
           onRefresh={refetch}
           onOpen={() => onOpenElement(c.elementId!)}
           onOpenElement={onOpenElement}
+          onExecute={(el) => setExecuteTarget(el)}
           onHandOver={c.handable ? () => void handOver(c) : undefined} />
       ),
     });
@@ -151,6 +156,9 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
         onDropStatus={canEdit ? (status, id) => void dropToStatus(status, id) : undefined}
         columnAction={canEdit && objectRows.length > 0 ? (status) => <AddElementMenu status={status} objects={objectRows} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
         columns={columns} />
+      <ExecutePlanDialog element={executeTarget} open={executeTarget !== null}
+        onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}
+        onFinished={refetch} />
     </div>
   );
 }
