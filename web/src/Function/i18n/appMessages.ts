@@ -543,6 +543,15 @@ const APP_MESSAGES: Record<string, Row> = {
   '{work} is waiting on this connection': ['この接続を待っている仕事：{work}', '이 연결을 기다리는 작업: {work}', 'Travail en attente de cette connexion : {work}', 'Trabajo en espera de esta conexión: {work}'],
   'Only a Space owner can connect it.': ['接続できるのは Space のオーナーだけです。', '연결할 수 있는 사람은 Space 소유자뿐입니다.', 'Seul un propriétaire du Space peut le connecter.', 'Solo un propietario del Space puede conectarlo.'],
   'Find and connect it from the MCP Registry in Settings › Customize': ['Settings › Customize の MCP Registry から探して接続できます', 'Settings › Customize의 MCP Registry에서 찾아 연결할 수 있습니다', 'Recherchez-le et connectez-le depuis le MCP Registry dans Settings › Customize', 'Búscalo y conéctalo desde el MCP Registry en Settings › Customize'],
+  // Settings on one page (redesign PR2): the page description, the area
+  // descriptions the layout names, and the Elements → Strategy SLA pointer.
+  'Your Space, how Athena works in it, and your own preferences — every setting on one page.': ['Space のこと、Athena の動き方、あなた自身の設定 — すべての設定を1ページに。', 'Space, Athena의 동작 방식, 그리고 내 설정 — 모든 설정을 한 페이지에.', 'Votre Space, le fonctionnement d’Athena et vos propres réglages — tous les paramètres sur une seule page.', 'Tu Space, cómo funciona Athena y tus propios ajustes: todos los parámetros en una sola página.'],
+  'The harnesses Athena works by, and the services connected to this Space.': ['Athena が従うハーネスと、この Space に接続されたサービス。', 'Athena가 따르는 하네스와 이 Space에 연결된 서비스.', 'Les harnais de travail d’Athena et les services connectés à ce Space.', 'Los arneses con los que trabaja Athena y los servicios conectados a este Space.'],
+  'Tokens, endpoints and connected machines — the ways other tools work with Alcon.': ['トークン、エンドポイント、接続されたマシン — 他のツールが Alcon と連携する手段。', '토큰, 엔드포인트, 연결된 머신 — 다른 도구가 Alcon과 연동하는 방법.', 'Jetons, points de terminaison et machines connectées — les moyens pour d’autres outils de travailler avec Alcon.', 'Tokens, endpoints y máquinas conectadas: las formas en que otras herramientas trabajan con Alcon.'],
+  'Labels and templates for Elements, set per Domain.': ['Element のラベルとテンプレート。Domain ごとに設定します。', 'Element의 라벨과 템플릿. Domain별로 설정합니다.', 'Étiquettes et modèles pour les Elements, définis par Domain.', 'Etiquetas y plantillas para Elements, definidos por Domain.'],
+  'Risk thresholds': ['リスクしきい値', '위험 임계값', 'Seuils de risque', 'Umbrales de riesgo'],
+  'Set under Strategy': ['Strategy で設定します', 'Strategy에서 설정합니다', 'Se définit sous Strategy', 'Se define en Strategy'],
+  'Go to Strategy settings': ['Strategy 設定へ', 'Strategy 설정으로', 'Aller aux réglages Strategy', 'Ir a los ajustes de Strategy'],
   // The Space's approval mode (Settings › Activity space).
   'Approval mode': ['承認モード', '승인 모드', 'Mode d’approbation', 'Modo de aprobación'],
   'Change in Space settings': ['Space 設定で変更', 'Space 설정에서 변경', 'Modifier dans les réglages du Space', 'Cambiar en los ajustes del Space'],
