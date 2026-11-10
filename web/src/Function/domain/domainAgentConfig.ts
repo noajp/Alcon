@@ -4,10 +4,12 @@
 // would be ignored at run time. tests/domainAgentConfig.test.ts keeps the two
 // in step.
 
+// Labels are i18n keys, rendered through t() by the settings surface
+// (the ja rows carry the original Japanese suffixes).
 export const DOMAIN_AGENT_MODELS = [
-  { value: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 — 標準' },
-  { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 — 高速・低コスト' },
-  { value: 'claude-opus-5-5', label: 'Claude Opus 5.5 — 高品質' },
+  { value: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 — Standard' },
+  { value: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 — Fast, low cost' },
+  { value: 'claude-opus-5-5', label: 'Claude Opus 5.5 — Highest quality' },
 ] as const;
 
 export const DEFAULT_DOMAIN_AGENT_MODEL = 'claude-sonnet-5-5';

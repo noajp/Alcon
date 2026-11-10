@@ -11,6 +11,7 @@ import { FONT } from '@/shared/designTokens';
 
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
+import { SegmentedControl, SettingField } from '@/Function/settings/SettingsControls';
 import { NavAutomationIcon, NavCalendarIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
@@ -485,7 +486,7 @@ export function AppSidebar({
         </nav></ButtonAppearanceProvider>
 
         {/* Who you are, at the foot; it opens the Profile. */}
-        <MeFooter active={railMode === 'personal'} onOpen={() => onViewChange('profile')} onSettings={onOpenSettings} />
+        <MeFooter active={railMode === 'personal'} onOpen={() => onViewChange('profile')} />
 
 
         {!collapsed && (
@@ -813,37 +814,22 @@ function DomainGeneralSettings({
       </div>
 
       <fieldset disabled={!canEdit} className="space-y-5">
-        <div>
-          <label htmlFor="domain-settings-name" className="mb-1.5 block text-[12px] font-semibold text-foreground">{t('Name')}</label>
+        <SettingField flush label={t('Name')} htmlFor="domain-settings-name">
           <Input id="domain-settings-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
+        </SettingField>
 
-        <div>
-          <label htmlFor="domain-settings-identifier" className="mb-1.5 block text-[12px] font-semibold text-foreground">{t('Identifier')}</label>
+        <SettingField flush label={t('Identifier')} htmlFor="domain-settings-identifier">
           <Input id="domain-settings-identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder={t('e.g. MKT')} />
-        </div>
+        </SettingField>
 
-        <div>
-          <div className="mb-1.5 text-[12px] font-semibold text-foreground">{t('Privacy')}</div>
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              ['workspace', 'Workspace'],
-              ['private', 'Private'],
-            ] as [DomainPrivacy, string][]).map(([value, label]) => (
-              <Button
-                key={value}
-                type="button"
-                shape="tab"
-                variant={privacy === value ? 'secondary' : 'ghost'}
-                aria-pressed={privacy === value}
-                onClick={() => setPrivacy(value)}
-                className="min-w-0 w-full truncate"
-              >
-                {t(label)}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <SettingField flush label={t('Privacy')}>
+          <SegmentedControl
+            label={t('Privacy')}
+            value={privacy === 'workspace' ? 'Workspace' : 'Private'}
+            options={['Workspace', 'Private']}
+            onChange={(label) => setPrivacy(label === 'Workspace' ? 'workspace' : 'private')}
+          />
+        </SettingField>
 
         {error && (
           <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>

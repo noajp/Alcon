@@ -59,13 +59,15 @@ export function SettingRow({
 }
 
 /** The stacked variant: label above, full-width control — for textareas
- *  and long inputs inside an island. */
+ *  and long inputs inside an island. `flush` drops the island padding for a
+ *  field embedded in another padded container (a dialog), mirroring
+ *  SettingRow's flush; `htmlFor` binds the label to a control by id. */
 export function SettingField({
-  label, hint, children,
-}: { label: string; hint?: string; children: React.ReactNode }) {
+  label, hint, children, flush = false, htmlFor,
+}: { label: string; hint?: string; children: React.ReactNode; flush?: boolean; htmlFor?: string }) {
   return (
-    <div className="px-5 py-3.5">
-      <label className="block text-[12px] font-medium text-foreground mb-1.5">{label}</label>
+    <div className={flush ? '' : 'px-5 py-3.5'}>
+      <label htmlFor={htmlFor} className="block text-[12px] font-medium text-foreground mb-1.5">{label}</label>
       {children}
       {hint && <div className="text-[11px] text-muted-foreground mt-1.5">{hint}</div>}
     </div>

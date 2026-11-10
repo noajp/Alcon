@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { Bot, Check, AlertTriangle, Loader2, Zap, ShieldCheck } from '@/ui/icons';
-import { cn } from '@/lib/utils';
 import { updateDomain, pingAgentRuntime } from '@/hooks/useSupabase';
 import type { Domain, DomainAIConfig } from '@/hooks/useSupabase';
 import { DOMAIN_AGENT_MODELS, DOMAIN_AGENT_TURNS, clampAgentTurns, domainAgentModel } from '@/Function/domain/domainAgentConfig';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { SelectControl, SettingField, SettingRow, ToggleRow } from '@/Function/settings/SettingsControls';
 
 type PingState =
   | { status: 'idle' }
@@ -17,7 +18,9 @@ type PingState =
 // The Domain's "API Settings" screen — configures the autonomous agent for
 // every Element in this Domain. The Anthropic API key itself is NOT entered
 // here: it stays a server-side Edge Function secret (ANTHROPIC_API_KEY).
-// "Test connection" verifies that secret is present.
+// "Test connection" verifies that secret is present. The controls are the
+// shared settings primitives in their flush (dialog-embedded) form, and
+// every string goes through t() (settings redesign PR4b).
 export function DomainAgentSettings({
   domain,
   onSaved,
@@ -29,6 +32,7 @@ export function DomainAgentSettings({
    *  form shows the settings but every control is disabled. */
   canEdit?: boolean;
 }) {
+  const { t } = useI18n();
   const initial: DomainAIConfig = domain.ai_config ?? {};
   const [enabled, setEnabled] = useState(initial.enabled !== false);
   const [model, setModel] = useState(domainAgentModel(initial.model));
@@ -38,6 +42,11 @@ export function DomainAgentSettings({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [ping, setPing] = useState<PingState>({ status: 'idle' });
+
+  // The shared SelectControl speaks in labels (the approval-mode pattern):
+  // the option strings are the models' i18n-key labels, mapped back to the
+  // stored value on change.
+  const modelLabel = DOMAIN_AGENT_MODELS.find((m) => m.value === model)?.label ?? DOMAIN_AGENT_MODELS[0].label;
 
   const handleSave = async () => {
     setSaving(true);
@@ -57,7 +66,7 @@ export function DomainAgentSettings({
       onSaved?.();
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
-      setSaveError((e as { message?: string } | null)?.message || '不明なエラー');
+      setSaveError((e as { message?: string } | null)?.message || t('Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -81,57 +90,40 @@ export function DomainAgentSettings({
           <Bot size={16} className="text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[13px] font-medium text-foreground">AI エージェント</h3>
+          <h3 className="text-[13px] font-medium text-foreground">{t('AI agent')}</h3>
           <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
-            看板ボードや Element 詳細の「開始 ▶︎」を押すと、エージェントがこの設定で Element の任務を実行します。
+            {t("When you press Start on the board or in an Element's details, the agent carries out the Element's task using these settings.")}
           </p>
         </div>
       </div>
 
-      {/* Enabled toggle */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[13px] text-foreground">エージェント実行を有効化</div>
-          <div className="text-[11.5px] text-muted-foreground">無効にすると、この Domain では「開始 ▶︎」が動作しません。</div>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          onClick={() => setEnabled((v) => !v)}
-          className={cn(
-            'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
-            enabled ? 'bg-primary' : 'bg-muted',
-          )}
-        >
-          <span
-            className={cn(
-              'inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform',
-              enabled ? 'translate-x-[18px]' : 'translate-x-[3px]',
-            )}
-          />
-        </button>
-      </div>
+      {/* Enabled toggle — the one shared Switch, via ToggleRow */}
+      <ToggleRow
+        flush
+        label={t('Enable agent execution')}
+        desc={t('While disabled, Start does not work in this Domain.')}
+        value={enabled}
+        onChange={(v) => setEnabled(v)}
+      />
 
       {/* Model */}
-      <div className="space-y-1.5">
-        <label className="text-[12px] font-medium text-foreground">モデル</label>
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 focus:outline-none"
-        >
-          {DOMAIN_AGENT_MODELS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SettingRow flush label={t('Model')}>
+        <SelectControl
+          value={modelLabel}
+          options={DOMAIN_AGENT_MODELS.map((m) => m.label)}
+          onChange={(label) => {
+            const next = DOMAIN_AGENT_MODELS.find((m) => m.label === label);
+            if (next) setModel(next.value);
+          }}
+        />
+      </SettingRow>
 
       {/* Max steps */}
-      <div className="space-y-1.5">
-        <label className="text-[12px] font-medium text-foreground">最大ターン数</label>
+      <SettingField
+        flush
+        label={t('Max turns')}
+        hint={t('The maximum number of times the model can be called in a single run ({min}–{max}, default {default}). A limit set on an individual AI Worker takes precedence.', { min: DOMAIN_AGENT_TURNS.min, max: DOMAIN_AGENT_TURNS.max, default: DOMAIN_AGENT_TURNS.default })}
+      >
         <input
           type="number"
           min={DOMAIN_AGENT_TURNS.min}
@@ -140,32 +132,31 @@ export function DomainAgentSettings({
           onChange={(e) => setMaxTurns(e.target.value)}
           className="w-24 text-[13px] bg-muted/40 rounded-md px-2.5 py-1.5 border border-border/60 focus:outline-none"
         />
-        <p className="text-[11.5px] text-muted-foreground">1 回の実行でモデルを呼べる回数の上限（{DOMAIN_AGENT_TURNS.min}〜{DOMAIN_AGENT_TURNS.max}、既定 {DOMAIN_AGENT_TURNS.default}）。AI Worker に個別の上限があればそちらが優先されます。</p>
-      </div>
+      </SettingField>
 
       {/* Instructions */}
-      <div className="space-y-1.5">
-        <label className="text-[12px] font-medium text-foreground">エージェントへの追加指示（任意）</label>
+      <SettingField
+        flush
+        label={t('Additional instructions for the agent (optional)')}
+        hint={t("Common rules for the agent, applied to every Element in this Domain. They are passed before any individual AI Worker's instructions.")}
+      >
         <textarea
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
-          placeholder="例: 成果物は必ず箇条書きで。社内用語『SEM』は Strategy Execution Manager の略。"
+          placeholder={t('Example: Always write deliverables as bullet points. The internal term “SEM” is short for Strategy Execution Manager.')}
           rows={3}
           className="w-full text-[13px] bg-muted/40 rounded-md px-2.5 py-2 border border-border/60 focus:outline-none resize-none leading-snug"
         />
-        <p className="text-[11.5px] text-muted-foreground">
-          この Domain の Element すべてに適用される、エージェント共通のルール。AI Worker 個別の指示より先に渡されます。
-        </p>
-      </div>
+      </SettingField>
 
       {/* API key — server-side secret */}
       <div className="rounded-lg bg-muted/40 border border-border/60 px-3 py-2.5">
         <div className="flex items-start gap-2">
           <ShieldCheck size={14} className="text-muted-foreground mt-0.5 shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] text-foreground">Anthropic API キー</div>
+            <div className="text-[12px] text-foreground">{t('Anthropic API key')}</div>
             <p className="text-[11.5px] text-muted-foreground leading-snug mt-0.5">
-              キーはサーバー側の Edge Function シークレット（<code className="text-[11px]">ANTHROPIC_API_KEY</code>）で安全に管理されています。ここには保存されません。
+              {t('The key is managed safely as a server-side Edge Function secret (ANTHROPIC_API_KEY). It is not stored here.')}
             </p>
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <button
@@ -179,21 +170,21 @@ export function DomainAgentSettings({
                 ) : (
                   <Zap size={12} />
                 )}
-                接続テスト
+                {t('Test connection')}
               </button>
               {ping.status === 'ok' && (
                 <span className="inline-flex items-center gap-1 text-[12px] text-emerald-500">
-                  <Check size={13} /> キー設定済み・接続OK
+                  <Check size={13} /> {t('API key is set — connection OK')}
                 </span>
               )}
               {ping.status === 'missing' && (
                 <span className="inline-flex items-center gap-1 text-[12px] text-amber-500">
-                  <AlertTriangle size={13} /> サーバーにキーが未設定です
+                  <AlertTriangle size={13} /> {t('No API key is set on the server')}
                 </span>
               )}
               {ping.status === 'error' && (
                 <span className="inline-flex items-center gap-1 text-[12px] text-rose-500">
-                  <AlertTriangle size={13} /> 接続失敗
+                  <AlertTriangle size={13} /> {t('Connection failed')}
                 </span>
               )}
             </div>
@@ -210,16 +201,16 @@ export function DomainAgentSettings({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-[12px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           {saving ? <Loader2 size={13} className="animate-spin" /> : null}
-          {saving ? '保存中…' : '設定を保存'}
+          {saving ? t('Saving…') : t('Save settings')}
         </button>
         {saved && (
           <span className="inline-flex items-center gap-1 text-[12px] text-emerald-500">
-            <Check size={13} /> 保存しました
+            <Check size={13} /> {t('Settings saved')}
           </span>
         )}
         {saveError && (
           <span role="alert" className="inline-flex items-center gap-1 text-[12px] text-destructive">
-            <AlertTriangle size={13} /> 保存できませんでした: {saveError}
+            <AlertTriangle size={13} /> {t("Couldn't save the settings: {error}", { error: saveError })}
           </span>
         )}
       </div>
