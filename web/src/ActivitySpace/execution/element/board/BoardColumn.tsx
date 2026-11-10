@@ -36,6 +36,11 @@ const DANGER = 'var(--status-danger)';
  *  drift apart. */
 export const CHAIN_COLUMN_WIDTH = 'w-80';
 
+/** The board's ground: one definite step off the island, one step under
+ *  the cards that stand on it. Every board — Chain and Cascade alike —
+ *  stands on this and nothing else. */
+export const BOARD_GROUND = 'bg-muted';
+
 type Translate = ReturnType<typeof useI18n>['t'];
 
 /** The chip's short label for a reason: why this card waits, in the words
@@ -87,7 +92,7 @@ export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, em
   return (
     <section
       aria-label={label}
-      className={cn('flex flex-shrink-0 flex-col rounded-lg bg-muted/60 dark:bg-muted/30', CHAIN_COLUMN_WIDTH)}
+      className={cn('flex flex-shrink-0 flex-col rounded-lg', BOARD_GROUND, CHAIN_COLUMN_WIDTH)}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
@@ -126,7 +131,7 @@ export function BoardLane({ mark, label, count, action, onDragOver, onDrop, empt
   return (
     <section
       aria-label={label}
-      className="flex w-full flex-shrink-0 rounded-lg bg-muted/60 dark:bg-muted/30"
+      className={cn('flex w-full flex-shrink-0 rounded-lg', BOARD_GROUND)}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
