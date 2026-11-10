@@ -30,6 +30,7 @@
 // knows nothing about runs, panels or sessions. Binding (the secret, the
 // MCP session) is the executor's side, in integrationTools.ts.
 
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sha256Hex } from "./googleOAuth.ts";
 import type { PlannedIntegrationTool } from "./integrationTools.ts";
 
@@ -110,7 +111,9 @@ export function planFitsCache(plan: PlannedIntegrationTool[]): boolean {
 
 // ── The store (service role writes; reads follow the table's RLS) ───────
 
-/** The part of a Supabase client the plan store uses. */
+/** The part of a Supabase client the plan store uses. The store takes
+ *  either: a real client is named as such, because checking its generic
+ *  query builder against this shape is too deep for the type checker. */
 export interface ToolPlanDb {
   from(table: string): {
     select(columns: string): {
@@ -126,7 +129,8 @@ export interface ToolPlanDb {
  * migrated yet, a read error) reads as "no plans", and the callers plan
  * fresh, exactly as they did before the cache existed.
  */
-export async function loadToolPlans(db: ToolPlanDb, integrationIds: readonly string[]): Promise<Map<string, StoredToolPlan>> {
+export async function loadToolPlans(client: SupabaseClient | ToolPlanDb, integrationIds: readonly string[]): Promise<Map<string, StoredToolPlan>> {
+  const db = client as ToolPlanDb;
   const out = new Map<string, StoredToolPlan>();
   if (integrationIds.length === 0) return out;
   try {
@@ -149,12 +153,13 @@ export async function loadToolPlans(db: ToolPlanDb, integrationIds: readonly str
  * plan it made; the next assembly will make it again.
  */
 export async function saveToolPlan(
-  db: ToolPlanDb,
+  client: SupabaseClient | ToolPlanDb,
   integrationId: string,
   fingerprint: string,
   plan: PlannedIntegrationTool[],
 ): Promise<boolean> {
   if (!planFitsCache(plan)) return false;
+  const db = client as ToolPlanDb;
   try {
     const { error } = await db.from("integration_tool_plans").upsert(
       { integration_id: integrationId, fingerprint, plan, fetched_at: new Date().toISOString() },

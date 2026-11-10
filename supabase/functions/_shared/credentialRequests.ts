@@ -169,7 +169,7 @@ async function lapseRequest(admin: SupabaseClient, id: string): Promise<void> {
  */
 export async function ensureIntegrationCredentialRequest(
   admin: SupabaseClient,
-  args: { spaceId: string; userId: string; row: CaptureIntegrationRow; waitingFor: string; runId?: string | null },
+  args: { spaceId: string; userId: string | null; row: CaptureIntegrationRow; waitingFor: string; runId?: string | null },
 ): Promise<{ request: CredentialRequestRow; created: boolean } | null> {
   const source = captureSourceForRow(args.row);
   if (!source) return null;
@@ -218,7 +218,7 @@ export async function ensureIntegrationCredentialRequest(
  */
 export async function createCredentialRequestsForNames(
   admin: SupabaseClient,
-  args: { spaceId: string; userId: string; names: readonly string[]; waitingFor: string; runId?: string | null },
+  args: { spaceId: string; userId: string | null; names: readonly string[]; waitingFor: string; runId?: string | null },
 ): Promise<{ request: CredentialRequestRow; created: boolean; row: CaptureIntegrationRow }[]> {
   const wanted = new Set(
     args.names.map((n) => foldConnectorName(typeof n === "string" ? n : "")).filter(Boolean),
@@ -367,9 +367,10 @@ export async function createSiteReauthCredentialRequest(
  */
 export async function notifyCredentialRequestOwners(
   admin: SupabaseClient,
-  args: { spaceId: string; requesterId: string; label: string; waitingFor: string; always?: boolean },
+  args: { spaceId: string; requesterId: string | null; label: string; waitingFor: string; always?: boolean },
 ): Promise<number> {
-  if (!args.always) {
+  // A requester with no user (an actor without a person) is no owner.
+  if (!args.always && args.requesterId) {
     const { data: mine } = await admin.from("activity_space_members")
       .select("role")
       .eq("activity_space_id", args.spaceId)

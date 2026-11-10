@@ -191,7 +191,7 @@ export async function writeDistilledEpisodes(
     .select("id, fingerprint, status")
     .eq(args.scope === "space" ? "activity_space_id" : "user_id", args.scope === "space" ? args.spaceId : args.userId)
     .eq("status", "active").not("fingerprint", "is", null).limit(500);
-  const rows = (existing ?? []) as { id: string; fingerprint: string | null; status: string }[];
+  const rows = (existing ?? []) as Pick<MemoryRow, "id" | "fingerprint" | "status">[];
   let written = 0;
   const now = new Date();
   for (const c of args.candidates) {

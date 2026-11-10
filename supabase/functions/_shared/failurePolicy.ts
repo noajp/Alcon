@@ -216,7 +216,7 @@ export const ESCALATE_TARGET_LABEL: Record<EscalateTarget, string> = {
 function entryMatches(
   entry: InstalledExceptionEntry,
   cls: FailureClass,
-  match?: { destination?: string | readonly string[] | null; tool?: string | null },
+  match?: { destination?: string | readonly (string | null)[] | null; tool?: string | null },
 ): boolean {
   const m = entry.match;
   if (m.errorClass !== null && m.errorClass !== cls) return false;
@@ -243,7 +243,7 @@ export function resolveFailurePolicy(args: {
   class: FailureClass;
   definition: ParsedDefinition | null;
   entries: readonly InstalledExceptionEntry[];
-  match?: { destination?: string | readonly string[] | null; tool?: string | null };
+  match?: { destination?: string | readonly (string | null)[] | null; tool?: string | null };
 }): ResolvedFailurePolicy {
   const defRow = args.definition?.failure.find((r) => r.class === args.class) ?? null;
   const entryRows: FailureRow[] = [];

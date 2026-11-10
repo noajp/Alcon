@@ -547,7 +547,7 @@ export function constraintDraftSignals(
   drafts: readonly ConstraintDraftFact[],
 ): HeartbeatSignal[] {
   return drafts.map((d) => ({
-    kind: "constraint_review",
+    kind: "constraint_review" as const,
     id: d.id,
     since: d.createdAt,
     version: "awaiting_review",
@@ -705,7 +705,7 @@ interface ActionRow {
 interface DraftRow {
   id: string;
   activity_space_id: string;
-  scope: string;
+  scope: ConstraintScope;
   target_definition_id: string | null;
   target_strategy_id: string | null;
   status: string;
@@ -826,7 +826,12 @@ export async function deriveConstraintDrafts(
   const open = (openRows ?? []) as DraftRow[];
   const openPerSpace = new Map<string, number>();
   for (const d of open) openPerSpace.set(d.activity_space_id, (openPerSpace.get(d.activity_space_id) ?? 0) + 1);
-  const planned = draftPlanOf(clusters, open, openPerSpace);
+  const openRefs: OpenDraftRef[] = open.map((d) => ({
+    scope: d.scope,
+    targetDefinitionId: d.target_definition_id,
+    targetStrategyId: d.target_strategy_id,
+  }));
+  const planned = draftPlanOf(clusters, openRefs, openPerSpace);
   if (!planned.length) return { expired, clusters: clusters.length, planned: 0, drafted: 0, taintedDropped };
 
   // The calibration bridge: an open revision candidate for the same
@@ -906,7 +911,7 @@ export async function deriveConstraintDrafts(
 interface PlanningConstraintRow {
   id: string;
   activity_space_id: string;
-  scope: string;
+  scope: ConstraintScope;
   target_definition_id: string | null;
   target_strategy_id: string | null;
   signature: string;

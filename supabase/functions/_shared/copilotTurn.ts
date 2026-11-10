@@ -133,7 +133,8 @@ export interface CopilotTurn {
    *  carries, so the driver can say on the record why the call ran
    *  unasked. Null for Alcon's own tools and ungranted commands. */
   grantOf(call: ToolCall): { lane: 1 | 2; clean: number } | null;
-  execute(call: ToolCall): Promise<{ content: string; is_error?: boolean }>;
+  /** An integration call's verify read-back (B2) rides on its result. */
+  execute(call: ToolCall): Promise<{ content: string; is_error?: boolean; verify?: VerifyCheck }>;
 }
 
 /**
@@ -340,16 +341,17 @@ export async function buildCopilotTurn(args: {
           ? r.waitingFor
           : (typeof call.input?.waitingFor === "string" ? call.input.waitingFor.trim().slice(0, 300) : "");
         let credentialRequests: { requestId: string; label: string; waitingFor: string }[] | undefined;
-        if (admin && ctx.spaceId && waitingFor) {
+        const requestSpaceId = ctx.spaceId;
+        if (admin && requestSpaceId && waitingFor) {
           const made = await createCredentialRequestsForNames(admin, {
-            spaceId: ctx.spaceId, userId: actor.userId, names: askedNames, waitingFor,
+            spaceId: requestSpaceId, userId: actor.userId, names: askedNames, waitingFor,
           }).catch(() => []);
           if (made.length) {
             credentialRequests = made.map((m) => ({ requestId: m.request.id, label: m.row.name, waitingFor }));
             for (const m of made) {
               if (m.created) {
                 await notifyCredentialRequestOwners(admin, {
-                  spaceId: ctx.spaceId, requesterId: actor.userId, label: m.row.name, waitingFor,
+                  spaceId: requestSpaceId, requesterId: actor.userId, label: m.row.name, waitingFor,
                 }).catch(() => 0);
               }
             }

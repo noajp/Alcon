@@ -174,13 +174,13 @@ const normalizeCommand = (c: string): string => c.trim().replace(/\s+/g, " ");
 export function testEvidenceOf(calls: readonly ShellCallRecord[], testCommand: string | null): TestEvidence {
   if (!testCommand) return { state: "missing" };
   const want = normalizeCommand(testCommand);
-  let best: ShellCallRecord | null = null;
+  let best: { call: ShellCallRecord; exitCode: number } | null = null;
   for (const c of calls) {
     if (c.status !== "done" || c.exitCode == null) continue;
     if (normalizeCommand(c.command) !== want) continue;
-    if (!best || c.at >= best.at) best = c;
+    if (!best || c.at >= best.call.at) best = { call: c, exitCode: c.exitCode };
   }
-  return best ? { state: "ran", exitCode: best.exitCode, callId: best.id, at: best.at } : { state: "missing" };
+  return best ? { state: "ran", exitCode: best.exitCode, callId: best.call.id, at: best.call.at } : { state: "missing" };
 }
 
 /** Pure. Whether a finish asserts that the tests passed — in a claim
