@@ -192,32 +192,6 @@ export function editFlowStepLine(body: string, index: number, newText: string): 
   return next.join('\n');
 }
 
-/** Pure. Adds a step at the end of the Procedure, as a bullet line
- *  after the section's last written line; a body with no Procedure
- *  gets one (`# 進め方`) at its end. Nothing outside the Procedure
- *  moves. Null for an empty or multi-line step. */
-export function appendFlowStep(body: string, newText: string): string | null {
-  const text = typeof newText === 'string' ? newText.trim() : '';
-  if (!text || /[\r\n]/.test(text)) return null;
-  const { lines, roles } = bodyLines(body);
-  const heading = roles.findIndex((role, i) => role === 'heading' && sectionOf(HEADING.exec(lines[i])![1]) === 'procedure');
-  if (heading < 0) {
-    const kept = body.replace(/\s+$/, '');
-    return `${kept ? `${kept}\n\n` : ''}# 進め方\n- ${text}\n`;
-  }
-  let last = heading;
-  let marker = '- ';
-  for (let i = heading + 1; i < lines.length && roles[i] !== 'heading'; i++) {
-    if (!lines[i].trim()) continue;
-    last = i;
-    // Follow the list as written: "3." is followed by "4.".
-    const n = /^\s*(\d+)([.)])\s+/.exec(lines[i]);
-    if (n) marker = `${Number(n[1]) + 1}${n[2]} `;
-    else if (BULLET.test(lines[i])) marker = '- ';
-  }
-  return [...lines.slice(0, last + 1), `${marker}${text}`, ...lines.slice(last + 1)].join('\n');
-}
-
 /** Pure. A body's Procedure alone, as a workflow of its own (`# 進め方`
  *  and its steps) — what another automation takes when it picks this
  *  body's workflow. Empty when the body has no steps. */

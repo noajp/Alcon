@@ -4,7 +4,6 @@ import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { ChevronDown, ChevronRight } from '@/ui/icons';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -17,8 +16,10 @@ import {
   useAutomationEvents, useAutomations, webhookUrl, type Automation, type AutomationKind,
 } from '@/hooks/automationData';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
-import { DefinitionFlow, type FlowEditHandlers } from '@/AIP/harness/DefinitionFlow';
-import { appendFlowStep, deleteFlowStep, editFlowStepLine, flowStepTitles, moveFlowStep, workflowOf } from '@/Function/shared/flowEdit';
+import { workflowOf } from '@/Function/shared/flowEdit';
+import { graphFromWorkflow, parseWorkflowGraph, workflowFromGraph, type WorkflowGraph } from '@/Function/shared/workflowGraph';
+import { WorkflowCanvas } from './WorkflowCanvas';
+import { ViewTabs } from '@/Function/shared/ViewTabs';
 import { decideAgentActionById, usePendingAgentAction } from '@/AIP/ai/agentData';
 import { useIsSpaceOwner } from '@/AIP/connectors/data';
 
@@ -39,7 +40,12 @@ const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo
 /** A workflow that can be picked: a harness's procedure, or another
  *  automation's workflow. Picking copies its steps; they are this
  *  automation's from then on. */
-interface WorkflowSource { id: string; label: string; workflow: string }
+interface WorkflowSource { id: string; label: string; graph: WorkflowGraph }
+
+/** An automation's drawing; one not drawn yet shows its text as a line. */
+function graphOf(a: Pick<Automation, 'workflow' | 'workflow_graph'>): WorkflowGraph {
+  return parseWorkflowGraph(a.workflow_graph) ?? graphFromWorkflow(a.workflow ?? '');
+}
 const PICK = '__pick';
 const NEW_WORKFLOW = '__new';
 
@@ -50,24 +56,24 @@ function workflowSources(
   t: (key: string, vars?: Record<string, string | number>) => string,
 ): WorkflowSource[] {
   return [
-    ...automations.filter((a) => a.id !== except && flowStepTitles(a.workflow ?? '').length > 0)
-      .map((a) => ({ id: `a:${a.id}`, label: a.name, workflow: a.workflow })),
-    ...harnesses.filter((d) => d.enabled).map((d) => ({ id: `h:${d.id}`, label: t('Harness: {name}', { name: d.name }), workflow: workflowOf(d.body ?? '') }))
-      .filter((s) => s.workflow),
-  ];
+    ...automations.filter((a) => a.id !== except).map((a) => ({ id: `a:${a.id}`, label: a.name, graph: graphOf(a) })),
+    ...harnesses.filter((d) => d.enabled).map((d) => ({ id: `h:${d.id}`, label: t('Harness: {name}', { name: d.name }), graph: graphFromWorkflow(workflowOf(d.body ?? '')) })),
+  ].filter((s) => s.graph.nodes.length > 0);
 }
 
 function cronProblem(cron: string): string | null {
   try { parseCron(cron); return null; } catch (e) { return formatError(e); }
 }
 
-/** The Automations, one row each. A row opens to its workflow — the steps
- *  its run follows, drawn and edited in place — where the work goes, and
- *  its recent starts. */
-export function AutomationsSection({ spaceId, creating, onCreatingChange, onOpenElement }: {
+/** The Automations, one row each; a row opens the automation on its own
+ *  page, with its Overview and its Flow. */
+export function AutomationsSection({ spaceId, creating, onCreatingChange, openId, onOpen, onOpenElement }: {
   spaceId: string | null;
   creating: boolean;
   onCreatingChange: (creating: boolean) => void;
+  /** The automation open on its own page (Overview / Flow), or null for the list. */
+  openId: string | null;
+  onOpen: (id: string | null) => void;
   onOpenElement?: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -75,9 +81,19 @@ export function AutomationsSection({ spaceId, creating, onCreatingChange, onOpen
   const harnesses = useDefinitions(spaceId);
   const { data: explorer } = useObjects(null);
   const objects = explorer.objects;
-  const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<{ id: string; value: string } | null>(null);
+
+  const opened = openId ? automations.data.find((a) => a.id === openId) ?? null : null;
+  if (opened) {
+    return (
+      <AutomationRow key={opened.id} mode="detail" a={opened} spaceId={spaceId} onOpen={() => onOpen(null)}
+        harnesses={harnesses.data} objects={objects} sources={workflowSources(harnesses.data, automations.data, opened.id, t)}
+        token={token?.id === opened.id ? token.value : null}
+        onToken={(value) => setToken({ id: opened.id, value })}
+        onChanged={automations.refetch} onDeleted={() => onOpen(null)} onOpenElement={onOpenElement} />
+    );
+  }
 
   return (
     <div>
@@ -87,7 +103,7 @@ export function AutomationsSection({ spaceId, creating, onCreatingChange, onOpen
           <NewAutomation spaceId={spaceId} objects={objects} sources={workflowSources(harnesses.data, automations.data, null, t)}
             onCancel={() => onCreatingChange(false)}
             onCreated={async (a) => {
-              onCreatingChange(false); setOpen(a.id); automations.refetch();
+              onCreatingChange(false); onOpen(a.id); automations.refetch();
               if (a.kind === 'webhook') {
                 try { setToken({ id: a.id, value: await issueWebhookToken(a.id) }); automations.refetch(); }
                 catch (e) { setError(formatError(e)); }
@@ -102,8 +118,7 @@ export function AutomationsSection({ spaceId, creating, onCreatingChange, onOpen
       ) : (
         <ul>
           {automations.data.map((a) => (
-            <AutomationRow key={a.id} a={a} spaceId={spaceId} expanded={open === a.id}
-              onToggle={() => setOpen(open === a.id ? null : a.id)}
+            <AutomationRow key={a.id} mode="row" a={a} spaceId={spaceId} onOpen={() => onOpen(a.id)}
               harnesses={harnesses.data} objects={objects} sources={workflowSources(harnesses.data, automations.data, a.id, t)}
               token={token?.id === a.id ? token.value : null}
               onToken={(value) => setToken({ id: a.id, value })}
@@ -115,12 +130,18 @@ export function AutomationsSection({ spaceId, creating, onCreatingChange, onOpen
   );
 }
 
-function AutomationRow({ a, spaceId, expanded, onToggle, harnesses, objects, sources, token, onToken, onChanged, onOpenElement }: {
+type DetailTab = 'overview' | 'flow';
+
+/** An automation as a list row (`mode="row"`), or open on its own page
+ *  (`mode="detail"`): an Overview of what it runs with and its starts, and
+ *  its Flow — the workflow canvas. */
+function AutomationRow({ mode, a, spaceId, onOpen, harnesses, objects, sources, token, onToken, onChanged, onDeleted, onOpenElement }: {
+  mode: 'row' | 'detail';
   sources: WorkflowSource[];
   a: Automation;
   spaceId: string | null;
-  expanded: boolean;
-  onToggle: () => void;
+  onOpen: () => void;
+  onDeleted?: () => void;
   harnesses: { id: string; name: string; body: string; enabled: boolean }[];
   objects: { id: string; name: string }[];
   token: string | null;
@@ -132,14 +153,15 @@ function AutomationRow({ a, spaceId, expanded, onToggle, harnesses, objects, sou
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // The workflow as last written here, so the canvas follows each edit
-  // without waiting for the list to be read again.
-  const [workflow, setWorkflow] = useState(a.workflow ?? '');
-  const [newStep, setNewStep] = useState('');
+  // The drawing as last saved here; `drawing` remounts the canvas when a
+  // picked workflow replaces it.
+  const [graph, setGraph] = useState(() => graphOf(a));
+  const [drawing, setDrawing] = useState(0);
+  const [tab, setTab] = useState<DetailTab>('overview');
   const harness = harnesses.find((d) => d.id === a.definition_id) ?? null;
   const objectName = objects.find((o) => o.id === a.object_id)?.name ?? t('Unknown Object');
   const when = a.kind === 'schedule' ? describeCron(a.cron ?? '') : t('When an outside service posts');
-  const stepCount = flowStepTitles(workflow).length;
+  const stepCount = graph.nodes.length;
 
   const act = async (f: () => Promise<void>, done?: string) => {
     setBusy(true); setError(null); setNotice(null);
@@ -147,76 +169,75 @@ function AutomationRow({ a, spaceId, expanded, onToggle, harnesses, objects, sou
     catch (e) { setError(formatError(e)); }
     finally { setBusy(false); }
   };
-  const saveWorkflow = (next: string | null) => {
-    if (next === null) return;
-    const before = workflow;
-    setWorkflow(next);
-    updateAutomation(a.id, { workflow: next }).then(onChanged, (e) => { setWorkflow(before); setError(formatError(e)); });
+  const saveGraph = (next: WorkflowGraph) => {
+    setGraph(next);
+    updateAutomation(a.id, { workflow_graph: next, workflow: workflowFromGraph(next) }).then(onChanged, (e) => setError(formatError(e)));
   };
-  const edit: FlowEditHandlers = {
-    onEditStepLine: (i, text) => saveWorkflow(editFlowStepLine(workflow, i, text)),
-    onMoveStep: (i, dir) => saveWorkflow(moveFlowStep(workflow, i, dir)),
-    onDeleteStep: (i) => saveWorkflow(deleteFlowStep(workflow, i)),
-  };
-  const addStep = () => {
-    const next = appendFlowStep(workflow, newStep);
-    if (next) { saveWorkflow(next); setNewStep(''); }
-  };
+  const trigger = a.kind === 'schedule' ? describeCron(a.cron ?? '') : t('When an outside service posts');
 
   const status = !a.enabled ? t('Off')
     : a.last_status === 'failed' ? <span className="text-[var(--status-danger)]">{t('Last start failed')}</span>
     : a.kind === 'schedule' && a.next_run_at ? t('Next {when}', { when: new Date(a.next_run_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })
     : a.last_fired_at ? t('Last {when}', { when: formatRelative(a.last_fired_at) }) : '';
 
+  if (mode === 'row') {
+    return (
+      <li className="border-b border-border/50">
+        <div className="group flex h-11 items-center gap-3 pl-6 pr-3 transition-colors hover:bg-muted/30">
+          <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <span aria-hidden className={`size-2 shrink-0 rounded-full ${a.enabled ? 'bg-[var(--status-success)]' : 'bg-muted-foreground/40'}`} />
+            <span className="min-w-[8rem] flex-1 truncate text-[13px] font-medium text-foreground">{a.name}</span>
+            <span className="hidden w-44 min-w-0 shrink truncate text-[12px] text-muted-foreground md:block">{when}</span>
+            <span className="hidden w-20 min-w-0 shrink truncate text-[12px] text-muted-foreground lg:block">
+              {t('{n} steps', { n: stepCount })}
+            </span>
+            <span className="hidden w-40 min-w-0 shrink truncate text-[12px] text-muted-foreground lg:block">{objectName}</span>
+            <span className="hidden w-36 min-w-0 shrink truncate text-right text-[11px] tabular-nums text-muted-foreground sm:block">{status}</span>
+          </button>
+          <Button size="xs" variant="ghost" disabled={busy}
+            onClick={() => void act(() => setAutomationEnabled(a, !a.enabled))}>{a.enabled ? t('Turn off') : t('Turn on')}</Button>
+        </div>
+      </li>
+    );
+  }
+
   return (
-    <li className="border-b border-border/50">
-      <div className="group flex h-11 items-center gap-3 pl-6 pr-3 transition-colors hover:bg-muted/30">
-        <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          {expanded ? <ChevronDown size={13} className="shrink-0 text-muted-foreground" /> : <ChevronRight size={13} className="shrink-0 text-muted-foreground" />}
-          <span aria-hidden className={`size-2 shrink-0 rounded-full ${a.enabled ? 'bg-[var(--status-success)]' : 'bg-muted-foreground/40'}`} />
-          <span className="min-w-[8rem] flex-1 truncate text-[13px] font-medium text-foreground">{a.name}</span>
-          <span className="hidden w-44 min-w-0 shrink truncate text-[12px] text-muted-foreground md:block">{when}</span>
-          <span className="hidden w-20 min-w-0 shrink truncate text-[12px] text-muted-foreground lg:block">
-            {t('{n} steps', { n: stepCount })}
-          </span>
-          <span className="hidden w-40 min-w-0 shrink truncate text-[12px] text-muted-foreground lg:block">{objectName}</span>
-          <span className="hidden w-36 min-w-0 shrink truncate text-right text-[11px] tabular-nums text-muted-foreground sm:block">{status}</span>
-        </button>
-        <Button size="xs" variant="ghost" disabled={busy}
-          onClick={() => void act(() => setAutomationEnabled(a, !a.enabled))}>{a.enabled ? t('Turn off') : t('Turn on')}</Button>
-      </div>
-      {expanded && (
-        <div className="space-y-5 border-t border-border/40 bg-muted/10 py-4 pl-[54px] pr-6">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ViewTabs tabs={[{ id: 'overview' as const, label: 'Overview' }, { id: 'flow' as const, label: 'Flow' }]} active={tab} onSelect={setTab}
+        label={t('Automation sections')}
+        actions={tab === 'flow' && sources.length > 0 ? (
+          <OptionMenu label={t('Choose a workflow')} value={PICK} className="text-muted-foreground"
+            onChange={(v) => { const src = sources.find((x) => x.id === v); if (src) { saveGraph(src.graph); setDrawing((d) => d + 1); } }}
+            options={[{ value: PICK, label: t('Choose a workflow') }, ...sources.map((x) => ({ value: x.id, label: x.label }))]} />
+        ) : null} />
+      {(error || notice) && (
+        <div className="px-6 pb-1">
           {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
           {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
-          {a.last_status === 'failed' && a.last_error && <p className="text-[12px] text-[var(--status-danger)]">{a.last_error}</p>}
-
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-[13px] font-medium text-foreground">{t('Workflow')}</h3>
-              {sources.length > 0 && (
-                <OptionMenu label={t('Choose a workflow')} value={PICK} className="text-muted-foreground"
-                  onChange={(v) => { const src = sources.find((x) => x.id === v); if (src) saveWorkflow(src.workflow); }}
-                  options={[{ value: PICK, label: t('Choose a workflow') }, ...sources.map((x) => ({ value: x.id, label: x.label }))]} />
-              )}
-            </div>
-            {stepCount === 0 ? (
-              <p className="text-[12px] text-muted-foreground">
-                {t('No steps yet. Add the first step below.')}
-              </p>
-            ) : (
-              <DefinitionFlow body={workflow} edit={edit}
-                context={{
-                  trigger: a.kind === 'schedule' ? { kind: 'schedule', cron: a.cron ?? '', timezone: a.timezone } : { kind: 'webhook' },
-                  objectName,
-                }} />
-            )}
-            <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); addStep(); }}>
-              <Input value={newStep} onChange={(e) => setNewStep(e.target.value)} placeholder={t('Add a step — e.g. Collect yesterday’s inquiries')} aria-label={t('Add a step')} className="h-8 max-w-xl text-[13px]" />
-              <Button type="submit" size="sm" variant="secondary" disabled={!newStep.trim()}>{t('Add')}</Button>
-            </form>
+        </div>
+      )}
+      {tab === 'flow' ? (
+        <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
+          <WorkflowCanvas key={drawing} graph={graph} trigger={trigger} onChange={saveGraph} className="min-h-[320px] flex-1" />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-4">
+          <section className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
+            <span className="flex items-center gap-2">
+              <span aria-hidden className={`size-2 rounded-full ${a.enabled ? 'bg-[var(--status-success)]' : 'bg-muted-foreground/40'}`} />
+              <span className="text-foreground">{a.enabled ? t('On') : t('Off')}</span>
+            </span>
+            <span className="text-muted-foreground">{when}</span>
+            <span className="text-muted-foreground">{status}</span>
+            <span className="text-muted-foreground">{t('{n} steps', { n: stepCount })}</span>
+            <span className="ml-auto flex items-center gap-1">
+              <Button size="xs" variant="secondary" disabled={busy}
+                onClick={() => void act(() => runAutomationNow(a.id), t('Started “{name}”.', { name: a.name }))}>{t('Run now')}</Button>
+              <Button size="xs" variant="ghost" disabled={busy}
+                onClick={() => void act(() => setAutomationEnabled(a, !a.enabled))}>{a.enabled ? t('Turn off') : t('Turn on')}</Button>
+            </span>
           </section>
-
+          {a.last_status === 'failed' && a.last_error && <p className="text-[12px] text-[var(--status-danger)]">{a.last_error}</p>}
           {/* An automation made before workflows lived here may still name a
               harness; it keeps running under it until that is cleared. */}
           {harness && (
@@ -253,15 +274,11 @@ function AutomationRow({ a, spaceId, expanded, onToggle, harnesses, objects, sou
           )}
 
           <RecentStarts automationId={a.id} spaceId={spaceId} onOpenElement={onOpenElement} />
-          <div className="flex items-center gap-1">
-            <Button size="xs" variant="secondary" disabled={busy}
-              onClick={() => void act(() => runAutomationNow(a.id), t('Started “{name}”.', { name: a.name }))}>{t('Run now')}</Button>
-            <Button size="xs" variant="ghost" className="text-[var(--status-danger)]" disabled={busy}
-              onClick={() => void act(() => deleteAutomation(a.id))}>{t('Delete')}</Button>
-          </div>
+          <Button size="xs" variant="ghost" className="text-[var(--status-danger)]" disabled={busy}
+            onClick={() => void act(async () => { await deleteAutomation(a.id); onDeleted?.(); })}>{t('Delete')}</Button>
         </div>
       )}
-    </li>
+    </div>
   );
 }
 
@@ -381,7 +398,7 @@ function NewAutomation({ spaceId, objects, sources, onCancel, onCreated }: {
 
   const save = async () => {
     setSaving(true); setError(null);
-    try { onCreated(await createAutomation({ spaceId, name, definitionId: null, workflow: sources.find((x) => x.id === source)?.workflow ?? '', objectId, kind, cron: kind === 'schedule' ? cron : null, timezone: TIMEZONE })); }
+    try { onCreated(await createAutomation({ spaceId, name, definitionId: null, ...(() => { const g = sources.find((x) => x.id === source)?.graph; return g ? { workflow: workflowFromGraph(g), workflowGraph: g } : {}; })(), objectId, kind, cron: kind === 'schedule' ? cron : null, timezone: TIMEZONE })); }
     catch (e) { setError(formatError(e)); }
     finally { setSaving(false); }
   };
@@ -397,7 +414,7 @@ function NewAutomation({ spaceId, objects, sources, onCancel, onCreated }: {
           <span className="mb-1 block text-[12px] text-muted-foreground">{t('Workflow')}</span>
           <OptionMenu label={t('Workflow')} value={source} onChange={setSource}
             options={[{ value: NEW_WORKFLOW, label: t('New workflow') }, ...sources.map((x) => ({ value: x.id, label: x.label }))]} />
-          <p className="mt-1 text-[11px] text-muted-foreground">{t('Pick one to start from its steps, or start empty and add steps after creating it.')}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{t('Pick one to start from its steps, or start empty and draw it after creating it.')}</p>
         </div>
         <div>
           <span className="mb-1 block text-[12px] text-muted-foreground">{t('Put the work in')}</span>
