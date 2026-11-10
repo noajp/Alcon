@@ -20,6 +20,7 @@ vi.mock('@/Function/settings/ActivitySpaceSettings', () => ({ ActivitySpaceSetti
 vi.mock('@/Function/settings/MemberSettings', () => ({ MemberSettings: () => 'Member panel' }));
 vi.mock('@/Function/settings/NotificationSettings', () => ({ NotificationSettings: () => 'Notifications panel' }));
 vi.mock('@/Function/settings/LabelSettings', () => ({ LabelSettings: () => 'Labels panel' }));
+vi.mock('@/Function/automation/AutomationSettings', () => ({ AutomationSettings: () => 'Automation panel' }));
 vi.mock('@/Function/settings/ElementTemplateSettings', () => ({ ElementTemplateSettings: () => 'Templates panel' }));
 vi.mock('@/Function/settings/StrategySettingsPanels', () => ({
   InitiativeJudgementSettings: () => 'SLA panel',

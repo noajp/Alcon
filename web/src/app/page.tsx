@@ -866,7 +866,6 @@ function WorkspaceContent({
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
                       onViewChange={(view) => updateTab(tab.id, { activeView: view })}
-                      onOpenItem={openItem}
                       onRefresh={refetch}
                       pendingNewNote={isActive ? pendingNewNote : 0}
                       onNewNoteHandled={() => setPendingNewNote(0)}

@@ -2,7 +2,7 @@
 //
 // The sidebar's fixed top block (shell/navigation PR3): AI stays first
 // (PR #779), Inbox is a real row second carrying its unread count as a
-// plain number in the row's meta slot, then Strategy and Automation.
+// plain number in the row's meta slot, then Calendar and Strategy.
 // The count is the StatusBar badge's own source — useNotifications over
 // the signed-in user — and at zero unread the row carries no meta at
 // all. Rows stay icon + name (+ count): no subtitle, no annotation.
@@ -111,9 +111,9 @@ afterEach(() => {
 });
 
 describe('AppSidebar fixed top block', () => {
-  it('renders AI → Inbox → Strategy → Automation in order', () => {
+  it('renders AI → Inbox → Calendar → Strategy in order', () => {
     renderSidebar();
-    const order = ['AI', 'Inbox', 'Strategy', 'Automation'].map(rowOf);
+    const order = ['AI', 'Inbox', 'Calendar', 'Strategy'].map(rowOf);
     for (let i = 0; i < order.length - 1; i++) {
       expect(
         order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,

@@ -26,7 +26,6 @@ const HomeScreen = dynamic(() => import('@/Frame/HomeScreen').then(m => m.HomeSc
 const NotebookSurface = dynamic(() => import('@/ActivitySpace/artifacts/notebook/NotebookSurface').then(m => m.NotebookSurface), { ssr: false, loading: viewLoading });
 const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
 const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
-const AutomationView = dynamic(() => import('@/ActivitySpace/automation/AutomationView').then(m => m.AutomationView), { ssr: false, loading: viewLoading });
 const DomainView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainView').then(m => m.DomainView), { ssr: false, loading: viewLoading });
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
@@ -44,9 +43,6 @@ interface MainContentProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
-  /** Open an item (a Strategy, an Element) in a shell tab of its own —
-   *  the shell routes it; without it, opens navigate this tab in place. */
-  onOpenItem?: (view: string, nav?: Partial<NavigationState>) => void;
   onOpenSettings: () => void;
   onRefresh?: () => void;
   pendingNewNote?: number;
@@ -60,7 +56,7 @@ interface MainContentProps {
   aiSubject?: CopilotSubject;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenItem, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId, onMinimizeAi, aiSubject }: MainContentProps) {
   const notebookVisible = activeActivity === 'note' || (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder');
   // The notebook stays mounted once opened (it keeps its editor state while
   // hidden), but it is not loaded until the user first opens it.
@@ -93,17 +89,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <MyCalendarView initialScope={activeActivity === 'schedule' ? 'space' : 'mine'} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} activeObjectId={navigation.objectId} />
             </div>
-          )}
-
-          {activeActivity === 'automation' && (
-            <AutomationView onOpenStrategy={(id) => {
-                if (onOpenItem) onOpenItem('strategy', { strategyId: id });
-                else { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }
-              }}
-              onOpenElement={(id) => {
-                if (onOpenItem) onOpenItem('domain-elements', { elementId: id });
-                else { onNavigate({ elementId: id }); onViewChange?.('domain-elements'); }
-              }} />
           )}
 
           {activeActivity === 'strategy' && (
