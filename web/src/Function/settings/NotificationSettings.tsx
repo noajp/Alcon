@@ -1,7 +1,6 @@
 'use client';
 
-import { SettingsSection, SettingsRow } from './SettingsSection';
-import { Switch } from './SettingsControls';
+import { SettingsIsland, ToggleRow } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useNotificationPreferences } from './useNotificationPreferences';
 import { NOTIFICATION_KINDS, NOTIFICATION_KIND_META } from '@/Function/shared/notificationKinds';
@@ -30,22 +29,22 @@ export function NotificationSettings() {
       {error && (
         <div className="text-[12px] text-destructive">{error}</div>
       )}
-      <SettingsSection title="">
+      <SettingsIsland>
         {NOTIFICATION_KINDS.map((kind) => {
           const meta = NOTIFICATION_KIND_META[kind];
           const isEnabled = !muted.has(kind);
           return (
-            <SettingsRow key={kind} label={t(meta.label)} hint={KIND_HINT[kind] ? t(KIND_HINT[kind]!) : undefined}>
-              <Switch
-                label={t(meta.label)}
-                value={isEnabled}
-                onChange={(v) => setKindMuted(kind, !v)}
-                disabled={loading || pendingKinds.has(kind)}
-              />
-            </SettingsRow>
+            <ToggleRow
+              key={kind}
+              label={t(meta.label)}
+              desc={KIND_HINT[kind] ? t(KIND_HINT[kind]!) : undefined}
+              value={isEnabled}
+              onChange={(v) => setKindMuted(kind, !v)}
+              disabled={loading || pendingKinds.has(kind)}
+            />
           );
         })}
-      </SettingsSection>
+      </SettingsIsland>
     </div>
   );
 }

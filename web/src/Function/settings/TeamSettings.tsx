@@ -14,7 +14,7 @@ import { setDomainMemberRole } from '@/hooks/useDomainMembers';
 import { Button } from '@/ui/button';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { isUnreachableWorker } from '@/Function/shared/workerReach';
-import { SettingsSection } from './SettingsSection';
+import { SettingsIsland, Switch } from './SettingsControls';
 import { InviteUserDialog } from './InviteUserDialog';
 import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
 import { AgentModelDialog } from './AgentModelDialog';
@@ -209,8 +209,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   );
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+    <div className="space-y-10">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-[180px] flex-1">
           <h2 className={`${FONT.lg} text-foreground`}>{t('Team')}</h2>
           <p className="text-[12px] text-muted-foreground mt-0.5">
@@ -232,12 +232,13 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       </div>
 
       {error && (
-        <div className="mb-3 text-[12px] text-[var(--status-danger)]">
+        <div className="text-[12px] text-[var(--status-danger)]">
           {error}
         </div>
       )}
 
-      <SettingsSection title={t('Humans ({n})', { n: humans.length })}>
+      <SettingsIsland title={t('Humans ({n})', { n: humans.length })}>
+        <div className="px-5 py-2">
         {loading && humans.length === 0 ? (
           <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
         ) : humans.length === 0 ? (
@@ -261,10 +262,12 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
         {domainId && (
           <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
         )}
-      </SettingsSection>
+        </div>
+      </SettingsIsland>
 
       {domainId && viewers.length > 0 && (
-        <SettingsSection title={t('Viewers ({n})', { n: viewers.length })}>
+        <SettingsIsland title={t('Viewers ({n})', { n: viewers.length })}>
+          <div className="px-5 py-2">
           {viewers.map((v) => (
             <div key={v.userId} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
               <WorkerAvatar worker={{ name: v.name, avatar_url: v.avatarUrl }} size={32} className="shrink-0" />
@@ -280,10 +283,12 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               )}
             </div>
           ))}
-        </SettingsSection>
+          </div>
+        </SettingsIsland>
       )}
 
-      <SettingsSection title={t('Models ({n})', { n: agents.length })}>
+      <SettingsIsland title={t('Models ({n})', { n: agents.length })}>
+        <div className="px-5 py-2">
         {agents.length === 0 && modelProviders.length === 0 ? (
           <div className="py-3 text-[13px] text-muted-foreground">{t('No models yet.')}</div>
         ) : (
@@ -318,7 +323,8 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
             )}
           </div>
         )}
-      </SettingsSection>
+        </div>
+      </SettingsIsland>
 
       {showAdd && (
         <AddMemberDialog
@@ -437,13 +443,13 @@ function WorkerRow({
           {roleAction.label}
         </Button>
       )}
-      {onToggleStatus && <button
-        onClick={onToggleStatus}
-        className="px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
-        title={worker.status === 'active' ? t('Deactivate') : t('Reactivate')}
-      >
-        {worker.status === 'active' ? t('Deactivate') : t('Activate')}
-      </button>}
+      {onToggleStatus && (
+        <Switch
+          label={worker.name}
+          value={worker.status === 'active'}
+          onChange={() => onToggleStatus()}
+        />
+      )}
       {onDelete && <button
         onClick={onDelete}
         className="p-1.5 text-muted-foreground hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] dark:hover:bg-[var(--status-danger)]/20 rounded transition-colors"
