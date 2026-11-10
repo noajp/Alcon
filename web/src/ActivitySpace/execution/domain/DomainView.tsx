@@ -12,7 +12,7 @@ import { Plus } from '@/ui/icons';
 import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
+import { createObject, updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 import type { NavigationState } from '@/types/navigation';
@@ -626,7 +626,8 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   // Board: the Domain's Objects, each in the column its Elements put it in.
   // An Object's own Board, one level down, shows its Elements.
   if (activeType === 'flow') {
-    return <DomainObjectBoard objects={objects ?? []} elements={allElements} onOpenObject={onSelectObject} />;
+    return <DomainObjectBoard objects={objects ?? []} elements={allElements} onOpenObject={onSelectObject}
+      domain={domainId ? { id: domainId, name: domainName ?? '' } : null} onRefresh={onRefresh} />;
   }
 
   if (activeType === 'summary') {
@@ -709,18 +710,36 @@ export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails
   };
 }
 
-function DomainObjectBoard({ objects, elements, onOpenObject }: {
+function DomainObjectBoard({ objects, elements, onOpenObject, domain, onRefresh }: {
   objects: BoardObject[];
   elements: readonly { object_id?: string | null; status?: string | null }[];
   onOpenObject: (objectId: string) => void;
+  /** The Domain a new Object goes into; null: no "+". */
+  domain: { id: string; name: string } | null;
+  onRefresh?: () => void;
 }) {
+  const { t } = useI18n();
   const [orientation, setOrientation] = useBoardOrientation();
+  const [error, setError] = useState<string | null>(null);
+  // A new Object, named Untitled, opened at once so it can be named.
+  const add = async (domainId: string) => {
+    setError(null);
+    try {
+      const made = await createObject({ name: t('Untitled'), domain_id: domainId });
+      onRefresh?.();
+      onOpenObject(made.id);
+    } catch {
+      setError(t('Could not add an Object here.'));
+    }
+  };
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 pb-4 pt-3">
       <div className="flex items-start gap-2">
+        {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         <BoardOrientationToggle orientation={orientation} onChange={setOrientation} className="ml-auto" />
       </div>
       <ObjectBoard objects={objects} elements={elements} orientation={orientation} onOpenObject={onOpenObject}
+        addTo={domain ? { domains: [domain], onAdd: (id) => void add(id) } : undefined}
         className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'} />
     </div>
   );
