@@ -47,6 +47,27 @@ import { Chip } from './BoardColumn';
 const TITLE_MAX_LINES = 1;
 const TITLE_LINE_HEIGHT = 22;
 
+// The execute rail's geometry (card hover-execute design, D7): one
+// number family — a 112px rail (w-28), armed from the card's right 28px
+// edge zone, and peeked as a 28px tab where there is no hover.
+const EXECUTE_RAIL_EDGE_PX = 28;
+
+/** Pure. Whether a pointer x sits inside the card's right edge zone. */
+export function isExecuteEdgeZone(clientX: number, cardRight: number): boolean {
+  return clientX >= cardRight - EXECUTE_RAIL_EDGE_PX;
+}
+
+/** The rail's arrow, thick on purpose (owner addendum, 2026-11-10): a
+ *  heavy stroke, not the hairline action glyph. */
+function ThickArrowRight({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 12h16M13.5 5.5 20 12l-6.5 6.5" />
+    </svg>
+  );
+}
+
 interface ElementCardProps {
   element: ElementWithDetails;
   onRefresh?: () => void;
@@ -60,9 +81,13 @@ interface ElementCardProps {
   object?: { name: string; icon?: string | null; color?: string | null; isNew?: boolean } | null;
   /** Lines between the title and the footer, for what the host adds. */
   extra?: React.ReactNode;
+  /** The hover-execute rail's press (card hover-execute, PR1): the host
+   *  opens its ExecutePlanDialog for this Element. A host that passes
+   *  nothing renders the card exactly as before — no rail, no tab. */
+  onExecute?: (element: ElementWithDetails) => void;
 }
 
-export function ElementCard({ element, onRefresh, onOpen, badge, object, extra }: ElementCardProps) {
+export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, onExecute }: ElementCardProps) {
   const { t } = useI18n();
   // Who can be assigned to THIS Element, read when the assignee menu opens;
   // the people already on it stay listed so they can be removed.
@@ -137,13 +162,37 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra }
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
+  // The execute rail (card hover-execute, PR1): armed when the pointer
+  // reaches the card's right edge zone, then held while the pointer
+  // stays on the card, so pushing to the edge and clicking the rail
+  // that slides in under the cursor is one gesture. A drag collapses
+  // and suppresses it — the drag image is always the resting card.
+  // Touch has no hover: a 28px tab peeks instead, its first tap reveals
+  // the full rail without activating, its second activates. A closed
+  // Element has nothing left for an AI to do (the footer's own rule),
+  // so it grows no rail.
+  const canExecute = !!onExecute && element.status !== 'done' && element.status !== 'cancelled';
+  const [armed, setArmed] = useState(false);
+  const [touchRevealed, setTouchRevealed] = useState(false);
+  const [draggingCard, setDraggingCard] = useState(false);
+  const railRevealed = canExecute && !draggingCard && (armed || touchRevealed);
+
   return (
     <div
       draggable={!editingTitle}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/id', element.id);
         draggingRef.current = false;
+        setArmed(false);
+        setTouchRevealed(false);
+        setDraggingCard(true);
       }}
+      onDragEnd={() => setDraggingCard(false)}
+      onPointerMove={(e) => {
+        if (!canExecute || e.pointerType === 'touch') return;
+        if (isExecuteEdgeZone(e.clientX, e.currentTarget.getBoundingClientRect().right)) setArmed(true);
+      }}
+      onPointerLeave={() => { setArmed(false); setTouchRevealed(false); }}
       // A new press starts clean: the drag flag used to stick after a
       // text-select in the title (mousemove without a dragstart), swallowing
       // every later click on the card.
@@ -167,9 +216,20 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra }
       }}
       // Hover tints the card as a list row is tinted (the foreground at 6%,
       // laid over the card's own ground as an image so the ground stays).
-      className="group/card rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
+      className="group/card relative overflow-hidden rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
     >
-      <div className="px-3.5 py-3.5">
+      {/* The track: the card's content in a full-width cell, the execute
+          rail in a 112px cell after it, clipped by the root. Revealed,
+          the track slides left by exactly the rail's width and the rail
+          lands flush at the card's right edge, full height — the card's
+          box never resizes. Keyboard: the track also slides on
+          focus-within, so tabbing to the rail reveals it first. */}
+      <div className={cn(
+        'flex motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out',
+        railRevealed ? '-translate-x-28' : 'translate-x-0',
+        canExecute && 'group-focus-within/card:-translate-x-28',
+      )}>
+      <div className="w-full shrink-0 px-3.5 py-3.5">
         {/* The headline: the title on one line, and the priority at the
             row's right end. No Status on the card — the column it stands
             in says where the work stands. */}
@@ -338,6 +398,37 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra }
           </div>
         </div>
       </div>
+      {canExecute && (
+        <button
+          type="button"
+          aria-label={t('Execute Element')}
+          onPointerDown={stop}
+          onClick={(e) => { stop(e); onExecute?.(element); }}
+          className="flex w-28 shrink-0 flex-col items-center justify-center gap-1.5 bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <ThickArrowRight size={26} />
+          <span className="text-center text-[11px] font-medium leading-tight">{t('Execute Element')}</span>
+        </button>
+      )}
+      </div>
+      {/* Touch (no hover): the rail's first 28px as an always-visible
+          tab at the right edge. The first tap reveals the full rail
+          without activating; the second tap activates. */}
+      {canExecute && (
+        <button
+          type="button"
+          aria-label={t('Execute Element')}
+          onPointerDown={stop}
+          onClick={(e) => {
+            stop(e);
+            if (!touchRevealed) setTouchRevealed(true);
+            else onExecute?.(element);
+          }}
+          className="absolute right-0 top-0 z-10 hidden h-full w-7 items-center justify-center bg-primary text-primary-foreground [@media(hover:none)]:flex"
+        >
+          <ThickArrowRight size={17} />
+        </button>
+      )}
     </div>
   );
 }
