@@ -11,6 +11,8 @@ import { traceFromRunSteps } from '@/Function/shared/workTrace';
 import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared/workTraceView';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
+import { CreatedEntityCard } from '@/AIP/ai/CreatedEntityCard';
+import type { CreatedEntity } from '@/AIP/ai/useAlconCopilot';
 import type { AgentOutput } from '@/types/database';
 import type { ProposedReading } from '@/Function/audit/auditModel';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
@@ -120,6 +122,36 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
     }
     return [...seen.entries()].map(([requestId, label]) => ({ requestId, label }));
   }, [agent.steps]);
+  // The pull request this run's publish opened (coding capability
+  // PR3): its step's detail is the created record the card family
+  // reads — the card re-reads the code_changes row live, so the run
+  // record keeps showing the PR's state after the run ends. A step
+  // whose detail is the plain-URL fallback carries no card record
+  // and stays a trace row.
+  const publishedPrs = useMemo(() => {
+    const seen = new Map<string, CreatedEntity>();
+    for (const s of agent.steps) {
+      if (s.type !== 'pull_request' || !s.detail) continue;
+      try {
+        const parsed = JSON.parse(s.detail) as { created?: unknown };
+        if (!Array.isArray(parsed.created)) continue;
+        for (const entry of parsed.created) {
+          if (!entry || typeof entry !== 'object') continue;
+          const e = entry as Record<string, unknown>;
+          if (e.kind !== 'pull_request' || typeof e.id !== 'string' || !e.id
+            || typeof e.title !== 'string' || !e.title || seen.has(e.id)) continue;
+          seen.set(e.id, {
+            kind: 'pull_request', id: e.id, title: e.title,
+            ...(typeof e.url === 'string' && e.url ? { url: e.url } : {}),
+            ...(typeof e.repo === 'string' && e.repo ? { repo: e.repo } : {}),
+            ...(typeof e.number === 'number' && e.number > 0 ? { number: e.number } : {}),
+            ...(typeof e.state === 'string' && e.state ? { state: e.state } : {}),
+          });
+        }
+      } catch { /* a step whose detail is not the record's JSON is just a row */ }
+    }
+    return [...seen.values()];
+  }, [agent.steps]);
   // The run told the shared way (workTrace): headline, steps, completion.
   const trace = useMemo(
     () => traceFromRunSteps(
@@ -181,6 +213,13 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
           {credentialAsks.map((c) => (
             <div key={c.requestId} className="mt-2">
               <CredentialRequestCard spaceId={spaceId} requestId={c.requestId} label={c.label} />
+            </div>
+          ))}
+          {/* The PR the run published, as its created card — the
+              durable surface next to the trace that produced it. */}
+          {publishedPrs.map((entity) => (
+            <div key={entity.id} className="mt-2">
+              <CreatedEntityCard entity={entity} />
             </div>
           ))}
         </div>

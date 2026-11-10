@@ -11,14 +11,17 @@ import { VIEW_REGISTRY } from '@/Frame/viewRegistry';
 import { useElementById } from '@/hooks/elementData';
 import { useObjectById } from '@/hooks/useObjectArchive';
 import { useStrategies } from '@/hooks/strategyData';
-import type { ElementStatus } from '@/types/database';
+import { useCodeChangeById } from '@/hooks/codeChangeData';
+import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from '@/ui/icons';
+import type { CodeChange, ElementStatus } from '@/types/database';
 import { CHART_CARD_CLASS } from './chartColors';
 import { flattenCreated } from './copilotSteps';
 import type { CreatedEntity, ToolEvent } from './useAlconCopilot';
 
 // Cards for what a chat turn created in Alcon — Elements, Objects and
-// Strategies the turn's creation tools made, drawn from the tool
-// events' created records (server-side truth), never from parsing the
+// Strategies the turn's creation tools made, and the pull request a
+// coding run's publish opened (coding capability PR3), drawn from the
+// tool events' created records (server-side truth), never from parsing the
 // answer's prose: a mentioned entity stays a sentence, a created one
 // gets a card. One component family on the chat charts' island surface
 // — deliberately not the board's ElementCard (drag, inline editing,
@@ -120,6 +123,59 @@ function StrategyCreatedCard({ entity }: { entity: CreatedEntity }) {
   );
 }
 
+const PR_STATES: readonly string[] = ['open', 'draft', 'merged', 'closed'];
+
+/** A PR state's mark and word, mirroring the code-changes surface's
+ *  own table (ActivitySpace/reviews/codeChangeLabels): that module
+ *  lives on the surface layer, which this layer may not import, so
+ *  the four marks are restated here from the same glyphs and the
+ *  same label strings — the translations resolve identically. */
+const PR_STATE_META: Record<CodeChange['state'], { icon: typeof GitPullRequest; color: string; label: string }> = {
+  open: { icon: GitPullRequest, color: 'text-[var(--status-success)]', label: 'Open PR' },
+  draft: { icon: GitPullRequestDraft, color: 'text-muted-foreground', label: 'Draft' },
+  merged: { icon: GitMerge, color: 'text-[var(--accent-hover)]', label: 'Merged' },
+  closed: { icon: GitPullRequestClosed, color: 'text-[var(--status-danger)]', label: 'Closed' },
+};
+
+/** A pull request a coding run published (coding capability PR3,
+ *  design §8): the same card family, its row the code_changes link
+ *  the publish wrote — read live by id, so the state word and icon
+ *  follow the PR (open → merged → closed) after the run ends. The
+ *  snapshot stands while the read loads; a link row that no longer
+ *  resolves renders muted and unlinked, as with every kind here —
+ *  the PR itself lives on GitHub, but its Alcon record is what the
+ *  card vouches for. Clicking opens the PR on GitHub: a pull request
+ *  has no in-app home of its own; code-changes is its durable record,
+ *  reached from the Element. */
+function PullRequestCreatedCard({ entity }: { entity: CreatedEntity }) {
+  const { t } = useI18n();
+  const { change, settled } = useCodeChangeById(entity.id);
+  const gone = settled && !change;
+  const url = change?.url ?? entity.url;
+  const rawState = change?.state ?? entity.state;
+  const state = rawState && PR_STATES.includes(rawState) ? (rawState as CodeChange['state']) : undefined;
+  const repo = change?.repo ?? entity.repo;
+  const number = change?.number ?? entity.number;
+  const meta = state ? PR_STATE_META[state] : undefined;
+  const StateIcon = meta?.icon ?? GitPullRequest;
+  return (
+    <CardShell muted={gone}
+      onOpen={gone || !url ? undefined : () => window.open(url, '_blank', 'noopener,noreferrer')}>
+      <StateIcon size={15} className={`shrink-0 ${meta?.color ?? 'text-muted-foreground'}`} />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="min-w-0 truncate text-[13px] text-foreground">{change?.title ?? entity.title}</span>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">
+          {repo && (
+            <span className="min-w-0 truncate">{repo}{number ? ` #${number}` : ''}</span>
+          )}
+          {meta && <span className="shrink-0">{t(meta.label)}</span>}
+          {gone && <span className="shrink-0">{t('Deleted')}</span>}
+        </span>
+      </span>
+    </CardShell>
+  );
+}
+
 /** One created entity's card, its body per kind. */
 export function CreatedEntityCard({ entity }: { entity: CreatedEntity }) {
   switch (entity.kind) {
@@ -127,6 +183,8 @@ export function CreatedEntityCard({ entity }: { entity: CreatedEntity }) {
       return <ObjectCreatedCard entity={entity} />;
     case 'strategy':
       return <StrategyCreatedCard entity={entity} />;
+    case 'pull_request':
+      return <PullRequestCreatedCard entity={entity} />;
     default:
       return <ElementCreatedCard entity={entity} />;
   }

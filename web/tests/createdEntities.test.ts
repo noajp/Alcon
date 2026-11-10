@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // detail builder that carries them to the live panel within the
 // detail's size limit (copilotSession.ts). Both pure.
 // Deno dependencies belong to the Edge runtime, not the web compiler graph.
-const { createdOf } = await import(new URL('../../supabase/functions/_shared/createdEntities.ts', import.meta.url).pathname);
+const { createdOf, pullRequestCreatedOf } = await import(new URL('../../supabase/functions/_shared/createdEntities.ts', import.meta.url).pathname);
 const session = await import(new URL('../../supabase/functions/_shared/copilotSession.ts', import.meta.url).pathname);
 const { toolStepDetail, TOOL_STEP_CREATED_CAP, TOOL_STEP_DETAIL_LIMIT } = session;
 
@@ -80,6 +80,32 @@ describe('createdOf', () => {
       { kind: 'element', id: 'e1', title: 'A' },
       { kind: 'element', id: 'e2', title: 'B' },
     ]);
+  });
+});
+
+describe('pullRequestCreatedOf (coding capability PR3)', () => {
+  it('reads a linked code_changes row into the PR’s card record — its id is the row’s', () => {
+    expect(pullRequestCreatedOf({
+      id: 'cc1', title: '請求画面の修正', url: 'https://github.com/acme/widgets/pull/7',
+      repo: 'acme/widgets', number: 7, state: 'open',
+    })).toEqual({
+      kind: 'pull_request', id: 'cc1', title: '請求画面の修正',
+      url: 'https://github.com/acme/widgets/pull/7', repo: 'acme/widgets', number: 7, state: 'open',
+    });
+  });
+
+  it('a card needs the row’s id, a title and the PR’s URL — anything less is not a card', () => {
+    expect(pullRequestCreatedOf({ title: 'x', url: 'https://github.com/a/b/pull/1' })).toBeUndefined();
+    expect(pullRequestCreatedOf({ id: 'cc1', url: 'https://github.com/a/b/pull/1' })).toBeUndefined();
+    expect(pullRequestCreatedOf({ id: 'cc1', title: 'x' })).toBeUndefined();
+    expect(pullRequestCreatedOf({})).toBeUndefined();
+  });
+
+  it('snapshot extras are carried only when they are real: a bad number is dropped, not rendered', () => {
+    expect(pullRequestCreatedOf({ id: 'cc1', title: 'x', url: 'u', number: 0, state: '' }))
+      .toEqual({ kind: 'pull_request', id: 'cc1', title: 'x', url: 'u' });
+    expect(pullRequestCreatedOf({ id: 'cc1', title: 'x', url: 'u', number: '7' }))
+      .toEqual({ kind: 'pull_request', id: 'cc1', title: 'x', url: 'u' });
   });
 });
 

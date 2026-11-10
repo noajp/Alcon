@@ -1329,6 +1329,9 @@ export type AgentRunStepType =
   // Memory: a run kept what it learned (capture), or read what earlier
   // work kept (retrieval, including an auto-promotion it completed).
   | 'memory'
+  // A coding run's publish landing (coding capability PR3): the step
+  // carries the opened PR's created record in its detail.
+  | 'pull_request'
 
 export interface AgentRun {
   id: string

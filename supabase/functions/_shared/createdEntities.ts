@@ -13,7 +13,7 @@
 // been deleted — never as the displayed truth over a live row.
 
 export interface CreatedEntity {
-  kind: "element" | "object" | "strategy";
+  kind: "element" | "object" | "strategy" | "pull_request";
   id: string;
   /** The Element's title / the Object's or Strategy's name, as created. */
   title: string;
@@ -24,6 +24,14 @@ export interface CreatedEntity {
   /** An Element's Object, when its result carried it (single creates
    *  do; a batch's rows do not — the card's live read resolves it). */
   objectId?: string;
+  /** A pull request's own facts (coding capability PR3): its id is
+   *  the code_changes row's — the durable Alcon-side record whose
+   *  state the card re-reads live — and these are the snapshot the
+   *  card falls back to, as with every kind here. */
+  url?: string;
+  repo?: string;
+  number?: number;
+  state?: string;
 }
 
 function rowOf(data: unknown): Record<string, unknown> | null {
@@ -91,4 +99,31 @@ export function createdOf(toolName: string, data: unknown): CreatedEntity[] | un
     default:
       return undefined;
   }
+}
+
+/**
+ * Pure. A pull request the coding publish opened, as a card record:
+ * the code_changes row the PR was linked into (coding capability
+ * PR3, design §8) — the row is the card's identity because it is
+ * what carries the PR's live state in Alcon; the snapshot fields
+ * are the fallback while that read loads, as with every kind here.
+ * Anything without the row's id, a title and the PR's URL is not a
+ * card: a card without them would be a lie about what was made.
+ */
+export function pullRequestCreatedOf(change: {
+  id?: unknown; title?: unknown; url?: unknown; repo?: unknown; number?: unknown; state?: unknown;
+}): CreatedEntity | undefined {
+  const id = text(change.id);
+  const title = text(change.title);
+  const url = text(change.url);
+  if (!id || !title || !url) return undefined;
+  return {
+    kind: "pull_request",
+    id,
+    title,
+    url,
+    ...(text(change.repo) ? { repo: text(change.repo) } : {}),
+    ...(typeof change.number === "number" && change.number > 0 ? { number: change.number } : {}),
+    ...(text(change.state) ? { state: text(change.state) } : {}),
+  };
 }
