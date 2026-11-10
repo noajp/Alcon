@@ -7,15 +7,16 @@ import { cn } from '@/lib/utils';
 import { ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { advanceFromElement, startElementRun } from '@/AIP/ai/agentData';
+import { startElementRun } from '@/AIP/ai/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
-import { createElement, updateElement } from '@/hooks/useSupabase';
+import { updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
 import { createIntent } from '@/hooks/strategyData';
 import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
+import { ObjectBoard } from '@/ActivitySpace/execution/chain/ObjectBoard';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
-import { AddElementMenu, ChainCard, ChainLines } from '@/ActivitySpace/execution/chain/ChainCard';
+import { ChainCard, ChainLines } from '@/ActivitySpace/execution/chain/ChainCard';
 import { ExecutePlanDialog, type ExecuteTarget, type ObjectExecuteTarget } from '@/ActivitySpace/execution/element/agent';
 import { waitingReasonsByElement, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import { CARD_FLAT } from '@/shared/designTokens';
@@ -32,11 +33,10 @@ import { listenForPlanRequests } from './plannerRequest';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { useDefinitions, useRunRounds } from '@/hooks/definitionData';
 
-// The Strategy's Execution Chain: every action under its Objects in the
-// Board's Status columns, each card saying which Object it belongs to, the
-// verb it asks for, whether it waits on a person, what it delivers and what
-// it waits on. The Planner's draft waits, dashed, in To Do until the person
-// creates it; then its actions move along like the rest.
+// The Strategy's Board: its Objects in the Status columns their Elements
+// put them in. While the Planner's draft is open, the board shows actions
+// instead — the written ones and the draft's, dashed, in To Do until the
+// person creates them.
 
 function DraftTag() {
   const { t } = useI18n();
@@ -76,7 +76,7 @@ function DraftCard({ element, object }: { element: FleetElement; object: FleetOb
 }
 
 
-export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot, orientation, via }: {
+export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorkers, people, ensureRoot, orientation, via, onOpenObject }: {
   ctx: MissionContext;
   /** The board's orientation, from the page's tabs-row toggle. */
   orientation: BoardOrientation;
@@ -93,6 +93,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   ensureRoot: () => Promise<string>;
   /** Objects a Strategy under this one holds, by id, with that Strategy. */
   via?: ReadonlyMap<string, { id: string; name: string }>;
+  /** Open one of the board's Objects. */
+  onOpenObject?: (objectId: string) => void;
 }) {
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
@@ -236,33 +238,6 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     setBusy(null);
     if (failed) setNotice(t('{n} could not be handed to Claude Code.', { n: failed }));
     ctx.refetch();
-  };
-
-  // A card dropped on a column takes the StatusPicker's own path — write
-  // the Status, let acceptance land when the work closes, refetch — so a
-  // drag and a menu pick can never diverge. Enabled only for an editor
-  // with no Planner draft open (the fleet is hypothetical then).
-  const dropToStatus = async (status: ChainStatus, elementId: string) => {
-    const written = details.get(elementId);
-    if (!written || written.status === status) return;
-    setError(null);
-    try {
-      await updateElement(elementId, { status });
-      if (status === 'done' || status === 'cancelled') await advanceFromElement(elementId);
-      ctx.refetch();
-    } catch {
-      setError(t('Could not move {title}', { title: written.title }));
-    }
-  };
-
-  const addToColumn = async (status: ChainStatus, objectId: string) => {
-    setError(null);
-    try {
-      await createElement({ title: t('Untitled'), status, object_id: objectId });
-      ctx.refetch();
-    } catch {
-      setError(t('Could not add an Element here.'));
-    }
   };
 
   // Where each action stands: a written Element by its Status, its action and
@@ -438,14 +413,18 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
         {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
         {notice && <p role="status" className="text-[12px] text-muted-foreground">{notice}</p>}
 
-        {/* The chain: every action in the column for where it stands, left
-            to right. The draft's actions wait, dashed, in the first. With
-            no Objects yet, the columns stand empty, as on every board. */}
-        <ExecutionChain orientation={orientation}
-          className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
-          onDropStatus={ctx.canEdit && !draft ? (status, id) => void dropToStatus(status, id) : undefined}
-          columnAction={ctx.canEdit && !draft ? (status) => <AddElementMenu status={status} objects={objects} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
-          columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
+        {/* The board: the Strategy's Objects — its own and its descendants' —
+            each in the column its Elements put it in. While the Planner's
+            draft is open, the board shows the draft's actions instead,
+            dashed, beside the written ones, so the draft is read in place. */}
+        {draft ? (
+          <ExecutionChain orientation={orientation}
+            className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
+            columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
+        ) : (
+          <ObjectBoard objects={objects} elements={ctx.elements} via={via} orientation={orientation} onOpenObject={onOpenObject}
+            className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'} />
+        )}
         <ExecutePlanDialog target={executeTarget} open={executeTarget !== null}
           onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}
           onFinished={ctx.refetch} />

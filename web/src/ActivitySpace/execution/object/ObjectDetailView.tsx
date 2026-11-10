@@ -18,6 +18,7 @@ import type { NavigationState } from '@/types/navigation';
 import { TabBar } from '@/Frame/TabBar';
 import { bulkSetAssignee } from '@/hooks/bulkAssign';
 import { CalendarView } from '@/ActivitySpace/calendar/CalendarView';
+import { DomainChain } from '@/ActivitySpace/execution/domain/DomainChain';
 import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryView';
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
 import { GanttView } from '@/ActivitySpace/execution/element/gantt';
@@ -44,8 +45,8 @@ import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/e
 // Every tab type the union knows. A stored tab whose type sits outside
 // this set has no view of its own — a 'board' row the migration has not
 // rewritten yet, or a type from another build — and reads as the Elements
-// list rather than a blank pane (see showElementsTab below). Known types
-// without a branch here ('note', 'flow') keep their current rendering.
+// list rather than a blank pane (see showElementsTab below). A known type
+// without a branch here ('note') keeps its current rendering.
 const KNOWN_OBJECT_TAB_TYPES: ReadonlySet<string> = new Set([
   'summary', 'elements', 'overview', 'gantt', 'calendar', 'workers',
   'resource', 'custom_view', 'note', 'flow',
@@ -596,6 +597,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               milestones={objectMilestones}
               onElementOpen={(el) => setDetailElementId(el.id)}
             />
+          </div>
+        )}
+
+        {/* Board: this Object's Elements in their Status columns. */}
+        {activeTab?.tab_type === 'flow' && (
+          <div className="flex-1 overflow-hidden bg-card">
+            <DomainChain elements={filteredElements} objects={[object]} domainId={object.domain_id ?? null} canEdit nameObjects={false}
+              onRefresh={onRefresh} onOpenElement={(id) => setDetailElementId(id)} />
           </div>
         )}
 

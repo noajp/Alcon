@@ -17,9 +17,9 @@ import {
   type FleetElement, type FleetObjectRow,
 } from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 
-// A Domain's Execution Chain: the same chain a Strategy draws — the same
-// component, the same cards, the same fleet readings — over the Domain's
-// Elements and their runs, with no Strategy around them. What a Strategy
+// An Object's Board: its Elements in their Status columns — the same
+// chain a Strategy draws while the Planner's draft is open, the same
+// cards, the same fleet readings — with no Strategy around them. What a Strategy
 // adds and a Domain has no meaning for is left out, not faked: there are
 // no measures to serve and no cost to total, and the cards' serves lines
 // stay empty.
@@ -29,7 +29,7 @@ import {
 // cancelled), refetch — so a drag here and a drag there can never
 // diverge, and a failed move says so instead of snapping back silently.
 
-export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, onOpenElement }: {
+export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, onOpenElement, nameObjects = true }: {
   /** The Domain's Elements — its Objects' and its own root Elements. */
   elements: ElementWithDetails[];
   /** The Domain's Objects, for the cards that name theirs and the "+". */
@@ -40,6 +40,8 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
   onRefresh?: () => void;
   /** Open an Element's detail (the drilldown this tab borrows). */
   onOpenElement: (elementId: string) => void;
+  /** False inside one Object, where every card would name the same one. */
+  nameObjects?: boolean;
 }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
@@ -144,7 +146,7 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
   for (const c of cards) {
     const detail = c.elementId ? details.get(c.elementId) : undefined;
     if (!c.elementId || !detail) continue;
-    const object = detail.object_id ? objectById.get(detail.object_id) ?? null : null;
+    const object = nameObjects && detail.object_id ? objectById.get(detail.object_id) ?? null : null;
     columns[chainStatusOf(detail.status)].push({
       key: c.key,
       node: (

@@ -32,7 +32,8 @@ import {
 import { DomainOverview } from './DomainOverview';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
-import { DomainChain } from './DomainChain';
+import { ObjectBoard, type BoardObject } from '@/ActivitySpace/execution/chain/ObjectBoard';
+import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { ObjectIcon } from '@/Frame/icons';
 import { IslandHeader } from '@/Function/shared/MainIsland';
@@ -68,10 +69,10 @@ const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
 // A Domain always has its Overview, its Flow and its People; other views are added.
 const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['overview', 'flow', 'gantt', 'workers'];
-const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
+const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
-  elements: { domainTitle: 'All Objects', objectTitle: 'All Elements' },
+  elements: { domainTitle: 'Objects', objectTitle: 'Elements' },
   overview: { domainTitle: 'Overview', objectTitle: 'Overview' },
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
@@ -83,8 +84,7 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   flow: { domainTitle: 'Board', objectTitle: 'Board' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
-// Flow is a Domain's view; an Object's tabs offer the rest.
-const OBJECT_CREATE_TAB_TYPES: ObjectTabType[] = ALL_TAB_TYPES.filter((t) => t !== 'flow');
+const OBJECT_CREATE_TAB_TYPES: ObjectTabType[] = ALL_TAB_TYPES;
 // Object tabs that show its Elements through the Elements tab's Filter / Display.
 const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'gantt', 'calendar'];
 
@@ -104,6 +104,25 @@ function loadVisibleTabs(key: string, fallback: ObjectTabType[]): ObjectTabType[
     return valid.length > 0 ? Array.from(new Set(valid)) : fallback;
   } catch {
     return fallback;
+  }
+}
+
+/** An Object's tabs saved before Objects had a Board gain it once, after
+ *  Elements; closed after that, it stays closed. */
+const OBJECT_BOARD_ADDED_PREFIX = 'domain:objectBoardAdded:';
+function withObjectBoardOnce(objectId: string, types: ObjectTabType[]): ObjectTabType[] {
+  if (typeof window === 'undefined') return types;
+  try {
+    const flag = `${OBJECT_BOARD_ADDED_PREFIX}${objectId}`;
+    if (window.localStorage.getItem(flag)) return types;
+    window.localStorage.setItem(flag, '1');
+    if (types.includes('flow')) return types;
+    const at = types.indexOf('elements');
+    const next = at < 0 ? [...types, 'flow' as ObjectTabType] : [...types.slice(0, at + 1), 'flow' as ObjectTabType, ...types.slice(at + 1)];
+    saveVisibleTabs(`${OBJECT_VISIBLE_TABS_PREFIX}${objectId}`, next);
+    return next;
+  } catch {
+    return types;
   }
 }
 
@@ -244,7 +263,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     const key = `${OBJECT_VISIBLE_TABS_PREFIX}${selectedObject.id}`;
     setObjectVisibleTypesById((prev) => ({
       ...prev,
-      [selectedObject.id]: loadVisibleTabs(key, DEFAULT_OBJECT_TAB_TYPES),
+      [selectedObject.id]: withObjectBoardOnce(selectedObject.id, loadVisibleTabs(key, DEFAULT_OBJECT_TAB_TYPES)),
     }));
   }, [selectedObject, objectVisibleTypesById]);
 
@@ -481,7 +500,6 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             objListControls={objListControls}
             domainId={activeDomainId ?? null}
             domainName={activeDomain?.name ?? null}
-            canEdit={!viewOnly}
             onNavigate={onNavigate}
             onViewChange={onViewChange}
             onElementDetailChange={setElementDetailOpen}
@@ -536,9 +554,6 @@ interface DomainTabContentProps {
   /** Named on the breadcrumb of an Element opened from the Execution
    *  Chain / Calendar / Workload. */
   domainName?: string | null;
-  /** False for a Domain viewer, who reads: the Execution Chain's drops
-   *  and adds are then off. */
-  canEdit?: boolean;
   /** The tools' Element detail borrows these to reach an Object or an
    *  Strategy — the one-click round trip the List tab already has. */
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -549,7 +564,7 @@ interface DomainTabContentProps {
   onElementDetailChange: (open: boolean) => void;
 }
 
-function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, canEdit = true, onNavigate, onViewChange, onElementDetailChange }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange, onElementDetailChange }: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -608,14 +623,10 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     );
   }
 
+  // Board: the Domain's Objects, each in the column its Elements put it in.
+  // An Object's own Board, one level down, shows its Elements.
   if (activeType === 'flow') {
-    return (
-      <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Execution Chain" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
-          {openElement => <DomainChain elements={allElements} objects={objects ?? []} domainId={domainId ?? null} canEdit={canEdit} onRefresh={onRefresh} onOpenElement={openElement} />}
-        </ElementDrilldown>
-      </div>
-    );
+    return <DomainObjectBoard objects={objects ?? []} elements={allElements} onOpenObject={onSelectObject} />;
   }
 
   if (activeType === 'summary') {
@@ -696,4 +707,21 @@ export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails
     created_at: o.created_at ?? null,
     updated_at: o.updated_at ?? null,
   };
+}
+
+function DomainObjectBoard({ objects, elements, onOpenObject }: {
+  objects: BoardObject[];
+  elements: readonly { object_id?: string | null; status?: string | null }[];
+  onOpenObject: (objectId: string) => void;
+}) {
+  const [orientation, setOrientation] = useBoardOrientation();
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 pb-4 pt-3">
+      <div className="flex items-start gap-2">
+        <BoardOrientationToggle orientation={orientation} onChange={setOrientation} className="ml-auto" />
+      </div>
+      <ObjectBoard objects={objects} elements={elements} orientation={orientation} onOpenObject={onOpenObject}
+        className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'} />
+    </div>
+  );
 }
