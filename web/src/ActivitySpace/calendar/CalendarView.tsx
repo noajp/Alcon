@@ -814,8 +814,10 @@ function TimeGridView({
 
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${days.length > 1 ? "min-w-[640px]" : "min-w-0"}`}>
-      {/* Day-of-week header row */}
-      <div className="flex border-b border-[var(--border-subtle)] bg-card/95 backdrop-blur sticky top-0 z-10">
+      {/* Day-of-week header row. It, the all-day row and the hour grid all
+          reserve the scrollbar's gutter, so the grid's scrollbar never
+          narrows its columns out of line with the rows above. */}
+      <div className="flex overflow-hidden [scrollbar-gutter:stable] border-b border-[var(--border-subtle)] bg-card/95 backdrop-blur sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         {days.map((d, i) => {
           const isTodayCol = isSameDay(d, today);
@@ -851,7 +853,7 @@ function TimeGridView({
         const lanes = spans.reduce((max, span) => Math.max(max, span.lane + 1), 0);
         const height = Math.max(28, 4 + lanes * MONTH_LANE_HEIGHT + 4);
         return (
-          <div className="flex border-b border-[var(--border-subtle)] bg-card">
+          <div className="flex overflow-hidden [scrollbar-gutter:stable] border-b border-[var(--border-subtle)] bg-card">
             <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
               {t('All day')}
             </div>
@@ -905,7 +907,7 @@ function TimeGridView({
       })()}
 
       {/* Scrollable hour grid */}
-      <div ref={scrollRef} className="flex-1 overflow-auto relative">
+      <div ref={scrollRef} className="flex-1 overflow-auto [scrollbar-gutter:stable] relative">
         <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
           {/* Hour rail */}
           <div className="w-14 flex-shrink-0 relative">
