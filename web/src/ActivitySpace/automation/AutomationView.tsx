@@ -37,6 +37,7 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
   const automations = useAutomations(spaceId);
   const library = useDefinitions(spaceId);
 
@@ -53,12 +54,22 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
     finally { setSaving(null); }
   };
 
+  const opened = openId ? automations.data.find((a) => a.id === openId) ?? null : null;
+  if (opened) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col bg-card">
+        <IslandHeader crumbs={[{ id: 'automation', label: t('Automation'), onClick: () => setOpenId(null) }, { id: opened.id, label: opened.name }]} />
+        <AutomationsSection spaceId={spaceId} creating={false} onCreatingChange={setCreating} openId={opened.id} onOpen={setOpenId} onOpenElement={onOpenElement} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-card">
       <IslandHeader crumbs={[{ id: 'automation', label: t('Automation') }]} count={automations.data.length}
         actions={!creating && <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setCreating(true)}>{t('New automation')}</Button>} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} onOpenElement={onOpenElement} />
+        <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} openId={null} onOpen={setOpenId} onOpenElement={onOpenElement} />
         {/* Each Strategy's own AI work, beside the automations. */}
         <div className="px-6 py-6">
         <FoldSection title={t('When a run finishes')} count={String(strategies.length)}>

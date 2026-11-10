@@ -980,6 +980,7 @@ export type Database = {
           token_hash: string | null
           updated_at: string
           workflow: string
+          workflow_graph: Json | null
         }
         Insert: {
           activity_space_id: string
@@ -1002,6 +1003,7 @@ export type Database = {
           token_hash?: string | null
           updated_at?: string
           workflow?: string
+          workflow_graph?: Json | null
         }
         Update: {
           activity_space_id?: string
@@ -1024,6 +1026,7 @@ export type Database = {
           token_hash?: string | null
           updated_at?: string
           workflow?: string
+          workflow_graph?: Json | null
         }
         Relationships: [
           {

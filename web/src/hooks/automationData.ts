@@ -6,6 +6,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import type { Json } from '@/types/supabase';
 import { nextCronRun } from '@/AIP/automation/cron';
 
 export type AutomationKind = 'schedule' | 'webhook';
@@ -19,6 +20,8 @@ export interface Automation {
   definition_id: string | null;
   /** Its own steps, in the harness's Procedure form (`# 進め方`). */
   workflow: string;
+  /** The workflow as drawn on its canvas; null until it is first drawn. */
+  workflow_graph: unknown;
   object_id: string;
   kind: AutomationKind;
   cron: string | null;
@@ -52,7 +55,7 @@ export function runWaitingOnApproval(runStatus: string | null | undefined): bool
   return runStatus === 'awaiting_approval';
 }
 
-const COLUMNS = 'id, activity_space_id, name, enabled, definition_id, workflow, object_id, kind, cron, timezone, token_hash, owner_id, next_run_at, last_fired_at, last_status, last_error, created_at';
+const COLUMNS = 'id, activity_space_id, name, enabled, definition_id, workflow, workflow_graph, object_id, kind, cron, timezone, token_hash, owner_id, next_run_at, last_fired_at, last_status, last_error, created_at';
 const key = (spaceId: string | null) => ['automations', spaceId ?? 'none'] as const;
 
 function fromRow(r: Record<string, unknown>): Automation {
@@ -110,10 +113,10 @@ function nextRunOf(kind: AutomationKind, cron: string | null, timezone: string):
 }
 
 export async function createAutomation(input: {
-  spaceId: string; name: string; definitionId: string | null; workflow?: string; objectId: string; kind: AutomationKind; cron: string | null; timezone: string;
+  spaceId: string; name: string; definitionId: string | null; workflow?: string; workflowGraph?: unknown; objectId: string; kind: AutomationKind; cron: string | null; timezone: string;
 }): Promise<Automation> {
   const { data, error } = await supabase.from('automations').insert({
-    activity_space_id: input.spaceId, name: input.name.trim(), definition_id: input.definitionId, workflow: input.workflow ?? '', object_id: input.objectId,
+    activity_space_id: input.spaceId, name: input.name.trim(), definition_id: input.definitionId, workflow: input.workflow ?? '', workflow_graph: (input.workflowGraph ?? null) as Json, object_id: input.objectId,
     kind: input.kind, cron: input.kind === 'schedule' ? input.cron?.trim() || null : null, timezone: input.timezone,
     next_run_at: nextRunOf(input.kind, input.cron, input.timezone),
   }).select(COLUMNS).single();
@@ -123,8 +126,8 @@ export async function createAutomation(input: {
 
 /** Changes what an automation is: its harness (null for none), where its
  *  work goes, or its workflow. */
-export async function updateAutomation(id: string, patch: Partial<Pick<Automation, 'definition_id' | 'object_id' | 'workflow' | 'name'>>): Promise<void> {
-  const { error } = await supabase.from('automations').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
+export async function updateAutomation(id: string, patch: Partial<Pick<Automation, 'definition_id' | 'object_id' | 'workflow' | 'name'>> & { workflow_graph?: unknown }): Promise<void> {
+  const { error } = await supabase.from('automations').update({ ...patch, workflow_graph: patch.workflow_graph as Json | undefined, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }
 
