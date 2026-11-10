@@ -1375,6 +1375,86 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_event_elements: {
+        Row: {
+          created_at: string
+          element_id: string
+          event_id: string
+        }
+        Insert: {
+          created_at?: string
+          element_id: string
+          event_id: string
+        }
+        Update: {
+          created_at?: string
+          element_id?: string
+          event_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_elements_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_event_elements_element_id_fkey"
+            columns: ["element_id"]
+            isOneToOne: false
+            referencedRelation: "elements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_events: {
+        Row: {
+          activity_space_id: string
+          created_at: string
+          created_by: string
+          end_date: string
+          end_time: string | null
+          id: string
+          start_date: string
+          start_time: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          activity_space_id: string
+          created_at?: string
+          created_by?: string
+          end_date: string
+          end_time?: string | null
+          id?: string
+          start_date: string
+          start_time?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          activity_space_id?: string
+          created_at?: string
+          created_by?: string
+          end_date?: string
+          end_time?: string | null
+          id?: string
+          start_date?: string
+          start_time?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_activity_space_id_fkey"
+            columns: ["activity_space_id"]
+            isOneToOne: false
+            referencedRelation: "activity_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catalog_items: {
         Row: {
           body: string | null

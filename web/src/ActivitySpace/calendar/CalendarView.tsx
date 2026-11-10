@@ -2,11 +2,12 @@
 
 import { toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly, isSameDay, isOverdue as isDueDayPast } from '@/Function/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from '@/ui/icons';
+import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, Plus, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
+import type { CalendarEvent } from '@/hooks/calendarEventData';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails, AlconObject } from '@/types/database';
@@ -26,6 +27,13 @@ interface CalendarViewProps {
   /** The day the grid is on, when a parent (the Calendar sidebar) owns it. */
   date?: Date;
   onDateChange?: (date: Date) => void;
+  /** The Space's events (plans that are not work), drawn filled. */
+  events?: CalendarEvent[];
+  onEventClick?: (event: CalendarEvent) => void;
+  /** Make a new event — from the header's button (no slot) or an empty
+   *  spot on the hour grid (that day, from that half hour). Absent: the
+   *  Calendar makes no events. */
+  onCreateEvent?: (slot: { date: string; startMinutes: number | null; endMinutes?: number }) => void;
 }
 
 type CalendarMode = 'day' | 'week' | 'month';
@@ -61,7 +69,7 @@ const MONTH_LANE_TOP = 34;      // px from the row's top to the first lane (date
 // Time grid constants
 const GRID_START_HOUR = 0;
 const GRID_END_HOUR = 24;
-const HOUR_HEIGHT = 48; // px per hour
+const HOUR_HEIGHT = 80; // px per hour: a half hour holds a title and its time
 const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
 function getWeekDays(date: Date, weekStartsOn: number): Date[] {
@@ -101,12 +109,13 @@ function formatTimeShort(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange }: CalendarViewProps) {
+export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange, events, onEventClick, onCreateEvent }: CalendarViewProps) {
   const { t, locale } = useI18n();
-  const elements = useMemo(() => calendarEntries(sourceElements, objects), [sourceElements, objects]);
+  const elements = useMemo(() => calendarEntries(sourceElements, objects, events), [sourceElements, objects, events]);
   const onElementClick = (entry: CalendarEntry) => {
-    if (entry.object) onObjectClick?.(entry.object);
-    else openElement?.(entry.element);
+    if (entry.event) onEventClick?.(entry.event);
+    else if (entry.object) onObjectClick?.(entry.object);
+    else if (entry.element) openElement?.(entry.element);
   };
   const [ownDate, setOwnDate] = useState(new Date());
   const currentDate = date ?? ownDate;
@@ -240,7 +249,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     }
   };
 
-  const isOverdue = (element: CalendarEntry): boolean => isDueDayPast(element.due_date, element.status === 'done');
+  // An event is a plan, not work: it is never overdue.
+  const isOverdue = (element: CalendarEntry): boolean => !element.event && isDueDayPast(element.due_date, element.status === 'done');
 
   const scheduleOn = async (element: CalendarEntry, date: Date) => {
     if (!element.element) return;
@@ -291,6 +301,10 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
   const getCardStyle = (
     element: CalendarEntry
   ): { className: string; style?: React.CSSProperties; dotColor?: string } => {
+    // An event is drawn filled, so it reads apart from the work around it.
+    if (element.event) {
+      return { className: 'text-primary-foreground', style: { backgroundColor: 'var(--accent-default)' }, dotColor: 'var(--accent-default)' };
+    }
     if (element.color) {
       const p = pastelFromHex(element.color);
       return {
@@ -341,6 +355,11 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label={t('Next period')}><ChevronRight size={16} /></Button>
         </ButtonAppearanceProvider>
         <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
+        {onCreateEvent && (
+          <Button size="sm" variant="secondary" onClick={() => onCreateEvent({ date: fmtDateOnly(currentDate), startMinutes: null })}>
+            <Plus size={13} />{t('New event')}
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ day: 'Day', week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
           <MenuShell as="dropdown" align="end">
@@ -508,7 +527,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                                     />
                                     <span
                                       className={`truncate flex-1 ${
-                                        element.status === 'done' ? 'line-through opacity-60' : ''
+                                        element.status === 'done' ? 'opacity-60' : ''
                                       }`}
                                     >
                                       {element.title}
@@ -591,9 +610,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                     <div className="flex h-full items-center gap-1.5 min-w-0">
                       {element.object && <ObjectIcon size={12} />}
                       <span
-                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
-                          isDone ? 'line-through' : ''
-                        }`}
+                        className="text-[11px] font-medium leading-tight truncate flex-1"
                       >
                         {element.title}
                       </span>
@@ -627,6 +644,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             setSelectedElement(el);
             setShowColorPicker(Boolean(el.element));
           }}
+          onSlotClick={onCreateEvent ? (day, startMinutes, endMinutes) => onCreateEvent({ date: fmtDateOnly(day), startMinutes, endMinutes }) : undefined}
         />
         </div>
       )}
@@ -744,6 +762,10 @@ interface TimeGridViewProps {
   isOverdue: (el: CalendarEntry) => boolean;
   onElementClick: (el: CalendarEntry) => void;
   onElementContextMenu: (el: CalendarEntry) => void;
+  /** An empty stretch of a day's hour grid was picked — clicked (its half
+   *  hour) or dragged over (the half hours it covers): that day, from the
+   *  start to the end. */
+  onSlotClick?: (day: Date, startMinutes: number, endMinutes: number) => void;
 }
 
 function TimeGridView({
@@ -754,6 +776,7 @@ function TimeGridView({
   isOverdue,
   onElementClick,
   onElementContextMenu,
+  onSlotClick,
 }: TimeGridViewProps) {
   const { t, locale } = useI18n();
   const [now, setNow] = useState(new Date());
@@ -811,32 +834,58 @@ function TimeGridView({
   const showNowLine = nowMinutes >= gridStartMin && nowMinutes <= gridEndMin;
   const nowLineTop = ((nowMinutes - gridStartMin) / 60) * HOUR_HEIGHT;
   const todayColIdx = days.findIndex(d => isSameDay(d, today));
+  // The half hour under the pointer on the empty grid.
+  const [hoverSlot, setHoverSlot] = useState<{ col: number; minutes: number } | null>(null);
+  // A drag down the empty grid: the half hour pressed on, and the one the
+  // pointer is over now. On release it becomes one event over that stretch.
+  const [pick, setPick] = useState<{ col: number; anchor: number; current: number } | null>(null);
+  const pickRef = useRef(pick);
+  useEffect(() => { pickRef.current = pick; });
+  const pickRange = (p: { anchor: number; current: number }) => ({
+    start: Math.min(p.anchor, p.current), end: Math.max(p.anchor, p.current) + 30,
+  });
+  useEffect(() => {
+    if (!pick || !onSlotClick) return;
+    // Released anywhere — inside the column or not — the stretch is made.
+    const up = () => {
+      const p = pickRef.current;
+      setPick(null);
+      if (!p) return;
+      const { start, end } = pickRange(p);
+      onSlotClick(days[p.col], start, end);
+    };
+    window.addEventListener('mouseup', up, { once: true });
+    return () => window.removeEventListener('mouseup', up);
+  // Bound once per drag; the ref carries where it ends.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pick !== null]);
+  const slotAt = (e: React.MouseEvent<HTMLDivElement>) => {
+    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+    const minutes = GRID_START_HOUR * 60 + Math.floor((y / HOUR_HEIGHT) * 2) * 30;
+    return Math.max(0, Math.min(minutes, 23 * 60 + 30));
+  };
 
   const colWidthClass = 'flex-1 min-w-0';
 
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${days.length > 1 ? "min-w-[640px]" : "min-w-0"}`}>
-      {/* Day-of-week header row */}
-      <div className="flex border-b border-[var(--border-subtle)] bg-card/95 backdrop-blur sticky top-0 z-10">
+      {/* Day-of-week header row. It, the all-day row and the hour grid all
+          reserve the scrollbar's gutter, so the grid's scrollbar never
+          narrows its columns out of line with the rows above. */}
+      <div className="flex overflow-hidden [scrollbar-gutter:stable] border-b border-[var(--border-subtle)] bg-card/95 backdrop-blur sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         {days.map((d, i) => {
           const isTodayCol = isSameDay(d, today);
           return (
             <div
               key={i}
-              className={`${colWidthClass} px-2 py-2 text-center`}
+              className={`${colWidthClass} border-l border-t-2 border-l-[var(--border-subtle)] px-2.5 pb-1.5 pt-1 ${isTodayCol ? 'border-t-[var(--accent-default)] text-[var(--accent-default)]' : 'border-t-transparent text-foreground'}`}
             >
-              <div className="text-[10px] text-muted-foreground">
-                {weekdayLabel(locale, d.getDay())}
+              <div className={`text-[22px] leading-tight tabular-nums ${isTodayCol ? 'font-semibold' : 'font-light'}`}>
+                {String(d.getDate()).padStart(2, '0')}
               </div>
-              <div className="mt-0.5 inline-flex items-center justify-center">
-                {isTodayCol ? (
-                  <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 pt-0.5 rounded-full flex items-center justify-center text-[12px] font-semibold leading-none tabular-nums">
-                    {d.getDate()}
-                  </span>
-                ) : (
-                  <span className="text-[13px] font-medium text-foreground">{d.getDate()}</span>
-                )}
+              <div className={`truncate text-[11px] ${isTodayCol ? 'font-medium' : 'text-muted-foreground'}`}>
+                {d.toLocaleDateString(locale, { weekday: 'long' })}
               </div>
             </div>
           );
@@ -853,7 +902,7 @@ function TimeGridView({
         const lanes = spans.reduce((max, span) => Math.max(max, span.lane + 1), 0);
         const height = Math.max(28, 4 + lanes * MONTH_LANE_HEIGHT + 4);
         return (
-          <div className="flex border-b border-[var(--border-subtle)] bg-card">
+          <div className="flex overflow-hidden [scrollbar-gutter:stable] border-b border-[var(--border-subtle)] bg-card">
             <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
               {t('All day')}
             </div>
@@ -893,9 +942,7 @@ function TimeGridView({
                   >
                     <div className="flex h-full items-center min-w-0">
                       <span
-                        className={`text-[11px] font-medium leading-tight truncate flex-1 ${
-                          isDone ? 'line-through' : ''
-                        }`}
+                        className="text-[11px] font-medium leading-tight truncate flex-1"
                       >
                         {el.title}
                       </span>
@@ -909,15 +956,15 @@ function TimeGridView({
       })()}
 
       {/* Scrollable hour grid */}
-      <div ref={scrollRef} className="flex-1 overflow-auto relative">
+      <div ref={scrollRef} className="flex-1 overflow-auto [scrollbar-gutter:stable] relative">
         <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
           {/* Hour rail */}
           <div className="w-14 flex-shrink-0 relative">
-            {hours.filter(h => h !== GRID_START_HOUR).map(h => (
+            {hours.map(h => (
               <div
                 key={h}
-                className="absolute left-0 right-0 px-1 text-right text-[10px] text-muted-foreground"
-                style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT - 6, height: HOUR_HEIGHT }}
+                className="absolute left-0 right-0 px-2 text-[11px] text-muted-foreground"
+                style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + 4 }}
               >
                 {formatHourLabel(locale, h)}
               </div>
@@ -931,15 +978,70 @@ function TimeGridView({
               <div
                 key={colIdx}
                 className={`${colWidthClass} relative border-l border-[var(--border-subtle)]`}
+                onMouseDown={onSlotClick ? (e) => {
+                  // Only the empty grid: a press on a card is the card's.
+                  if (e.button !== 0 || e.target !== e.currentTarget) return;
+                  e.preventDefault();
+                  const minutes = slotAt(e);
+                  setHoverSlot(null);
+                  setPick({ col: colIdx, anchor: minutes, current: minutes });
+                } : undefined}
+                onMouseMove={onSlotClick ? (e) => {
+                  if (pick) {
+                    if (pick.col === colIdx) {
+                      const minutes = slotAt(e);
+                      if (minutes !== pick.current) setPick({ ...pick, current: minutes });
+                    }
+                    return;
+                  }
+                  if (e.target !== e.currentTarget) { if (hoverSlot) setHoverSlot(null); return; }
+                  const minutes = slotAt(e);
+                  if (hoverSlot?.col !== colIdx || hoverSlot.minutes !== minutes) setHoverSlot({ col: colIdx, minutes });
+                } : undefined}
+                onMouseLeave={onSlotClick ? () => setHoverSlot(null) : undefined}
               >
-                {/* Hour grid lines */}
+                {/* Hour lines, and a dashed line at each half hour */}
                 {hours.map(h => (
-                  <div
-                    key={h}
-                    className="absolute left-0 right-0 border-t border-[var(--border-subtle)]"
-                    style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
-                  />
+                  <div key={h} className="pointer-events-none">
+                    <div
+                      className="absolute left-0 right-0 border-t border-[var(--border-default)]"
+                      style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
+                    />
+                    <div
+                      className="absolute left-0 right-0 border-t border-dashed border-[var(--border-default)]"
+                      style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
+                    />
+                  </div>
                 ))}
+
+                {/* The stretch being dragged over: the event it will make */}
+                {pick?.col === colIdx && (() => {
+                  const { start, end } = pickRange(pick);
+                  return (
+                    <div
+                      className="pointer-events-none absolute left-0.5 right-0.5 z-20 rounded-sm border border-[var(--accent-default)] bg-[var(--accent-subtle)] px-1.5 py-0.5 text-[11px] tabular-nums text-foreground"
+                      style={{ top: ((start - gridStartMin) / 60) * HOUR_HEIGHT, height: ((end - start) / 60) * HOUR_HEIGHT }}
+                    >
+                      {formatTimeShort(start)} – {formatTimeShort(end)}
+                    </div>
+                  );
+                })()}
+
+                {/* The half hour under the pointer: where a click makes an event */}
+                {!pick && hoverSlot?.col === colIdx && (
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 rounded-sm border border-foreground/70"
+                    style={{ top: ((hoverSlot.minutes - gridStartMin) / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 2 }}
+                  />
+                )}
+
+                {/* Now, on the days before and after today this week: dashed */}
+                {!isTodayCol && todayColIdx >= 0 && showNowLine && (
+                  <div
+                    className="pointer-events-none absolute left-0 right-0 z-10 border-t border-dashed border-[var(--status-danger)] opacity-60"
+                    style={{ top: nowLineTop }}
+                  />
+                )}
 
                 {/* Now line */}
                 {isTodayCol && showNowLine && (
@@ -987,9 +1089,7 @@ function TimeGridView({
                       title={`${el.title}\n${timeLabel}`}
                     >
                       <div
-                        className={`text-[11px] font-medium leading-tight truncate ${
-                          isDone ? 'line-through' : ''
-                        }`}
+                        className="text-[11px] font-medium leading-tight truncate"
                       >
                         {el.title}
                       </div>

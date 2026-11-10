@@ -18,6 +18,12 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { CalendarEventPopup } from '@/ActivitySpace/calendar/CalendarEventPopup';
+import { draftFromEvent, draftFromSlot, inputFromDraft, type EventDraft } from '@/ActivitySpace/calendar/eventDraft';
+import {
+  createCalendarEvent, deleteCalendarEvent, updateCalendarEvent, useCalendarEvents, useInvalidateCalendarEvents,
+  type CalendarEvent,
+} from '@/hooks/calendarEventData';
 
 interface MyCalendarViewProps {
   initialScope?: 'mine' | 'space';
@@ -66,6 +72,17 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
   const date = useMemo(() => parseDateOnly(day) ?? new Date(), [day]);
   const loading = domainQuery.loading || (selection.mine ? mine.isPending : explorers.some(query => query.isPending));
   const error = domainQuery.error || (selection.mine ? mine.error : explorers.find(query => query.error)?.error);
+  // The Space's events — everyone in it sees them, whatever the scope.
+  const { events } = useCalendarEvents(spaceId);
+  const invalidateEvents = useInvalidateCalendarEvents();
+  const [eventPopup, setEventPopup] = useState<{ draft: EventDraft; event?: CalendarEvent } | null>(null);
+  const saveEvent = async (draft: EventDraft) => {
+    const input = inputFromDraft(draft);
+    if (eventPopup?.event) await updateCalendarEvent(eventPopup.event, input);
+    else if (spaceId) await createCalendarEvent(spaceId, input);
+    await invalidateEvents();
+  };
+
   const fetchMine = useCallback(async () => {
     await Promise.all([qc.invalidateQueries({ queryKey: ['my-elements', userId] }), qc.invalidateQueries({ queryKey: ['explorer'] })]);
   }, [qc, userId]);
@@ -87,8 +104,19 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
           const domainId = domainIds.find(id => explorers[domainIds.indexOf(id)]?.data?.objects.some(item => item.id === object.id));
           onNavigate?.({ objectId: object.id, objectDomainId: domainId ?? null });
           onViewChange?.('objects');
-        }} elements={elements} date={date} onDateChange={next => setCalendarDay(toDateOnlyString(next))} onRefresh={fetchMine} onElementClick={(el) => openElement(el.id)} />
+        }} elements={elements} date={date} onDateChange={next => setCalendarDay(toDateOnlyString(next))} onRefresh={fetchMine} onElementClick={(el) => openElement(el.id)}
+          events={events}
+          onEventClick={event => setEventPopup({ draft: draftFromEvent(event), event })}
+          onCreateEvent={spaceId ? slot => setEventPopup({ draft: draftFromSlot(slot.date, slot.startMinutes, slot.endMinutes) }) : undefined} />
       </div>
+      {eventPopup && (
+        <CalendarEventPopup key={eventPopup.event?.id ?? 'new'} initial={eventPopup.draft} event={eventPopup.event}
+          elements={scopedElements}
+          onSave={saveEvent}
+          onDelete={eventPopup.event ? async () => { await deleteCalendarEvent(eventPopup.event!.id); await invalidateEvents(); } : undefined}
+          onClose={() => setEventPopup(null)}
+          onOpenElement={id => { setEventPopup(null); openElement(id); }} />
+      )}
       </div>}
     </ElementDrilldown>
   );

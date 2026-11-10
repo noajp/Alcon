@@ -1,10 +1,15 @@
 import type { AlconObject, ElementWithDetails } from '@/types/database';
 import type { ExplorerData } from '@/Function/sync/explorerPatch';
+import type { CalendarEvent } from '@/hooks/calendarEventData';
 import { shiftDateOnly } from '@/Function/shared/dateUtils';
 
 export type CalendarEntry = Pick<ElementWithDetails,
   'id' | 'title' | 'start_date' | 'due_date' | 'start_time' | 'due_time' | 'color' | 'status' | 'priority' | 'estimated_hours'
-> & ({ element: ElementWithDetails; object?: never } | { object: AlconObject; element?: never });
+> & (
+  | { element: ElementWithDetails; object?: never; event?: never }
+  | { object: AlconObject; element?: never; event?: never }
+  | { event: CalendarEvent; element?: never; object?: never }
+);
 
 /** The day part of either column shape. `elements.start_date` is a timestamp
  *  and comes back as `2026-09-12T00:00:00+00:00`, while `due_date` is a plain
@@ -29,8 +34,15 @@ export function occursOn(entry: { start_date: string | null; due_date: string | 
   return Boolean(span && span.s <= dayOf(date) && dayOf(date) <= span.e);
 }
 
-export function calendarEntries(elements: ElementWithDetails[], objects: AlconObject[] = []): CalendarEntry[] {
+/** Everything the Calendar draws: Elements, Objects with dates, and the
+ *  Space's events (a plan, not work: no status, never overdue). */
+export function calendarEntries(elements: ElementWithDetails[], objects: AlconObject[] = [], events: CalendarEvent[] = []): CalendarEntry[] {
   return [
+    ...events.map(event => ({
+      id: `event:${event.id}`, title: event.title, start_date: event.start_date, due_date: event.end_date,
+      start_time: event.start_time, due_time: event.end_time, color: null,
+      status: null, priority: null, estimated_hours: null, event,
+    })),
     ...elements.map(element => ({ ...element, element })),
     ...objects.map(object => ({
       id: `object:${object.id}`, title: object.name, start_date: object.start_date,
