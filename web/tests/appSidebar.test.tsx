@@ -111,9 +111,9 @@ afterEach(() => {
 });
 
 describe('AppSidebar fixed top block', () => {
-  it('renders AI → Inbox → Calendar → Strategy in order', () => {
+  it('renders Inbox → Calendar → Artifacts → People → AI → Strategy by default', () => {
     renderSidebar();
-    const order = ['AI', 'Inbox', 'Calendar', 'Strategy'].map(rowOf);
+    const order = ['Inbox', 'Calendar', 'Artifacts', 'People', 'AI', 'Strategy'].map(rowOf);
     for (let i = 0; i < order.length - 1; i++) {
       expect(
         order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,
