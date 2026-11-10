@@ -164,6 +164,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Remove this member from "{space}"?': ['このメンバーを「{space}」から外しますか？', '이 구성원을 "{space}"에서 제거할까요?', 'Retirer ce membre de « {space} » ?', '¿Quitar a este miembro de «{space}»?'],
   '"{name}" still has Domains. Move or delete them before deleting the Space.': ['「{name}」にはまだ Domain があります。Space を削除する前に、移動するか削除してください。', '"{name}"에 아직 Domain이 있습니다. Space를 삭제하기 전에 옮기거나 삭제하세요.', '« {name} » contient encore des Domains. Déplacez-les ou supprimez-les avant de supprimer le Space.', '«{name}» todavía tiene Domains. Muévelos o elimínalos antes de eliminar el Space.'],
   'Delete "{name}"? This can’t be undone.': ['「{name}」を削除しますか？元に戻せません。', '"{name}"을(를) 삭제할까요? 되돌릴 수 없습니다.', 'Supprimer « {name} » ? Action irréversible.', '¿Eliminar «{name}»? No se puede deshacer.'],
+  'Delete "{name}"? Everything in it is deleted and this can’t be undone. Type the Space’s name to confirm.': ['「{name}」を削除しますか？中身はすべて削除され、元に戻せません。確認のため Space の名前を入力してください。', '"{name}"을(를) 삭제할까요? 안의 모든 것이 삭제되며 되돌릴 수 없습니다. 확인을 위해 Space 이름을 입력하세요.', 'Supprimer « {name} » ? Tout son contenu est supprimé et c’est irréversible. Tapez le nom du Space pour confirmer.', '¿Eliminar «{name}»? Todo su contenido se elimina y no se puede deshacer. Escribe el nombre del Space para confirmar.'],
+  'The name did not match. Nothing was deleted.': ['名前が一致しませんでした。何も削除されていません。', '이름이 일치하지 않았습니다. 아무것도 삭제되지 않았습니다.', 'Le nom ne correspondait pas. Rien n’a été supprimé.', 'El nombre no coincidía. No se eliminó nada.'],
   'Logo': ['ロゴ', '로고', 'Logo', 'Logo'],
   'Change logo': ['ロゴを変更', '로고 변경', 'Changer le logo', 'Cambiar logo'],
   'Upload image': ['画像をアップロード', '이미지 업로드', 'Importer une image', 'Subir imagen'],
@@ -874,6 +876,16 @@ const APP_MESSAGES: Record<string, Row> = {
   'Flow diagram': ['フロー図', '흐름도', 'Schéma du flux', 'Diagrama de flujo'],
   'Definition text': ['定義の本文', '정의 본문', 'Texte de la définition', 'Texto de la definición'],
   'Trigger': ['トリガ', '트리거', 'Déclencheur', 'Activador'],
+  // The Automation builder's three zones (Input → Athena → Output) and
+  // the blocks the zones project: the trigger and its declared sources
+  // on the left, the effects a run's steps carry on the right.
+  'Athena': ['Athena', 'Athena', 'Athena', 'Athena'],
+  'Mail': ['メール', '메일', 'Courrier', 'Correo'],
+  'Files': ['ファイル', '파일', 'Fichiers', 'Archivos'],
+  'Tickets': ['Element の起票', 'Element 티켓', 'Elements créés', 'Elements creados'],
+  'Sends': ['送信', '전송', 'Envois', 'Envíos'],
+  'Marks processed': ['処理済みにする', '처리됨으로 표시', 'Marque comme traité', 'Marca como procesado'],
+  'Proposes a change — a person approves': ['変更の提案 — 人が承認します', '변경 제안 — 사람이 승인합니다', 'Propose un changement — une personne approuve', 'Propone un cambio: una persona lo aprueba'],
   'Element target': ['起票先', '생성 위치', 'Destination de l’Element', 'Destino del Element'],
   'Step': ['ステップ', '단계', 'Étape', 'Paso'],
   'Condition step': ['条件', '조건', 'Condition', 'Condición'],

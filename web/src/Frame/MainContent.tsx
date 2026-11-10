@@ -26,7 +26,7 @@ const HomeScreen = dynamic(() => import('@/Frame/HomeScreen').then(m => m.HomeSc
 const NotebookSurface = dynamic(() => import('@/ActivitySpace/artifacts/notebook/NotebookSurface').then(m => m.NotebookSurface), { ssr: false, loading: viewLoading });
 const ElementsListView = dynamic(() => import('@/ActivitySpace/execution/element/ElementsListView').then(m => m.ElementsListView), { ssr: false, loading: viewLoading });
 const MyElementsView = dynamic(() => import('@/ActivitySpace/home/MyElementsView').then(m => m.MyElementsView), { ssr: false, loading: viewLoading });
-const AutomationView = dynamic(() => import('@/ActivitySpace/automation/AutomationView').then(m => m.AutomationView), { ssr: false, loading: viewLoading });
+const AutomationView = dynamic(() => import('@/Function/automation/AutomationView').then(m => m.AutomationView), { ssr: false, loading: viewLoading });
 const DomainView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainView').then(m => m.DomainView), { ssr: false, loading: viewLoading });
 const DomainsView = dynamic(() => import('@/ActivitySpace/execution/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/ActivitySpace/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
@@ -95,11 +95,13 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
+          {/* Automation's home is Settings since the 837 move (Function/automation);
+              this screen is that surface under the main island's header,
+              for a tab that still carries the view. The surface takes no
+              Strategy opener — its one navigation out is to an Element a
+              start made. */}
           {activeActivity === 'automation' && (
-            <AutomationView onOpenStrategy={(id) => {
-                if (onOpenItem) onOpenItem('strategy', { strategyId: id });
-                else { onNavigate({ strategyId: id }); onViewChange?.('strategy'); }
-              }}
+            <AutomationView
               onOpenElement={(id) => {
                 if (onOpenItem) onOpenItem('domain-elements', { elementId: id });
                 else { onNavigate({ elementId: id }); onViewChange?.('domain-elements'); }
