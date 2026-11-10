@@ -114,20 +114,14 @@ export const SETTINGS_ITEMS: Record<string, SettingsNavItem> = Object.fromEntrie
   SETTINGS_NAV.flatMap((s) => s.items.map((i) => [i.id, i])),
 );
 
-// ── External store: the area in view, the last revealed tab, a nonce ──
-// Settings opens on the first area of the nav. Three writers, one value:
-//   · setActiveSettingsSection — a REVEAL (a sidebar click, a deep link,
-//     page.tsx's restore, the OAuth return). It validates the tab exactly
-//     as the old page store did and bumps the reveal nonce, so
-//     SettingsView scrolls the area to the top — re-revealing the area
-//     already in view re-scrolls to it.
-//   · setSettingsSectionInView — the scroll-spy in SettingsView. It
-//     follows the reader's scroll, so it changes the section WITHOUT a
-//     nonce bump (the spy never causes a scroll) and leaves the tab
-//     alone: the tab records the last reveal, which is what page.tsx
-//     persists for restore.
-//   · the in-area segmented controls keep their own per-area tab state
-//     inside SettingsView, seeded by reveals.
+// ── External store: the area shown, the last revealed tab, a nonce ──
+// Settings opens on the first area of the nav. setActiveSettingsSection
+// is a REVEAL (a sidebar click, a deep link, page.tsx's restore, the
+// OAuth return): it validates the tab and bumps the reveal nonce, so
+// SettingsView shows that area from its top — re-revealing the area
+// already shown starts it at the top again. The in-area segmented
+// controls keep their own per-area tab state inside SettingsView,
+// seeded by reveals.
 const FIRST_PAGE = SETTINGS_NAV[0].items[0];
 interface ActiveSettings { section: string; tab: string | null; nonce: number }
 let active: ActiveSettings = { section: FIRST_PAGE.id, tab: FIRST_PAGE.tabs?.[0].id ?? null, nonce: 0 };
@@ -142,13 +136,6 @@ export function setActiveSettingsSection(id: string, tab?: string) {
   const tabs = SETTINGS_ITEMS[id]?.tabs;
   const nextTab = tabs ? (tabs.some((t) => t.id === tab) ? tab! : tabs[0].id) : null;
   active = { section: id, tab: nextTab, nonce: active.nonce + 1 };
-  emit();
-}
-
-/** The scroll-spy's writer: the named area is the one in view now. */
-export function setSettingsSectionInView(id: string) {
-  if (!SETTINGS_ITEMS[id] || id === active.section) return;
-  active = { ...active, section: id };
   emit();
 }
 
@@ -169,26 +156,4 @@ export function useActiveSettingsTab(): string | null {
  *  cue to seed the revealed area's tab and scroll to it. */
 export function useSettingsRevealNonce(): number {
   return useSyncExternalStore(subscribe, () => active.nonce, () => DEFAULT_ACTIVE.nonce);
-}
-
-// ── The scroll-spy's pick (pure) ──────────────────────────────────────
-/** One area shell's position as the spy's observer reports it; `top` is
- *  the shell's viewport-relative top edge. */
-export interface SpyCandidate { id: string; top: number; intersecting: boolean }
-
-/** Given the shells currently intersecting the spy's band, the area the
- *  reader has reached: the last visible shell whose top has crossed the
- *  spy line. Shells still below the line don't count; when none has
- *  crossed (the reader is up in the page's title zone), the highest
- *  visible shell wins; when nothing is visible (a fast flick between
- *  reports), the previous area stands rather than flickering the nav. */
-export function spySectionAt(candidates: readonly SpyCandidate[], line: number, previous: string): string {
-  const visible = candidates.filter((c) => c.intersecting);
-  if (visible.length === 0) return previous;
-  let reached: SpyCandidate | null = null;
-  for (const c of visible) {
-    if (c.top <= line && (!reached || c.top > reached.top)) reached = c;
-  }
-  if (reached) return reached.id;
-  return visible.reduce((a, b) => (b.top < a.top ? b : a)).id;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { AutomationSettings } from '@/Function/automation/AutomationSettings';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
@@ -16,7 +16,7 @@ import { IntegrationsSettings } from '@/AIP/connectors/IntegrationsSettings';
 import {
   SETTINGS_NAV, SETTINGS_ITEMS,
   useActiveSettingsSection, useActiveSettingsTab, useSettingsRevealNonce,
-  setActiveSettingsSection, setSettingsSectionInView, spySectionAt,
+  setActiveSettingsSection,
   type SettingsNavItem,
 } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
@@ -24,30 +24,22 @@ import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
 import { SettingsIsland, SettingRow, SelectRow, SegmentedRow, SegmentedControl, ToggleRow, SettingsComingSoon } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySettingsPanels';
-import { FONT } from '@/shared/designTokens';
 
 // =============================================================
 // SettingsView — content pane only. The settings NAV lives in
 // the AppSidebar (SettingsSidebarPanel); both share the settingsNav
 // store.
 //
-// Settings is ONE page (redesign §2): every area renders, stacked
-// under its nav group heading, on the page ground (bg-background) so
-// the property islands float. There is no panel switch — the store
-// names the area in view, a reveal (nav click / deep link / restore)
-// scrolls to it, and an IntersectionObserver scroll-spy keeps the
-// store on the area the reader is actually looking at. Areas that
-// subdivide (AI, API & access, Elements) swap only their own body
-// behind an in-area segmented control; their per-area tab state lives
-// here, seeded by reveals.
+// One area per page: the area the nav names is the page, headed by its
+// name and one-line description, on the page ground (bg-background) so
+// the property islands float. A reveal (nav click / deep link / restore)
+// switches the page and lands it at the top. Areas that subdivide (AI,
+// API & access, Elements) swap their body behind an in-area segmented
+// control; their per-area tab state lives here, seeded by reveals.
 //
 // Alcon's vocabulary replaces Linear's: Issues → Elements,
 // Projects → Objects, Team(s) → Domain(s).
 // =============================================================
-
-/** Where the scroll-spy's "current area" line sits: this far below the
- *  scroll container's top edge. */
-const SPY_LINE_OFFSET = 96;
 
 /** One-line descriptions for the areas whose panels don't carry one of
  *  their own yet (redesign §7); the rest gain theirs as their panels
@@ -66,23 +58,10 @@ export function SettingsView() {
   const revealTab = useActiveSettingsTab();
   const nonce = useSettingsRevealNonce();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const areaRefs = useRef(new Map<string, HTMLElement>());
-  const sectionRef = useRef(section);
-  useEffect(() => { sectionRef.current = section; });
   const handledNonce = useRef(-1);
-  // The spy stands down while a reveal's programmatic scroll settles,
-  // so it can't fight the reveal for the store (redesign §11 D8).
-  const spySuspended = useRef(false);
-  const suspendTimers = useRef<{ cap?: number; settle?: number }>({});
   // Per-area in-area tab state, seeded by reveals. Segmented clicks
-  // write here only — never through the reveal path — so swapping a
-  // body never scrolls the page (redesign §2.3).
+  // write here only.
   const [areaTabs, setAreaTabs] = useState<Record<string, string>>({});
-
-  const registerShell = useCallback((id: string, el: HTMLElement | null) => {
-    if (el) areaRefs.current.set(id, el);
-    else areaRefs.current.delete(id);
-  }, []);
 
   const tabFor = (item: SettingsNavItem): string | null => {
     if (!item.tabs) return null;
@@ -90,7 +69,7 @@ export function SettingsView() {
     return chosen && item.tabs.some((x) => x.id === chosen) ? chosen : item.tabs[0].id;
   };
 
-  // A reveal: seed the area's tab, then scroll its shell to the top.
+  // A reveal: seed the area's tab, and start the page at its top.
   useEffect(() => {
     if (handledNonce.current === nonce) return;
     handledNonce.current = nonce;
@@ -98,44 +77,8 @@ export function SettingsView() {
     if (item?.tabs && revealTab) {
       setAreaTabs((prev) => (prev[section] === revealTab ? prev : { ...prev, [section]: revealTab }));
     }
-    const el = areaRefs.current.get(section);
-    if (!el) return;
-    spySuspended.current = true;
-    window.clearTimeout(suspendTimers.current.cap);
-    suspendTimers.current.cap = window.setTimeout(() => { spySuspended.current = false; }, 1000);
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [nonce, section, revealTab]);
-
-  // The scroll-spy: observe the area shells; the pure pick
-  // (spySectionAt) decides which one the reader has reached.
-  useEffect(() => {
-    const root = scrollRef.current;
-    if (!root || typeof IntersectionObserver === 'undefined') return;
-    const seen = new Map<string, { top: number; intersecting: boolean }>();
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        const id = (e.target as HTMLElement).dataset.settingsArea;
-        if (id) seen.set(id, { top: e.boundingClientRect.top, intersecting: e.isIntersecting });
-      }
-      if (spySuspended.current) return;
-      const line = root.getBoundingClientRect().top + SPY_LINE_OFFSET;
-      const candidates = SETTINGS_NAV.flatMap((g) => g.items).map((i) => {
-        const s = seen.get(i.id);
-        return { id: i.id, top: s?.top ?? Number.POSITIVE_INFINITY, intersecting: s?.intersecting ?? false };
-      });
-      setSettingsSectionInView(spySectionAt(candidates, line, sectionRef.current));
-    }, { root, rootMargin: '0px 0px -55% 0px', threshold: 0 });
-    areaRefs.current.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
-
-  // Scrolling again after a reveal means it has settled (or the reader
-  // took over): lift the spy's suspension early.
-  const onScroll = () => {
-    if (!spySuspended.current) return;
-    window.clearTimeout(suspendTimers.current.settle);
-    suspendTimers.current.settle = window.setTimeout(() => { spySuspended.current = false; }, 200);
-  };
 
   const renderArea = (item: SettingsNavItem) => {
     switch (item.id) {
@@ -175,57 +118,38 @@ export function SettingsView() {
     }
   };
 
+  const item = SETTINGS_ITEMS[section] ?? SETTINGS_NAV[0].items[0];
+  const group = SETTINGS_NAV.find((g) => g.items.some((i) => i.id === item.id));
   return (
-    <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto bg-background">
+    <div ref={scrollRef} className="h-full overflow-y-auto bg-background">
       <div className="max-w-3xl mx-auto px-10 py-10">
-        <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-foreground">{t('Settings')}</h1>
-          <p className="text-[13px] text-muted-foreground mt-1.5">
-            {t('Your Space, how Athena works in it, and your own preferences — every setting on one page.')}
-          </p>
-        </div>
-
-        {SETTINGS_NAV.map((group) => (
-          <div key={group.title} className="mt-12">
-            <div className="text-[12px] font-medium text-muted-foreground/80">{t(group.title)}</div>
-            <div className="mt-4 space-y-10">
-              {group.items.map((item) => (
-                <AreaShell key={item.id} item={item} description={AREA_DESCRIPTIONS[item.id]} registerShell={registerShell}>
-                  {renderArea(item)}
-                </AreaShell>
-              ))}
-            </div>
-          </div>
-        ))}
+        <AreaShell key={item.id} item={item} group={group ? t(group.title) : undefined} description={AREA_DESCRIPTIONS[item.id]}>
+          {renderArea(item)}
+        </AreaShell>
       </div>
     </div>
   );
 }
 
 // =============================================================
-// Area shell — the area's heading + one-line description above its
-// body (Linear's pattern: the heading sits outside the islands).
-// The shell is the reveal target and the spy's observed element.
+// Area shell — the page's heading: the nav group it sits in, the
+// area's name and one-line description above its body (Linear's
+// pattern: the heading sits outside the islands).
 // =============================================================
 function AreaShell({
-  item, description, registerShell, children,
+  item, group, description, children,
 }: {
-  item: SettingsNavItem; description?: string;
-  registerShell: (id: string, el: HTMLElement | null) => void;
+  item: SettingsNavItem; group?: string; description?: string;
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
   return (
-    <section
-      ref={(el) => registerShell(item.id, el)}
-      data-settings-area={item.id}
-      aria-label={t(item.label)}
-      className="scroll-mt-6"
-    >
-      <div className="mb-2">
-        <h2 className={`${FONT.lg} text-foreground`}>{t(item.label)}</h2>
+    <section data-settings-area={item.id} aria-label={t(item.label)}>
+      <div className="mb-6">
+        {group && <div className="text-[12px] text-muted-foreground/80">{group}</div>}
+        <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-foreground">{t(item.label)}</h1>
         {description && (
-          <p className="text-[12px] text-muted-foreground mt-0.5">{t(description)}</p>
+          <p className="text-[13px] text-muted-foreground mt-1">{t(description)}</p>
         )}
       </div>
       {children}
