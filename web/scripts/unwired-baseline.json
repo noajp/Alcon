@@ -14,7 +14,6 @@
     "src/Function/shared/workTrace.ts#traceStepFromRunStep": "traceFromRunSteps が使う純粋な変換（エンジンのステップ→トレースの行）。呼び出し元が同一ファイルのため走査からは未配線に見える。tests/workTrace.test.ts が直接確かめるために export している",
     "src/Function/shared/attachments/openOwner.ts#fileResultRoute": "openFoundFile が使う純粋な行き先判定（ファイル結果は最新版の id でファイル自体を開く／ファイルが無ければ null でホストに落とす）。呼び出し元が同一ファイルのため走査からは未配線に見える。tests/openOwner.test.ts が直接確かめるために export している",
     "src/shared/designTokens.ts#CARD": "影のあるカードの基底トークン。Phase 1.5 で導入面（ハーネス／コネクタ／レジストリのカード）が CARD_FLAT に移り、現在の利用者はいないが、他の面の基底として定義はそのまま残す",
-    "src/Function/settings/SettingsControls.tsx#SettingField": "Settings 再設計 PR1 で primitive として先行導入した積み上げ型フィールド（ラベル上・全幅コントロール）。最初の利用者は PR4a の Profile（Bio）変換で、それまでは tests/settingsControls.test.tsx の primitive 群と並ぶ土台として置く",
     "src/AIP/harness/installReturn.ts#serializeInstallSession": "保存ラッパー（saveInstallSession）が使う純粋な変換。壊れた保存値を弾く検証とあわせて tests/harnessInstallReturn.test.ts が直接確かめるために export している",
     "src/AIP/harness/installReturn.ts#parseInstallSession": "取り出しラッパー（takeInstallSession）が使う純粋な検証。serializeInstallSession と対で tests/harnessInstallReturn.test.ts が直接確かめるために export している",
     "src/AIP/connectors/draftModel.ts#canonicalJson": "サーバ側 canonicalJson の twin。同一ファイルの hash 関数が使い、tests/connectorDraft.test.ts がサーバとの一致を検証するために export",

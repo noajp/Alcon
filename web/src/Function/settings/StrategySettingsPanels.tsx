@@ -6,8 +6,7 @@ import type { Domain, DomainPhaseDefaults } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { PHASE_DEFAULTS_MAX } from '@/Function/shared/phaseDefaults';
 import { SlaSettings } from './SlaSettings';
-import { SettingsSection, SettingsRow } from './SettingsSection';
-import { SelectControl } from './SettingsControls';
+import { SegmentedRow, SettingRow, SettingsIsland } from './SettingsControls';
 
 // The two Strategy settings panels, shared by Settings > Strategy and the
 // Strategies row's settings modal.
@@ -73,18 +72,17 @@ export function PhaseDefaultsSettings() {
       {domains.map((domain) => {
         const current = overrides[domain.id] ?? domain.phase_defaults ?? {};
         return (
-          <SettingsSection key={domain.id} title={domain.name}>
-            <SettingsRow label={t('Default length')} hint={t('Days a new Phase spans, end date included')}>
+          <SettingsIsland key={domain.id} title={domain.name}>
+            <SettingRow label={t('Default length')} desc={t('Days a new Phase spans, end date included')}>
               <DaysInput key={`len:${current.length_days ?? ''}`} value={current.length_days} max={PHASE_DEFAULTS_MAX.length_days}
                 unit={t('days')} disabled={pending.has(domain.id)} onCommit={(v) => save(domain, { length_days: v })} />
-            </SettingsRow>
-            <SettingsRow label={t('Start')} hint={t('Where a new Phase begins')}>
-              <SelectControl value={START_LABEL[current.start === 'after_last' ? 'after_last' : 'today']}
-                options={START_OPTIONS.map((o) => START_LABEL[o])}
-                onChange={(label) => save(domain, { start: START_OPTIONS.find((o) => START_LABEL[o] === label) ?? 'today' })} />
-            </SettingsRow>
-            {errors[domain.id] && <div className="py-2 text-[11px] text-destructive">{errors[domain.id]}</div>}
-          </SettingsSection>
+            </SettingRow>
+            <SegmentedRow label={t('Start')} desc={t('Where a new Phase begins')}
+              value={START_LABEL[current.start === 'after_last' ? 'after_last' : 'today']}
+              options={START_OPTIONS.map((o) => START_LABEL[o])}
+              onChange={(label) => save(domain, { start: START_OPTIONS.find((o) => START_LABEL[o] === label) ?? 'today' })} />
+            {errors[domain.id] && <div className="px-5 py-2 text-[11px] text-destructive">{errors[domain.id]}</div>}
+          </SettingsIsland>
         );
       })}
     </div>

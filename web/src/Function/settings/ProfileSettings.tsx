@@ -5,7 +5,7 @@ import { Textarea } from '@/ui/textarea';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
-import { SettingsSection, SettingsField } from './SettingsSection';
+import { SettingField, SettingRow, SettingsIsland } from './SettingsControls';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
@@ -142,38 +142,40 @@ function DomainMembershipsSection() {
   }, [domains, spaceNames]);
 
   return (
-    <SettingsSection title={t('Domains')} description={t('Domains you’re a member of, grouped by Space.')}>
-      {loading ? (
-        <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
-      ) : error ? (
-        <div className="py-3 text-[13px] text-destructive">
-          {t('Couldn’t load your Domains — {error}', { error: error.message })}
-        </div>
-      ) : domains.length === 0 ? (
-        <div className="py-3 text-[13px] text-muted-foreground">
-          {t('You’re not a member of any Domain yet.')}
-        </div>
-      ) : (
-        grouped.map(([spaceId, list]) => (
-          <div key={spaceId || 'unassigned'} className="py-3">
-            <div className="text-[12px] font-medium text-muted-foreground/80 mb-1.5">
-              {spaceId.startsWith(GUEST_GROUP_PREFIX) ? t('Guest access') : spaceNames.get(spaceId) ?? t('Unassigned')}
-            </div>
-            <div className="space-y-1.5">
-              {list.map((d) => (
-                <div key={d.id} className="flex items-center gap-2">
-                  <DomainGlyph color={d.color} />
-                  <span className="text-[13px] text-foreground truncate">{d.name}</span>
-                  {role && (
-                    <span className="text-[11px] text-muted-foreground ml-auto shrink-0 truncate">{role}</span>
-                  )}
-                </div>
-              ))}
-            </div>
+    <SettingsIsland title={t('Domains')} description={t('Domains you’re a member of, grouped by Space.')}>
+      <div className="px-5 py-2">
+        {loading ? (
+          <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
+        ) : error ? (
+          <div className="py-3 text-[13px] text-destructive">
+            {t('Couldn’t load your Domains — {error}', { error: error.message })}
           </div>
-        ))
-      )}
-    </SettingsSection>
+        ) : domains.length === 0 ? (
+          <div className="py-3 text-[13px] text-muted-foreground">
+            {t('You’re not a member of any Domain yet.')}
+          </div>
+        ) : (
+          grouped.map(([spaceId, list]) => (
+            <div key={spaceId || 'unassigned'} className="py-3">
+              <div className="text-[12px] font-medium text-muted-foreground/80 mb-1.5">
+                {spaceId.startsWith(GUEST_GROUP_PREFIX) ? t('Guest access') : spaceNames.get(spaceId) ?? t('Unassigned')}
+              </div>
+              <div className="space-y-1.5">
+                {list.map((d) => (
+                  <div key={d.id} className="flex items-center gap-2">
+                    <DomainGlyph color={d.color} />
+                    <span className="text-[13px] text-foreground truncate">{d.name}</span>
+                    {role && (
+                      <span className="text-[11px] text-muted-foreground ml-auto shrink-0 truncate">{role}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </SettingsIsland>
   );
 }
 
@@ -183,9 +185,9 @@ function DomainMembershipsSection() {
 function InvitationsSection() {
   const { t } = useI18n();
   return (
-    <SettingsSection title={t('Invitations')} description={t('You join a Space, Domain or Object only when you accept its invitation.')}>
+    <SettingsIsland title={t('Invitations')} description={t('You join a Space, Domain or Object only when you accept its invitation.')}>
       <MyInvitations emptyText={t('No pending invitations.')} />
-    </SettingsSection>
+    </SettingsIsland>
   );
 }
 
@@ -284,9 +286,9 @@ export function ProfileSettings() {
   const initials = initialsFor(displayName || profile?.display_name, user?.email ?? '');
 
   return (
-    <div>
-      <SettingsSection title={t('Profile')} description={t('How your name and avatar appear across Alcon.')}>
-        <div className="py-4 flex items-center gap-4">
+    <div className="space-y-10">
+      <SettingsIsland title={t('Profile')} description={t('How your name and avatar appear across Alcon.')}>
+        <div className="px-5 py-4 flex items-center gap-4">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -327,16 +329,17 @@ export function ProfileSettings() {
           </div>
         </div>
 
-        <SettingsField label={t('Display name')} hint={t('Used in @-mentions, comments, and assignments.')}>
+        <SettingRow label={t('Display name')} desc={t('Used in @-mentions, comments, and assignments.')}>
           <input
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder={t('Your name')}
-            className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
+            aria-label={t('Display name')}
+            className="w-56 px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:bg-muted/40 transition-colors"
           />
-        </SettingsField>
-        <SettingsField label={t('Bio')} hint={t('A short introduction shown on your Profile page.')}>
+        </SettingRow>
+        <SettingField label={t('Bio')} hint={t('A short introduction shown on your Profile page.')}>
           <Textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
@@ -344,8 +347,8 @@ export function ProfileSettings() {
             rows={3}
             maxLength={280}
           />
-        </SettingsField>
-        <div className="flex items-center justify-end gap-3 pt-2">
+        </SettingField>
+        <div className="flex items-center justify-end gap-3 px-5 py-3.5">
           {error && <span className="text-[12px] text-[var(--status-danger)]">{error}</span>}
           {savedAt && !dirty && !error && (
             <span className="text-[12px] text-muted-foreground">{t('Saved.')}</span>
@@ -354,7 +357,7 @@ export function ProfileSettings() {
             {saving ? t('Saving…') : t('Save changes')}
           </Button>
         </div>
-      </SettingsSection>
+      </SettingsIsland>
 
       <InvitationsSection />
 

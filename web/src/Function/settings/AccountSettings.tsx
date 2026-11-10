@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { LogOut } from '@/ui/icons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
-import { SettingsSection, SettingsRow } from './SettingsSection';
+import { SettingRow, SettingsIsland } from './SettingsControls';
 import { PersonalMemorySettings } from './MemorySettings';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -45,25 +45,25 @@ export function AccountSettings() {
   const createdAt = user?.created_at ? new Date(user.created_at).toLocaleDateString(locale) : '—';
 
   return (
-    <div>
-      <SettingsSection title={t('Account')} description={t('Authentication and session details.')}>
-        <SettingsRow label={t('Email')} hint={t('Your sign-in identifier. Contact support to change.')}>
+    <div className="space-y-10">
+      <SettingsIsland title={t('Account')} description={t('Authentication and session details.')}>
+        <SettingRow label={t('Email')} desc={t('Your sign-in identifier. Contact support to change.')}>
           <span className="text-[13px] text-muted-foreground">{user?.email ?? '—'}</span>
-        </SettingsRow>
+        </SettingRow>
 
-        <SettingsRow label={t('User ID')} hint={t('Used by integrations and the Supabase Edge.')}>
+        <SettingRow label={t('User ID')} desc={t('Used by integrations and the Supabase Edge.')}>
           <span className="text-[11px] font-mono text-muted-foreground select-all">
             {user?.id ?? '—'}
           </span>
-        </SettingsRow>
+        </SettingRow>
 
-        <SettingsRow label={t('Member since')}>
+        <SettingRow label={t('Member since')}>
           <span className="text-[13px] text-muted-foreground">{createdAt}</span>
-        </SettingsRow>
+        </SettingRow>
 
-        <SettingsRow
+        <SettingRow
           label={t('Password')}
-          hint={resetSent ? t('Reset email sent. Check your inbox.') : t('Send a reset link to your inbox.')}
+          desc={resetSent ? t('Reset email sent. Check your inbox.') : t('Send a reset link to your inbox.')}
         >
           <Button
             variant="ghost"
@@ -72,21 +72,21 @@ export function AccountSettings() {
           >
             {resetting ? t('Sending…') : resetSent ? t('Sent') : t('Send reset link')}
           </Button>
-        </SettingsRow>
-      </SettingsSection>
+        </SettingRow>
+      </SettingsIsland>
 
       {user?.id && <PersonalMemorySettings userId={user.id} />}
 
-      <SettingsSection title={t('Session')}>
-        <SettingsRow label={t('Sign out')} hint={t('End your session on this device.')}>
+      <SettingsIsland title={t('Session')}>
+        <SettingRow label={t('Sign out')} desc={t('End your session on this device.')}>
           <Button variant="danger" onClick={handleSignOut} disabled={signingOut}>
             <LogOut size={12} />
             {signingOut ? t('Signing out…') : t('Sign out')}
           </Button>
-        </SettingsRow>
-      </SettingsSection>
+        </SettingRow>
+      </SettingsIsland>
 
-      {error && <p className="text-[12px] text-[var(--status-danger)] mt-2">{error}</p>}
+      {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
     </div>
   );
 }

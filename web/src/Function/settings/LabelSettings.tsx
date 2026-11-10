@@ -17,7 +17,7 @@ import { MenuShell } from '@/Function/shared/menu';
 import { LabelPaletteRows } from '@/Function/shared/LabelPaletteRows';
 import { LABEL_PALETTE, labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { CONTROL } from '@/shared/designTokens';
-import { SettingsSection } from './SettingsSection';
+import { SettingsIsland } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useLabelCatalog, type DomainLabelState } from './useLabelCatalog';
 import {
@@ -127,38 +127,40 @@ function DomainLabels({
         : t('{n} labels · {unused} unused', { n: entries.length, unused });
 
   return (
-    <SettingsSection title={domain.name} description={description}>
-      {entries.map((entry) => (
-        <LabelRow
-          key={entry.name}
-          domain={domain}
-          entry={entry}
-          busy={busy}
-          onColor={(colorKey) => onColor(entry.name, colorKey)}
-          onRename={(to) => onRename(entry.name, to, entries)}
-          onDelete={() => onDelete(entry.name, entries)}
-        />
-      ))}
-      {creating ? (
-        <NewLabelRow
-          entries={entries}
-          onCreate={(name, colorKey) => {
-            onColor(name, colorKey);
-            setCreating(false);
-          }}
-          onCancel={() => setCreating(false)}
-        />
-      ) : (
-        <div className="flex h-10 items-center">
-          <ButtonAppearanceProvider appearance="inline">
-            <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
-              <Plus size={CONTROL.icon.sm} />
-              {t('New label')}
-            </Button>
-          </ButtonAppearanceProvider>
-        </div>
-      )}
-    </SettingsSection>
+    <SettingsIsland title={domain.name} description={description}>
+      <div className="px-5 py-2">
+        {entries.map((entry) => (
+          <LabelRow
+            key={entry.name}
+            domain={domain}
+            entry={entry}
+            busy={busy}
+            onColor={(colorKey) => onColor(entry.name, colorKey)}
+            onRename={(to) => onRename(entry.name, to, entries)}
+            onDelete={() => onDelete(entry.name, entries)}
+          />
+        ))}
+        {creating ? (
+          <NewLabelRow
+            entries={entries}
+            onCreate={(name, colorKey) => {
+              onColor(name, colorKey);
+              setCreating(false);
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        ) : (
+          <div className="flex h-10 items-center">
+            <ButtonAppearanceProvider appearance="inline">
+              <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+                <Plus size={CONTROL.icon.sm} />
+                {t('New label')}
+              </Button>
+            </ButtonAppearanceProvider>
+          </div>
+        )}
+      </div>
+    </SettingsIsland>
   );
 }
 

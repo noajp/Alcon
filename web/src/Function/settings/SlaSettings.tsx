@@ -5,10 +5,11 @@ import { useDomains, updateDomain } from '@/hooks/useSupabase';
 import { getQueryClient } from '@/lib/queryClient';
 import type { Domain, DomainRiskThresholds } from '@/types/database';
 import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/Function/strategy/initiativeRiskModel';
-import { SettingsSection, SettingsRow } from './SettingsSection';
+import { SettingRow, SettingsIsland } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
-// Settings > Elements > SLAs. An SLA here is not another due date — it is the
+// Settings > Strategy — the SLA's one home (Elements points here). An SLA
+// here is not another due date — it is the
 // threshold policy the Strategy cross-section (initiativeRiskModel) judges a
 // Domain's work by: how close a date has to be before unstarted work is "due
 // soon", how long in-flight work may go without a progress comment before it
@@ -144,9 +145,9 @@ export function SlaSettings() {
       {domains.map((domain) => {
         const current = overrides[domain.id] ?? thresholdsOf(domain);
         return (
-          <SettingsSection key={domain.id} title={domain.name}>
+          <SettingsIsland key={domain.id} title={domain.name}>
             {FIELDS.map((f) => (
-              <SettingsRow key={f.key} label={t(f.label)} hint={t(f.hint)}>
+              <SettingRow key={f.key} label={t(f.label)} desc={t(f.hint)}>
                 <ThresholdInput
                   // Remount whenever the saved value changes (commit, rollback,
                   // refetch), so the draft is always seeded from the truth and
@@ -159,12 +160,12 @@ export function SlaSettings() {
                   disabled={pending.has(`${domain.id}:${f.key}`)}
                   onCommit={(v) => save(domain, f.key, v)}
                 />
-              </SettingsRow>
+              </SettingRow>
             ))}
             {errors[domain.id] && (
-              <div className="py-2 text-[11px] text-destructive">{errors[domain.id]}</div>
+              <div className="px-5 py-2 text-[11px] text-destructive">{errors[domain.id]}</div>
             )}
-          </SettingsSection>
+          </SettingsIsland>
         );
       })}
     </div>

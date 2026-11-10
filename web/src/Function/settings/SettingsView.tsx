@@ -20,9 +20,8 @@ import {
 } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
-import { SettingsIsland, SettingRow, SelectRow, SegmentedRow, SegmentedControl, ToggleRow } from './SettingsControls';
+import { SettingsIsland, SettingRow, SelectRow, SegmentedRow, SegmentedControl, ToggleRow, SettingsComingSoon } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { SettingsComingSoon } from './SettingsSection';
 import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySettingsPanels';
 import { FONT } from '@/shared/designTokens';
 

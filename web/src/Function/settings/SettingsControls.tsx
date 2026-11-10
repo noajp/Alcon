@@ -220,3 +220,13 @@ export function ToggleRow({
     </SettingRow>
   );
 }
+
+/** The placeholder for a settings surface that has nothing to set yet. */
+export function SettingsComingSoon({ title }: { title: string }) {
+  const { t } = useI18n();
+  return (
+    <p className="py-3 text-[13px] text-muted-foreground">
+      {t('{title} settings are coming soon.', { title })}
+    </p>
+  );
+}

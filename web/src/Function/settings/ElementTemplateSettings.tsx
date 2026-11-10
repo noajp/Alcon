@@ -21,7 +21,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/ui/dialog';
 import { MenuShell } from '@/Function/shared/menu';
-import { SettingsSection, SettingsRow } from './SettingsSection';
+import { SettingRow, SettingsIsland } from './SettingsControls';
 import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 
 // Settings > Elements > Templates (el_QLT-029). A saved Element shape,
@@ -58,7 +58,7 @@ export function ElementTemplateSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <p className="text-[12px] text-muted-foreground -mt-2">
         {t('A saved Element shape, offered as a starting point from the “+” new-Element popup. Authoring one needs owner or admin access to the Domain.')}
       </p>
@@ -100,15 +100,15 @@ function DomainTemplates({ domain }: { domain: Domain }) {
 
   return (
     <>
-      <SettingsSection
+      <SettingsIsland
         title={domain.name}
         description={loading ? t('Loading…') : templates.length === 0 ? t('No templates yet') : templates.length === 1 ? t('1 template') : t('{n} templates', { n: templates.length })}
       >
         {templates.map((tpl) => (
-          <SettingsRow
+          <SettingRow
             key={tpl.id}
             label={tpl.name}
-            hint={[tpl.type, tpl.status ? t(statusLabel(tpl.status)) : null, tpl.priority ? t(PRIORITY_OPTIONS.find((p) => p.value === tpl.priority)?.label ?? tpl.priority) : null].filter(Boolean).join(' · ') || undefined}
+            desc={[tpl.type, tpl.status ? t(statusLabel(tpl.status)) : null, tpl.priority ? t(PRIORITY_OPTIONS.find((p) => p.value === tpl.priority)?.label ?? tpl.priority) : null].filter(Boolean).join(' · ') || undefined}
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -126,9 +126,9 @@ function DomainTemplates({ domain }: { domain: Domain }) {
                 </DropdownMenuItem>
               </MenuShell>
             </DropdownMenu>
-          </SettingsRow>
+          </SettingRow>
         ))}
-        <div className="flex h-10 items-center">
+        <div className="flex h-10 items-center px-5">
           <ButtonAppearanceProvider appearance="inline">
             <Button variant="ghost" size="sm" onClick={() => setEditing('new')}>
               <Plus size={14} />
@@ -136,10 +136,10 @@ function DomainTemplates({ domain }: { domain: Domain }) {
             </Button>
           </ButtonAppearanceProvider>
         </div>
-      </SettingsSection>
-      {(error || rowError) && (
-        <div className="-mt-4 mb-4 text-[11px] text-destructive">{error ?? rowError}</div>
-      )}
+        {(error || rowError) && (
+          <div className="px-5 py-2 text-[11px] text-destructive">{error ?? rowError}</div>
+        )}
+      </SettingsIsland>
       {editing && (
         <TemplateDialog
           domain={domain}

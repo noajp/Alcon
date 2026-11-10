@@ -10,7 +10,7 @@ import { useActivitySpaces, fetchSpaceGuests, type SpaceGuestRow } from '@/hooks
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { Button } from '@/ui/button';
-import { SettingsSection } from './SettingsSection';
+import { SettingsIsland } from './SettingsControls';
 import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/membership/invitations';
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { membershipErrorMessage } from '@/Function/membership/membershipErrors';
@@ -190,15 +190,16 @@ export function MemberSettings() {
   if (!active) return null;
 
   return (
-    <div>
+    <div className="space-y-10">
       {loadError && (
-        <div className="mb-4 text-[12px] text-destructive">{loadError}</div>
+        <div className="text-[12px] text-destructive">{loadError}</div>
       )}
 
-      <SettingsSection
+      <SettingsIsland
         title={t('Space members ({n})', { n: members.length })}
         description={t('Everyone in "{space}", plus Guests invited into one of its Domains (except private Domains you’re not in). Invite and remove people from Activity space and Domain settings; change a Space member’s role here.', { space: active.name })}
       >
+        <div className="px-5 py-2">
         {loading && members.length === 0 ? (
           <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
         ) : sortedMembers.length === 0 ? (
@@ -251,12 +252,14 @@ export function MemberSettings() {
           })
         )}
         <PendingInviteRows invitees={invitees} canCancel={(i) => isOwner || i.invitedBy === user?.id} onChanged={() => void refetchInvitees()} />
-      </SettingsSection>
+        </div>
+      </SettingsIsland>
 
-      <SettingsSection
+      <SettingsIsland
         title={t('Guests ({n})', { n: uniqueGuestCount })}
         description={t('Invited into a single Domain, not the Space — they see only the Domain that invited them.')}
       >
+        <div className="px-5 py-2">
         {loading && guests.length === 0 && members.length === 0 ? (
           <div className="py-3 text-[13px] text-muted-foreground">{t('Loading…')}</div>
         ) : sortedGuests.length === 0 ? (
@@ -283,7 +286,8 @@ export function MemberSettings() {
             );
           })
         )}
-      </SettingsSection>
+        </div>
+      </SettingsIsland>
     </div>
   );
 }
