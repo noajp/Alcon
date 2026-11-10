@@ -18,14 +18,16 @@ export interface EventDraft {
 
 const hhmm = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
-/** Pure. A new event's draft: from an hour-grid spot, the half hour
- *  there; from the header's button, all day on the day shown. */
-export function draftFromSlot(date: string, startMinutes: number | null): EventDraft {
+/** Pure. A new event's draft: from the hour grid, the stretch picked (a
+ *  click picks its half hour); from the header's button, all day on the
+ *  day shown. */
+export function draftFromSlot(date: string, startMinutes: number | null, endMinutes?: number): EventDraft {
   if (startMinutes === null) {
     return { title: '', allDay: true, startDate: date, endDate: date, startTime: '09:00', endTime: '10:00', elementIds: [] };
   }
   const start = Math.max(0, Math.min(startMinutes, 23 * 60 + 30));
-  return { title: '', allDay: false, startDate: date, endDate: date, startTime: hhmm(start), endTime: hhmm(Math.min(start + 30, 23 * 60 + 59)), elementIds: [] };
+  const end = Math.min(Math.max(endMinutes ?? start + 30, start + 30), 23 * 60 + 59);
+  return { title: '', allDay: false, startDate: date, endDate: date, startTime: hhmm(start), endTime: hhmm(end), elementIds: [] };
 }
 
 /** Pure. An existing event, as the popup edits it. */

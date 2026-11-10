@@ -33,7 +33,7 @@ interface CalendarViewProps {
   /** Make a new event — from the header's button (no slot) or an empty
    *  spot on the hour grid (that day, from that half hour). Absent: the
    *  Calendar makes no events. */
-  onCreateEvent?: (slot: { date: string; startMinutes: number | null }) => void;
+  onCreateEvent?: (slot: { date: string; startMinutes: number | null; endMinutes?: number }) => void;
 }
 
 type CalendarMode = 'day' | 'week' | 'month';
@@ -644,7 +644,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             setSelectedElement(el);
             setShowColorPicker(Boolean(el.element));
           }}
-          onSlotClick={onCreateEvent ? (day, startMinutes) => onCreateEvent({ date: fmtDateOnly(day), startMinutes }) : undefined}
+          onSlotClick={onCreateEvent ? (day, startMinutes, endMinutes) => onCreateEvent({ date: fmtDateOnly(day), startMinutes, endMinutes }) : undefined}
         />
         </div>
       )}
@@ -762,9 +762,10 @@ interface TimeGridViewProps {
   isOverdue: (el: CalendarEntry) => boolean;
   onElementClick: (el: CalendarEntry) => void;
   onElementContextMenu: (el: CalendarEntry) => void;
-  /** An empty spot on a day's hour grid was clicked: that day, at the
-   *  half hour under the pointer. */
-  onSlotClick?: (day: Date, startMinutes: number) => void;
+  /** An empty stretch of a day's hour grid was picked — clicked (its half
+   *  hour) or dragged over (the half hours it covers): that day, from the
+   *  start to the end. */
+  onSlotClick?: (day: Date, startMinutes: number, endMinutes: number) => void;
 }
 
 function TimeGridView({
@@ -835,6 +836,29 @@ function TimeGridView({
   const todayColIdx = days.findIndex(d => isSameDay(d, today));
   // The half hour under the pointer on the empty grid.
   const [hoverSlot, setHoverSlot] = useState<{ col: number; minutes: number } | null>(null);
+  // A drag down the empty grid: the half hour pressed on, and the one the
+  // pointer is over now. On release it becomes one event over that stretch.
+  const [pick, setPick] = useState<{ col: number; anchor: number; current: number } | null>(null);
+  const pickRef = useRef(pick);
+  useEffect(() => { pickRef.current = pick; });
+  const pickRange = (p: { anchor: number; current: number }) => ({
+    start: Math.min(p.anchor, p.current), end: Math.max(p.anchor, p.current) + 30,
+  });
+  useEffect(() => {
+    if (!pick || !onSlotClick) return;
+    // Released anywhere — inside the column or not — the stretch is made.
+    const up = () => {
+      const p = pickRef.current;
+      setPick(null);
+      if (!p) return;
+      const { start, end } = pickRange(p);
+      onSlotClick(days[p.col], start, end);
+    };
+    window.addEventListener('mouseup', up, { once: true });
+    return () => window.removeEventListener('mouseup', up);
+  // Bound once per drag; the ref carries where it ends.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pick !== null]);
   const slotAt = (e: React.MouseEvent<HTMLDivElement>) => {
     const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
     const minutes = GRID_START_HOUR * 60 + Math.floor((y / HOUR_HEIGHT) * 2) * 30;
@@ -954,12 +978,22 @@ function TimeGridView({
               <div
                 key={colIdx}
                 className={`${colWidthClass} relative border-l border-[var(--border-subtle)]`}
-                onClick={onSlotClick ? (e) => {
-                  // Only the empty grid: a click on a card is the card's.
-                  if (e.target !== e.currentTarget) return;
-                  onSlotClick(days[colIdx], slotAt(e));
+                onMouseDown={onSlotClick ? (e) => {
+                  // Only the empty grid: a press on a card is the card's.
+                  if (e.button !== 0 || e.target !== e.currentTarget) return;
+                  e.preventDefault();
+                  const minutes = slotAt(e);
+                  setHoverSlot(null);
+                  setPick({ col: colIdx, anchor: minutes, current: minutes });
                 } : undefined}
                 onMouseMove={onSlotClick ? (e) => {
+                  if (pick) {
+                    if (pick.col === colIdx) {
+                      const minutes = slotAt(e);
+                      if (minutes !== pick.current) setPick({ ...pick, current: minutes });
+                    }
+                    return;
+                  }
                   if (e.target !== e.currentTarget) { if (hoverSlot) setHoverSlot(null); return; }
                   const minutes = slotAt(e);
                   if (hoverSlot?.col !== colIdx || hoverSlot.minutes !== minutes) setHoverSlot({ col: colIdx, minutes });
@@ -980,8 +1014,21 @@ function TimeGridView({
                   </div>
                 ))}
 
+                {/* The stretch being dragged over: the event it will make */}
+                {pick?.col === colIdx && (() => {
+                  const { start, end } = pickRange(pick);
+                  return (
+                    <div
+                      className="pointer-events-none absolute left-0.5 right-0.5 z-20 rounded-sm border border-[var(--accent-default)] bg-[var(--accent-subtle)] px-1.5 py-0.5 text-[11px] tabular-nums text-foreground"
+                      style={{ top: ((start - gridStartMin) / 60) * HOUR_HEIGHT, height: ((end - start) / 60) * HOUR_HEIGHT }}
+                    >
+                      {formatTimeShort(start)} – {formatTimeShort(end)}
+                    </div>
+                  );
+                })()}
+
                 {/* The half hour under the pointer: where a click makes an event */}
-                {hoverSlot?.col === colIdx && (
+                {!pick && hoverSlot?.col === colIdx && (
                   <div
                     className="pointer-events-none absolute left-0 right-0 rounded-sm border border-foreground/70"
                     style={{ top: ((hoverSlot.minutes - gridStartMin) / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 2 }}

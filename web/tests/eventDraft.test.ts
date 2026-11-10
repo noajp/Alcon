@@ -6,6 +6,9 @@ describe('eventDraft', () => {
     expect(draftFromSlot('2026-11-10', 13 * 60 + 30)).toMatchObject({ allDay: false, startDate: '2026-11-10', startTime: '13:30', endTime: '14:00' });
     expect(draftFromSlot('2026-11-10', 23 * 60 + 30)).toMatchObject({ startTime: '23:30', endTime: '23:59' });
     expect(draftFromSlot('2026-11-10', null)).toMatchObject({ allDay: true, startDate: '2026-11-10', endDate: '2026-11-10' });
+    // A drag picks the stretch it covered, to the end of the day at most.
+    expect(draftFromSlot('2026-11-10', 9 * 60, 12 * 60)).toMatchObject({ startTime: '09:00', endTime: '12:00' });
+    expect(draftFromSlot('2026-11-10', 22 * 60, 24 * 60)).toMatchObject({ startTime: '22:00', endTime: '23:59' });
   });
 
   it('names what keeps a draft from being saved', () => {

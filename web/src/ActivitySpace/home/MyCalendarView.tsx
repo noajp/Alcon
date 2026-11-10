@@ -107,7 +107,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
         }} elements={elements} date={date} onDateChange={next => setCalendarDay(toDateOnlyString(next))} onRefresh={fetchMine} onElementClick={(el) => openElement(el.id)}
           events={events}
           onEventClick={event => setEventPopup({ draft: draftFromEvent(event), event })}
-          onCreateEvent={spaceId ? slot => setEventPopup({ draft: draftFromSlot(slot.date, slot.startMinutes) }) : undefined} />
+          onCreateEvent={spaceId ? slot => setEventPopup({ draft: draftFromSlot(slot.date, slot.startMinutes, slot.endMinutes) }) : undefined} />
       </div>
       {eventPopup && (
         <CalendarEventPopup key={eventPopup.event?.id ?? 'new'} initial={eventPopup.draft} event={eventPopup.event}
