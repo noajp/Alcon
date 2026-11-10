@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseDefinition } from '@/AIP/harness/harnessDefinition';
-import { describeCron } from '@/AIP/automation/cron';
+import { describeCron, parseCron } from '@/AIP/automation/cron';
 import { flowStepTitles, workflowOf } from '@/Function/shared/flowEdit';
 import {
-  automationStatusOf, inputBlocksOf, outputBlocksOf, workflowGraphOf, type AutomationZoneRow,
+  AUTOMATION_CRON_PRESETS, automationStatusOf, bindingInputOf, bindingUpdateOf,
+  inputBlocksOf, outputBlocksOf, workflowGraphOf, type AutomationZoneRow,
 } from '@/Function/shared/automationZones';
+import { nextRunOf } from '@/hooks/automationData';
 
 // The Automation builder's zones (design §4.4) are pure projections of
 // the automation row plus the steps Athena follows — in the #837 shape
@@ -100,6 +102,82 @@ describe('inputBlocksOf', () => {
 
   it('offers no block for kinds with no machinery (no arrival, no run-finished)', () => {
     expect(inputBlocksOf(row(), ['まとめて報告する']).map((b) => b.kind)).toEqual(['trigger']);
+  });
+});
+
+describe('binding editing (PR2)', () => {
+  const NOW = new Date('2026-11-06T01:00:00Z');
+
+  it('offers only presets whose cron can be read', () => {
+    expect(AUTOMATION_CRON_PRESETS.length).toBeGreaterThan(0);
+    for (const p of AUTOMATION_CRON_PRESETS) expect(() => parseCron(p.cron)).not.toThrow();
+  });
+
+  it('reads a row into the binding input, templates and all', () => {
+    expect(bindingInputOf({
+      kind: 'schedule', cron: '0 9 * * *', timezone: 'Asia/Tokyo', object_id: 'obj-1',
+      title_template: '朝のまとめ', description_template: null,
+    })).toEqual({
+      kind: 'schedule', cron: '0 9 * * *', timezone: 'Asia/Tokyo', objectId: 'obj-1',
+      titleTemplate: '朝のまとめ', descriptionTemplate: null,
+    });
+    // A row read before the template columns were carried reads as none.
+    expect(bindingInputOf({ kind: 'webhook', cron: null, timezone: 'UTC', object_id: 'obj-2' }))
+      .toEqual({ kind: 'webhook', cron: null, timezone: 'UTC', objectId: 'obj-2', titleTemplate: null, descriptionTemplate: null });
+  });
+
+  it('shapes a schedule edit as creation does: trimmed cron, recomputed next run', () => {
+    expect(bindingUpdateOf({
+      kind: 'schedule', cron: ' 0 9 * * * ', timezone: 'Asia/Tokyo', objectId: 'obj-1',
+      titleTemplate: '', descriptionTemplate: '  ',
+    }, NOW)).toEqual({
+      kind: 'schedule', cron: '0 9 * * *', timezone: 'Asia/Tokyo', object_id: 'obj-1',
+      title_template: null, description_template: null,
+      // 9:00 in Asia/Tokyo after 2026-11-06T01:00:00Z is the next day's 00:00Z.
+      next_run_at: '2026-11-07T00:00:00.000Z',
+    });
+  });
+
+  it('keeps a non-empty template as written', () => {
+    const shaped = bindingUpdateOf({
+      kind: 'schedule', cron: '0 9 * * *', timezone: 'Asia/Tokyo', objectId: 'obj-1',
+      titleTemplate: '{date} の問い合わせ', descriptionTemplate: '本文',
+    }, NOW);
+    expect(shaped.title_template).toBe('{date} の問い合わせ');
+    expect(shaped.description_template).toBe('本文');
+  });
+
+  it('shapes a webhook edit with no cron and no next run, whatever cron it was handed', () => {
+    expect(bindingUpdateOf({
+      kind: 'webhook', cron: '0 9 * * *', timezone: 'Asia/Tokyo', objectId: 'obj-1',
+      titleTemplate: null, descriptionTemplate: null,
+    }, NOW)).toEqual({
+      kind: 'webhook', cron: null, timezone: 'Asia/Tokyo', object_id: 'obj-1',
+      title_template: null, description_template: null, next_run_at: null,
+    });
+  });
+
+  it('leaves the next run empty for a cron that cannot be read or never runs', () => {
+    const base = { kind: 'schedule' as const, timezone: 'Asia/Tokyo', objectId: 'obj-1', titleTemplate: null, descriptionTemplate: null };
+    expect(bindingUpdateOf({ ...base, cron: 'not a cron' }, NOW).next_run_at).toBeNull();
+    expect(bindingUpdateOf({ ...base, cron: '0 9 31 2 *' }, NOW).next_run_at).toBeNull();
+    expect(bindingUpdateOf({ ...base, cron: null }, NOW).next_run_at).toBeNull();
+  });
+
+  it('falls back to Asia/Tokyo when the timezone is empty, as the promotion binding does', () => {
+    const shaped = bindingUpdateOf({
+      kind: 'schedule', cron: '0 9 * * *', timezone: ' ', objectId: 'obj-1',
+      titleTemplate: null, descriptionTemplate: null,
+    }, NOW);
+    expect(shaped.timezone).toBe('Asia/Tokyo');
+    expect(shaped.next_run_at).toBe('2026-11-07T00:00:00.000Z');
+  });
+
+  it('exports the next-run computation creation uses, agreeing with the shaping', () => {
+    expect(nextRunOf('webhook', '0 9 * * *', 'Asia/Tokyo')).toBeNull();
+    expect(nextRunOf('schedule', 'not a cron', 'Asia/Tokyo')).toBeNull();
+    expect(nextRunOf('schedule', null, 'Asia/Tokyo')).toBeNull();
+    expect(typeof nextRunOf('schedule', '0 9 * * *', 'Asia/Tokyo')).toBe('string');
   });
 });
 

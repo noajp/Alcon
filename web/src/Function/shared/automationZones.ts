@@ -1,5 +1,5 @@
 import type { ParsedDefinition } from '@/AIP/harness/harnessDefinition';
-import { describeCron } from '@/AIP/automation/cron';
+import { describeCron, nextCronRun } from '@/AIP/automation/cron';
 import { graphFromWorkflow, parseWorkflowGraph, type WorkflowGraph } from '@/Function/shared/workflowGraph';
 
 // The Automation builder's three zones (Automation builder design §4),
@@ -20,6 +20,96 @@ import { graphFromWorkflow, parseWorkflowGraph, type WorkflowGraph } from '@/Fun
  *  the list's step count and the builder's canvas start from. */
 export function workflowGraphOf(a: { workflow: string | null; workflow_graph: unknown }): WorkflowGraph {
   return parseWorkflowGraph(a.workflow_graph) ?? graphFromWorkflow(a.workflow ?? '');
+}
+
+/** The schedule presets the surfaces offer, in one home: the new-
+ *  automation form and the builder's trigger editor pick from the
+ *  same list, so a preset means the same cron on both. Labels are
+ *  i18n keys, translated where they render. */
+export const AUTOMATION_CRON_PRESETS: { cron: string; label: string }[] = [
+  { cron: '0 9 * * *', label: 'Every day at 9:00' },
+  { cron: '0 9 * * 1-5', label: 'Weekdays at 9:00' },
+  { cron: '0 * * * *', label: 'Every hour' },
+  { cron: '0 9 * * 1', label: 'Mondays at 9:00' },
+];
+
+/** The row-owned facts of an automation — its binding (Automation
+ *  builder design §5.3): when it starts (kind / cron / timezone),
+ *  where its firings land (the Object), and the Element title and
+ *  description templates a firing is created with. These are not
+ *  body facts: editing them writes the automations row directly and
+ *  takes effect at once, with no rehearsal. */
+export interface AutomationBindingInput {
+  kind: 'schedule' | 'webhook';
+  cron: string | null;
+  timezone: string;
+  objectId: string;
+  titleTemplate: string | null;
+  descriptionTemplate: string | null;
+}
+
+/** The binding as the row stores it: snake-case columns, plus the
+ *  recomputed next run. */
+export interface AutomationBindingUpdate {
+  kind: 'schedule' | 'webhook';
+  cron: string | null;
+  timezone: string;
+  object_id: string;
+  title_template: string | null;
+  description_template: string | null;
+  next_run_at: string | null;
+}
+
+/** Pure. A row's binding, in the input shape — the starting point a
+ *  binding editor overrides one fact of, so an edit to one fact
+ *  carries the others through unchanged. */
+export function bindingInputOf(row: {
+  kind: 'schedule' | 'webhook';
+  cron: string | null;
+  timezone: string;
+  object_id: string;
+  title_template?: string | null;
+  description_template?: string | null;
+}): AutomationBindingInput {
+  return {
+    kind: row.kind,
+    cron: row.cron,
+    timezone: row.timezone,
+    objectId: row.object_id,
+    titleTemplate: row.title_template ?? null,
+    descriptionTemplate: row.description_template ?? null,
+  };
+}
+
+function templateOrNull(value: string | null): string | null {
+  return value !== null && value.trim() !== '' ? value : null;
+}
+
+/**
+ * Pure. A binding edit shaped for the row, exactly as creating an
+ * automation shapes it: a webhook carries no cron, a schedule's cron
+ * is trimmed, an empty template is stored as none, and `next_run_at`
+ * is recomputed from the new trigger — null for a webhook or a cron
+ * that cannot be read or never runs. An empty timezone falls back to
+ * Asia/Tokyo, the default the promotion binding and the cron reader
+ * both use.
+ */
+export function bindingUpdateOf(input: AutomationBindingInput, now: Date): AutomationBindingUpdate {
+  const cron = input.kind === 'schedule' ? input.cron?.trim() || null : null;
+  const timezone = input.timezone.trim() || 'Asia/Tokyo';
+  let nextRunAt: string | null = null;
+  if (cron) {
+    try { nextRunAt = nextCronRun(cron, now, timezone)?.toISOString() ?? null; } catch { nextRunAt = null; }
+  }
+  return {
+    kind: input.kind,
+    cron,
+    timezone,
+    object_id: input.objectId,
+    title_template: templateOrNull(input.titleTemplate),
+    description_template: templateOrNull(input.descriptionTemplate),
+    next_run_at: nextRunAt,
+  };
 }
 
 /** The part of an automation row the zones read. Structural, so the

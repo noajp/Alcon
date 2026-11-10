@@ -16,7 +16,7 @@ import {
 } from '@/hooks/automationData';
 import { workflowOf } from '@/Function/shared/flowEdit';
 import { graphFromWorkflow, workflowFromGraph, type WorkflowGraph } from '@/Function/shared/workflowGraph';
-import { automationStatusOf, workflowGraphOf } from '@/Function/shared/automationZones';
+import { AUTOMATION_CRON_PRESETS, automationStatusOf, workflowGraphOf } from '@/Function/shared/automationZones';
 import { NavAutomationIcon } from '@/Frame/sidebar/NavIcons';
 import { AutomationBuilder } from './AutomationBuilder';
 
@@ -32,12 +32,6 @@ import { AutomationBuilder } from './AutomationBuilder';
 // A row is only that — clicking it opens the builder (AutomationBuilder),
 // which holds the zones, the starts, the token and the verbs.
 
-const PRESETS: { cron: string; label: string }[] = [
-  { cron: '0 9 * * *', label: 'Every day at 9:00' },
-  { cron: '0 9 * * 1-5', label: 'Weekdays at 9:00' },
-  { cron: '0 * * * *', label: 'Every hour' },
-  { cron: '0 9 * * 1', label: 'Mondays at 9:00' },
-];
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
 const NEW_WORKFLOW = '__new';
 
@@ -169,7 +163,7 @@ function NewAutomation({ spaceId, objects, sources, onCancel, onCreated }: {
   const [objectId, setObjectId] = useState(objects[0]?.id ?? '');
   const [source, setSource] = useState(NEW_WORKFLOW);
   const [kind, setKind] = useState<AutomationKind>('schedule');
-  const [cron, setCron] = useState(PRESETS[0].cron);
+  const [cron, setCron] = useState(AUTOMATION_CRON_PRESETS[0].cron);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -212,7 +206,7 @@ function NewAutomation({ spaceId, objects, sources, onCancel, onCreated }: {
       {kind === 'schedule' && (
         <div className="space-y-1.5">
           <div className="flex flex-wrap gap-1">
-            {PRESETS.map((p) => (
+            {AUTOMATION_CRON_PRESETS.map((p) => (
               <Button key={p.cron} size="xs" shape="tab" variant={cron === p.cron ? 'secondary' : 'ghost'} onClick={() => setCron(p.cron)}>{t(p.label)}</Button>
             ))}
           </div>
