@@ -9,7 +9,6 @@ import {
   NavMyTasksIcon,
   NavObjectsIcon,
   NavStrategyIcon,
-  NavAutomationIcon,
   NavNoteIcon,
   NavSettingsIcon,
   NavTableIcon, NavSlidesIcon, NavFilesIcon,
@@ -38,7 +37,6 @@ export type ViewId =
   | 'domain-elements'
   | 'objects'
   | 'strategy'
-  | 'automation'
   | 'phase'
   | 'workload'
   | 'timeline'
@@ -72,7 +70,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   'domain-elements':       { label: 'Elements',    icon: NavMyTasksIcon },
   objects:      { label: 'Objects',     icon: NavObjectsIcon },
   strategy:      { label: 'Strategy',    icon: NavStrategyIcon },
-  automation:    { label: 'Automation',  icon: NavAutomationIcon },
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
   workload:      { label: 'Workload',    icon: NavWorkloadIcon },
   timeline:      { label: 'Timeline',    icon: NavTimelineIcon },

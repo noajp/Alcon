@@ -218,7 +218,7 @@ function AutomationRow({ mode, a, spaceId, onOpen, harnesses, objects, sources, 
       )}
       {tab === 'flow' ? (
         <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
-          <WorkflowCanvas key={drawing} graph={graph} trigger={trigger} onChange={saveGraph} className="min-h-[320px] flex-1" />
+          <WorkflowCanvas key={drawing} graph={graph} trigger={trigger} onChange={saveGraph} className="h-[480px]" />
         </div>
       ) : (
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-4">

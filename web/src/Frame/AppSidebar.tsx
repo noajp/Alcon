@@ -12,7 +12,7 @@ import { FONT } from '@/shared/designTokens';
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { SegmentedControl, SettingField } from '@/Function/settings/SettingsControls';
-import { NavAutomationIcon, NavCalendarIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
+import { NavCalendarIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 
@@ -408,8 +408,6 @@ export function AppSidebar({
               onClick={() => { if (railMode !== 'calendar') onViewChange('calendar'); }} />
             <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
               onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />
-            <SidebarRow active={activeView === 'automation'} icon={<NavAutomationIcon size={16} />} label={t('Automation')}
-              onClick={() => onViewChange('automation')} />
             {SIDEBAR_TOOLS.map((mode) => {
               const { label, icon: Icon, defaultView } = MODE_META[mode];
               return <SidebarRow key={mode} active={railMode === mode} icon={<Icon size={16} />} label={t(label)}

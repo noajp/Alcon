@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react';
 import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Sparkles, Link2 } from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import {
-  NavStrategyIcon, NavPhaseIcon,
+  NavStrategyIcon, NavPhaseIcon, NavAutomationIcon,
   NavNoteIcon, NavTableIcon, NavTeamsIcon, NavCalendarIcon, NavWorkloadIcon,
 } from '@/Frame/sidebar/NavIcons';
 
@@ -51,6 +51,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
           { id: 'external', label: 'Connectors' },
         ],
       },
+      { id: 'automation', label: 'Automation', icon: NavAutomationIcon },
       {
         id: 'access', label: 'API & access', icon: Link2,
         tabs: [

@@ -1,5 +1,6 @@
 'use client';
 
+import { AutomationSettings } from '@/Function/automation/AutomationSettings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { ProfileSettings } from './ProfileSettings';
@@ -54,6 +55,7 @@ const SPY_LINE_OFFSET = 96;
 const AREA_DESCRIPTIONS: Record<string, string> = {
   integrations: 'The harnesses Athena works by, and the services connected to this Space.',
   access: 'Tokens, endpoints and connected machines — the ways other tools work with Alcon.',
+  automation: 'The work that runs by itself — open one to see and change its flow.',
   elements: 'Labels and templates for Elements, set per Domain.',
   preferences: 'Language, appearance, and defaults for how Alcon works for you.',
 };
@@ -149,6 +151,7 @@ export function SettingsView() {
           </>
         );
       }
+      case 'automation': return <AutomationSettings />;
       case 'initiative': return <InitiativeJudgementSettings />;
       case 'phase': return <PhaseDefaultsSettings />;
       case 'domain': return <TeamSettings />;
