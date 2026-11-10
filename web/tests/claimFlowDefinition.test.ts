@@ -35,6 +35,23 @@ function seedBody(): string {
 const BODY = seedBody();
 const NO_ROW: FlowContext = { trigger: null, objectName: null };
 
+const sqlV2 = readFileSync(
+  new URL('../../supabase/migrations/20261224090000_claim_flow_input_section.sql', import.meta.url),
+  'utf8',
+);
+
+function seedBodyV2(): string {
+  const at = sqlV2.indexOf("'def.claim-intake-gmail'");
+  expect(at).toBeGreaterThan(-1);
+  const open = sqlV2.indexOf('$def$', at);
+  const close = sqlV2.indexOf('$def$', open + 5);
+  expect(open).toBeGreaterThan(-1);
+  expect(close).toBeGreaterThan(open);
+  return sqlV2.slice(open + 5, close);
+}
+
+const BODY_V2 = seedBodyV2();
+
 describe('the claim-flow seed migration', () => {
   it('is guarded for preview replay and lands as a definition catalog row', () => {
     expect(sql).toContain("if to_regclass('public.catalog_items') is null then");
@@ -123,5 +140,57 @@ describe('the claim-flow body', () => {
     const cut = deleteFlowStep(BODY, 0)!;
     expect(cut.slice(0, cut.indexOf('# 進め方'))).toBe(BODY.slice(0, BODY.indexOf('# 進め方')));
     expect(cut.slice(cut.indexOf('# 点検'))).toBe(BODY.slice(BODY.indexOf('# 点検')));
+  });
+});
+
+describe('the claim-flow catalog version 2 (Automation builder PR3, design §6.3)', () => {
+  const def = parseDefinition(BODY_V2);
+
+  it('lands as the same catalog row at version 2, guarded, installing nothing itself', () => {
+    expect(sqlV2).toContain("if to_regclass('public.catalog_items') is null then");
+    expect(sqlV2).toContain('raise notice');
+    expect(sqlV2).toContain("'def.claim-intake-gmail', 'definition'");
+    expect(sqlV2).toContain(", '{}'::jsonb, 24, 2)");
+    expect(sqlV2).toContain('on conflict (id) do update');
+    expect(sqlV2).not.toMatch(/insert into public\.(definitions|automations|promotion_drafts)/);
+    expect(sqlV2).not.toMatch(/update public\.(definitions|automations)/);
+  });
+
+  it('is the version 1 body with only the Input section added', () => {
+    expect(BODY_V2).toBe(BODY.replace(
+      '# 進め方',
+      '# 入力\n- Gmail: is:unread label:claim -label:processed\n\n# 進め方',
+    ));
+  });
+
+  it('declares its intake: the Gmail row parses clean and its connector is among 使うコネクタ', () => {
+    expect(def.inputProblems).toEqual([]);
+    expect(def.inputs).toEqual([
+      { kind: 'connector', source: 'Gmail', connector: 'Gmail', detail: 'is:unread label:claim -label:processed' },
+    ]);
+    // The row's connector ∈ the connectors section, and the union
+    // names Gmail once — the set the hashes and scope derive from.
+    const sectionConnectors = [...new Set(
+      def.sections.connectors.split('\n').map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean),
+    )];
+    expect(sectionConnectors).toContain(def.inputs[0].connector);
+    expect(def.connectors).toEqual(['Gmail']);
+    const problems = checkHarness(def).filter((d) => d.severity === 'error');
+    expect(problems).toEqual([]);
+  });
+
+  it('keeps the declared query in agreement with step 1, token for token', () => {
+    const step1 = flowStepTitles(BODY_V2)[0];
+    for (const token of def.inputs[0].detail.split(/\s+/)) expect(step1).toContain(token);
+  });
+
+  it('still references only real Gmail commands — and no label-listing command that does not exist', () => {
+    const commands = (GMAIL_MANIFEST as { commands: { name: string }[] }).commands.map((c) => c.name);
+    const referenced = [...new Set(BODY_V2.match(/gmail_[a-z_]+/g) ?? [])];
+    for (const name of referenced) expect(commands).toContain(name);
+    // gmail_list_labels is a separate, still-unshipped port: the v2
+    // body names labels as free text in the query and never calls it.
+    expect(referenced).not.toContain('gmail_list_labels');
+    expect(commands).not.toContain('gmail_list_labels');
   });
 });

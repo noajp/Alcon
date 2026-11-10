@@ -160,14 +160,15 @@ export type InputBlock =
   /** The row's one trigger, always present (design §3.1: one trigger
    *  per automation; combining means one trigger × declared inputs). */
   | { kind: 'trigger'; triggerKind: 'schedule' | 'webhook'; detail: string }
-  /** A declared intake the run reads when it fires: a mail poll named
-   *  by a step, or a poll of the Space's files. `stepIndex` points at
-   *  the step that names it, in the order the surface passed the
-   *  steps in. */
-  | { kind: 'mail' | 'files'; detail: string; stepIndex: number }
-  /** A poll of another connection (a step naming its read command):
-   *  the same composition as mail, under the connector's own name. */
-  | { kind: 'source'; connector: string; detail: string; stepIndex: number };
+  /** A declared intake the run reads when it fires: a mail poll, or
+   *  a poll of the Space's files. `stepIndex` points at the step that
+   *  names it, in the order the surface passed the steps in — or is
+   *  null when the block comes from the body's declared Input
+   *  section (design §6), which names no step. */
+  | { kind: 'mail' | 'files'; detail: string; stepIndex: number | null }
+  /** A poll of another connection: the same composition as mail,
+   *  under the connector's own name. */
+  | { kind: 'source'; connector: string; detail: string; stepIndex: number | null };
 
 export type OutputBlock =
   /** Where firings land, and the default home of ticketed Elements. */
@@ -188,21 +189,33 @@ const FILE_READ = /\b(searchFiles|listFiles)\b|ファイル(を|の).*(読|探|�
 
 /**
  * Pure. The Input zone: the trigger block, then one source block per
- * declared intake the steps name. Before the grammar's Input section
- * exists (design §6, a later PR), a source is a *reading* of the step
- * that names it — used to display, never to write back. A Gmail read
- * (or a connector whose name carries "mail") reads as a Mail block;
- * any other connector's read is a Source block under its own name,
- * because polling a connection for new work is the one intake
- * composition that exists today (design §3.1) — and every block's
- * detail keeps the step's own words, so nothing is invented.
+ * declared intake. The body's Input section (design §6) is the
+ * blocks' home when it declares rows: a connector row reads as a
+ * Mail block when its name carries "mail" (Gmail included), a Source
+ * block under its own name otherwise, and a ファイル row as a Files
+ * block — each block's detail is the row's declared query or pattern,
+ * and its stepIndex is null (the section names no step). For a body
+ * that predates the section (or declares no rows), the step-reading
+ * remains the fallback: a source is a *reading* of the step that
+ * names it — used to display, never to write back — because polling
+ * a connection for new work is the one intake composition that
+ * exists today (design §3.1), and every block's detail then keeps
+ * the step's own words, so nothing is invented.
  */
-export function inputBlocksOf(row: AutomationZoneRow, steps: string[]): InputBlock[] {
+export function inputBlocksOf(row: AutomationZoneRow, steps: string[], parsed?: ParsedDefinition | null): InputBlock[] {
   let triggerDetail = '';
   if (row.kind === 'schedule') {
     try { triggerDetail = describeCron(row.cron ?? ''); } catch { triggerDetail = row.cron ?? ''; }
   }
   const blocks: InputBlock[] = [{ kind: 'trigger', triggerKind: row.kind, detail: triggerDetail }];
+  if (parsed && parsed.inputs.length > 0) {
+    for (const input of parsed.inputs) {
+      if (input.kind === 'files') blocks.push({ kind: 'files', detail: input.detail, stepIndex: null });
+      else if ((input.connector ?? '').toLowerCase().includes('mail')) blocks.push({ kind: 'mail', detail: input.detail, stepIndex: null });
+      else blocks.push({ kind: 'source', connector: input.connector ?? input.source, detail: input.detail, stepIndex: null });
+    }
+    return blocks;
+  }
   const seen = new Set<string>();
   steps.forEach((step, stepIndex) => {
     if (FILE_READ.test(step)) {

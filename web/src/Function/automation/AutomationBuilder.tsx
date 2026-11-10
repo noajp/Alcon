@@ -99,7 +99,7 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
     return fromGraph.length > 0 || !harness ? fromGraph : flowStepTitles(harness.body ?? '');
   }, [graph, harness]);
   const parsed = useMemo(() => (harness ? parseDefinition(harness.body ?? '') : null), [harness]);
-  const inputs = useMemo(() => inputBlocksOf(a, steps), [a, steps]);
+  const inputs = useMemo(() => inputBlocksOf(a, steps, parsed), [a, steps, parsed]);
   const outputs = useMemo(() => outputBlocksOf(a, parsed, steps, objectName), [a, parsed, steps, objectName]);
   const status = automationStatusOf(a);
   const trigger = a.kind === 'schedule' ? describeCron(a.cron ?? '') : t('When an outside service posts');
