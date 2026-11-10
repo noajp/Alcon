@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -14,6 +14,15 @@ import { traceFromRunSteps } from '@/Function/shared/workTrace';
 import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared/workTraceView';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import { CRITICAL_CLASS_LABELS } from '@/AIP/connectors/catalog';
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
+import { ObjectIcon } from '@/Function/shared/conceptIcons';
+import { displayIdOf } from '@/Function/shared/element/displayId';
+import { describeBlocker } from '@/Function/shared/element/dependencyReadiness';
+import {
+  objectExecuteManifest,
+  type ManifestDisposition, type ObjectManifestInput,
+} from '@/Function/shared/element/objectExecuteManifest';
+import { startElementRun, type AgentStartOutcome } from '@/AIP/ai/agentData';
 import { planCallsFromAction, planPopupState, procedureLines, type PlanPopupCall } from './planPopupState';
 
 // The board-level plan surface (card hover-execute, PR1): a surface over
@@ -260,13 +269,178 @@ function ExecutePlanBody({ element, domainId, onRequestClose, registerCloseActio
   );
 }
 
+/** What the popup is opened on for an Object (PR2): the Object's face
+ *  for the header, and the board readings the manifest is computed
+ *  from — data the host's board already reads, handed over at the
+ *  moment the popup opens. */
+export interface ObjectExecuteTarget {
+  id: string;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  /** The Object's quotable prefix (its display_id read through
+   *  displayIdOf, or its raw prefix), where the host knows it. */
+  prefixLabel?: string | null;
+  /** Where the Object sits, where the host knows the Domain's name. */
+  domainName?: string | null;
+  manifest: ObjectManifestInput;
+}
+
+/** The popup's one target: an Element (its plan, PR1) or an Object
+ *  (its manifest, PR2). */
+export type ExecuteTarget =
+  | { kind: 'element'; element: ElementWithDetails }
+  | { kind: 'object'; object: ObjectExecuteTarget };
+
+type Translate = ReturnType<typeof useI18n>['t'];
+
+/** A manifest row's disposition word — the design's §6.1 words, in the
+ *  chain vocabulary that already stands in the dictionary (the waiting
+ *  words are the WaitingChip's own). */
+function dispositionLabel(disposition: ManifestDisposition, t: Translate): string {
+  switch (disposition.kind) {
+    case 'done': return t('Done');
+    case 'cancelled': return t('Cancelled');
+    case 'running':
+      if (disposition.runStatus === 'awaiting_approval') return t('Waiting: approval');
+      if (disposition.runStatus === 'awaiting_input') return t('Waiting: your answer');
+      if (disposition.runStatus === 'paused') return t('Paused');
+      return t('Running');
+    case 'blocked': {
+      const first = disposition.blockers[0];
+      if (!first) return t('Waiting on work');
+      const word = t('Waiting on {title}', { title: describeBlocker(first) });
+      return disposition.blockers.length > 1 ? `${word} +${disposition.blockers.length - 1}` : word;
+    }
+    case 'waiting':
+      switch (disposition.waiting.kind) {
+        case 'approval': return t('Waiting: approval');
+        case 'answer': return t('Waiting: your answer');
+        case 'review': return t('Waiting: review');
+        case 'readings': return t('Accept to record {n} readings', { n: disposition.waiting.heldReadings ?? 0 });
+        case 'blocked': return t('Blocked');
+        case 'paused': return t('Paused');
+        default: return t('Waiting on you');
+      }
+    case 'with-person': return t('With {name}', { name: disposition.name ?? t('A person') });
+    case 'will-start': return t('Will start');
+  }
+}
+
+/** What one start came back as, in the popup's words: a start is a run
+ *  the board now shows; a busy is a run that opened between the
+ *  manifest and the press; a failure reads plainly here, with its
+ *  detail kept on its run row, never in the popup (§4.3). */
+function outcomeLabel(outcome: AgentStartOutcome, t: Translate): string {
+  if (outcome === 'started') return t('Running');
+  if (outcome === 'busy') return t('Already running');
+  return t('Could not start the run.');
+}
+
 /**
- * The one Execute popup for an Element (PR1; the Object target kind
- * arrives with PR2 in this same component). Hosts own the single mounted
- * instance and hand it the target Element while it is open.
+ * The Object popup (PR2): a manifest, not a plan — no plan unit exists
+ * for a set and none is invented (§5.2). The rows are the pure
+ * manifest's: what would start, what would not, and why. Execute is a
+ * start gesture, not an approval: it runs the sequential
+ * `startElementRun` loop — the MissionExecution pattern — over the
+ * startable set in dependency order, and each started run then lives
+ * under the full ordinary governance. Waiting Elements are not chained
+ * when their blockers finish (§6.3). Closing the popup at any point
+ * loses nothing: the starts are ordinary runs, tracked by the board
+ * and the Inbox, not by the popup.
  */
-export function ExecutePlanDialog({ element, open, onOpenChange, domainId, onFinished }: {
-  element: ElementWithDetails | null;
+function ObjectExecuteBody({ target, onRequestClose, registerCloseAction, onFinished }: {
+  target: ObjectExecuteTarget;
+  onRequestClose: () => Promise<void>;
+  registerCloseAction: (fn: () => Promise<void>) => void;
+  onFinished?: () => void;
+}) {
+  const { t } = useI18n();
+  const manifest = useMemo(() => objectExecuteManifest(target.manifest), [target.manifest]);
+  const [phase, setPhase] = useState<'ready' | 'starting' | 'done'>('ready');
+  const [outcomes, setOutcomes] = useState<ReadonlyMap<string, AgentStartOutcome>>(new Map());
+
+  // Closing an Object popup cancels nothing — it holds no run of its
+  // own — so it clears whatever close action an Element body on this
+  // same dialog instance registered before it.
+  useEffect(() => { registerCloseAction(async () => {}); }, [registerCloseAction]);
+
+  const execute = async () => {
+    setPhase('starting');
+    const next = new Map<string, AgentStartOutcome>();
+    for (const row of manifest.startable) {
+      next.set(row.element.id, await startElementRun(row.element.id));
+      setOutcomes(new Map(next));
+    }
+    setPhase('done');
+    onFinished?.();
+  };
+
+  return (
+    <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+      <div className="flex min-w-0 items-center gap-2">
+        <ItemIcon icon={target.icon ?? null} color={target.color ?? null} size={14} fallback={<ObjectIcon size={14} />} />
+        <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{target.name}</span>
+        {target.prefixLabel && <span className="shrink-0 text-[12px] text-muted-foreground">{target.prefixLabel}</span>}
+        {target.domainName && <span className="ml-auto shrink-0 truncate text-[12px] text-muted-foreground">{target.domainName}</span>}
+      </div>
+
+      {manifest.rows.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground">{t('This Object has no Elements yet.')}</p>
+      ) : (
+        <div className="space-y-1">
+          {manifest.rows.map((row) => {
+            const outcome = outcomes.get(row.element.id);
+            const displayId = displayIdOf(row.element);
+            return (
+              <div key={row.element.id} className="flex min-w-0 items-baseline gap-2 rounded-md bg-muted/50 px-2 py-1.5">
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-foreground" title={row.element.title}>
+                  {row.element.title}
+                </span>
+                {displayId && <span className="shrink-0 text-[11px] text-muted-foreground">{displayId}</span>}
+                <span className={cn(
+                  'shrink-0 text-[12px]',
+                  outcome === 'failed' ? 'text-[var(--status-danger)]' : 'text-muted-foreground',
+                )}>
+                  {outcome ? outcomeLabel(outcome, t) : dispositionLabel(row.disposition, t)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="space-y-1 text-[12px] text-muted-foreground">
+        <p>{t('{n} to start · {m} skipped', { n: manifest.toStart, m: manifest.skipped })}</p>
+        <p>{t('Runs that later need an approval deliver it to the Inbox, as always.')}</p>
+      </div>
+
+      {phase === 'done' ? (
+        <div className="flex items-center justify-end gap-1.5">
+          <Button variant="primary" size="sm" onClick={() => void onRequestClose()}>{t('Done')}</Button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-end gap-1.5">
+          <Button variant="secondary" size="sm" disabled={phase === 'starting'} onClick={() => void onRequestClose()}>{t('Dismiss')}</Button>
+          <Button variant="primary" size="sm" disabled={phase === 'starting' || manifest.toStart === 0}
+            onClick={() => void execute()}>
+            {t('Execute')}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The one Execute popup: an Element target opens its B8 plan (PR1), an
+ * Object target opens its manifest (PR2). Hosts own the single mounted
+ * instance and hand it the target while it is open. The `element` prop
+ * is PR1's shape, kept as the element-kind shorthand.
+ */
+export function ExecutePlanDialog({ target, element, open, onOpenChange, domainId, onFinished }: {
+  target?: ExecuteTarget | null;
+  element?: ElementWithDetails | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The Domain the run belongs to; defaults to the active Domain. */
@@ -286,17 +460,32 @@ export function ExecutePlanDialog({ element, open, onOpenChange, domainId, onFin
     onOpenChange(false);
   }, [onOpenChange]);
 
+  const effective: ExecuteTarget | null = target ?? (element ? { kind: 'element', element } : null);
+
   return (
     <Dialog open={open} onOpenChange={(next) => { if (next) onOpenChange(true); else void requestClose(); }}>
       <DialogContent className="max-w-lg">
-        {element && (
+        {effective?.kind === 'element' && (
           <>
             <DialogHeader>
               <DialogTitle>{t('Execution plan')}</DialogTitle>
-              <DialogDescription className="truncate">{element.title}</DialogDescription>
+              <DialogDescription className="truncate">{effective.element.title}</DialogDescription>
             </DialogHeader>
             {open && (
-              <ExecutePlanBody key={element.id} element={element} domainId={domainId}
+              <ExecutePlanBody key={effective.element.id} element={effective.element} domainId={domainId}
+                onRequestClose={requestClose} registerCloseAction={registerCloseAction}
+                onFinished={onFinished} />
+            )}
+          </>
+        )}
+        {effective?.kind === 'object' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t('Execute Object')}</DialogTitle>
+              <DialogDescription className="truncate">{effective.object.name}</DialogDescription>
+            </DialogHeader>
+            {open && (
+              <ObjectExecuteBody key={effective.object.id} target={effective.object}
                 onRequestClose={requestClose} registerCloseAction={registerCloseAction}
                 onFinished={onFinished} />
             )}

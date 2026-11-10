@@ -10,7 +10,7 @@ import { useRunRounds } from '@/hooks/definitionData';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/boardOrientation';
 import { AddElementMenu, ChainCard } from '@/ActivitySpace/execution/chain/ChainCard';
-import { ExecutePlanDialog } from '@/ActivitySpace/execution/element/agent';
+import { ExecutePlanDialog, type ExecuteTarget, type ObjectExecuteTarget } from '@/ActivitySpace/execution/element/agent';
 import { waitingReason, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 import {
   fleetCard, fleetCardContext, handOverLabels, latestRuns, missionElementRow, orderFleetCards,
@@ -44,9 +44,10 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
   const { t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // The one Execute popup for this board (card hover-execute, PR1):
-  // a card's rail names its Element, the dialog does the rest.
-  const [executeTarget, setExecuteTarget] = useState<ElementWithDetails | null>(null);
+  // The one Execute popup for this board (card hover-execute, PR1/PR2):
+  // a card's rail names its Element, its Object chip's segment names
+  // the Object, the dialog does the rest.
+  const [executeTarget, setExecuteTarget] = useState<ExecuteTarget | null>(null);
   // The board's orientation — the one preference every board shares.
   const [orientation, setOrientation] = useBoardOrientation();
   // Ticks, so a lease that lapses while the tab is open stops reading as running.
@@ -85,6 +86,23 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
     [objects, domainId],
   );
   const objectById = useMemo(() => new Map(objects.map((o) => [o.id, o])), [objects]);
+
+  // The Object popup's target, built at the press from what this board
+  // already reads: the Object's Elements (the rows), every row as the
+  // blocker lookup's upstreams, the depends_on edges, the runs, and
+  // the same waiting map the cards' chips read. This host knows its
+  // Domain's id, not its name, so the header's Domain line stays out.
+  const objectTargetFor = (objectId: string): ObjectExecuteTarget | null => {
+    const object = objectById.get(objectId);
+    if (!object) return null;
+    return {
+      id: object.id, name: object.name, icon: object.icon ?? null, color: object.color ?? null,
+      manifest: {
+        elements: rows.filter((r) => r.object_id === objectId),
+        upstreams: rows, edges, runs, waiting: reasonMap,
+      },
+    };
+  };
 
   const dropToStatus = async (status: ChainStatus, elementId: string) => {
     const written = details.get(elementId);
@@ -131,7 +149,7 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
       key: c.key,
       node: (
         <ChainCard element={c} detail={detail}
-          object={object ? { name: object.name, icon: object.icon ?? null, color: object.color ?? null } : null}
+          object={object ? { id: object.id, name: object.name, icon: object.icon ?? null, color: object.color ?? null } : null}
           busy={busy !== null && busy === c.elementId}
           reason={reasonMap.get(c.elementId) ?? null}
           rounds={rounds.get(c.elementId)}
@@ -139,7 +157,8 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
           onRefresh={refetch}
           onOpen={() => onOpenElement(c.elementId!)}
           onOpenElement={onOpenElement}
-          onExecute={(el) => setExecuteTarget(el)}
+          onExecute={(el) => setExecuteTarget({ kind: 'element', element: el })}
+          onExecuteObject={(objectId) => { const target = objectTargetFor(objectId); if (target) setExecuteTarget({ kind: 'object', object: target }); }}
           onHandOver={c.handable ? () => void handOver(c) : undefined} />
       ),
     });
@@ -156,7 +175,7 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
         onDropStatus={canEdit ? (status, id) => void dropToStatus(status, id) : undefined}
         columnAction={canEdit && objectRows.length > 0 ? (status) => <AddElementMenu status={status} objects={objectRows} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
         columns={columns} />
-      <ExecutePlanDialog element={executeTarget} open={executeTarget !== null}
+      <ExecutePlanDialog target={executeTarget} open={executeTarget !== null}
         onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}
         onFinished={refetch} />
     </div>
