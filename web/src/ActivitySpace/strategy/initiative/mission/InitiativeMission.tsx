@@ -76,7 +76,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
   if (tab === 'execution') {
     return (
       <MissionExecutionPanel ctx={ctx} details={details} orientation={orientation} via={via}
-        onOpenObject={(id) => onOpenObject?.(id, objects.find((o) => o.id === id)?.domain_id ?? null)}
+        onOpenObject={(id, domainId) => onOpenObject?.(id, domainId ?? objects.find((o) => o.id === id)?.domain_id ?? null)}
         objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id, icon: o.icon ?? null, color: o.color ?? null }))}
         domains={domains.filter((d) => !spaceId || d.activity_space_id === spaceId).map((d) => ({ id: d.id, name: d.name }))}
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}

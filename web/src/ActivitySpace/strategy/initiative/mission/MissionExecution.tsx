@@ -9,9 +9,9 @@ import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { startElementRun } from '@/AIP/ai/agentData';
 import { runsInClaudeCode } from '@/Function/team/agentModel';
-import { updateElement } from '@/hooks/useSupabase';
+import { createObject, updateElement } from '@/hooks/useSupabase';
 import { applyInitiativePlan, requestInitiativePlan } from '@/hooks/initiativeMissionData';
-import { createIntent } from '@/hooks/strategyData';
+import { createIntent, linkObjectToStrategy } from '@/hooks/strategyData';
 import { type ElementWithDetails, type Worker } from '@/types/database';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
 import { ObjectBoard } from '@/ActivitySpace/execution/chain/ObjectBoard';
@@ -93,8 +93,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   ensureRoot: () => Promise<string>;
   /** Objects a Strategy under this one holds, by id, with that Strategy. */
   via?: ReadonlyMap<string, { id: string; name: string }>;
-  /** Open one of the board's Objects. */
-  onOpenObject?: (objectId: string) => void;
+  /** Open one of the board's Objects (the Domain, when the board knows it). */
+  onOpenObject?: (objectId: string, domainId?: string | null) => void;
 }) {
   const { t } = useI18n();
   const [guidance, setGuidance] = useState('');
@@ -238,6 +238,20 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
     setBusy(null);
     if (failed) setNotice(t('{n} could not be handed to Claude Code.', { n: failed }));
     ctx.refetch();
+  };
+
+  // The Backlog's "+": a new Object in the Domain picked, put under this
+  // Strategy and opened at once so it can be named.
+  const addObject = async (domainId: string) => {
+    setError(null);
+    try {
+      const made = await createObject({ name: t('Untitled'), domain_id: domainId });
+      await linkObjectToStrategy(ctx.initiativeId, made.id);
+      ctx.refetch();
+      onOpenObject?.(made.id, domainId);
+    } catch {
+      setError(t('Could not add an Object here.'));
+    }
   };
 
   // Where each action stands: a written Element by its Status, its action and
@@ -422,7 +436,8 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
             className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
             columns={Object.fromEntries((Object.keys(chain) as ChainStatus[]).map((c) => [c, chain[c].map(({ element: e, object: o, reason }) => ({ key: e.key, node: cardFor(e, o, reason) }))])) as Record<ChainStatus, { key: string; node: React.ReactNode }[]>} />
         ) : (
-          <ObjectBoard objects={objects} elements={ctx.elements} via={via} orientation={orientation} onOpenObject={onOpenObject}
+          <ObjectBoard objects={objects} elements={ctx.elements} via={via} orientation={orientation} onOpenObject={(id) => onOpenObject?.(id)}
+            addTo={ctx.canEdit ? { domains, onAdd: (domainId) => void addObject(domainId) } : undefined}
             className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'} />
         )}
         <ExecutePlanDialog target={executeTarget} open={executeTarget !== null}

@@ -175,6 +175,14 @@ export function AddElementMenu({ status, objects, onAdd }: {
 }) {
   const { t } = useI18n();
   const label = t('Add Element to {column}', { column: t(STATUS[status].label) });
+  // Inside one Object there is nothing to ask: the Element goes there.
+  if (objects.length === 1) {
+    return (
+      <Button variant="ghost" size="icon-xs" type="button" title={label} aria-label={label} onClick={() => onAdd(status, objects[0].id)}>
+        <Plus className="h-3.5 w-3.5" />
+      </Button>
+    );
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
