@@ -126,9 +126,44 @@ export async function deliverTreeToWorkspace(input: {
 }): Promise<DeliveryOutcome> {
   const tokens = await githubTokens(input.admin, input.spaceId).catch(() => [null]);
   let baseSha: string;
-  let tarball: Uint8Array;
   try {
     baseSha = await fetchBaseSha(tokens, input.target);
+  } catch (e) {
+    return { ok: false, code: "github_failed", detail: e instanceof Error ? e.message.slice(0, 300) : "GitHub からツリーを取得できませんでした" };
+  }
+  return deliverSnapshotAtSha(input, tokens, baseSha);
+}
+
+/**
+ * Deliver the target's tree at one fixed SHA into the workspace —
+ * the iteration's delivery (coding capability PR4): a follow-up run
+ * works on the PR's head tree as it stood when the event was routed,
+ * not on wherever the branch has since moved to. If the head moves
+ * afterwards, the amend's own head check refuses at publish time;
+ * the delivered tree is never silently re-based.
+ */
+export async function deliverTreeAtShaToWorkspace(input: {
+  admin: SupabaseClient;
+  runId: string;
+  spaceId: string | null;
+  target: CodingTarget;
+  sha: string;
+  runShell: RunShell;
+}): Promise<DeliveryOutcome> {
+  const tokens = await githubTokens(input.admin, input.spaceId).catch(() => [null]);
+  return deliverSnapshotAtSha(input, tokens, input.sha);
+}
+
+/** The shared delivery: snapshot the tree at `baseSha`, park it as
+ *  the run's one object, let the runner unpack it from a signed URL,
+ *  and delete the object the moment the unpack settles. */
+async function deliverSnapshotAtSha(
+  input: { admin: SupabaseClient; runId: string; target: CodingTarget; runShell: RunShell },
+  tokens: (string | null)[],
+  baseSha: string,
+): Promise<DeliveryOutcome> {
+  let tarball: Uint8Array;
+  try {
     tarball = await fetchTreeTarball(tokens, input.target, baseSha);
   } catch (e) {
     return { ok: false, code: "github_failed", detail: e instanceof Error ? e.message.slice(0, 300) : "GitHub からツリーを取得できませんでした" };

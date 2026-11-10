@@ -73,8 +73,15 @@ export type SavedPending = PendingApproval & {
     finish: FinishPayload;
     verdict: RunVerdict | null;
     /** The composed batch's create_pull_request call id: the call
-     *  whose landing the finalize reports on. */
+     *  whose landing the finalize reports on. For an amend batch
+     *  (below) it is the batch's first call — there is no PR call,
+     *  and the finalize judges the batch by all its results. */
     prCallId: string;
+    /** The amend rest (coding capability PR4): this publish is a
+     *  follow-up run's added commit on an existing PR's branch, not
+     *  a new PR. Approving executes the batch and reports the PR as
+     *  updated; rejecting seals the finish with the PR untouched. */
+    amend?: { codeChangeId: string; repo: string; number: number; branch: string };
   };
 };
 

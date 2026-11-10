@@ -1590,10 +1590,15 @@ export type Database = {
         Row: {
           activity_space_id: string | null
           additions: number | null
+          amend_exhausted_at: string | null
+          amend_rounds: number
           author_login: string | null
           base_ref: string | null
           body: string | null
           changed_files: number | null
+          ci_at: string | null
+          ci_state: string | null
+          ci_url: string | null
           created_at: string
           deletions: number | null
           element_id: string
@@ -1617,10 +1622,15 @@ export type Database = {
         Insert: {
           activity_space_id?: string | null
           additions?: number | null
+          amend_exhausted_at?: string | null
+          amend_rounds?: number
           author_login?: string | null
           base_ref?: string | null
           body?: string | null
           changed_files?: number | null
+          ci_at?: string | null
+          ci_state?: string | null
+          ci_url?: string | null
           created_at?: string
           deletions?: number | null
           element_id: string
@@ -1644,10 +1654,15 @@ export type Database = {
         Update: {
           activity_space_id?: string | null
           additions?: number | null
+          amend_exhausted_at?: string | null
+          amend_rounds?: number
           author_login?: string | null
           base_ref?: string | null
           body?: string | null
           changed_files?: number | null
+          ci_at?: string | null
+          ci_state?: string | null
+          ci_url?: string | null
           created_at?: string
           deletions?: number | null
           element_id?: string

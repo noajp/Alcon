@@ -1429,6 +1429,15 @@ export interface CodeChange {
   intent_check: Json | null
   /** The AI's walk-through of the change, in sections (read with readGuide). */
   guide: Json | null
+  /** The PR's latest CI state as routed from dev_events (coding PR4);
+   *  null until a CI event for this PR has been routed. */
+  ci_state: 'passed' | 'failed' | null
+  ci_url: string | null
+  ci_at: string | null
+  /** Follow-up (amend) rounds the iteration router has spent on this
+   *  PR, and when the round bound was reached and reported. */
+  amend_rounds: number
+  amend_exhausted_at: string | null
   linked_via: 'manual' | 'agent'
   run_id: string | null
   linked_by: string | null

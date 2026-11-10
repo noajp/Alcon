@@ -33,11 +33,15 @@ describe('run-agent composes the publish as governed calls', () => {
 
   it('composes from the pure core and resolves the connection’s declared commands by their wrapped tool', () => {
     expect(pub).toContain('parsePatchFiles(input.changeSet.patch)');
-    expect(pub).toContain('publishCommandKind(it.command) === kind');
-    expect(pub).toContain('toolFor("create_branch")');
-    expect(pub).toContain('toolFor("push_files")');
-    expect(pub).toContain('toolFor("delete_file")');
-    expect(pub).toContain('toolFor("create_pull_request")');
+    // The resolver itself was hoisted above the publish in PR4 so
+    // the amend composes through the same one (#7); the pin on its
+    // matching rule now reads the whole file, and the publish's own
+    // region pins which commands it resolves.
+    expect(runAgent).toContain('publishCommandKind(it.command) === kind');
+    expect(pub).toContain('publishToolFor("create_branch")');
+    expect(pub).toContain('publishToolFor("push_files")');
+    expect(pub).toContain('publishToolFor("delete_file")');
+    expect(pub).toContain('publishToolFor("create_pull_request")');
     // One branch at the base, one files call carrying the whole
     // tree, deletions by their base blob SHA, then the PR.
     expect(pub).toContain('from_branch: target.baseBranch');

@@ -170,7 +170,7 @@ interface ColumnOverrides {
     effect: ConstraintEffectRecord
     retire_reason: 'owner' | 'folded' | null
   }
-  code_changes: { provider: 'github'; state: CodeChangeState; linked_via: 'manual' | 'agent' }
+  code_changes: { provider: 'github'; state: CodeChangeState; linked_via: 'manual' | 'agent'; ci_state: 'passed' | 'failed' | null }
   code_change_reviews: { verdict: 'comment' | 'matches' | 'needs_changes' }
   code_change_comments: { side: 'old' | 'new' }
   assets: {

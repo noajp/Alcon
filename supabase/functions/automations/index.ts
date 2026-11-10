@@ -36,7 +36,15 @@
 //                                      (coding PR1): sandboxes past
 //                                      their wall clock are destroyed,
 //                                      and bindings whose run already
-//                                      ended are closed.
+//                                      ended are closed. The same
+//                                      tick routes development events
+//                                      to the coding loop's own PRs
+//                                      (coding PR4): PR state and CI
+//                                      state are refreshed on the
+//                                      code-changes record, and a
+//                                      review comment or a CI failure
+//                                      starts a bounded follow-up run
+//                                      that amends the PR.
 //   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -69,6 +77,7 @@ import { evaluateAutonomy } from "../_shared/autonomy.ts";
 import { deriveConstraintDrafts, evaluateConstraintEffects, type ConstraintCluster } from "../_shared/constraintDrafts.ts";
 import { claimExpiredQuestionTickets, settleRunBlockedByQuestions, type QuestionTicketRow } from "../_shared/questionTickets.ts";
 import { reapWorkspaces } from "../_shared/workspaceLifecycle.ts";
+import { routeCodingEvents } from "../_shared/codingIteration.ts";
 import { deriveScopeFromDefinition, loadDerivationIntegrations, rootChainScope, strategyIdForObject } from "../_shared/chainScope.ts";
 
 const corsHeaders = {
@@ -745,6 +754,23 @@ async function tick(env: Env): Promise<Record<string, number>> {
   } catch (e) {
     console.error("automations: workspace reaping failed", e instanceof Error ? e.message : e);
   }
+  // Coding iteration (PR4): development events routed to the coding
+  // loop's own PRs — records refreshed (PR state, CI state), and a
+  // review comment or CI failure answered by a bounded follow-up
+  // run on the same Element, acting as the person whose run opened
+  // the PR. Events that belong to anyone else are left unconsumed.
+  let devEventsScanned = 0, devEventsSynced = 0, devCiRecorded = 0, amendRunsStarted = 0, devEventsNoted = 0, amendExhausted = 0;
+  try {
+    const routed = await routeCodingEvents(env.admin, { url: env.url, anonKey: env.anonKey, sessionFor }, now);
+    devEventsScanned = routed.scanned;
+    devEventsSynced = routed.synced;
+    devCiRecorded = routed.ciRecorded;
+    amendRunsStarted = routed.amendRuns;
+    devEventsNoted = routed.noted;
+    amendExhausted = routed.exhausted;
+  } catch (e) {
+    console.error("automations: coding event routing failed", e instanceof Error ? e.message : e);
+  }
   // Heartbeats whose wake is due. The tick's arrival is stamped on
   // every enabled Space first: the pg_cron registration is per
   // environment, and this stamp is how the settings screen can say
@@ -784,7 +810,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, workspacesExpired, workspacesRunEnded, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, workspacesExpired, workspacesRunEnded, devEventsScanned, devEventsSynced, devCiRecorded, amendRunsStarted, devEventsNoted, amendExhausted, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {

@@ -273,6 +273,56 @@ describe('composePublish', () => {
   });
 });
 
+describe('composeAmend (PR4: the iteration’s added commit)', () => {
+  const baseFiles = new Map([
+    ['src/a.ts', { content: 'a\nb\nc\n', blobSha: 'sha-a' }],
+    ['src/old.ts', { content: 'x\ny\n', blobSha: 'sha-old' }],
+  ]);
+  const amend = (over: Partial<Parameters<typeof cp.composeAmend>[0]> = {}) => cp.composeAmend({
+    changeSet: FULL_SET,
+    patchFiles: cp.parsePatchFiles(FULL_PATCH),
+    baseFiles,
+    ...over,
+  });
+
+  it('resolves the same writes and deletes as a publish — no branch, no PR, the one composition', () => {
+    const r = amend();
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.writes).toEqual([
+      { path: 'src/a.ts', content: 'a\nB\nc\n' },
+      { path: 'src/new.ts', content: 'one\ntwo\n' },
+    ]);
+    expect(r.plan.deletes).toEqual([{ path: 'src/old.ts', sha: 'sha-old' }]);
+    expect('branch' in r.plan).toBe(false);
+    expect('pr' in r.plan).toBe(false);
+  });
+
+  it('applies against the head files it is given: a head that moved under the patch refuses exactly', () => {
+    const moved = new Map([
+      ['src/a.ts', { content: 'a\nCHANGED\nc\n', blobSha: 'sha-a2' }],
+      ['src/old.ts', { content: 'x\ny\n', blobSha: 'sha-old' }],
+    ]);
+    const r = amend({ baseFiles: moved });
+    expect(r.ok).toBe(false);
+  });
+
+  it('refuses a truncated patch and an unread head file, under the amend’s own name', () => {
+    const cut = FULL_PATCH.replace(' c\n', '');
+    const r1 = amend({ changeSet: changeSet(FULL_SET.files, cut), patchFiles: cp.parsePatchFiles(cut) });
+    expect(r1.ok).toBe(false);
+    const r2 = amend({ baseFiles: new Map([['src/old.ts', { content: 'x\ny\n', blobSha: 'sha-old' }]]) });
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.reason).toContain('修正できません');
+  });
+
+  it('the amend commit message names the work and the PR it amends', () => {
+    expect(cp.amendCommitMessage('請求フローを直す', 42)).toBe('請求フローを直す（PR #42 への修正）');
+    expect(cp.amendCommitMessage(null, 7)).toBe('コード変更（PR #7 への修正）');
+    expect(cp.amendCommitMessage('  ', 7)).toBe('コード変更（PR #7 への修正）');
+  });
+});
+
 describe('the publish plan’s small laws', () => {
   it('branchNameForRun is deterministic per run and safe as a ref', () => {
     expect(cp.branchNameForRun('12345678-9abc-def0-1234-56789abcdef0')).toBe('alcon/run-123456789abc');
