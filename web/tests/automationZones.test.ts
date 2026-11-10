@@ -103,6 +103,29 @@ describe('inputBlocksOf', () => {
   it('offers no block for kinds with no machinery (no arrival, no run-finished)', () => {
     expect(inputBlocksOf(row(), ['まとめて報告する']).map((b) => b.kind)).toEqual(['trigger']);
   });
+
+  it('reads the declared Input section first when the body has one (PR3): the section is the blocks\' home', () => {
+    const parsed = parseDefinition(
+      '# 目的\nx\n\n# 入力\n- Gmail: is:unread label:claim -label:processed\n- ファイル: 報告書\n- Notion: 会議\n',
+    );
+    // The steps name another connector entirely: with a declared
+    // section present, the step-reading is not consulted at all.
+    const blocks = inputBlocksOf(row(), ['slack_search で発言を探す'], parsed);
+    expect(blocks.map((b) => b.kind)).toEqual(['trigger', 'mail', 'files', 'source']);
+    expect(blocks[1]).toEqual({ kind: 'mail', detail: 'is:unread label:claim -label:processed', stepIndex: null });
+    expect(blocks[2]).toEqual({ kind: 'files', detail: '報告書', stepIndex: null });
+    expect(blocks[3]).toEqual({ kind: 'source', connector: 'Notion', detail: '会議', stepIndex: null });
+  });
+
+  it('falls back to the step-reading for a body whose Input section declares nothing', () => {
+    const parsed = parseDefinition(CLAIM);
+    expect(parsed.inputs).toEqual([]);
+    const blocks = inputBlocksOf(row(), CLAIM_STEPS, parsed);
+    expect(blocks.filter((b) => b.kind === 'mail')).toHaveLength(1);
+    expect(blocks[1]).toMatchObject({ kind: 'mail', stepIndex: 0 });
+    // And with no parsed body at all, the same reading stands.
+    expect(inputBlocksOf(row(), CLAIM_STEPS, null).map((b) => b.kind)).toEqual(['trigger', 'mail']);
+  });
 });
 
 describe('binding editing (PR2)', () => {
