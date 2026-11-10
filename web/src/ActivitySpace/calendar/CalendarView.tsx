@@ -2,11 +2,12 @@
 
 import { toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly, isSameDay, isOverdue as isDueDayPast } from '@/Function/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from '@/ui/icons';
+import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, Plus, X } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
+import type { CalendarEvent } from '@/hooks/calendarEventData';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails, AlconObject } from '@/types/database';
@@ -26,6 +27,13 @@ interface CalendarViewProps {
   /** The day the grid is on, when a parent (the Calendar sidebar) owns it. */
   date?: Date;
   onDateChange?: (date: Date) => void;
+  /** The Space's events (plans that are not work), drawn filled. */
+  events?: CalendarEvent[];
+  onEventClick?: (event: CalendarEvent) => void;
+  /** Make a new event — from the header's button (no slot) or an empty
+   *  spot on the hour grid (that day, from that half hour). Absent: the
+   *  Calendar makes no events. */
+  onCreateEvent?: (slot: { date: string; startMinutes: number | null }) => void;
 }
 
 type CalendarMode = 'day' | 'week' | 'month';
@@ -101,12 +109,13 @@ function formatTimeShort(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange }: CalendarViewProps) {
+export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange, events, onEventClick, onCreateEvent }: CalendarViewProps) {
   const { t, locale } = useI18n();
-  const elements = useMemo(() => calendarEntries(sourceElements, objects), [sourceElements, objects]);
+  const elements = useMemo(() => calendarEntries(sourceElements, objects, events), [sourceElements, objects, events]);
   const onElementClick = (entry: CalendarEntry) => {
-    if (entry.object) onObjectClick?.(entry.object);
-    else openElement?.(entry.element);
+    if (entry.event) onEventClick?.(entry.event);
+    else if (entry.object) onObjectClick?.(entry.object);
+    else if (entry.element) openElement?.(entry.element);
   };
   const [ownDate, setOwnDate] = useState(new Date());
   const currentDate = date ?? ownDate;
@@ -240,7 +249,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     }
   };
 
-  const isOverdue = (element: CalendarEntry): boolean => isDueDayPast(element.due_date, element.status === 'done');
+  // An event is a plan, not work: it is never overdue.
+  const isOverdue = (element: CalendarEntry): boolean => !element.event && isDueDayPast(element.due_date, element.status === 'done');
 
   const scheduleOn = async (element: CalendarEntry, date: Date) => {
     if (!element.element) return;
@@ -291,6 +301,10 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
   const getCardStyle = (
     element: CalendarEntry
   ): { className: string; style?: React.CSSProperties; dotColor?: string } => {
+    // An event is drawn filled, so it reads apart from the work around it.
+    if (element.event) {
+      return { className: 'text-primary-foreground', style: { backgroundColor: 'var(--accent-default)' }, dotColor: 'var(--accent-default)' };
+    }
     if (element.color) {
       const p = pastelFromHex(element.color);
       return {
@@ -341,6 +355,11 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label={t('Next period')}><ChevronRight size={16} /></Button>
         </ButtonAppearanceProvider>
         <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
+        {onCreateEvent && (
+          <Button size="sm" variant="secondary" onClick={() => onCreateEvent({ date: fmtDateOnly(currentDate), startMinutes: null })}>
+            <Plus size={13} />{t('New event')}
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ day: 'Day', week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
           <MenuShell as="dropdown" align="end">
@@ -625,6 +644,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
             setSelectedElement(el);
             setShowColorPicker(Boolean(el.element));
           }}
+          onSlotClick={onCreateEvent ? (day, startMinutes) => onCreateEvent({ date: fmtDateOnly(day), startMinutes }) : undefined}
         />
         </div>
       )}
@@ -742,6 +762,9 @@ interface TimeGridViewProps {
   isOverdue: (el: CalendarEntry) => boolean;
   onElementClick: (el: CalendarEntry) => void;
   onElementContextMenu: (el: CalendarEntry) => void;
+  /** An empty spot on a day's hour grid was clicked: that day, at the
+   *  half hour under the pointer. */
+  onSlotClick?: (day: Date, startMinutes: number) => void;
 }
 
 function TimeGridView({
@@ -752,6 +775,7 @@ function TimeGridView({
   isOverdue,
   onElementClick,
   onElementContextMenu,
+  onSlotClick,
 }: TimeGridViewProps) {
   const { t, locale } = useI18n();
   const [now, setNow] = useState(new Date());
@@ -928,7 +952,14 @@ function TimeGridView({
             return (
               <div
                 key={colIdx}
-                className={`${colWidthClass} relative border-l border-[var(--border-subtle)]`}
+                className={`${colWidthClass} relative border-l border-[var(--border-subtle)] ${onSlotClick ? 'cursor-cell' : ''}`}
+                onClick={onSlotClick ? (e) => {
+                  // Only the empty grid: a click on a card is the card's.
+                  if (e.target !== e.currentTarget) return;
+                  const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+                  const minutes = GRID_START_HOUR * 60 + Math.floor((y / HOUR_HEIGHT) * 2) * 30;
+                  onSlotClick(days[colIdx], Math.max(0, Math.min(minutes, 23 * 60 + 30)));
+                } : undefined}
               >
                 {/* Hour grid lines */}
                 {hours.map(h => (
