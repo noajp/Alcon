@@ -184,7 +184,14 @@ export function ActivitySpaceSettings() {
       await appDialog.alert(t('"{name}" still has Domains. Move or delete them before deleting the Space.', { name: active.name }));
       return;
     }
-    if (!await appDialog.confirm(t('Delete "{name}"? This can’t be undone.', { name: active.name }))) return;
+    // Deleting a Space takes everything in it, so it asks for the name typed
+    // out — one click can never do it.
+    const typed = await appDialog.prompt(t('Delete "{name}"? Everything in it is deleted and this can’t be undone. Type the Space’s name to confirm.', { name: active.name }));
+    if (typed === null) return;
+    if (typed.trim() !== active.name.trim()) {
+      await appDialog.alert(t('The name did not match. Nothing was deleted.'));
+      return;
+    }
     try {
       await deleteActivitySpace(active.id);
       window.location.reload();
