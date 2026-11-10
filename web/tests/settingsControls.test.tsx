@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { I18nProvider } from '@/Function/i18n/I18nProvider';
 import {
-  SettingRow, SettingsIsland, SegmentedControl, SelectControl, Switch,
+  SettingField, SettingRow, SettingsIsland, SegmentedControl, SelectControl, Switch,
 } from '@/Function/settings/SettingsControls';
 
 afterEach(() => { cleanup(); });
@@ -99,6 +99,29 @@ describe('SettingRow', () => {
     expect(screen.getByText('Theme')).toBeTruthy();
     expect(screen.queryByText('Match the system or pick a colour theme')).toBeNull();
     expect(screen.queryByText('Applies on this device')).toBeNull();
+  });
+});
+
+describe('SettingField', () => {
+  it('renders the label and hint around the control, padded for an island by default', () => {
+    const { container } = render(
+      <SettingField label="Bio" hint="Shown on your Profile page.">
+        <textarea />
+      </SettingField>,
+    );
+    expect(screen.getByText('Bio')).toBeTruthy();
+    expect(screen.getByText('Shown on your Profile page.')).toBeTruthy();
+    expect(container.firstElementChild?.className).toContain('px-5');
+  });
+
+  it('flush drops the island padding and htmlFor binds the label (PR4b, dialog-embedded fields)', () => {
+    const { container } = render(
+      <SettingField flush label="Name" htmlFor="field-name">
+        <input id="field-name" />
+      </SettingField>,
+    );
+    expect(container.firstElementChild?.className).not.toContain('px-5');
+    expect(container.querySelector('label')?.getAttribute('for')).toBe('field-name');
   });
 });
 
