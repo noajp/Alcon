@@ -15,6 +15,47 @@ export interface CascadeNode {
   id: string;
   /** Parent Strategy ids from strategy_children. Empty for a top level. */
   parentIds: string[];
+  /** Object ids from strategy_objects, in the junction's order. */
+  objectIds?: readonly string[];
+}
+
+/** The least of an Object the cascade reads: the face of its chip. */
+export interface CascadeObjectRef {
+  id: string;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  domain_id: string | null;
+}
+
+/** How many Object chips stand under one Strategy's card before the
+ *  rest fold into the count chip. The full list is one click away on
+ *  the Strategy's Overview; the cascade shows the shape, not the
+ *  inventory. */
+export const CASCADE_OBJECT_CHIP_CAP = 6;
+
+/**
+ * The Object chips of one Strategy: its objectIds resolved against the
+ * Object rows, in the junction's own order, capped — the rest counted,
+ * never listed. An id with no matching row is skipped silently, the
+ * same discipline as the cascade's byId guard for Strategies; a
+ * repeated id stands once, at its first place.
+ */
+export function cascadeObjectChips<T extends CascadeObjectRef>(
+  objectIds: readonly string[],
+  objectsById: ReadonlyMap<string, T>,
+  cap: number = CASCADE_OBJECT_CHIP_CAP,
+): { chips: T[]; overflow: number } {
+  const resolved: T[] = [];
+  const seen = new Set<string>();
+  for (const id of objectIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const object = objectsById.get(id);
+    if (object) resolved.push(object);
+  }
+  const chips = resolved.slice(0, cap);
+  return { chips, overflow: resolved.length - chips.length };
 }
 
 /**
