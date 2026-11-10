@@ -1,13 +1,12 @@
 /** @vitest-environment jsdom */
 //
-// Settings on ONE page (redesign §2/§9): every area renders, stacked in
-// nav order on the page ground; stub areas are compact placeholder
-// islands; in-area segmented controls swap only their own area's body;
-// a reveal lands the named area on the named tab and scrolls to it; the
-// scroll-spy moves the store's active section. Panels are stubbed —
-// this suite pins the page's composition, not the panels.
+// Settings, one area per page: the page shows only the area the store
+// names, headed by its name; a reveal switches the page and lands the
+// named tab; stub areas are a compact placeholder island; in-area
+// segmented controls swap the area's body. Panels are stubbed — this
+// suite pins the page's composition, not the panels.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { I18nProvider } from '@/Function/i18n/I18nProvider';
 import { SETTINGS_NAV, setActiveSettingsSection, useActiveSettingsSection } from '@/Function/settings/settingsNav';
@@ -42,32 +41,6 @@ vi.mock('@/Function/settings/useUserPreferences', () => ({
 vi.mock('next-themes', () => ({ useTheme: () => ({ theme: 'light', setTheme: vi.fn() }) }));
 vi.mock('@/Function/i18n/LanguageSelect', () => ({ LanguageSelect: () => 'Language select' }));
 
-// ── Browser stand-ins jsdom doesn't provide ──────────────────────────
-type EntryLike = { target: Element; isIntersecting: boolean; boundingClientRect: { top: number } };
-class MockIntersectionObserver {
-  static instances: MockIntersectionObserver[] = [];
-  callback: (entries: IntersectionObserverEntry[]) => void;
-  constructor(cb: (entries: IntersectionObserverEntry[]) => void) {
-    this.callback = cb;
-    MockIntersectionObserver.instances.push(this);
-  }
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-  fire(entries: EntryLike[]) {
-    this.callback(entries as unknown as IntersectionObserverEntry[]);
-  }
-}
-
-const scrolled: HTMLElement[] = [];
-
-beforeEach(() => {
-  MockIntersectionObserver.instances = [];
-  scrolled.length = 0;
-  globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
-  HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) { scrolled.push(this); };
-});
-
 afterEach(() => { cleanup(); });
 
 const renderPage = () => render(
@@ -76,100 +49,76 @@ const renderPage = () => render(
   </I18nProvider>,
 );
 
-const shell = (c: HTMLElement, id: string) => c.querySelector(`[data-settings-area="${id}"]`) as HTMLElement;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const shown = (c: HTMLElement) => [...c.querySelectorAll('[data-settings-area]')].map((s) => s.getAttribute('data-settings-area'));
 
-describe('the one page', () => {
-  it('renders every area shell in nav order, each headed by its label', () => {
+describe('one area per page', () => {
+  it('shows only the area the store names, headed by its name', () => {
+    act(() => setActiveSettingsSection('workspace'));
     const view = renderPage();
-    const shells = [...view.container.querySelectorAll('[data-settings-area]')];
-    const expected = SETTINGS_NAV.flatMap((g) => g.items);
-    expect(shells.map((s) => s.getAttribute('data-settings-area'))).toEqual(expected.map((i) => i.id));
-    expect(shells.map((s) => s.getAttribute('aria-label'))).toEqual(expected.map((i) => i.label));
+    expect(shown(view.container)).toEqual(['workspace']);
+    expect(screen.getByRole('heading', { name: 'Activity space' })).toBeTruthy();
+    expect(screen.getByText('Space panel')).toBeTruthy();
+    expect(screen.queryByText('Member panel')).toBeNull();
   });
 
-  it('renders the real panels and exactly seven compact placeholder islands', () => {
+  it('a reveal switches the page, landing the named tab', () => {
     const view = renderPage();
-    for (const text of [
-      'Space panel', 'Member panel', 'Integrations panel: definitions', 'Integrations panel: alcon',
-      'SLA panel', 'Phase panel', 'Team panel', 'Labels panel',
-      'Profile panel', 'Notifications panel', 'Account panel',
-    ]) {
-      expect(screen.getByText(text), text).toBeTruthy();
+    act(() => setActiveSettingsSection('integrations', 'external'));
+    expect(shown(view.container)).toEqual(['integrations']);
+    expect(screen.getByText('Integrations panel: external')).toBeTruthy();
+    act(() => setActiveSettingsSection('members'));
+    expect(shown(view.container)).toEqual(['members']);
+    expect(screen.getByText('Member panel')).toBeTruthy();
+  });
+
+  it('every area in the nav has a page', () => {
+    const view = renderPage();
+    for (const item of SETTINGS_NAV.flatMap((g) => g.items)) {
+      act(() => setActiveSettingsSection(item.id));
+      expect(shown(view.container)).toEqual([item.id]);
     }
-    // Objects + Notebook, Table, People, Calendar, Workload, Connected accounts.
-    expect(screen.getAllByText(/settings are coming soon\./)).toHaveLength(7);
-    // …and the Objects placeholder sits inside a floating island, not loose.
-    const objects = shell(view.container, 'objects');
-    const island = [...objects.querySelectorAll('div')].find((d) => d.className.includes('--shadow-island'));
+  });
+
+  it('a stub area is one compact placeholder island', () => {
+    act(() => setActiveSettingsSection('objects'));
+    const view = renderPage();
+    const island = [...view.container.querySelectorAll('div')].find((d) => d.className.includes('--shadow-island'));
     expect(island?.textContent).toContain('settings are coming soon.');
   });
 
-  it('Preferences is headed once — by the area shell, not a panel page title', () => {
+  it('Preferences is headed once', () => {
+    act(() => setActiveSettingsSection('preferences'));
     renderPage();
     expect(screen.getAllByRole('heading', { name: 'Preferences' })).toHaveLength(1);
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
     expect(screen.getByText('General')).toBeTruthy();
   });
 });
 
 describe('in-area segmented controls', () => {
-  it('swaps only the Elements body, and never scrolls', () => {
-    const view = renderPage();
-    const elements = shell(view.container, 'elements');
-    expect(elements.textContent).toContain('Labels panel');
-    const scrollsBefore = scrolled.length;
+  it('swaps the Elements body between Labels and Templates', () => {
+    act(() => setActiveSettingsSection('elements'));
+    renderPage();
+    expect(screen.getByText('Labels panel')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'Templates' }));
-    expect(elements.textContent).toContain('Templates panel');
-    expect(elements.textContent).not.toContain('Labels panel');
-    // Every other area is untouched, and a body swap is not a reveal.
-    expect(shell(view.container, 'integrations').textContent).toContain('Integrations panel: definitions');
-    expect(scrolled.length).toBe(scrollsBefore);
+    expect(screen.getByText('Templates panel')).toBeTruthy();
+    expect(screen.queryByText('Labels panel')).toBeNull();
   });
 
   it('swaps the AI body between Harnesses and Connectors', () => {
-    const view = renderPage();
+    act(() => setActiveSettingsSection('integrations'));
+    renderPage();
     fireEvent.click(screen.getByRole('radio', { name: 'Connectors' }));
-    expect(shell(view.container, 'integrations').textContent).toContain('Integrations panel: external');
-    expect(shell(view.container, 'access').textContent).toContain('Integrations panel: alcon');
-  });
-});
-
-describe('reveal and scroll-spy', () => {
-  it('a reveal lands the AI area on Connectors and scrolls its shell into view', () => {
-    const view = renderPage();
-    act(() => setActiveSettingsSection('integrations', 'external'));
-    expect(shell(view.container, 'integrations').textContent).toContain('Integrations panel: external');
-    expect(scrolled[scrolled.length - 1]).toBe(shell(view.container, 'integrations'));
+    expect(screen.getByText('Integrations panel: external')).toBeTruthy();
   });
 
-  it('the SLA pointer row reveals the Strategy area (the thresholds’ one home)', () => {
+  it('the SLA pointer row opens the Strategy page (the thresholds’ one home)', () => {
+    act(() => setActiveSettingsSection('elements'));
     const view = renderPage();
     const section = renderHook(() => useActiveSettingsSection());
-    const elements = shell(view.container, 'elements');
-    expect(elements.textContent).toContain('Risk thresholds');
+    expect(screen.getByText('Risk thresholds')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Go to Strategy settings' }));
     expect(section.result.current).toBe('initiative');
-    expect(scrolled[scrolled.length - 1]).toBe(shell(view.container, 'initiative'));
-    section.unmount();
-  });
-
-  it('the scroll-spy moves the store to the area the reader has reached', async () => {
-    const view = renderPage();
-    const section = renderHook(() => useActiveSettingsSection());
-    // The mount reveal suspends the spy; a scroll + settle lifts it.
-    const root = view.container.querySelector('.overflow-y-auto') as HTMLElement;
-    fireEvent.scroll(root);
-    await sleep(300);
-    const members = shell(view.container, 'members');
-    const workspace = shell(view.container, 'workspace');
-    act(() => {
-      MockIntersectionObserver.instances[0].fire([
-        { target: workspace, isIntersecting: false, boundingClientRect: { top: -300 } },
-        { target: members, isIntersecting: true, boundingClientRect: { top: 40 } },
-      ]);
-    });
-    expect(section.result.current).toBe('members');
+    expect(shown(view.container)).toEqual(['initiative']);
     section.unmount();
   });
 });
