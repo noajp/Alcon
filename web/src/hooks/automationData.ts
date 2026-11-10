@@ -8,6 +8,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Json } from '@/types/supabase';
 import { nextCronRun } from '@/AIP/automation/cron';
+import { bindingUpdateOf, type AutomationBindingInput } from '@/Function/shared/automationZones';
+
+export type { AutomationBindingInput };
 
 export type AutomationKind = 'schedule' | 'webhook';
 
@@ -23,6 +26,10 @@ export interface Automation {
   /** The workflow as drawn on its canvas; null until it is first drawn. */
   workflow_graph: unknown;
   object_id: string;
+  /** The Element title/description a firing is created with, when the
+   *  promotion activation set them; null for the defaults. */
+  title_template: string | null;
+  description_template: string | null;
   kind: AutomationKind;
   cron: string | null;
   timezone: string;
@@ -55,7 +62,7 @@ export function runWaitingOnApproval(runStatus: string | null | undefined): bool
   return runStatus === 'awaiting_approval';
 }
 
-const COLUMNS = 'id, activity_space_id, name, enabled, definition_id, workflow, workflow_graph, object_id, kind, cron, timezone, token_hash, owner_id, next_run_at, last_fired_at, last_status, last_error, created_at';
+const COLUMNS = 'id, activity_space_id, name, enabled, definition_id, workflow, workflow_graph, object_id, title_template, description_template, kind, cron, timezone, token_hash, owner_id, next_run_at, last_fired_at, last_status, last_error, created_at';
 const key = (spaceId: string | null) => ['automations', spaceId ?? 'none'] as const;
 
 function fromRow(r: Record<string, unknown>): Automation {
@@ -107,7 +114,7 @@ export function useAutomationEvents(automationId: string | null) {
 }
 
 /** When a schedule next runs; null for a webhook or an unreadable cron. */
-function nextRunOf(kind: AutomationKind, cron: string | null, timezone: string): string | null {
+export function nextRunOf(kind: AutomationKind, cron: string | null, timezone: string): string | null {
   if (kind !== 'schedule' || !cron) return null;
   try { return nextCronRun(cron, new Date(), timezone)?.toISOString() ?? null; } catch { return null; }
 }
@@ -128,6 +135,23 @@ export async function createAutomation(input: {
  *  work goes, or its workflow. */
 export async function updateAutomation(id: string, patch: Partial<Pick<Automation, 'definition_id' | 'object_id' | 'workflow' | 'name'>> & { workflow_graph?: unknown }): Promise<void> {
   const { error } = await supabase.from('automations').update({ ...patch, workflow_graph: patch.workflow_graph as Json | undefined, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Changes an automation's binding — the row-owned facts (Automation
+ * builder design §5.3): its trigger (kind, cron, timezone), the Object
+ * its firings land in, and its Element title/description templates.
+ * One update, shaped by `bindingUpdateOf` exactly as creation shapes
+ * a new row, with `next_run_at` recomputed from the new trigger.
+ * Binding edits take effect at once, like the enable toggle: changing
+ * when a harness fires, or where its work lands, is not changing the
+ * harness, so no rehearsal stands in front of it.
+ */
+export async function updateAutomationBinding(id: string, input: AutomationBindingInput): Promise<void> {
+  const { error } = await supabase.from('automations')
+    .update({ ...bindingUpdateOf(input, new Date()), updated_at: new Date().toISOString() })
+    .eq('id', id);
   if (error) throw error;
 }
 

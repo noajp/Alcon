@@ -2,26 +2,29 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/ui/button';
+import { Input } from '@/ui/input';
 import { ChevronLeft } from '@/ui/icons';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
+import { Switch } from '@/Function/settings/SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { formatError } from '@/Function/shared/formatError';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { NavAutomationIcon } from '@/Frame/sidebar/NavIcons';
 import { SETTINGS_ISLAND } from '@/shared/designTokens';
 import { CopyField } from '@/AIP/connectors/CopyField';
-import { describeCron } from '@/AIP/automation/cron';
+import { describeCron, nextCronRun, parseCron } from '@/AIP/automation/cron';
 import { parseDefinition } from '@/AIP/harness/harnessDefinition';
 import { DefinitionFlow } from '@/AIP/harness/DefinitionFlow';
 import {
-  deleteAutomation, issueWebhookToken, runAutomationNow, runWaitingOnApproval, setAutomationEnabled, updateAutomation,
-  useAutomationEvents, webhookUrl, type Automation,
+  deleteAutomation, issueWebhookToken, runAutomationNow, runWaitingOnApproval, setAutomationEnabled,
+  updateAutomation, updateAutomationBinding,
+  useAutomationEvents, webhookUrl, type Automation, type AutomationBindingInput, type AutomationKind,
 } from '@/hooks/automationData';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import { flowStepTitles } from '@/Function/shared/flowEdit';
 import { workflowFromGraph, type WorkflowGraph } from '@/Function/shared/workflowGraph';
 import {
-  automationStatusOf, inputBlocksOf, outputBlocksOf, workflowGraphOf,
+  AUTOMATION_CRON_PRESETS, automationStatusOf, bindingInputOf, inputBlocksOf, outputBlocksOf, workflowGraphOf,
   type InputBlock, type OutputBlock,
 } from '@/Function/shared/automationZones';
 import { WorkflowCanvas } from './WorkflowCanvas';
@@ -31,15 +34,23 @@ import { useIsSpaceOwner } from '@/AIP/connectors/data';
 
 // The Automation builder shell (Automation builder design §4.2, PR1):
 // one automation open as Input → Athena → Output. The side zones are
-// read-only projections of the row and the steps (automationZones) —
-// they edit nothing; the middle zone IS the automation's own canvas
-// from the 837 piece (WorkflowCanvas over workflowGraph, whose edits write the
-// workflow text exactly as the Flow tab did before), with the harness's
+// projections of the row and the steps (automationZones); the middle
+// zone IS the automation's own canvas from the 837 piece
+// (WorkflowCanvas over workflowGraph, whose edits write the workflow
+// text exactly as the Flow tab did before), with the harness's
 // DefinitionFlow beside it when the automation still follows a harness.
 // Everything the old inline detail held lives here: the enable switch,
 // Run now, the webhook token, the target Object, the recent starts with
 // their approvals, and Delete — in the header, the Output zone and
 // below the zones, as the design's layout names them.
+//
+// PR2 makes the row-owned facts editable in place: the trigger (kind,
+// cron, timezone) in the Input zone and the target Object in the
+// Output zone write the automations row through
+// `updateAutomationBinding` — the one binding seam — and the enable
+// switch in the header writes through `setAutomationEnabled`, as it
+// always has. The body is not edited here: a harness's body changes
+// only through the draft path (design §5.2, a later PR).
 
 /** A workflow that can be picked, as the list surface computes them. */
 export interface BuilderWorkflowSource { id: string; label: string; graph: WorkflowGraph }
@@ -127,8 +138,11 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
         <span className="ml-auto flex items-center gap-1">
           <Button size="xs" variant="secondary" disabled={busy}
             onClick={() => void act(() => runAutomationNow(a.id), t('Started “{name}”.', { name: a.name }))}>{t('Run now')}</Button>
-          <Button size="xs" variant="ghost" disabled={busy}
-            onClick={() => void act(() => setAutomationEnabled(a, !a.enabled))}>{a.enabled ? t('Turn off') : t('Turn on')}</Button>
+          <span className="flex items-center gap-1.5 px-1 text-[12px] text-muted-foreground">
+            {t('Enabled')}
+            <Switch label={t('Enabled')} value={a.enabled} disabled={busy}
+              onChange={(v) => void act(() => setAutomationEnabled(a, v))} />
+          </span>
           <Button size="xs" variant="ghost" className="text-[var(--status-danger)]" disabled={busy}
             onClick={() => void act(async () => { await deleteAutomation(a.id); onDeleted(); })}>{t('Delete')}</Button>
         </span>
@@ -152,28 +166,26 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
                   {b.kind === 'source' ? b.connector : t(INPUT_LABEL[b.kind])}
                 </p>
                 {b.kind === 'trigger' ? (
-                  <p className="mt-0.5 text-[12px] text-muted-foreground">
-                    {b.triggerKind === 'schedule' ? `${b.detail} · ${a.timezone}` : t('When an outside service posts')}
-                  </p>
+                  <TriggerEditor key={`${a.kind}|${a.cron ?? ''}|${a.timezone}`} a={a} busy={busy}
+                    onSave={(input) => void act(() => updateAutomationBinding(a.id, input))}>
+                    <div className="mt-2 space-y-1.5">
+                      <p className="text-[11px] text-muted-foreground">{t('POST JSON to this URL with the token in the x-alcon-token header. The body becomes the input of the Element it makes.')}</p>
+                      <CopyField value={webhookUrl(a.id)} label={t('URL')} />
+                      {token ? (
+                        <>
+                          <CopyField value={token} label={t('Token')} />
+                          <p className="text-[11px] text-muted-foreground">{t('Copy the token now. It is not shown again.')}</p>
+                        </>
+                      ) : (
+                        <Button size="xs" variant="ghost" disabled={busy}
+                          onClick={() => void act(async () => onToken(await issueWebhookToken(a.id)))}>
+                          {a.has_token ? t('Replace the token') : t('Issue a token')}
+                        </Button>
+                      )}
+                    </div>
+                  </TriggerEditor>
                 ) : (
                   <p className="mt-0.5 line-clamp-3 text-[12px] text-muted-foreground" title={b.detail}>{b.detail}</p>
-                )}
-                {b.kind === 'trigger' && b.triggerKind === 'webhook' && (
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-[11px] text-muted-foreground">{t('POST JSON to this URL with the token in the x-alcon-token header. The body becomes the input of the Element it makes.')}</p>
-                    <CopyField value={webhookUrl(a.id)} label={t('URL')} />
-                    {token ? (
-                      <>
-                        <CopyField value={token} label={t('Token')} />
-                        <p className="text-[11px] text-muted-foreground">{t('Copy the token now. It is not shown again.')}</p>
-                      </>
-                    ) : (
-                      <Button size="xs" variant="ghost" disabled={busy}
-                        onClick={() => void act(async () => onToken(await issueWebhookToken(a.id)))}>
-                        {a.has_token ? t('Replace the token') : t('Issue a token')}
-                      </Button>
-                    )}
-                  </div>
                 )}
               </li>
             ))}
@@ -229,7 +241,7 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
                 {b.kind === 'target' ? (
                   <div className="mt-1">
                     <OptionMenu label={t('Put the work in')} value={a.object_id} disabled={busy}
-                      onChange={(v) => void act(() => updateAutomation(a.id, { object_id: v }))}
+                      onChange={(v) => void act(() => updateAutomationBinding(a.id, { ...bindingInputOf(a), objectId: v }))}
                       options={objects.map((o) => ({ value: o.id, label: o.name }))} />
                   </div>
                 ) : b.kind === 'artifact' ? (
@@ -251,6 +263,81 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
       <div className="px-6 pb-6">
         <RecentStarts automationId={a.id} spaceId={spaceId} onOpenElement={onOpenElement} />
       </div>
+    </div>
+  );
+}
+
+function cronProblem(cron: string): string | null {
+  try { parseCron(cron); return null; } catch (e) { return formatError(e); }
+}
+
+/**
+ * The Input zone's trigger block as an editor (PR2): the kind picker
+ * the new-automation form uses, the shared cron presets plus a free
+ * cron field read by `cron.ts`, and a timezone picker over the IANA
+ * zones the platform knows. The draft is local until Save, which
+ * writes the whole binding — this trigger over the row's current
+ * Object and templates — through `updateAutomationBinding`, so the
+ * edit lands on the row at once and `next_run_at` is recomputed
+ * there. "Run now" stays what it is: the manual start in the header,
+ * never a stored kind. The webhook token block arrives as children
+ * and shows only once the row itself is a webhook — a draft that
+ * switches kinds shows it after the switch is saved.
+ */
+function TriggerEditor({ a, busy, onSave, children }: {
+  a: Automation;
+  busy: boolean;
+  onSave: (input: AutomationBindingInput) => void;
+  children?: React.ReactNode;
+}) {
+  const { t } = useI18n();
+  const [kind, setKind] = useState<AutomationKind>(a.kind);
+  const [cron, setCron] = useState(a.cron ?? AUTOMATION_CRON_PRESETS[0].cron);
+  const [timezone, setTimezone] = useState(a.timezone);
+  const timezones = useMemo(() => {
+    const supported = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+    return [...new Set([a.timezone, ...supported])];
+  }, [a.timezone]);
+  const problem = kind === 'schedule' ? cronProblem(cron) : null;
+  const next = useMemo(() => {
+    if (kind !== 'schedule' || problem) return null;
+    try { return nextCronRun(cron, new Date(), timezone); } catch { return null; }
+  }, [kind, cron, timezone, problem]);
+  const dirty = kind !== a.kind
+    || (kind === 'schedule' && (cron.trim() !== (a.cron ?? '') || timezone !== a.timezone));
+
+  return (
+    <div className="mt-1 space-y-2">
+      <OptionMenu label={t('Starts')} value={kind} disabled={busy}
+        onChange={(v) => setKind(v)}
+        options={[{ value: 'schedule', label: t('At set times') }, { value: 'webhook', label: t('When an outside service posts') }]} />
+      {kind === 'schedule' ? (
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-1">
+            {AUTOMATION_CRON_PRESETS.map((p) => (
+              <Button key={p.cron} size="xs" shape="tab" variant={cron === p.cron ? 'secondary' : 'ghost'} disabled={busy}
+                onClick={() => setCron(p.cron)}>{t(p.label)}</Button>
+            ))}
+          </div>
+          <Input value={cron} onChange={(e) => setCron(e.target.value)} aria-label={t('Cron expression')} className="font-mono" disabled={busy} />
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">{t('Timezone')}</span>
+            <OptionMenu label={t('Timezone')} value={timezone} disabled={busy} onChange={setTimezone}
+              options={timezones.map((z) => ({ value: z, label: z }))} />
+          </div>
+          <p className={`text-[12px] ${problem ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>
+            {problem ?? (next ? t('{when} — next {at} ({zone})', { when: describeCron(cron), at: next.toLocaleString(), zone: timezone }) : t('This never runs.'))}
+          </p>
+        </div>
+      ) : a.kind === 'webhook' ? children : null}
+      {dirty && (
+        <div className="flex justify-end">
+          <Button size="xs" variant="primary" disabled={busy || !!problem}
+            onClick={() => onSave({ ...bindingInputOf(a), kind, cron: kind === 'schedule' ? cron : null, timezone })}>
+            {t('Save changes')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
