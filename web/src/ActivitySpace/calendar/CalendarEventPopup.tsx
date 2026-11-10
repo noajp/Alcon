@@ -83,7 +83,7 @@ export function CalendarEventPopup({ initial, event, elements, onSave, onDelete,
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent showCloseButton={false} className="max-w-2xl gap-0 p-0 sm:max-w-2xl">
+      <DialogContent showCloseButton={false} className="flex max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         {/* Heading: what this is, and the two ways out — Teams' order. */}
         <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-5 py-3">
           <DialogTitle className="flex-1 text-[15px] font-semibold">{event ? t('Edit event') : t('New event')}</DialogTitle>
@@ -98,7 +98,7 @@ export function CalendarEventPopup({ initial, event, elements, onSave, onDelete,
           <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>{t('Close')}</Button>
         </div>
 
-        <div className="space-y-4 px-5 py-5">
+        <div className="min-w-0 space-y-4 px-5 py-5">
           <Row icon={<Pencil size={15} />}>
             <input autoFocus value={draft.title} onChange={(e) => set({ title: e.target.value })}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void save(); } }}
@@ -156,10 +156,10 @@ export function CalendarEventPopup({ initial, event, elements, onSave, onDelete,
                 {matches.map((e) => (
                   <button key={e.id} type="button"
                     onClick={() => { set({ elementIds: [...draft.elementIds, e.id] }); setQuery(''); }}
-                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] hover:bg-muted/50">
-                    <ElementIcon size={12} />
+                    className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left text-[13px] hover:bg-muted/50">
+                    <ElementIcon size={12} className="shrink-0" />
                     {e.display_id && <span className="shrink-0 text-[11px] text-muted-foreground">{e.display_id}</span>}
-                    <span className="truncate">{e.title}</span>
+                    <span className="min-w-0 truncate">{e.title}</span>
                   </button>
                 ))}
               </div>
