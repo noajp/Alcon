@@ -92,7 +92,7 @@ import {
 } from "../_shared/signIn.ts";
 import { matchPendingCapabilities } from "../_shared/pendingCapability.ts";
 import { resolveAgentConfig, type DomainConfigRow, type WorkerConfigRow } from "./agentConfig.ts";
-import { readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
+import { alignVerdictScoring, readVerdict, VERDICT_SCHEMA, VERIFY_SYSTEM, verifyPrompt } from "./verify.ts";
 import { delegationOf, readyDownstream, type AdvanceCandidate } from "./advance.ts";
 import { resolveDefinition, type DefinitionCandidate } from "../_shared/definitionResolution.ts";
 import { artifactFileName, saveArtifactFile } from "./artifactFile.ts";
@@ -120,7 +120,7 @@ import { checkFinishClaims, finishDetailOf, normalizeClaims, normalizeUnconfirme
 import { emptyVerifyTally, tallyVerify, verifyDiffText, type VerifyCheck, type VerifyTally } from "../_shared/verifyReads.ts";
 import { parseProposedReadings, readingsDecision, readingsSummaryLine, validateProposals, type BoundMeasure, type ProposedReading } from "../_shared/readingsGate.ts";
 import { checkHarness, checkOutput, checksDue, definitionPrompt, freshnessTableOf, loopStop, parseDefinition, type ParsedDefinition } from "../_shared/definition.ts";
-import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, passwordFieldOf, pickRunner, RUNNER_ONLINE_MS, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, signInResultText, type RunnerRow } from "./runnerTools.ts";
+import { isMachineTool, isRunnerTool, machineResultText, MACHINE_TOOLS, passwordFieldOf, pickRunner, RUNNER_TOOLS, runnerOperation, runnerResultText, runnerStep, signInResultText, type RunnerRow } from "./runnerTools.ts";
 import {
   DEFAULT_WORKSPACE_CAPS, machineCallKind, provisionedRunIdOf, WORKSPACE_READY_WAIT_MS, type MachineBindingFacts,
 } from "../_shared/workspaces.ts";
@@ -314,8 +314,6 @@ type Transcript = {
 type Run = {
   id: string; element_id: string; strategy_id: string | null; ai_session_id: string | null; integration_draft_id: string | null; promotion_draft_id: string | null; domain_id: string | null; worker_id: string | null; status: string;
   mode: string; prompt: string | null; reply_to: string | null; triggered_by: string | null;
-  /** The run's latest one-line summary (the row is read with select("*")). */
-  summary: string | null;
   /** A run trying a definition with its writes blocked (the rehearsal substrate). */
   rehearsal: boolean;
   /** A plan run (B8): writes recorded as a plan instead of executed. */
@@ -1598,9 +1596,7 @@ async function execute(a: ExecArgs): Promise<void> {
       }
     } catch { /* the counts are a judgement's material, never the run's life */ }
   }
-  // Typed through the initializer: it is set inside a closure, so a plain
-  // `= null` would narrow every later read to null.
-  let giveUpFired = null as { failureClass: FailureClass; count: number } | null;
+  let giveUpFired: { failureClass: FailureClass; count: number } | null = null;
   const currentGiveUp = (): { failureClass: string; detail: string } | null => {
     if (giveUpFired) {
       return {
@@ -2745,16 +2741,7 @@ async function execute(a: ExecArgs): Promise<void> {
     if (call.name === SIGN_IN_TOOL) {
       const resolved = runner && run.activity_space_id ? await resolveSignInTarget(call).catch(() => null) : null;
       return await record("PC: サインイン", {
-        display: resolved
-          ? {
-            ...signInDisplayFor(call, {
-              origin: resolved.target.origin,
-              username: resolved.target.stored?.username ?? resolved.target.storedUsername ?? "",
-              runnerName: runner?.name ?? "PC のブラウザ",
-            }),
-            rememberable: false,
-          }
-          : undefined,
+        display: resolved ? { ...signInDisplayFor(call, resolved.target), rememberable: false } : undefined,
       });
     }
     if (isRunnerTool(call.name)) {
@@ -3223,13 +3210,11 @@ async function execute(a: ExecArgs): Promise<void> {
   let elementTitleCache: string | null = null;
   const elementTitle = async (): Promise<string> => {
     if (elementTitleCache !== null) return elementTitleCache;
-    let title = "Element";
     try {
       const { data: el } = await userDb.from("elements").select("title").eq("id", run.element_id).maybeSingle();
-      title = el?.title ?? "Element";
-    } catch { /* keep the fallback title */ }
-    elementTitleCache = title;
-    return title;
+      elementTitleCache = el?.title ?? "Element";
+    } catch { elementTitleCache = "Element"; }
+    return elementTitleCache;
   };
 
   // The return the agent receives is the correction envelope (B3):
@@ -3314,7 +3299,7 @@ async function execute(a: ExecArgs): Promise<void> {
         model,
         max_tokens: 4000,
         system: VERIFY_SYSTEM,
-        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { title: string; content: string }[], usedWeb, definition: definition?.body ?? null, claimCheck: attemptCheck }) }],
+        messages: [{ role: "user", content: verifyPrompt({ element: el, intents, finish, artifacts: (arts ?? []) as { id: string; title: string; content: string }[], usedWeb, definition: definition?.body ?? null, claimCheck: attemptCheck, checksItems: parsedAll?.checks.items ?? [], outputShape: parsedAll?.output ?? null }) }],
         output_config: { effort: "low", format: { type: "json_schema", schema: VERDICT_SCHEMA } },
       // deno-lint-ignore no-explicit-any
       } as any, { signal: sliceSignal() });
@@ -3323,9 +3308,16 @@ async function execute(a: ExecArgs): Promise<void> {
       const verdict = readVerdict(text);
       if (verdict) {
         const stepIdx = await addStep(admin, run.id, "thought", verdict.pass ? "検証: 合格" : `検証: 不足 ${verdict.gaps.length} 点`, verdict.gaps.join("\n") || null);
+        const artifactRows = (arts ?? []) as { id: string; title: string }[];
         lastCheck = {
           pass: verdict.pass, gaps: verdict.gaps, model, checkedAt: new Date().toISOString(), verifyStepIdx: stepIdx,
-          artifactIds: ((arts ?? []) as { id: string }[]).map((art) => art.id),
+          artifactIds: artifactRows.map((art) => art.id),
+          // v3: the same answer's scoring, aligned by code to the
+          // declared Checks items and the artifacts actually shown —
+          // the seal (buildRunVerdict) derives any declared item this
+          // left unscored. Absent blocks stay absent here.
+          checksItems: parsedAll?.checks.items ?? [],
+          ...alignVerdictScoring(verdict, { checksItems: parsedAll?.checks.items ?? [], artifacts: artifactRows }),
         };
         returnProvenance = { source: "verifier", verifyStepIdx: lastCheck.verifyStepIdx, artifactIds: lastCheck.artifactIds };
       }
@@ -4728,7 +4720,7 @@ async function reconcileForDraft(a: ExecArgs, d: DraftRow): Promise<ReconcileRes
     case "preset":
       return { close: { status: "rerouted", summary: `「${d.name}」には組み込みの接続（プリセット）があります。設定の接続ダイアログから接続してください。起草はしません。` }, note: "" };
     case "registry":
-      return { close: { status: "rerouted", summary: `「${d.name}」は MCP Registry にサーバがあります（${outcome.title}: ${outcome.endpoint}）。Registry 経由の接続を使ってください。起草はしません。` }, note: "" };
+      return { close: { status: "rerouted", summary: `「${d.name}」は MCP Registry にサーバがあります（${outcome.entry.title}: ${outcome.entry.endpoint}）。Registry 経由の接続を使ってください。起草はしません。` }, note: "" };
     case "join":
       return { close: { status: "superseded", summary: "同じサービスの起草がすでに進んでいます。そちらのドラフトに合流しました。" }, note: "" };
     case "update": {
@@ -4757,11 +4749,8 @@ async function draft(a: ExecArgs, said: string): Promise<void> {
   stepNext.delete(a.run.id);
   const { run, admin, user } = a;
   const draftId = run.integration_draft_id!;
-  const loaded = await loadDraft(admin, draftId);
-  if (!loaded) { await failRun(admin, run, "起草の対象が見つかりません。"); return; }
-  // Declared non-null: the closures below read it, and a narrowing of
-  // the `let` would not reach them.
-  let d: DraftRow = loaded;
+  let d = await loadDraft(admin, draftId);
+  if (!d) { await failRun(admin, run, "起草の対象が見つかりません。"); return; }
   // The draft names its run (the review screen links to it; the run's
   // steps are the drafting's audit record). The creator cannot always
   // write the draft row, so the driver stamps it.
@@ -4799,9 +4788,7 @@ async function draft(a: ExecArgs, said: string): Promise<void> {
 
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : draftTools();
   let state: LoopState;
-  // Typed through the initializer: the tool closures set it, so a plain
-  // `= null` would narrow every later read to null.
-  let finished = null as { kind: "ready" | "rerouted" | "failed" | "testing_wait"; reason: string } | null;
+  let finished: { kind: "ready" | "rerouted" | "failed" | "testing_wait"; reason: string } | null = null;
 
   if (run.transcript?.messages?.length) {
     state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: 0, revisions: 0 };
@@ -5167,11 +5154,8 @@ async function promote(a: ExecArgs, said: string): Promise<void> {
   stepNext.delete(a.run.id);
   const { run, admin, user } = a;
   const draftId = run.promotion_draft_id!;
-  const loaded = await loadPromotionDraft(admin, draftId);
-  if (!loaded) { await failRun(admin, run, "起草の対象が見つかりません。"); return; }
-  // Declared non-null: the closures below read it, and a narrowing of
-  // the `let` would not reach them.
-  let d: PromotionDraftRow = loaded;
+  let d = await loadPromotionDraft(admin, draftId);
+  if (!d) { await failRun(admin, run, "起草の対象が見つかりません。"); return; }
   if (d.draft_run_id !== run.id) {
     await admin.from("promotion_drafts").update({ draft_run_id: run.id, updated_at: new Date().toISOString() }).eq("id", d.id);
     d.draft_run_id = run.id;
@@ -5244,9 +5228,7 @@ async function promote(a: ExecArgs, said: string): Promise<void> {
 
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : promotionTools();
   let state: LoopState;
-  // Typed through the initializer: the tool closures set it, so a plain
-  // `= null` would narrow every later read to null.
-  let finished = null as { kind: "rehearsal_started" | "failed"; reason: string } | null;
+  let finished: { kind: "rehearsal_started" | "failed"; reason: string } | null = null;
 
   if (run.transcript?.messages?.length) {
     state = { messages: run.transcript.messages, turns: run.transcript.turns ?? 0, nudges: 0, revisions: 0 };
@@ -5290,9 +5272,7 @@ async function promote(a: ExecArgs, said: string): Promise<void> {
     // creation, or found through the draft this source already
     // activated — pins the base hash the activation will compare.
     let reconcileNote = "この元の仕事から生まれた定義はまだありません。新規の定義として起草します。";
-    // Typed through the initializer: resolveTarget sets it, so a plain
-    // `= null` would narrow the read below to null.
-    let targetBody = null as { name: string; body: string } | null;
+    let targetBody: { name: string; body: string } | null = null;
     const resolveTarget = async (definitionId: string) => {
       const { data: defRow } = await admin.from("definitions").select("id, name, body").eq("id", definitionId).maybeSingle();
       if (!defRow) return;
@@ -5763,12 +5743,11 @@ async function readHeartbeatSignals(userDb: SupabaseClient, spaceId: string): Pr
   signals.push(...correctionExhaustedSignals(exhaustedFacts));
 
   // ── Work itself waiting for a person's review ──
-  // The joined columns only filter; the signal reads the element's own.
-  const reviewing = await guard<{ id: string; title: string; updated_at: string }[]>(
+  const reviewing = await guard(
     userDb.from("elements").select("id, title, updated_at, objects!inner(domains!inner(activity_space_id))")
       .eq("status", "review").eq("objects.domains.activity_space_id", spaceId)
       .order("updated_at", { ascending: true }).limit(20),
-    [],
+    [] as { id: string; title: string; updated_at: string }[],
   );
   for (const e of reviewing) {
     signals.push({ kind: "element_review", id: e.id, since: e.updated_at, version: e.updated_at, label: e.title, place: "Element で確認できます" });
@@ -6617,14 +6596,6 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
         flushedLength = shown.length;
       }
       const final = await stream.finalMessage();
-      // Each web search and page the call made: a step of the trace (the
-      // live display) and a tool event of the kept message, as a tool's.
-      const searched = webSteps((final.content ?? []) as unknown as { type: string; name?: string; input?: unknown }[]);
-      if (searched.length) await stepChain;
-      for (const line of searched) {
-        await addStep(admin, run.id, "action", line);
-        toolEvents.push({ name: line, result: { ok: true } });
-      }
       const blocks = (final.content ?? []) as unknown as { type: string; text?: string }[];
       const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
       if (draftIdx !== null) {

@@ -31,12 +31,24 @@ import { EvaluationTrend } from './EvaluationTrend';
 // The Overview's Evaluate panel (MissionEvaluatePanel) is untouched.
 // Deliverable size is labelled as size wherever it renders (character
 // counts, a "Short" flag) — never as quality, never a score (D8).
+// PR3 adds the verifier's v3 scoring beside it: per-Checks-item
+// results and per-artifact depth (substantial | thin | empty, the
+// verifier's judgement with its one-line note) — shown only where a
+// v3 verdict actually scored them; a period with no scored runs shows
+// no scoring blocks at all (absence, not zero).
 
 const PERIOD_LABEL: Record<EvaluationPeriod, string> = {
   '7d': '7 days',
   '28d': '28 days',
   '90d': '90 days',
   all: 'All',
+};
+
+/** The v3 depth vocabulary, as display labels (i18n keys). */
+const DEPTH_LABEL: Record<string, string> = {
+  substantial: 'Substantial',
+  thin: 'Thin',
+  empty: 'Empty',
 };
 
 function pct(rate: Rate): string | null {
@@ -139,7 +151,33 @@ export function StrategyEvaluationPanel({ objects, onOpenRun }: {
             <Stat label={t('Cost per accepted finish')}
               value={h.costPerAccepted === null ? '—' : `$${h.costPerAccepted.toFixed(2)}`}
               sub={t('Total spend {amount}', { amount: `$${h.costUsd.toFixed(2)}` })} />
+            {/* PR3, headline-adjacent: the thin/empty deliverable count
+                exists only once a v3 verdict has scored a run in this
+                period — before that the card is absent, not zero. */}
+            {h.scoring.scoredRuns > 0 && (
+              <Stat label={t('Thin deliverables')}
+                value={String(h.scoring.thinDeliverables)}
+                sub={t('Judged thin or empty by the verifier, of {n} scored finishes', { n: h.scoring.scoredRuns })} />
+            )}
           </div>
+
+          {/* Per-Checks-item results (PR3): the definitions' declared
+              bars, worst first — present only when a scored run in
+              period carried item results. */}
+          {report.checksItems.length > 0 && (
+            <PageSection title={t('Checks items')}>
+              <ul className="space-y-1 text-[13px]">
+                {report.checksItems.map((c) => (
+                  <li key={c.item} className="flex items-center gap-2">
+                    <span className="flex-1 text-foreground">{c.item}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {t('Passed {pass} · Partial {partial} · Failed {fail}', { pass: c.pass, partial: c.partial, fail: c.fail })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </PageSection>
+          )}
 
           <EvaluationTrend buckets={report.trend} />
 
@@ -261,11 +299,27 @@ function ArtifactVerifier({ deliverable: d }: { deliverable: DeliverableEvaluati
   );
 }
 
+/** The verifier's depth judgement on one artifact (PR3): the depth
+ *  word, and — when `withNote` — its one-line reason. Renders nothing
+ *  when the producing verdict did not judge this artifact. Depth is a
+ *  judgement word, stated beside (never merged with) the size text. */
+function ArtifactDepth({ deliverable: d, withNote }: { deliverable: DeliverableEvaluation; withNote?: boolean }) {
+  const { t } = useI18n();
+  if (!d.depth) return null;
+  return (
+    <span>
+      {t('Depth')}: {t(DEPTH_LABEL[d.depth.depth] ?? d.depth.depth)}
+      {withNote && d.depth.note ? ` — ${d.depth.note}` : ''}
+    </span>
+  );
+}
+
 function DeliverableRow({ deliverable: d, open, onToggle }: {
   deliverable: DeliverableEvaluation;
   open: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <li className="px-3 py-2">
       <button type="button" onClick={onToggle} aria-expanded={open}
@@ -273,11 +327,15 @@ function DeliverableRow({ deliverable: d, open, onToggle }: {
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{d.artifact.title}</span>
         <span className="shrink-0 truncate text-[11px] text-muted-foreground">{d.elementTitle}</span>
         <span className="shrink-0 text-[11px] text-muted-foreground">{d.artifact.format}</span>
+        {d.depth && (
+          <span className="shrink-0 text-[11px] text-foreground/80">{t(DEPTH_LABEL[d.depth.depth] ?? d.depth.depth)}</span>
+        )}
         <span className="shrink-0 text-[11px] text-muted-foreground"><ArtifactSizeText size={d.size} /></span>
         <span className="shrink-0 text-[11px] text-muted-foreground">{formatRelative(d.artifact.updated_at)}</span>
       </button>
       {open && (
         <div className="mt-2 space-y-1.5 text-[12px] text-muted-foreground">
+          {d.depth && <div><ArtifactDepth deliverable={d} withNote /></div>}
           <ArtifactVerifier deliverable={d} />
           {/* The content itself, rendered as the Overview's Deliverables
               panel renders it (#7: one rendering, two homes). */}
@@ -394,6 +452,16 @@ function WorstRunRow({ run: r, open, onToggle, onOpenRun }: {
                 {` · ${t('{n} revisions', { n: verdict.revisions })}`}
               </div>
               {verdict.gaps.map((g, i) => <div key={i}>• {g}</div>)}
+              {/* PR3: this run's per-item results, in the definition's
+                  declaration order, as sealed. */}
+              {verdict.checks && verdict.checks.length > 0 && (
+                <div>
+                  <div className="text-foreground">{t('Checks items')}</div>
+                  {verdict.checks.map((c) => (
+                    <div key={c.item}>• {c.item}: {c.result}</div>
+                  ))}
+                </div>
+              )}
               {verdict.claims && (
                 <div>{t('Claims: {sourced} of {total} sourced · {stale} stale', {
                   sourced: verdict.claims.sourced, total: verdict.claims.total, stale: verdict.claims.stale,
@@ -434,6 +502,9 @@ function WorstRunRow({ run: r, open, onToggle, onOpenRun }: {
                       artifact and what it returned. The Deliverables
                       block carries the gaps on the artifact row. */}
                   {d.verifier ? ` · ${t('Shown to the verifier')}: ${d.verifier.result}` : ''}
+                  {/* PR3: the depth judgement on this artifact, beside
+                      its size — the note lives on the Deliverables row. */}
+                  {d.depth ? <> · <ArtifactDepth deliverable={d} /></> : ''}
                 </div>
               ))}
             </div>

@@ -27,8 +27,23 @@
 // artifactSizeOf. It is labelled as size everywhere it renders
 // (character counts, a "Short" flag): the cheap tripwire beside the
 // verifier's judgement, never merged with it into a score (D8).
-// Whether a deliverable is substantial or hollow as a JUDGEMENT —
-// depth classification — is PR3's verdict work, not this model's.
+//
+// VERDICT v3 SCORING (PR3): verdict records written since v3 carry the
+// verifier's structured scoring, sealed at finish time — one result
+// per Checks item the run's definition declared, and one depth
+// judgement (substantial | thin | empty) per artifact it was shown.
+// This model aggregates those blocks over the period's runs exactly
+// like the failure mix: per-item pass/partial/fail counts, depth on
+// each deliverable row (only where the producing verdict's evidence
+// names the artifact AND its deliverables block judges it — the two
+// must agree, so a judgement is never attached to an artifact the
+// verifier was not recorded as seeing), and a thin/empty count for
+// the headline. ABSENCE IS ABSENT, NOT ZERO: runs sealed before v3
+// (and v3 runs nobody checked) carry no blocks, so the aggregates
+// report `scoredRuns` beside them and the panel shows the counts only
+// once at least one run in period was actually scored. Depth and size
+// stay side by side, never merged (D8): a short artifact the verifier
+// judged substantial reads exactly that.
 //
 // Pure. `now` is a parameter; the caller owns the clock. The hook
 // (hooks/strategyEvaluationData.ts) reads the rows and parses the runs'
@@ -36,7 +51,7 @@
 // them is worth a person's eye.
 
 import type { DefinitionRevisionCandidate, DefinitionTest, VerifierCalibration } from '@/types/database';
-import type { RunVerdict } from '@/Function/audit/auditModel';
+import type { RunVerdict, VerdictDepth } from '@/Function/audit/auditModel';
 import { calibrationSummaryOf, type CalibrationSummary } from '@/AIP/harness/calibrationModel';
 import { readTestVerdict, testFreshness } from '@/AIP/harness/definitionTestModel';
 // The data shapes live in the hook (hooks may not import this layer);
@@ -143,6 +158,13 @@ export interface DeliverableEvaluation {
    *  absence, never inferred from the run merely having a verdict
    *  about other artifacts. */
   verifier: Pick<RunVerdict, 'result' | 'gaps'> | null;
+  /** PR3: the verifier's depth judgement on THIS artifact, from the
+   *  producing v3 verdict's deliverables block — present only when
+   *  that block judges this artifact (which the record's parser only
+   *  allows for evidence-named artifacts). The verifier's JUDGEMENT,
+   *  kept apart from the size signal above: a row can be short AND
+   *  substantial, or long AND thin, and the tab shows both facts. */
+  depth: { depth: VerdictDepth; note: string } | null;
 }
 
 /** Worst-first for deliverables, as a named definition: short-by-size
@@ -240,6 +262,34 @@ function tally(outcomes: readonly EvaluationOutcomeRow[]): EvaluationTallies {
 
 export interface FailureMixEntry { failureClass: string; count: number }
 
+/** One declared Checks item's results across the period's scored
+ *  runs (PR3): how many finishes passed it, partly met it, failed it.
+ *  The item text is the definition's own words, verbatim — items from
+ *  different definitions that happen to share a text aggregate
+ *  together, which is the honest reading of "this declared bar, across
+ *  the Strategy's work". */
+export interface ChecksItemEvaluation {
+  item: string;
+  pass: number;
+  partial: number;
+  fail: number;
+  /** Scored finishes that carried this item (pass+partial+fail). */
+  scored: number;
+}
+
+/** The period's v3 scoring aggregates (PR3). `scoredRuns` is the
+ *  honesty denominator: the runs in period whose verdict actually
+ *  carried scoring blocks. Zero means the period predates v3 (or
+ *  nothing was checked) — the counts are then absent, not zero, and
+ *  the panel shows no scoring blocks at all. */
+export interface ScoringEvaluation {
+  scoredRuns: number;
+  checksItems: ChecksItemEvaluation[];
+  depthCounts: Record<VerdictDepth, number>;
+  /** thin + empty: the headline-adjacent 「薄い成果物」 count. */
+  thinDeliverables: number;
+}
+
 /** Failure classes over a set of runs, most frequent first, class name
  *  breaking ties so the order is a definition, not an accident. */
 function failureMixOf(runs: readonly EvaluationRunRow[]): FailureMixEntry[] {
@@ -318,10 +368,17 @@ export interface EvaluationHeadline extends EvaluationTallies {
   failedFinishes: number;
   /** Total spend over finishes a person accepted; null when none was. */
   costPerAccepted: number | null;
+  /** PR3: the v3 scoring over the period's runs — its thinDeliverables
+   *  count renders beside the headline ONLY when scoredRuns > 0. */
+  scoring: ScoringEvaluation;
 }
 
 export interface EvaluationReport {
   headline: EvaluationHeadline;
+  /** PR3: per-Checks-item results across the period (also under
+   *  headline.scoring — one computation, two surfaces). Ordered
+   *  worst-first: fail desc, then partial desc, then item text. */
+  checksItems: ChecksItemEvaluation[];
   objects: ObjectEvaluation[];
   definitions: DefinitionEvaluation[];
   /** The period's deliverables across the Strategy, worst-first by
@@ -457,13 +514,19 @@ export function buildEvaluation(input: EvaluationInputs): EvaluationReport {
   // its verifier evidence can never be computed two ways.
   const deliverableOf = (a: EvaluationArtifactRow): DeliverableEvaluation => {
     const verdict = a.run_id ? runById.get(a.run_id)?.verdict ?? null : null;
+    const shown = !!verdict && verdict.evidence.artifactIds.includes(a.id);
+    // Depth rides only on the same evidence link as the verifier block
+    // above: the v3 deliverables entry for THIS artifact, when the
+    // verdict both was shown it and judged it.
+    const judged = shown ? verdict?.deliverables?.find((d) => d.artifactId === a.id) : undefined;
     return {
       artifact: a,
       elementTitle: elementInfo.get(a.element_id)?.title ?? a.element_id,
       size: artifactSizeOf(a.content, a.format),
-      verifier: verdict && verdict.evidence.artifactIds.includes(a.id)
+      verifier: shown
         ? { result: verdict.result, gaps: verdict.gaps }
         : null,
+      depth: judged ? { depth: judged.depth, note: judged.note } : null,
     };
   };
   const artifactsByRun = new Map<string, DeliverableEvaluation[]>();
@@ -593,6 +656,37 @@ export function buildEvaluation(input: EvaluationInputs): EvaluationReport {
     .map(deliverableOf)
     .sort(compareDeliverables);
 
+  // PR3 scoring aggregates, over the period's runs only (scopedRuns —
+  // the runs behind the scoped outcomes). A run counts as scored when
+  // its verdict carries either block; per-item and per-depth counts
+  // then read those blocks as sealed. v1/v2 verdicts and unchecked v3
+  // verdicts carry neither, so a pre-v3 period yields scoredRuns 0 and
+  // empty counts — absent, not zero.
+  const scoring: ScoringEvaluation = (() => {
+    const byItem = new Map<string, ChecksItemEvaluation>();
+    const depthCounts: Record<VerdictDepth, number> = { substantial: 0, thin: 0, empty: 0 };
+    let scoredRuns = 0;
+    for (const r of scopedRuns) {
+      const v = r.verdict;
+      if (!v || (v.checks === undefined && v.deliverables === undefined)) continue;
+      scoredRuns += 1;
+      for (const c of v.checks ?? []) {
+        const entry = byItem.get(c.item) ?? { item: c.item, pass: 0, partial: 0, fail: 0, scored: 0 };
+        entry[c.result] += 1;
+        entry.scored += 1;
+        byItem.set(c.item, entry);
+      }
+      for (const d of v.deliverables ?? []) depthCounts[d.depth] += 1;
+    }
+    return {
+      scoredRuns,
+      checksItems: [...byItem.values()].sort((a, b) =>
+        b.fail - a.fail || b.partial - a.partial || a.item.localeCompare(b.item)),
+      depthCounts,
+      thinDeliverables: depthCounts.thin + depthCounts.empty,
+    };
+  })();
+
   const headlineTallies = tally(scoped);
   const mix = failureMixOf(scopedRuns);
   return {
@@ -602,7 +696,9 @@ export function buildEvaluation(input: EvaluationInputs): EvaluationReport {
       topFailure: mix[0] ?? null,
       failedFinishes: mix.reduce((n, m) => n + m.count, 0),
       costPerAccepted: headlineTallies.accepted > 0 ? headlineTallies.costUsd / headlineTallies.accepted : null,
+      scoring,
     },
+    checksItems: scoring.checksItems,
     objects: objectEvals,
     definitions,
     deliverables,

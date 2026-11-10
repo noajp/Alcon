@@ -171,6 +171,67 @@ describe('Strategy Evaluation tab', () => {
     expect(screen.getByText(/No numbers anywhere/)).toBeTruthy();
   });
 
+  it('PR3: v3 scoring renders — thin count card, per-item results, depth with its note beside the size', async () => {
+    const o = outcome({ verdict_result: 'fail' });
+    const verdict = parseRunVerdict({
+      v: 3, result: 'fail', source: 'verifier', model: 'm', gaps: ['表が足りない'], revisions: 0,
+      checkedAt: iso(NOW - DAY), outcome: 'completed', reason: 'revisions-exhausted',
+      evidence: { verifyStepIdx: 2, artifactIds: ['a-thin'] },
+      claims: { total: 0, sourced: 0, stale: 0 }, claimGaps: [],
+      checks: [
+        { item: '根拠を挙げる', result: 'pass' },
+        { item: '価格を税込で書く', result: 'fail' },
+      ],
+      deliverables: [{ artifactId: 'a-thin', depth: 'thin', note: '表の見出しだけで中身がない' }],
+    });
+    fixture.outcomes = [o];
+    fixture.runs = [{
+      id: o.run_id, element_id: 'e1', status: 'completed', finished_at: o.finished_at,
+      verdict, finishDetail: null, failureDetail: null,
+    }];
+    fixture.artifacts = [
+      artifactRow({ id: 'a-thin', run_id: o.run_id, title: 'Thin deck', content: '# Deck\n\n## Plan' }),
+    ];
+    render(<StrategyEvaluationPanel objects={OBJECTS} />);
+
+    // Headline-adjacent thin count, with its scored denominator named.
+    expect(screen.getByText('Thin deliverables')).toBeTruthy();
+    expect(screen.getByText('Judged thin or empty by the verifier, of 1 scored finishes')).toBeTruthy();
+    // The per-item results block, in the model's worst-first order.
+    expect(screen.getByText('Checks items')).toBeTruthy();
+    expect(screen.getByText('価格を税込で書く')).toBeTruthy();
+    expect(screen.getByText('Passed 0 · Partial 0 · Failed 1')).toBeTruthy();
+    expect(screen.getByText('Passed 1 · Partial 0 · Failed 0')).toBeTruthy();
+
+    // The deliverable row: depth word AND size, as separate facts.
+    const row = screen.getByText('Thin deck');
+    expect(screen.getAllByText('Thin').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/characters/)).toBeTruthy();
+    fireEvent.click(row);
+    // Expansion: the depth judgement with the verifier's own note.
+    expect(await screen.findByText(/表の見出しだけで中身がない/)).toBeTruthy();
+    expect(screen.getByText(/Depth/)).toBeTruthy();
+  });
+
+  it('PR3: a period with only v2 verdicts shows no scoring blocks — absence, not zero', () => {
+    const o = outcome({ verdict_result: 'pass' });
+    const verdict = parseRunVerdict({
+      v: 2, result: 'pass', source: 'verifier', model: 'm', gaps: [], revisions: 0,
+      checkedAt: iso(NOW - DAY), outcome: 'completed', reason: null,
+      evidence: { verifyStepIdx: 1, artifactIds: [] },
+      claims: { total: 0, sourced: 0, stale: 0 }, claimGaps: [],
+    });
+    fixture.outcomes = [o];
+    fixture.runs = [{
+      id: o.run_id, element_id: 'e1', status: 'completed', finished_at: o.finished_at,
+      verdict, finishDetail: null, failureDetail: null,
+    }];
+    render(<StrategyEvaluationPanel objects={OBJECTS} />);
+    expect(screen.getByText('Verifier pass rate')).toBeTruthy();
+    expect(screen.queryByText('Thin deliverables')).toBeNull();
+    expect(screen.queryByText('Checks items')).toBeNull();
+  });
+
   it('worst-run artifact rows carry the size signal too', async () => {
     const failed = outcome({ verdict_result: 'fail' });
     fixture.outcomes = [failed];

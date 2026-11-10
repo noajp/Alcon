@@ -1169,6 +1169,13 @@ const APP_MESSAGES: Record<string, Row> = {
   '{n} sections': ['{n} セクション', '섹션 {n}개', '{n} sections', '{n} secciones'],
   'Short': ['短い', '짧음', 'Court', 'Corto'],
   'Shown to the verifier': ['検証者に提示済み', '검증자에게 제시됨', 'Présenté au vérificateur', 'Mostrado al verificador'],
+  'Thin deliverables': ['薄い成果物', '얇은 산출물', 'Livrables minces', 'Entregables pobres'],
+  'Judged thin or empty by the verifier, of {n} scored finishes': ['採点済み {n} 件のうち、検証者が薄い・空と判定した成果物', '채점된 완료 {n}건 중 검증자가 얇거나 비어 있다고 판단한 산출물', 'Jugés minces ou vides par le vérificateur, sur {n} finitions notées', 'Juzgados pobres o vacíos por el verificador, de {n} finalizaciones puntuadas'],
+  'Checks items': ['点検項目', '점검 항목', 'Points de contrôle', 'Puntos de control'],
+  'Passed {pass} · Partial {partial} · Failed {fail}': ['合格 {pass} · 部分的 {partial} · 不合格 {fail}', '통과 {pass} · 부분 {partial} · 실패 {fail}', 'Réussis {pass} · Partiels {partial} · Échoués {fail}', 'Superados {pass} · Parciales {partial} · Fallidos {fail}'],
+  'Depth': ['厚み', '깊이', 'Profondeur', 'Profundidad'],
+  'Substantial': ['充実', '충실함', 'Substantiel', 'Sustancial'],
+  'Thin': ['薄い', '얇음', 'Mince', 'Pobre'],
   'Trend': ['推移', '추세', 'Tendance', 'Tendencia'],
 };
 
