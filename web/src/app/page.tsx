@@ -569,7 +569,7 @@ function WorkspaceContent({
   const onSlides = activeTab.activeView === 'slides';
   // The pop-up's expand button opens the AI screen; the screen's shrink
   // button goes back to where the person was, with the pop-up open.
-  const lastViewRef = useRef('home');
+  const lastViewRef = useRef('inbox');
   useEffect(() => {
     if (activeTab.activeView !== 'ai') lastViewRef.current = activeTab.activeView;
   }, [activeTab.activeView]);
@@ -763,7 +763,7 @@ function WorkspaceContent({
 
   // Views that read nothing from the Domain list paint without waiting for
   // it — and without being blocked when it fails.
-  const standsAlone = ['home', 'inbox', 'profile', 'my-elements'].includes(activeTab.activeView);
+  const standsAlone = ['inbox', 'profile', 'my-elements'].includes(activeTab.activeView);
   if (loading && !standsAlone) {
     return <AppShellSkeleton />;
   }
@@ -862,7 +862,6 @@ function WorkspaceContent({
                     aria-hidden={!isActive}
                   >
                     <MainContent
-                      activeSpaceId={activeSpaceId}
                       onOpenSettings={handleOpenSettings}
                       activeActivity={tab.activeView}
                       navigation={tab.navigation}

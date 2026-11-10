@@ -46,7 +46,7 @@ export function usePreference<T>(read: () => T): T {
   return value;
 }
 
-export type HomeView = 'Now' | 'My Elements' | 'Inbox' | 'Calendar';
+export type HomeView = 'My Elements' | 'Inbox' | 'Calendar';
 export type SendCommentShortcut = '⌘+Enter' | 'Enter';
 export type FirstDayOfWeek = 'Monday' | 'Sunday' | 'Saturday';
 export type DisplayNames = 'Full name' | 'Short name' | 'Username';
@@ -58,8 +58,9 @@ const FIRST_DAY_KEY = 'alcon:pref:first-day-of-week';
 const DISPLAY_NAMES_KEY = 'alcon:pref:display-names';
 const EMOTICONS_KEY = 'alcon:pref:convert-emoticons';
 
+// A stored value with no view behind it any more (the retired 'Now')
+// opens the Inbox.
 const HOME_VIEW_TO_VIEW_ID: Record<HomeView, string> = {
-  Now: 'home',
   'My Elements': 'my-elements',
   Inbox: 'inbox',
   Calendar: 'calendar',

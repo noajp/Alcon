@@ -11,7 +11,7 @@ import { useCurrentUserId } from '@/providers/authContext';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { ElementDependencies } from './ElementDependencies';
-import { CheckInDialog } from '../../home/now/CheckInDialog';
+import { CheckInDialog } from './checkIn/CheckInDialog';
 import { STATUS, PRIORITY, FONT } from '@/shared/designTokens';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Calendar, User, Link2, Plus, CheckCircle2, Tag, Circle, Flag, History, Timer, ChevronRight, ChevronLeft, Pencil, Check, Compass } from '@/ui/icons';

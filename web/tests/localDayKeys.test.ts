@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { dateKey } from '@/Function/strategy/initiativeRiskModel';
 import { todayYMD } from '@/Function/strategy/phaseClose';
-import { localWorkDate } from '@/ActivitySpace/home/now/nowModel';
 
 // Each surface names "today on the viewer's calendar" its own way; all of them
 // delegate to dateUtils, so they cannot drift apart.
@@ -16,6 +15,5 @@ describe('local day keys agree with toDateOnlyString', () => {
     const expected = toDateOnlyString(date);
     expect(dateKey(date.getTime())).toBe(expected);
     expect(todayYMD(date)).toBe(expected);
-    expect(localWorkDate(date)).toBe(expected);
   });
 });

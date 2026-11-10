@@ -1,7 +1,6 @@
 import type React from 'react';
 import {
   NavAiIcon,
-  NavHomeIcon,
   NavInboxIcon,
   NavCalendarIcon,
   NavMyTasksIcon,
@@ -27,7 +26,6 @@ import {
 // intentionally not part of this registry.
 
 export type ViewId =
-  | 'home'
   | 'inbox'
   | 'calendar'
   | 'schedule'
@@ -58,7 +56,6 @@ export interface ViewMeta {
 }
 
 export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
-  home:          { label: 'Now',        icon: NavHomeIcon },
   inbox:         { label: 'Inbox',       icon: NavInboxIcon },
   calendar:      { label: 'Calendar',    icon: NavCalendarIcon },
   schedule:      { label: 'Calendar',    icon: NavCalendarIcon },

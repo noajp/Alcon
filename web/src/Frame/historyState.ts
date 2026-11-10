@@ -35,7 +35,6 @@ function routePartsOf(screen: ScreenSnapshot): (string | null)[] {
     n.canvasId ?? null,
     n.workerId ?? null,
     n.unitId ?? null,
-    n.homeSelection ? `${n.homeSelection.type}:${n.homeSelection.id}` : null,
     n.files?.view ?? null,
     n.files?.tab ?? null,
     n.files?.domainId ?? null,
