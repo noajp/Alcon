@@ -1,17 +1,26 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { BoardColumn, BoardLane, CHAIN_COLUMN_WIDTH, Chip } from '@/ActivitySpace/execution/element/board/BoardColumn';
+import { ThickArrowRight } from '@/ActivitySpace/execution/element/board/ElementCard';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
+import { useElementChainRows } from '@/hooks/initiativeMissionData';
+import { useNowMinute } from '@/Function/shared/useNow';
+import { displayIdOf } from '@/Function/shared/element/displayId';
+import { ExecutePlanDialog, type ExecuteTarget, type ObjectExecuteTarget } from '@/ActivitySpace/execution/element/agent';
+import { waitingReason, type WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
+import {
+  fleetCard, fleetCardContext, latestRuns, missionElementRow,
+} from '@/ActivitySpace/strategy/initiative/mission/missionModel';
 import { formatMeasureValue } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import { CARD_FLAT } from '@/shared/designTokens';
-import type { AlconObject, Intent, StrategyWithObjects } from '@/types/database';
+import type { AlconObject, AlconObjectWithChildren, Intent, StrategyWithObjects } from '@/types/database';
 import { cascadeLineage, cascadeObjectChips } from './cascadeModel';
 
 // The Cascade tab: this Strategy's whole lineage, drawn with the
@@ -26,6 +35,10 @@ import { cascadeLineage, cascadeObjectChips } from './cascadeModel';
 // lineage can be walked up as well as down. Under each card stand the
 // Objects that Strategy holds, as the pill chips the Chain teaches —
 // descent goes right, contents stay home — and a pill opens its Object.
+// The one act this tab allows stands beside the pill, never inside it:
+// the execute segment (card hover-execute, PR3) opens that Object's
+// execute manifest — the same ExecutePlanDialog the Chain's chip
+// segment opens (PR2), hosted here, never forked.
 // Like every board, it stands vertical or lies horizontal — the page's
 // tabs-row toggle decides, on the one shared orientation preference.
 
@@ -87,12 +100,22 @@ function CascadeCard({ strategy, measures, onOpen }: {
  *  is an Object. Capped, with the rest counted on a plain chip (the
  *  full list stands on the Strategy's Overview); a Strategy holding no
  *  Objects grows no group at all. The pills are their own buttons,
- *  siblings of the card's button, never nested inside it. */
-function CascadeObjectChips({ strategy, objectsById, onOpenObject }: {
+ *  siblings of the card's button, never nested inside it.
+ *
+ *  The execute segment is a sibling button after the navigating pill —
+ *  never nested inside it, per the nesting rule above — carrying the
+ *  rail's thick arrow at the chip segment's 11px, with the Chain
+ *  segment's reveal discipline (§3.5): shown while its entry block is
+ *  hovered or focused within, always where there is no hover. The
+ *  pill's own click keeps its one meaning (open the Object); the
+ *  segment's click opens the Object's execute manifest instead. */
+function CascadeObjectChips({ strategy, objectsById, onOpenObject, onExecuteObject }: {
   strategy: StrategyWithObjects;
   objectsById: ReadonlyMap<string, AlconObject>;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  onExecuteObject?: (objectId: string) => void;
 }) {
+  const { t } = useI18n();
   const { chips, overflow } = cascadeObjectChips(strategy.objectIds, objectsById);
   if (chips.length === 0) return null;
   return (
@@ -104,12 +127,26 @@ function CascadeObjectChips({ strategy, objectsById, onOpenObject }: {
             <span className="truncate">{object.name}</span>
           </Chip>
         );
-        if (!onOpenObject) return <span key={object.id} className="inline-flex min-w-0">{chip}</span>;
+        const navigating = !onOpenObject
+          ? <span className="inline-flex min-w-0">{chip}</span>
+          : (
+            <button type="button" className="group inline-flex min-w-0"
+              onClick={() => onOpenObject(object.id, object.domain_id)}>
+              {chip}
+            </button>
+          );
+        if (!onExecuteObject) {
+          return <span key={object.id} className="inline-flex min-w-0">{navigating}</span>;
+        }
         return (
-          <button key={object.id} type="button" className="group inline-flex min-w-0"
-            onClick={() => onOpenObject(object.id, object.domain_id)}>
-            {chip}
-          </button>
+          <span key={object.id} className="group/chip inline-flex min-w-0 items-center gap-0.5">
+            {navigating}
+            <button type="button" aria-label={t('Execute Object')} title={t('Execute Object')}
+              onClick={() => onExecuteObject(object.id)}
+              className="flex h-5 shrink-0 items-center rounded-md border border-border/60 bg-muted/40 px-1 text-muted-foreground transition-opacity hover:text-foreground opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 [@media(hover:none)]:opacity-100">
+              <ThickArrowRight size={11} />
+            </button>
+          </span>
         );
       })}
       {overflow > 0 && <Chip>+{overflow}</Chip>}
@@ -127,12 +164,18 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
   /** The board's orientation, from the page's tabs-row toggle. */
   orientation: BoardOrientation;
   /** Every Object, so each Strategy's held Objects can stand as chips
-   *  under its card. Omit to draw Strategies only. */
-  objects?: readonly AlconObject[];
+   *  under its card — with their Elements, so a chip's execute segment
+   *  can build its Object's manifest from the same rows. Omit to draw
+   *  Strategies only. */
+  objects?: readonly AlconObjectWithChildren[];
   /** Open an Object chip (the shell's Object view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   const { t } = useI18n();
+  // The one Execute popup for this board (card hover-execute, PR3): a
+  // chip's segment names its Object, the dialog does the rest — the
+  // same Object mode the Chain boards open from their chip segment.
+  const [executeTarget, setExecuteTarget] = useState<ExecuteTarget | null>(null);
   const lineage = useMemo(() => cascadeLineage(strategy.id, allStrategies), [strategy.id, allStrategies]);
   const byId = useMemo(() => new Map(allStrategies.map((s) => [s.id, s] as const)), [allStrategies]);
   const objectsById = useMemo(
@@ -140,6 +183,68 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
     [objects],
   );
   const visibleIds = useMemo(() => lineage.flat(), [lineage]);
+
+  // The manifest's readings, over the Objects the lineage actually
+  // shows: their Elements (from the Object rows the shell already
+  // loads), and their runs and depends_on edges — the rows a Domain's
+  // chain reads through the same hook, so a manifest opened here can
+  // never disagree with a board. Ticks, so a lease that lapses while
+  // the tab is open stops reading as held.
+  const now = useNowMinute(true);
+  const visibleElements = useMemo(() => {
+    const objectIds = new Set<string>();
+    for (const id of visibleIds) for (const oid of byId.get(id)?.objectIds ?? []) objectIds.add(oid);
+    const seen = new Set<string>();
+    const out: NonNullable<AlconObjectWithChildren['elements']>[number][] = [];
+    for (const o of objects ?? []) {
+      if (!objectIds.has(o.id)) continue;
+      for (const e of o.elements ?? []) {
+        if (seen.has(e.id)) continue;
+        seen.add(e.id);
+        out.push(e);
+      }
+    }
+    return out;
+  }, [objects, visibleIds, byId]);
+  const elementIds = useMemo(() => visibleElements.map((e) => e.id), [visibleElements]);
+  const chainRows = useElementChainRows(elementIds);
+  const { runs, edges } = chainRows.data;
+  const rows = useMemo(
+    () => visibleElements.map((e) => missionElementRow(e, e.object_id ?? null, now)),
+    [visibleElements, now],
+  );
+  // Each Element's waiting reason, built the Domain chain's way — the
+  // fleet core over the same rows, runs and edges — so the manifest's
+  // waiting words are the chain's own.
+  const reasonMap = useMemo(() => {
+    const ctx = fleetCardContext({ elements: rows, measures: [], bindings: [], edges, runs });
+    const latest = latestRuns(runs);
+    const out = new Map<string, WaitingReason | null>();
+    for (const r of rows) {
+      const card = fleetCard(ctx, r);
+      out.set(r.id, waitingReason({ element: card, latestRun: latest.get(r.id), blockers: card.blockers }));
+    }
+    return out;
+  }, [rows, edges, runs]);
+
+  // The Object popup's target, built at the press from what this board
+  // already reads: the Object's own Elements (its row's, read under
+  // that Object), every visible Element as the blocker lookup's
+  // upstreams, the edges, the runs, and the waiting map above. This
+  // host knows the Object's Domain only by id, not by name, so the
+  // header's Domain line stays out — its prefix stands instead.
+  const objectTargetFor = (objectId: string): ObjectExecuteTarget | null => {
+    const object = objectsById.get(objectId);
+    if (!object) return null;
+    return {
+      id: object.id, name: object.name, icon: object.icon ?? null, color: object.color ?? null,
+      prefixLabel: displayIdOf(object) ?? object.prefix ?? null,
+      manifest: {
+        elements: (object.elements ?? []).map((e) => missionElementRow(e, objectId, now)),
+        upstreams: rows, edges, runs, waiting: reasonMap,
+      },
+    };
+  };
   const { measures } = useInitiativeMeasures(visibleIds);
   const measuresByStrategy = useMemo(() => {
     const out = new Map<string, Intent[]>();
@@ -178,7 +283,8 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
         <div key={id}>
           <CascadeCard strategy={s} measures={measuresByStrategy.get(id) ?? []}
             onOpen={() => onOpenStrategy(id)} />
-          <CascadeObjectChips strategy={s} objectsById={objectsById} onOpenObject={onOpenObject} />
+          <CascadeObjectChips strategy={s} objectsById={objectsById} onOpenObject={onOpenObject}
+            onExecuteObject={(objectId) => { const target = objectTargetFor(objectId); if (target) setExecuteTarget({ kind: 'object', object: target }); }} />
         </div>
       ),
     }];
@@ -213,6 +319,9 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
           ))}
         </div>
       )}
+      <ExecutePlanDialog target={executeTarget} open={executeTarget !== null}
+        onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}
+        onFinished={() => chainRows.refetch()} />
     </div>
   );
 }
