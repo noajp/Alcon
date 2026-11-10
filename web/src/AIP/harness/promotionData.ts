@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { PromotionDraft, PromotionDraftEvent, PromotionDraftStatus } from '@/types/database';
+import type { PromotionBinding, PromotionDraft, PromotionDraftEvent, PromotionDraftStatus } from '@/types/database';
 
 // Promotion drafts: the records of one-off work becoming standing
 // harnesses. Members read every draft (a draft holds no secret, ever);
@@ -134,6 +134,160 @@ export async function createPromotionDraft(args: {
   return made;
 }
 
+/** Pure. The binding an update draft carries (Automation builder
+ *  design §5.4): the automation's Object and templates, and NO
+ *  trigger — activation then updates the definition in place and
+ *  creates no second automation; the existing row keeps firing, now
+ *  on the new body. */
+export function builderUpdateBindingOf(args: {
+  objectId: string | null;
+  titleTemplate?: string | null;
+  descriptionTemplate?: string | null;
+}): PromotionBinding {
+  return {
+    objectId: args.objectId,
+    titleTemplate: args.titleTemplate ?? '',
+    descriptionTemplate: args.descriptionTemplate ?? '',
+    trigger: null,
+  };
+}
+
+/** Pure. A builder draft's insert row: the seed (name, body,
+ *  binding) written at insert, under the 'builder' source kind —
+ *  a draft with no memory or run behind it. The drafts INSERT policy
+ *  checks membership, authorship and the drafting status, not the
+ *  column set, and the table grant is table-wide, so the seed lands
+ *  with the row (the design's §5.4 fallback is implemented in
+ *  createBuilderDraft regardless). */
+export function builderDraftInsertOf(args: {
+  spaceId: string;
+  userId: string;
+  targetDefinitionId?: string | null;
+  seedName: string;
+  seedBody: string;
+  binding: PromotionBinding;
+}) {
+  return {
+    activity_space_id: args.spaceId,
+    source_kind: 'builder' as const,
+    source_memory_id: null,
+    source_run_id: null,
+    target_definition_id: args.targetDefinitionId ?? null,
+    status: 'drafting' as const,
+    created_by: args.userId,
+    requester_id: args.userId,
+    name: args.seedName,
+    body: args.seedBody,
+    binding: args.binding,
+  };
+}
+
+/** Pure. The skeleton body a new builder draft starts from: the
+ *  sections the zone picks fill, in the grammar's canonical order,
+ *  with the one line the promotion gate requires of any promoted
+ *  definition — a numeric cost ceiling in the stop conditions. The
+ *  drafting driver drafts around this seed; the person's own picks
+ *  in the builder are already inside it. */
+export function builderSeedBodyOf(name: string): string {
+  return [
+    '# 目的', name, '',
+    '# 進め方', '',
+    '# 点検', '',
+    '# 止める条件', '- 費用 $2 まで', '',
+    '# 成果物の型', '',
+    '# 使うコネクタ', '',
+    '# 入力', '',
+  ].join('\n');
+}
+
+/** The Automation builder's door into promotion (design §5.4): a
+ *  draft seeded from the zone picks — for a new automation, a fresh
+ *  definition whose binding carries the trigger; for a live
+ *  automation's body edit, an update draft against its definition
+ *  (target_definition_id, trigger-less binding). Like the other
+ *  creation routes it makes the draft and its drafting run and
+ *  starts the run: the driver drafts around the seed, and takes a
+ *  hand-edited body verbatim when it freezes the package, so builder
+ *  edits made while drafting are picked up, not overwritten. An open
+ *  draft already targeting the same definition is joined, never
+ *  rivalled (the one-open-draft-per-target rule). The draft's base
+ *  snapshot is pinned by the driver from the target, exactly as for
+ *  the other sources. */
+export async function createBuilderDraft(spaceId: string, seed: {
+  targetDefinitionId?: string | null;
+  seedName: string;
+  seedBody: string;
+  binding: PromotionBinding;
+}): Promise<PromotionDraft> {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) throw new Error('Not signed in');
+  const { data: open } = await supabase.from('promotion_drafts')
+    .select(DRAFT_COLUMNS)
+    .eq('activity_space_id', spaceId)
+    .in('status', [...PROMOTION_OPEN_STATUSES]);
+  const rows = (open ?? []) as unknown as PromotionDraft[];
+  if (seed.targetDefinitionId) {
+    const sameTarget = rows.find((d) => d.target_definition_id === seed.targetDefinitionId);
+    if (sameTarget) return sameTarget;
+  }
+  if (rows.length >= MAX_OPEN_PROMOTION_DRAFTS_PER_SPACE) {
+    throw new Error('この Space の昇格ドラフトが上限に達しています');
+  }
+  if (rows.filter((d) => d.requester_id === userId).length >= MAX_OPEN_PROMOTION_DRAFTS_PER_REQUESTER) {
+    throw new Error('あなたの昇格ドラフトが上限に達しています');
+  }
+  const insert = builderDraftInsertOf({ spaceId, userId, ...seed });
+  const { data: draft, error } = await supabase.from('promotion_drafts').insert(insert)
+    .select(DRAFT_COLUMNS).single();
+  let made = (draft ?? null) as unknown as PromotionDraft | null;
+  if (error || !made) {
+    // A unique-index race on the target: join the draft that won.
+    if (seed.targetDefinitionId) {
+      const { data: again } = await supabase.from('promotion_drafts')
+        .select(DRAFT_COLUMNS)
+        .eq('activity_space_id', spaceId)
+        .in('status', [...PROMOTION_OPEN_STATUSES]);
+      const winner = ((again ?? []) as unknown as PromotionDraft[]).find(
+        (d) => d.target_definition_id === seed.targetDefinitionId,
+      );
+      if (winner) return winner;
+    }
+    if (!error) throw new Error('下書きを作れませんでした');
+    // The design's §5.4 fallback: if the seeded insert is refused
+    // (a narrowed INSERT policy on some database), land the seed
+    // through the drafting-stage revision write right after a bare
+    // insert — the same net state, through the sanctioned write.
+    const { data: bare, error: bareError } = await supabase.from('promotion_drafts').insert({
+      activity_space_id: spaceId,
+      source_kind: 'builder',
+      target_definition_id: seed.targetDefinitionId ?? null,
+      status: 'drafting',
+      created_by: userId,
+      requester_id: userId,
+    }).select(DRAFT_COLUMNS).single();
+    if (bareError || !bare) throw new Error(bareError?.message ?? '下書きを作れませんでした');
+    made = bare as unknown as PromotionDraft;
+    await reviseDraftBody(made, seed.seedBody);
+    const { data: seeded, error: seedError } = await supabase.from('promotion_drafts').update({
+      name: seed.seedName, binding: seed.binding, updated_at: new Date().toISOString(),
+    }).eq('id', made.id).eq('status', 'drafting').select(DRAFT_COLUMNS).single();
+    if (seedError || !seeded) throw new Error(seedError?.message ?? '下書きに種を置けませんでした');
+    made = seeded as unknown as PromotionDraft;
+  }
+  const { data: run, error: runError } = await supabase.from('agent_runs').insert({
+    promotion_draft_id: made.id,
+    activity_space_id: spaceId,
+    triggered_by: userId,
+    triggered_from: 'automation_builder',
+    mode: 'promote',
+    status: 'queued',
+  }).select('id').single();
+  if (runError || !run) throw new Error(runError?.message ?? '起草の実行を作れませんでした');
+  await startPromotionRun((run as { id: string }).id);
+  return made;
+}
+
 /** The run-screen door (source B): a finished run someone points at
  *  and says "make this standing". The Space comes from the run's
  *  Domain — the record the audit panel itself shows has no Space
@@ -232,7 +386,7 @@ export function usePromotionDraft(draftId: string | null) {
  *  there is no moment where the row holds edited text under tested
  *  hashes. A 'revised' event marks the move; the drafting run reads
  *  it and takes the edited body as its package, unchanged. */
-export async function revisePromotionDraftBody(draft: PromotionDraft, body: string): Promise<void> {
+async function reviseDraftBodyGuarded(draft: PromotionDraft, body: string, from: PromotionDraftStatus): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) throw new Error('Not signed in');
@@ -251,9 +405,29 @@ export async function revisePromotionDraftBody(draft: PromotionDraft, body: stri
     expires_at: null,
     events,
     updated_at: now,
-  }).eq('id', draft.id).eq('status', 'awaiting_review').select('id');
+  }).eq('id', draft.id).eq('status', from).select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('ドラフトの状態が変わっていました。開き直して確認してください');
+}
+
+export async function revisePromotionDraftBody(draft: PromotionDraft, body: string): Promise<void> {
+  return reviseDraftBodyGuarded(draft, body, 'awaiting_review');
+}
+
+/** The drafting-stage sibling (Automation builder design §5.2): the
+ *  same guarded revision write, from `drafting` — the builder
+ *  revises what Athena is drafting (a builder draft's seed, or an
+ *  update draft's body while it is still being drafted). Same shape,
+ *  same clearing semantics, same 'revised' event, in a single
+ *  statement guarded on the status read: body, the (unchanged)
+ *  drafting status and the clearing of anything a rehearsal proved
+ *  move together, so the freeze invariant — "the tested text is the
+ *  text on the row" — is never half-broken. The drafting driver
+ *  takes the revised body verbatim when it freezes the package (the
+ *  standing P4 rule), so a builder edit mid-drafting is picked up,
+ *  not overwritten. */
+export async function reviseDraftBody(draft: PromotionDraft, body: string): Promise<void> {
+  return reviseDraftBodyGuarded(draft, body, 'drafting');
 }
 
 // ── The owner's decisions (the RPCs are the only route) ────────────────

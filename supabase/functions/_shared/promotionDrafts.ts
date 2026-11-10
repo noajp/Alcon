@@ -44,7 +44,7 @@ export interface PromotionDraftRow {
   id: string;
   activity_space_id: string;
   status: PromotionStatus;
-  source_kind: "memory" | "run";
+  source_kind: "memory" | "run" | "builder";
   source_memory_id: string | null;
   source_run_id: string | null;
   target_definition_id: string | null;

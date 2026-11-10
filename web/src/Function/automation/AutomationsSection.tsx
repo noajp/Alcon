@@ -15,6 +15,8 @@ import {
   useAutomations, type Automation, type AutomationKind,
 } from '@/hooks/automationData';
 import { workflowOf } from '@/Function/shared/flowEdit';
+import { builderSeedBodyOf, createBuilderDraft } from '@/AIP/harness/promotionData';
+import { PromotionReviewDialogForDraft } from '@/AIP/harness/PromotionDrafts';
 import { graphFromWorkflow, workflowFromGraph, type WorkflowGraph } from '@/Function/shared/workflowGraph';
 import { AUTOMATION_CRON_PRESETS, automationStatusOf, workflowGraphOf } from '@/Function/shared/automationZones';
 import { NavAutomationIcon } from '@/Frame/sidebar/NavIcons';
@@ -58,10 +60,14 @@ function cronProblem(cron: string): string | null {
 
 /** The Automations, one row each; a row opens the automation in the
  *  builder, with its Input / Athena / Output zones. */
-export function AutomationsSection({ spaceId, creating, onCreatingChange, openId, onOpen, onOpenElement }: {
+export function AutomationsSection({ spaceId, creating, onCreatingChange, builderCreating, onBuilderCreatingChange, openId, onOpen, onOpenElement }: {
   spaceId: string | null;
   creating: boolean;
   onCreatingChange: (creating: boolean) => void;
+  /** The "Build with Athena" door is open: a builder draft form
+   *  (PR4), beside the direct-bind form the `creating` door opens. */
+  builderCreating: boolean;
+  onBuilderCreatingChange: (creating: boolean) => void;
   /** The automation open in the builder, or null for the list. */
   openId: string | null;
   onOpen: (id: string | null) => void;
@@ -74,12 +80,16 @@ export function AutomationsSection({ spaceId, creating, onCreatingChange, openId
   const objects = explorer.objects;
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<{ id: string; value: string } | null>(null);
+  const [publishDraftId, setPublishDraftId] = useState<string | null>(null);
 
   const opened = openId ? automations.data.find((a) => a.id === openId) ?? null : null;
   if (opened) {
     return (
       <AutomationBuilder key={opened.id} a={opened} spaceId={spaceId} onBack={() => onOpen(null)}
         harnesses={harnesses.data} objects={objects} sources={workflowSources(harnesses.data, automations.data, opened.id, t)}
+        sharedDefinitionNames={opened.definition_id
+          ? automations.data.filter((x) => x.id !== opened.id && x.definition_id === opened.definition_id).map((x) => x.name)
+          : []}
         token={token?.id === opened.id ? token.value : null}
         onToken={(value) => setToken({ id: opened.id, value })}
         onChanged={automations.refetch} onDeleted={() => onOpen(null)} onOpenElement={onOpenElement} />
@@ -89,6 +99,19 @@ export function AutomationsSection({ spaceId, creating, onCreatingChange, openId
   return (
     <div>
       {error && <p role="alert" className="px-6 py-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
+      {builderCreating && spaceId && (
+        <div className="border-b border-border/60 px-6 py-4">
+          <BuilderDraftStart spaceId={spaceId} objects={objects}
+            onCancel={() => onBuilderCreatingChange(false)}
+            onCreated={(draftId) => { onBuilderCreatingChange(false); setPublishDraftId(draftId); }} />
+        </div>
+      )}
+      {publishDraftId && (
+        <PromotionReviewDialogForDraft draftId={publishDraftId} spaceId={spaceId}
+          definitions={harnesses.data}
+          onClose={() => setPublishDraftId(null)}
+          onChanged={automations.refetch} />
+      )}
       {creating && spaceId && (
         <div className="border-b border-border/60 px-6 py-4">
           <NewAutomation spaceId={spaceId} objects={objects} sources={workflowSources(harnesses.data, automations.data, null, t)}
@@ -220,6 +243,85 @@ function NewAutomation({ spaceId, objects, sources, onCancel, onCreated }: {
       <div className="flex justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>{t('Cancel')}</Button>
         <Button size="sm" variant="primary" onClick={() => void save()} disabled={!ready || saving}>{t('Create')}</Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The "Build with Athena" door (Automation builder design §5.4,
+ * PR4): the second way a new automation begins. The picks here —
+ * a name, the Object its Elements land in, a schedule — seed a
+ * promotion draft (source_kind 'builder', body skeleton + binding
+ * with the trigger), and the draft goes through the standing path:
+ * the drafting driver refines it, it is rehearsed, and the owner
+ * activates it from the review this form opens on the draft. No
+ * automation row exists until that activation; the direct-bind
+ * form above remains the other door, for binding an existing
+ * harness unchanged. Promotion bindings carry schedule triggers
+ * only, so this door offers schedules — a webhook automation is
+ * bound directly, as before.
+ */
+function BuilderDraftStart({ spaceId, objects, onCancel, onCreated }: {
+  spaceId: string;
+  objects: { id: string; name: string }[];
+  onCancel: () => void;
+  onCreated: (draftId: string) => void;
+}) {
+  const { t } = useI18n();
+  const [name, setName] = useState('');
+  const [objectId, setObjectId] = useState(objects[0]?.id ?? '');
+  const [cron, setCron] = useState(AUTOMATION_CRON_PRESETS[0].cron);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const problem = cronProblem(cron);
+  const ready = !!name.trim() && !!objectId && !problem;
+
+  const save = async () => {
+    setSaving(true); setError(null);
+    try {
+      const draft = await createBuilderDraft(spaceId, {
+        seedName: name.trim(),
+        seedBody: builderSeedBodyOf(name.trim()),
+        binding: {
+          objectId, titleTemplate: '', descriptionTemplate: '',
+          trigger: { kind: 'schedule', cron: cron.trim(), timezone: TIMEZONE },
+        },
+      });
+      onCreated(draft.id);
+    } catch (e) { setError(formatError(e)); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-3 rounded-md border border-[var(--border-default)] p-3">
+      <p className="text-[12px] text-muted-foreground">
+        {t('Athena drafts the harness from these picks. It goes live only after rehearsal and your review — nothing runs before that.')}
+      </p>
+      <label className="block">
+        <span className="mb-1 block text-[12px] text-muted-foreground">{t('Name')}</span>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('e.g. Morning inquiry digest')} autoFocus />
+      </label>
+      <div>
+        <span className="mb-1 block text-[12px] text-muted-foreground">{t('Put the work in')}</span>
+        <OptionMenu label={t('Put the work in')} value={objectId} onChange={setObjectId}
+          options={objects.map((o) => ({ value: o.id, label: o.name }))} />
+      </div>
+      <div className="space-y-1.5">
+        <span className="mb-1 block text-[12px] text-muted-foreground">{t('Starts')}</span>
+        <div className="flex flex-wrap gap-1">
+          {AUTOMATION_CRON_PRESETS.map((p) => (
+            <Button key={p.cron} size="xs" shape="tab" variant={cron === p.cron ? 'secondary' : 'ghost'} onClick={() => setCron(p.cron)}>{t(p.label)}</Button>
+          ))}
+        </div>
+        <Input value={cron} onChange={(e) => setCron(e.target.value)} aria-label={t('Cron expression')} className="font-mono" />
+        {problem && <p className="text-[12px] text-[var(--status-danger)]">{problem}</p>}
+      </div>
+      {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>{t('Cancel')}</Button>
+        <Button size="sm" variant="primary" onClick={() => void save()} disabled={!ready || saving}>{t('Start the draft')}</Button>
       </div>
     </div>
   );

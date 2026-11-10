@@ -1858,7 +1858,7 @@ export type PromotionDraftStatus =
   | 'drafting' | 'awaiting_input' | 'rehearsing' | 'awaiting_review'
   | 'active' | 'rejected' | 'expired' | 'failed'
 
-export type PromotionSourceKind = 'memory' | 'run'
+export type PromotionSourceKind = 'memory' | 'run' | 'builder'
 
 export type PromotionFailureClass =
   | 'definition_invalid' | 'connector_missing' | 'read_failed'

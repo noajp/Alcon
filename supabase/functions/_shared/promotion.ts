@@ -190,7 +190,7 @@ export function primaryPromotionFailure(
 // ── The reconcile (§4.5): before anything is written ──────────────────
 
 export interface PromotionSourceRef {
-  kind: "memory" | "run";
+  kind: "memory" | "run" | "builder";
   memoryId?: string | null;
   runId?: string | null;
 }
@@ -203,7 +203,10 @@ export interface PromotionOpenDraftRef {
 
 /** Rules 1 and 2, decidable at draft start: an open draft for the same
  *  source is joined, and a source that already produced a definition
- *  drafts an update against it, not a rival. */
+ *  drafts an update against it, not a rival. A builder source carries
+ *  no memory or run id, so it never joins by source — its update
+ *  drafts join by target instead (the one-open-draft-per-target
+ *  index), and a new automation's builder draft starts fresh. */
 export function reconcilePromotionSource(args: {
   source: PromotionSourceRef;
   openDrafts: readonly PromotionOpenDraftRef[];

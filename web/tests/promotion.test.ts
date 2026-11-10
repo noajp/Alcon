@@ -107,6 +107,16 @@ describe('reconcilePromotionSource (§4.5 rules 1–2)', () => {
     })).toEqual({ joinDraftId: null, asUpdateOf: { id: 'def-1', name: '既存' } });
   });
 
+  it('a builder source joins nothing by source and starts fresh', () => {
+    // A builder draft (Automation builder PR4) has no memory or run
+    // behind it: rule 1 has nothing to join, and its update drafts
+    // join by target (the database's one-open-per-target index),
+    // not by source.
+    expect(promo.reconcilePromotionSource({
+      source: { kind: 'builder' }, openDrafts: open, promotedDefinition: null,
+    })).toEqual({ joinDraftId: null, asUpdateOf: null });
+  });
+
   it('joining wins over updating', () => {
     expect(promo.reconcilePromotionSource({
       source: { kind: 'memory', memoryId: 'm1' }, openDrafts: open,

@@ -15,8 +15,9 @@ import type { Definition } from '@/hooks/definitionData';
 import {
   acceptUnverifiablePromotion, activatePromotionDraft, rejectPromotionDraft, revisePromotionDraftBody,
   rollbackPromotedDefinition,
-  sendPromotionMessage, usePromotionDraftDetail, usePromotionDrafts, usePromotionObjectNames,
+  sendPromotionMessage, usePromotionDraft, usePromotionDraftDetail, usePromotionDrafts, usePromotionObjectNames,
 } from './promotionData';
+import { useIsSpaceOwner } from '@/AIP/connectors/data';
 import { deleteFlowStep, editFlowStepLine, moveFlowStep } from '@/Function/shared/flowEdit';
 import {
   draftPackageWeb, promotionDriftWeb, promotionStructureHashWeb, readRehearsalReportWeb,
@@ -57,20 +58,39 @@ function StatusChip({ status }: { status: PromotionDraftStatus }) {
   );
 }
 
-export function PromotionsSection({ spaceId, isOwner, definitions, onChanged }: {
+/** The one line that says where a draft came from, per source kind. */
+const SOURCE_LABEL = { memory: 'From a memory', run: 'From a finished run', builder: 'From the Automation builder' } as const;
+
+export function PromotionsSection({ spaceId, isOwner, definitions, onChanged, openDraftId, onOpenDraftHandled }: {
   spaceId: string | null;
   isOwner: boolean;
   definitions: Definition[];
   onChanged?: () => void;
+  /** A draft another surface asks this section to open on (the
+   *  Automation builder's Publish hand-off, PR4): while the id
+   *  names a draft in the list, the review opens on it; closing it
+   *  calls onOpenDraftHandled, and the caller clears the id. */
+  openDraftId?: string | null;
+  onOpenDraftHandled?: () => void;
 }) {
   const { t } = useI18n();
   const drafts = usePromotionDrafts(spaceId);
   const objectNames = usePromotionObjectNames(spaceId);
-  const [open, setOpen] = useState<PromotionDraft | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  // The hand-off id opens the review as soon as it names a draft in
+  // the list — derived, not copied into state: the section's own
+  // pick wins while it stands, and closing a handed-off draft tells
+  // the caller, which clears the id.
+  const handedOff = openId === null && !!openDraftId && drafts.data.some((d) => d.id === openDraftId);
+  const effectiveOpenId = openId ?? (handedOff ? openDraftId : null);
   const live = useMemo(
-    () => (open ? drafts.data.find((d) => d.id === open.id) ?? open : null),
-    [open, drafts.data],
+    () => (effectiveOpenId ? drafts.data.find((d) => d.id === effectiveOpenId) ?? null : null),
+    [effectiveOpenId, drafts.data],
   );
+  const closeDialog = () => {
+    if (handedOff) onOpenDraftHandled?.();
+    setOpenId(null);
+  };
   if (!spaceId || (drafts.data.length === 0 && !drafts.loading)) return null;
   return (
     <div className="space-y-2">
@@ -84,12 +104,12 @@ export function PromotionsSection({ spaceId, isOwner, definitions, onChanged }: 
             : null;
           return (
             <div key={d.id} className="-mx-2 flex w-[calc(100%+16px)] items-center gap-2 rounded-md px-2 transition-colors hover:bg-[var(--surface-strong)]">
-              <button type="button" onClick={() => setOpen(d)}
+              <button type="button" onClick={() => setOpenId(d.id)}
                 className="flex min-w-0 flex-1 items-center gap-3 py-2 text-left outline-none focus-visible:underline">
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-[13px] font-medium text-foreground">
-                      {d.name ?? t(d.source_kind === 'memory' ? 'From a memory' : 'From a finished run')}
+                      {d.name ?? t(SOURCE_LABEL[d.source_kind])}
                     </span>
                     <StatusChip status={d.status} />
                     {drift?.drifted && (
@@ -99,13 +119,13 @@ export function PromotionsSection({ spaceId, isOwner, definitions, onChanged }: 
                     )}
                   </div>
                   <div className="truncate text-[12px] text-muted-foreground">
-                    {t(d.source_kind === 'memory' ? 'From a memory' : 'From a finished run')}
+                    {t(SOURCE_LABEL[d.source_kind])}
                     {d.status === 'awaiting_input' && d.awaiting_question ? ` · ${d.awaiting_question}` : ''}
                   </div>
                 </div>
               </button>
               {(d.status === 'awaiting_review' || (d.status === 'rehearsing' && readRehearsalReportWeb(d.rehearsal_report).outcome === 'unverifiable')) && (
-                <Button size="xs" variant="secondary" onClick={() => setOpen(d)}>{t('Review')}</Button>
+                <Button size="xs" variant="secondary" onClick={() => setOpenId(d.id)}>{t('Review')}</Button>
               )}
             </div>
           );
@@ -114,10 +134,36 @@ export function PromotionsSection({ spaceId, isOwner, definitions, onChanged }: 
       {live && (
         <PromotionDraftDialog draft={live} isOwner={isOwner} definitions={definitions}
           objectNames={objectNames}
-          onClose={() => setOpen(null)}
+          onClose={closeDialog}
           onChanged={() => { void drafts.refetch(); onChanged?.(); }} />
       )}
     </div>
+  );
+}
+
+/**
+ * The review dialog opened on a draft id alone — the Automation
+ * builder's Publish hand-off (PR4): the builder holds a draft id,
+ * not the review's props, so this wrapper reads the draft, its
+ * Object names and the reader's ownership the same way the section
+ * does, and renders the one review surface. There is no second
+ * approval UI; a caller that cannot name a loaded draft gets
+ * nothing, not a substitute dialog.
+ */
+export function PromotionReviewDialogForDraft({ draftId, spaceId, definitions, onClose, onChanged }: {
+  draftId: string | null;
+  spaceId: string | null;
+  definitions: Definition[];
+  onClose: () => void;
+  onChanged?: () => void;
+}) {
+  const draft = usePromotionDraft(draftId);
+  const objectNames = usePromotionObjectNames(spaceId);
+  const isOwner = useIsSpaceOwner(spaceId) === true;
+  if (!draftId || !draft.data) return null;
+  return (
+    <PromotionDraftDialog draft={draft.data} isOwner={isOwner} definitions={definitions}
+      objectNames={objectNames} onClose={onClose} onChanged={onChanged} />
   );
 }
 
@@ -261,7 +307,7 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
             <StatusChip status={draft.status} />
           </div>
           <DialogDescription className="pt-1 text-[12px]">
-            {t(draft.source_kind === 'memory' ? 'From a memory' : 'From a finished run')}
+            {t(SOURCE_LABEL[draft.source_kind])}
             {draft.expires_at && draft.status === 'awaiting_review'
               ? ` · ${t('Expires {date}', { date: new Date(draft.expires_at).toLocaleDateString() })}` : ''}
           </DialogDescription>
