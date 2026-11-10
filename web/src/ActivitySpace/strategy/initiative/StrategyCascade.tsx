@@ -5,29 +5,36 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { BoardColumn, BoardLane } from '@/ActivitySpace/execution/element/board/BoardColumn';
+import { BoardColumn, BoardLane, CHAIN_COLUMN_WIDTH } from '@/ActivitySpace/execution/element/board/BoardColumn';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
 import { formatMeasureValue } from '@/ActivitySpace/strategy/initiative/initiativeMeasureModel';
 import { CARD_FLAT } from '@/shared/designTokens';
 import type { Intent, StrategyWithObjects } from '@/types/database';
-import { cascadeLevels } from './cascadeModel';
+import { cascadeLineage } from './cascadeModel';
 
-// The Cascade down tab: how this Strategy decomposes, drawn with the
+// The Cascade tab: this Strategy's whole lineage, drawn with the
 // Execution Chain's own columns and card ground. The Strategy itself
-// stands in the first column; each column to the right is one generation
-// further down — children, grandchildren, descendants — each card saying
-// what that Strategy is for (its description) and the first of its
-// success conditions. Read-only: nesting is written on the Overview and
-// in the Strategy list; this tab is where the shape of it is read.
-// A card opens its Strategy, so the descent can be walked. Like every
-// board, it stands vertical or lies horizontal — the page's tabs-row
-// toggle decides, on the one shared orientation preference.
+// stands in its own column; the columns before it are its ancestry —
+// parents, grandparents, ancestors up to the root — and each column
+// after it is one generation further down — children, grandchildren,
+// descendants — each card saying what that Strategy is for (its
+// description) and the first of its success conditions. Read-only:
+// nesting is written on the Overview and in the Strategy list; this tab
+// is where the shape of it is read. A card opens its Strategy, so the
+// lineage can be walked up as well as down. Like every board, it stands
+// vertical or lies horizontal — the page's tabs-row toggle decides, on
+// the one shared orientation preference.
 
-/** The column a generation stands in: this Strategy (its card already
- *  carries its name), then children, grandchildren, and every deeper
- *  generation as descendants. */
+/** The column a generation stands in, by its signed depth from this
+ *  Strategy: negative is up (parents, grandparents, and every higher
+ *  generation as ancestors), 0 is this Strategy itself (its card already
+ *  carries its name), positive is down (children, grandchildren, and
+ *  every deeper generation as descendants). */
 function levelLabel(depth: number, t: ReturnType<typeof useI18n>['t']): string {
+  if (depth <= -3) return t('Ancestor Strategies');
+  if (depth === -2) return t('Grandparent Strategies');
+  if (depth === -1) return t('Parent Strategies');
   if (depth === 0) return t('This Strategy');
   if (depth === 1) return t('Child Strategies');
   if (depth === 2) return t('Grandchild Strategies');
@@ -71,9 +78,9 @@ function CascadeCard({ strategy, measures, onOpen }: {
 }
 
 export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orientation }: {
-  /** The Strategy this page is about — the cascade's root. */
+  /** The Strategy this page is about — the cascade's centre. */
   strategy: StrategyWithObjects;
-  /** Every Strategy, so the descent can be read off the nesting links. */
+  /** Every Strategy, so the lineage can be read off the nesting links. */
   allStrategies: StrategyWithObjects[];
   /** Open a Strategy of the cascade (drill into it, in this shell). */
   onOpenStrategy: (id: string) => void;
@@ -81,9 +88,9 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
   orientation: BoardOrientation;
 }) {
   const { t } = useI18n();
-  const levels = useMemo(() => cascadeLevels(strategy.id, allStrategies), [strategy.id, allStrategies]);
+  const lineage = useMemo(() => cascadeLineage(strategy.id, allStrategies), [strategy.id, allStrategies]);
   const byId = useMemo(() => new Map(allStrategies.map((s) => [s.id, s] as const)), [allStrategies]);
-  const visibleIds = useMemo(() => levels.flat(), [levels]);
+  const visibleIds = useMemo(() => lineage.flat(), [lineage]);
   const { measures } = useInitiativeMeasures(visibleIds);
   const measuresByStrategy = useMemo(() => {
     const out = new Map<string, Intent[]>();
@@ -95,10 +102,20 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
     return out;
   }, [measures]);
 
+  // The level this Strategy itself stands in. A level's signed depth is
+  // its distance from that level — negative toward the ancestors,
+  // positive toward the descendants.
+  const rootAt = lineage.findIndex((level) => level.includes(strategy.id));
+
   // A Strategy with nothing nested under it still shows the shape: its
   // own column, and the empty child column the next generation would
-  // stand in — the columns are always shown, as on the chain.
-  const shown = levels.length === 1 ? [...levels, []] : levels;
+  // stand in — the columns are always shown, as on the chain. Ancestors
+  // standing before it do not change that; the ancestor side itself
+  // gets no synthetic empty column — lineage is context, not a place
+  // waiting to be filled.
+  const shown = lineage.length === 0 || rootAt < lineage.length - 1
+    ? lineage
+    : [...lineage.slice(0, rootAt + 1), [], ...lineage.slice(rootAt + 1)];
 
   const cardsOf = (ids: string[]) => ids.flatMap((id) => {
     const s = byId.get(id);
@@ -124,18 +141,18 @@ export function StrategyCascade({ strategy, allStrategies, onOpenStrategy, orien
     <div className="flex min-h-0 flex-1 flex-col">
       {orientation === 'horizontal' ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2">
-          {shown.map((ids, depth) => (
-            <BoardLane key={depth} {...groupProps(depth, ids)}>
+          {shown.map((ids, index) => (
+            <BoardLane key={index} {...groupProps(index - rootAt, ids)}>
               {cardsOf(ids).map((c) => (
-                <div key={c.id} className="w-72 shrink-0">{c.node}</div>
+                <div key={c.id} className={cn(CHAIN_COLUMN_WIDTH, 'shrink-0')}>{c.node}</div>
               ))}
             </BoardLane>
           ))}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">
-          {shown.map((ids, depth) => (
-            <BoardColumn key={depth} {...groupProps(depth, ids)}>
+          {shown.map((ids, index) => (
+            <BoardColumn key={index} {...groupProps(index - rootAt, ids)}>
               {cardsOf(ids).map((c) => c.node)}
             </BoardColumn>
           ))}
