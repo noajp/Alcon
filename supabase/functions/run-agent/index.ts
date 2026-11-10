@@ -6589,6 +6589,14 @@ async function chat(a: ExecArgs, said: string): Promise<void> {
         flushedLength = shown.length;
       }
       const final = await stream.finalMessage();
+      // Each web search and page the call made: a step of the trace (the
+      // live display) and a tool event of the kept message, as a tool's.
+      const searched = webSteps((final.content ?? []) as unknown as { type: string; name?: string; input?: unknown }[]);
+      if (searched.length) await stepChain;
+      for (const line of searched) {
+        await addStep(admin, run.id, "action", line);
+        toolEvents.push({ name: line, result: { ok: true } });
+      }
       const blocks = (final.content ?? []) as unknown as { type: string; text?: string }[];
       const words = blocks.filter((b) => b.type === "text" && b.text?.trim()).map((b) => b.text!.trim()).join("\n\n");
       if (draftIdx !== null) {
