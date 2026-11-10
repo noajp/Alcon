@@ -1,5 +1,7 @@
 'use client';
 
+import { FIELD } from '@/shared/designTokens';
+
 import { formatError } from '@/Function/shared/formatError';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/button';
@@ -119,7 +121,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
         ))}
         <select
           value={kind} onChange={(e) => setKind(e.target.value as MemoryKind | 'all')}
-          className="px-2 py-1 text-[12px] rounded-md bg-muted/40 text-foreground border-none"
+          className={`px-2 py-1 text-[12px] ${FIELD.base} bg-transparent text-foreground`}
           aria-label={t('Kind')}
         >
           <option value="all">{t('All kinds')}</option>
@@ -129,7 +131,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
         </select>
         <input
           value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search memories')}
-          className="w-48 px-2 py-1 text-[12px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
+          className={`w-48 px-2 py-1 text-[12px] ${FIELD.base} bg-transparent text-foreground`}
         />
         <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
           <input type="checkbox" checked={showHistory} onChange={(e) => setShowHistory(e.target.checked)} />
@@ -220,7 +222,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
                       <span className="text-[12px] text-muted-foreground">{t('Share to a Space')}</span>
                       <select
                         value={shareSpaceId} onChange={(e) => setShareSpaceId(e.target.value)}
-                        className="px-2 py-1 text-[12px] rounded-md bg-muted/40 text-foreground border-none"
+                        className={`px-2 py-1 text-[12px] ${FIELD.base} bg-transparent text-foreground`}
                         aria-label={t('Share to a Space')}
                       >
                         <option value="">—</option>
@@ -244,17 +246,17 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
                 <div className="mt-2 space-y-2">
                   <input
                     value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                    className="w-full px-2 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
+                    className={`w-full px-2 py-1.5 text-[13px] ${FIELD.base} bg-transparent text-foreground`}
                     aria-label={t('Title')}
                   />
                   <input
                     value={draft.gist} onChange={(e) => setDraft({ ...draft, gist: e.target.value })}
-                    className="w-full px-2 py-1.5 text-[12px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
+                    className={`w-full px-2 py-1.5 text-[12px] ${FIELD.base} bg-transparent text-foreground`}
                     aria-label={t('Summary')}
                   />
                   <textarea
                     value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={6}
-                    className="w-full px-2 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
+                    className={`w-full px-2 py-1.5 text-[13px] ${FIELD.base} bg-transparent text-foreground`}
                     aria-label={t('Body')}
                   />
                   <div className="flex items-center gap-1.5">

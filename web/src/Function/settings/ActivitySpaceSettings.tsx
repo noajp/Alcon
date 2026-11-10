@@ -19,7 +19,7 @@ import { useScopeInvitations, useWhenInvitationsSettle } from '@/Function/member
 import { PendingInviteRows } from '@/Function/membership/PendingInviteRows';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { FONT } from '@/shared/designTokens';
+import { FONT, FIELD } from '@/shared/designTokens';
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Space owner', member: 'Member' };
 
@@ -273,7 +273,7 @@ export function ActivitySpaceSettings() {
             onBlur={saveName}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveName(); } }}
             aria-label={t('Name')}
-            className="w-56 px-3 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70"
+            className={`w-56 px-3 py-1.5 text-[13px] ${FIELD.base} bg-transparent text-foreground`}
             disabled={saving}
           />
         </SettingRow>

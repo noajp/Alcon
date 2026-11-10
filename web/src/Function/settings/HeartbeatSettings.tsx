@@ -1,5 +1,7 @@
 'use client';
 
+import { FIELD } from '@/shared/designTokens';
+
 import { formatError } from '@/Function/shared/formatError';
 import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
@@ -90,7 +92,7 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
   };
 
   const tick = tickState(settings, new Date());
-  const inputCls = 'w-24 px-2 py-1 text-[13px] rounded-md bg-muted/40 text-foreground border-none focus:bg-muted/70 disabled:opacity-50';
+  const inputCls = `w-24 px-2 py-1 text-[13px] disabled:opacity-50 ${FIELD.base} bg-transparent text-foreground`;
   const cadence = HEARTBEAT_CADENCES.find((c) => c.minutes === settings.cadenceMinutes) ?? HEARTBEAT_CADENCES[0];
   const capReached = monthSpent >= settings.monthlyBudgetUsd;
 
