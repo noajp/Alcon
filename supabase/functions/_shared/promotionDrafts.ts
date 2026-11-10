@@ -7,7 +7,7 @@
 // activation itself is the owner's RPC (PR4), never this module — the
 // drafting side can create neither a definition nor an Automation.
 
-import type { SupabaseClient } from "supabase";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   canPromotionTransition,
   PROMOTION_OPEN_STATUSES,

@@ -233,18 +233,19 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
     // The harness is optional: an automation without one runs on its own
     // workflow. With one, the harness is the contract: a disabled one does
     // not fire, and says why — it never falls back to another harness.
-    let def: { id: string; name: string; body: string | null; enabled: boolean } | null = null;
+    type FiredDefinition = { id: string; name: string; body: string | null; enabled: boolean };
+    let def: FiredDefinition | null = null;
     if (a.definition_id) {
       const { data } = await owner.db.from("definitions").select("id, name, body, enabled").eq("id", a.definition_id).maybeSingle();
       if (!data) return await fail("ハーネスが見つからないか、作った人が見られません。");
-      def = data as typeof def;
-      if (!usableDefinition(def as { enabled: boolean })) return await fail(`ハーネス「${def!.name}」が無効化されているため起動しませんでした`);
+      def = data as FiredDefinition;
+      if (!usableDefinition(def)) return await fail(`ハーネス「${def.name}」が無効化されているため起動しませんでした`);
       // The same check the editor shows: an error means the engine cannot run
       // the harness as written (no goal, or a loop with nothing that stops it),
       // so it is not fired at all rather than left to the generic backstops.
-      const harnessErrors = checkHarness(parseDefinition(def!.body ?? "")).filter((d) => d.severity === "error");
+      const harnessErrors = checkHarness(parseDefinition(def.body ?? "")).filter((d) => d.severity === "error");
       if (harnessErrors.length > 0) {
-        return await fail(`ハーネス「${def!.name}」の検査でエラーがあるため起動しませんでした: ${harnessErrors.map((d) => `${d.code} ${d.message}`).join(" ")}`);
+        return await fail(`ハーネス「${def.name}」の検査でエラーがあるため起動しませんでした: ${harnessErrors.map((d) => `${d.code} ${d.message}`).join(" ")}`);
       }
     }
     const steps = parseDefinition(a.workflow ?? "").sections.procedure.trim();

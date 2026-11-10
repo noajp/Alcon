@@ -34,7 +34,7 @@ export interface OAuthSecret {
   scope: string;
 }
 
-type IntegrationRowLike = { preset?: string | null; kind?: string; auth_type?: string; endpoint?: string } | null | undefined;
+type IntegrationRowLike = { preset?: string | null; kind?: string | null; auth_type?: string | null; endpoint?: string | null } | null | undefined;
 
 /** An account email read from a provider's answer, or null: not a string,
  *  or longer than an email can be. */

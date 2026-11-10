@@ -29,7 +29,7 @@ export interface GithubOAuthSecret {
 export interface GithubClientConfig { clientId: string; clientSecret: string }
 
 /** The integration rows that sign in with GitHub. */
-export function isGithubOAuthRow(row: { preset?: string | null; kind?: string; auth_type?: string; endpoint?: string } | null | undefined): boolean {
+export function isGithubOAuthRow(row: { preset?: string | null; kind?: string | null; auth_type?: string | null; endpoint?: string | null } | null | undefined): boolean {
   return !!row && row.preset === "github" && row.kind === "mcp" && row.auth_type === "oauth" && row.endpoint === GITHUB_MCP_ENDPOINT;
 }
 

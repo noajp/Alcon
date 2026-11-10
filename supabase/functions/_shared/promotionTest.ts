@@ -12,7 +12,7 @@
 // names (folded) against the Space's enabled connections, by row name
 // and by preset display name alike — the same names a harness may use.
 
-import type { SupabaseClient } from "supabase";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkHarness, parseDefinition } from "./definition.ts";
 import {
   MAX_PROMOTION_REVISIONS,
