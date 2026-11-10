@@ -14,6 +14,9 @@ import { I18nProvider } from "@/Function/i18n/I18nProvider";
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
+  // Inter has no Japanese: "Alcon JP" (globals.css) takes those glyphs, at
+  // weights matched to Inter's, before the system's own Japanese font.
+  fallback: ["Alcon JP", "system-ui", "sans-serif"],
 });
 
 // Monospace for code/data
