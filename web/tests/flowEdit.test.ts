@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 // edit (the same step order the canvas acted on).
 import { parseDefinition } from '@/AIP/harness/harnessDefinition';
 import {
-  deleteFlowStep, editFlowStepLine, flowStepCanMove, flowStepTitles, moveFlowStep,
+  appendFlowStep, workflowOf, deleteFlowStep, editFlowStepLine, flowStepCanMove, flowStepTitles, moveFlowStep,
 } from '@/Function/shared/flowEdit';
 import { projectDefinitionFlow, type FlowContext } from '@/Function/shared/flowProjection';
 
@@ -276,5 +276,35 @@ describe('flowEdit — the shared reading', () => {
       'Gmail で未処理のクレームメールを検索する',
       '分類に応じて対象 Object に Element を起票する',
     ]);
+  });
+});
+
+describe('appendFlowStep', () => {
+  it('starts a Procedure on an empty body', () => {
+    expect(appendFlowStep('', '集める')).toBe('# 進め方\n- 集める\n');
+    expect(flowStepTitles(appendFlowStep('', '集める')!)).toEqual(['集める']);
+  });
+  it('adds after the last step and leaves other sections alone', () => {
+    const body = '# 目的\n調べる\n\n# 進め方\n- 集める\n- まとめる\n\n# 止める条件\n10 周まで\n';
+    const next = appendFlowStep(body, '送る')!;
+    expect(flowStepTitles(next)).toEqual(['集める', 'まとめる', '送る']);
+    expect(next.endsWith('# 止める条件\n10 周まで\n')).toBe(true);
+    expect(next.startsWith('# 目的\n調べる\n')).toBe(true);
+  });
+  it('refuses an empty step', () => {
+    expect(appendFlowStep('', '  ')).toBeNull();
+  });
+});
+
+describe('workflowOf', () => {
+  it('keeps only the Procedure', () => {
+    expect(workflowOf('# 目的\n調べる\n\n# 進め方\n- 集める\n- まとめる\n\n# 止める条件\n10 周まで\n')).toBe('# 進め方\n- 集める\n- まとめる\n');
+    expect(workflowOf('# 目的\n調べる\n')).toBe('');
+  });
+});
+
+describe('appendFlowStep numbering', () => {
+  it('continues a numbered list', () => {
+    expect(appendFlowStep('# 進め方\n1. 集める\n2. まとめる\n', '送る')).toBe('# 進め方\n1. 集める\n2. まとめる\n3. 送る\n');
   });
 });

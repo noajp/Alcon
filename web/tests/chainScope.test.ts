@@ -400,7 +400,7 @@ describe('the mint and the carriage — driver wiring (source pins)', () => {
 
   it('an automation\u2019s fired run is born scoped from its harness (D4), inserted by the service role', () => {
     expect(automations).toContain('const firedScope = rootChainScope({');
-    expect(automations).toContain('connectors: parseDefinition(def.body ?? "").connectors');
+    expect(automations).toContain('connectors: def ? parseDefinition(def.body ?? "").connectors : []');
     expect(automations).toContain('chain_scope: firedScope');
     expect(automations).toContain('env.admin.from("agent_runs")');
   });

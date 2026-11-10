@@ -262,8 +262,10 @@ export function bootstrapScript(): string {
   ].join("\n");
 }
 
-/** Pure. Where inside the workspace the bootstrap files live. */
-export const WORKSPACE_HOME = "/home/sprite/.alcon";
+/** Pure. Where inside the workspace the bootstrap files live. Built from
+ *  parts: the deploy bundler reads a literal absolute path as a local
+ *  file to upload and fails on it. */
+export const WORKSPACE_HOME = ["", "home", "sprite", ".alcon"].join("/");
 
 // ── The provider seam ──────────────────────────────────────────────────
 

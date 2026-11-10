@@ -91,7 +91,9 @@ const RUNNING_STALE_MS = 10 * 60_000;
 const SESSION_PAUSED = "セッションの期限が切れた";
 
 interface Automation {
-  id: string; activity_space_id: string; name: string; enabled: boolean; definition_id: string; object_id: string;
+  id: string; activity_space_id: string; name: string; enabled: boolean; definition_id: string | null; object_id: string;
+  /** The automation's own steps, in the Procedure form (may be empty). */
+  workflow?: string | null;
   kind: "schedule" | "webhook"; cron: string | null; timezone: string; token_hash: string | null; owner_id: string;
   next_run_at: string | null;
   /** A promoted binding's templates (PR4): when present, a firing's
@@ -228,18 +230,25 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
   };
   try {
     const owner = await sessionFor(env.admin, env.url, env.anonKey, a.owner_id);
-    const { data: def } = await owner.db.from("definitions").select("id, name, body, enabled").eq("id", a.definition_id).maybeSingle();
-    if (!def) return await fail("ハーネスが見つからないか、作った人が見られません。");
-    // The automation's harness is its whole contract: a disabled one does
+    // The harness is optional: an automation without one runs on its own
+    // workflow. With one, the harness is the contract: a disabled one does
     // not fire, and says why — it never falls back to another harness.
-    if (!usableDefinition(def as { enabled: boolean })) return await fail(`ハーネス「${def.name}」が無効化されているため起動しませんでした`);
-    // The same check the editor shows: an error means the engine cannot run
-    // the harness as written (no goal, or a loop with nothing that stops it),
-    // so it is not fired at all rather than left to the generic backstops.
-    const harnessErrors = checkHarness(parseDefinition(def.body ?? "")).filter((d) => d.severity === "error");
-    if (harnessErrors.length > 0) {
-      return await fail(`ハーネス「${def.name}」の検査でエラーがあるため起動しませんでした: ${harnessErrors.map((d) => `${d.code} ${d.message}`).join(" ")}`);
+    let def: { id: string; name: string; body: string | null; enabled: boolean } | null = null;
+    if (a.definition_id) {
+      const { data } = await owner.db.from("definitions").select("id, name, body, enabled").eq("id", a.definition_id).maybeSingle();
+      if (!data) return await fail("ハーネスが見つからないか、作った人が見られません。");
+      def = data as typeof def;
+      if (!usableDefinition(def as { enabled: boolean })) return await fail(`ハーネス「${def!.name}」が無効化されているため起動しませんでした`);
+      // The same check the editor shows: an error means the engine cannot run
+      // the harness as written (no goal, or a loop with nothing that stops it),
+      // so it is not fired at all rather than left to the generic backstops.
+      const harnessErrors = checkHarness(parseDefinition(def!.body ?? "")).filter((d) => d.severity === "error");
+      if (harnessErrors.length > 0) {
+        return await fail(`ハーネス「${def!.name}」の検査でエラーがあるため起動しませんでした: ${harnessErrors.map((d) => `${d.code} ${d.message}`).join(" ")}`);
+      }
     }
+    const steps = parseDefinition(a.workflow ?? "").sections.procedure.trim();
+    if (!def && !steps) return await fail("ワークフローの手順が書かれていません。");
     const { data: obj } = await owner.db.from("objects").select("id, domain_id").eq("id", a.object_id).maybeSingle();
     if (!obj) return await fail("置き場所の Object が見つからないか、作った人が見られません。");
     const workerId = await aiWorkerOf(env.admin, a.activity_space_id);
@@ -262,12 +271,13 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
     const title = a.title_template
       ? renderTemplate(a.title_template).slice(0, 200) || `${a.name} — ${stamp(now, a.timezone)}`
       : subject ? `${a.name} — ${subject}` : `${a.name} — ${stamp(now, a.timezone)}`;
+    const workflowText = steps ? `\n\n## ワークフロー\nこの順に進めてください。\n\n${steps}` : "";
     const description = a.description_template
-      ? `${renderTemplate(a.description_template)}${input}`
-      : `自動化「${a.name}」が${how}起動しました。ハーネス「${def.name}」に従って進めてください。${input}`;
+      ? `${renderTemplate(a.description_template)}${workflowText}${input}`
+      : `自動化「${a.name}」が${how}起動しました。${def ? `ハーネス「${def.name}」に従って進めてください。` : ""}${workflowText}${input}`;
 
     const { data: el, error: elError } = await owner.db.from("elements")
-      .insert({ title, description, object_id: obj.id, status: "todo", priority: "medium", labels: ["automation"], definition_id: def.id })
+      .insert({ title, description, object_id: obj.id, status: "todo", priority: "medium", labels: ["automation"], definition_id: def?.id ?? null })
       .select("id").single();
     if (elError || !el) return await fail(`Element を作れませんでした: ${elError?.message ?? "unknown"}`);
     const { error: asError } = await owner.db.from("element_assignees").insert({ element_id: el.id, worker_id: workerId, role: "assignee" });
@@ -283,7 +293,7 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
     const firedScope = rootChainScope({
       runId: firedRunId,
       derived: deriveScopeFromDefinition({
-        connectors: parseDefinition(def.body ?? "").connectors,
+        connectors: def ? parseDefinition(def.body ?? "").connectors : [],
         integrations: await loadDerivationIntegrations(env.admin, a.activity_space_id).catch(() => []),
         strategyId: null,
       }),

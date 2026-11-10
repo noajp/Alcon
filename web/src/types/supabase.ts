@@ -963,7 +963,7 @@ export type Database = {
           activity_space_id: string
           created_at: string
           cron: string | null
-          definition_id: string
+          definition_id: string | null
           enabled: boolean
           id: string
           kind: string
@@ -979,12 +979,13 @@ export type Database = {
           title_template: string | null
           token_hash: string | null
           updated_at: string
+          workflow: string
         }
         Insert: {
           activity_space_id: string
           created_at?: string
           cron?: string | null
-          definition_id: string
+          definition_id?: string | null
           enabled?: boolean
           id?: string
           kind: string
@@ -1000,12 +1001,13 @@ export type Database = {
           title_template?: string | null
           token_hash?: string | null
           updated_at?: string
+          workflow?: string
         }
         Update: {
           activity_space_id?: string
           created_at?: string
           cron?: string | null
-          definition_id?: string
+          definition_id?: string | null
           enabled?: boolean
           id?: string
           kind?: string
@@ -1021,6 +1023,7 @@ export type Database = {
           title_template?: string | null
           token_hash?: string | null
           updated_at?: string
+          workflow?: string
         }
         Relationships: [
           {
