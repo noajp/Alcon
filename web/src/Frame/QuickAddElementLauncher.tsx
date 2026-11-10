@@ -1,6 +1,7 @@
 'use client';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
+import type { ElementStatus } from '@/types/database';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QuickAddElementPopup, type NewElementInput } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
@@ -26,8 +27,8 @@ const LAST_OBJECT_KEY = 'alcon.quickAddElement.lastObjectId';
 // a real keypress.
 export const CREATE_ELEMENT_EVENT = 'alcon:create-element';
 /** Optional detail on CREATE_ELEMENT_EVENT — the Calendar's "+" presets the
- *  day the grid is on. */
-export interface CreateElementDetail { dueDate?: string | null }
+ *  day the grid is on; a Board column's "+" presets its Object and Status. */
+export interface CreateElementDetail { dueDate?: string | null; objectId?: string | null; status?: ElementStatus | null }
 
 function readLastObjectId(): string | null {
   try { return localStorage.getItem(LAST_OBJECT_KEY); } catch { return null; }
@@ -81,6 +82,8 @@ export function QuickAddElementLauncher({
   const [defaultObjectId, setDefaultObjectId] = useState<string | null>(null);
   // Due date handed in by the opener (the Calendar's "+"); null for a plain C.
   const [presetDueDate, setPresetDueDate] = useState<string | null>(null);
+  // Status handed in by the opener (a Board column's "+").
+  const [presetStatus, setPresetStatus] = useState<ElementStatus | null>(null);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const { data: domains } = useDomains();
 
@@ -94,9 +97,11 @@ export function QuickAddElementLauncher({
   // CREATE_ELEMENT_EVENT below.
   const openQuickAdd = useCallback((detail?: CreateElementDetail) => {
     setPresetDueDate(detail?.dueDate ?? null);
+    setPresetStatus(detail?.status ?? null);
     const last = readLastObjectId();
     setDefaultObjectId(
-      contextObjectId && objectIds.has(contextObjectId)
+      detail?.objectId && objectIds.has(detail.objectId) ? detail.objectId
+      : contextObjectId && objectIds.has(contextObjectId)
         ? contextObjectId
         : last && objectIds.has(last) ? last : null,
     );
@@ -198,6 +203,7 @@ export function QuickAddElementLauncher({
     <QuickAddElementPopup
       open={open}
       contextLabel={contextLabel}
+      defaultStatus={presetStatus}
       hint={presetDueDate ? t('Due {date}', { date: parseDateOnly(presetDueDate)?.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) ?? presetDueDate }) : undefined}
       onClose={() => setOpen(false)}
       onSubmit={handleSubmit}

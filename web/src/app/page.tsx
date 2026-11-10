@@ -3,7 +3,7 @@
 import { ExplorerDataProvider } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
-import { WorkspaceActionsProvider } from '@/Frame/WorkspaceActionsContext';
+import { WorkspaceActionsProvider, type CreateObjectContext } from '@/Frame/WorkspaceActionsContext';
 import { AppSidebar } from '@/Frame/AppSidebar';
 import { ModePanel } from '@/Frame/ModePanel';
 import { useUserPreferences } from '@/Function/settings/useUserPreferences';
@@ -22,6 +22,7 @@ import { mergeNavigation, navigationAfterDomainChange, navigationForView } from 
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/ActivitySpace/execution/object/QuickAddObjectPopup';
+import { linkObjectToStrategy } from '@/hooks/strategyData';
 import { QuickAddNotebookPopup } from '@/ActivitySpace/artifacts/notebook/QuickAddNotebookPopup';
 import { placeNewNotebook, seedNotebook, setNextNotebookFolder } from '@/ActivitySpace/artifacts/notebook/notebookActions';
 import { useNotes } from '@/hooks/useNotesDb';
@@ -612,6 +613,8 @@ function WorkspaceContent({
   const [pendingNewNote, setPendingNewNote] = useState(0);
   // The workspace owns the Object creation popup.
   const [objectPopupOpen, setObjectPopupOpen] = useState(false);
+  // Where the open Object popup was raised from (a Board's "+"), if anywhere.
+  const [objectPopupContext, setObjectPopupContext] = useState<CreateObjectContext | null>(null);
   const [objectPopupWorkers, setObjectPopupWorkers] = useState<Worker[]>([]);
   // The Object popup uses the same visible Domain list as shell navigation.
   const previousDomainIdRef = useRef(activeDomainId);
@@ -624,7 +627,8 @@ function WorkspaceContent({
 
   // An Object lives in a Domain: with none yet, creating one starts with the Domain.
   const hasDomains = domains.length > 0;
-  const openObjectPopup = useCallback(() => {
+  const openObjectPopup = useCallback((context?: CreateObjectContext) => {
+    setObjectPopupContext(context ?? null);
     if (hasDomains) setObjectPopupOpen(true);
     else setCreateType('domain');
   }, [hasDomains]);
@@ -919,7 +923,8 @@ function WorkspaceContent({
         workers={objectPopupWorkers.map((w) => ({ id: w.id, name: w.name }))}
         domains={domains.map((d) => ({ id: d.id, name: d.name }))}
         types={activeDomainObjectTypes}
-        defaultDomainId={activeDomainId || null}
+        defaultDomainId={objectPopupContext?.domainId ?? (activeDomainId || null)}
+        contextLabel={objectPopupContext?.strategy?.name}
         onSubmit={async (input) => {
           const created = await createObject({
             name: input.name,
@@ -930,6 +935,7 @@ function WorkspaceContent({
             lead_id: input.leadWorkerId ?? null,
             due_date: input.dueDate ?? null,
           });
+          if (objectPopupContext?.strategy) await linkObjectToStrategy(objectPopupContext.strategy.id, created.id);
           await handleCreated({ type: 'object', id: created.id });
         }}
       />
