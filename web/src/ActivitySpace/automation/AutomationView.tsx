@@ -12,6 +12,9 @@ import type { StrategyDelegation } from '@/types/database';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { AutomationsSection } from './AutomationsSection';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
+import { FoldSection } from '@/Function/shared/FoldSection';
+import { Button } from '@/ui/button';
+import { useAutomations } from '@/hooks/automationData';
 import { setStrategyDefinition, useDefinitions } from '@/hooks/definitionData';
 
 /** The harness picker's value for "no harness of its own". */
@@ -33,6 +36,8 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
   const { data: strategies, loading, refetch } = useStrategiesInSpace();
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const automations = useAutomations(spaceId);
   const library = useDefinitions(spaceId);
 
   const change = async (id: string, delegation: StrategyDelegation) => {
@@ -50,12 +55,14 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-card">
-      <IslandHeader crumbs={[{ id: 'automation', label: t('Automation') }]} count={strategies.length} />
-      <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-4">
-        <AutomationsSection spaceId={spaceId} onOpenElement={onOpenElement} />
-        <section>
-        <h2 className="text-[14px] font-semibold text-foreground">{t('When a run finishes')}</h2>
-        <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">{t('What each Strategy’s AI work does when a run finishes.')}</p>
+      <IslandHeader crumbs={[{ id: 'automation', label: t('Automation') }]} count={automations.data.length}
+        actions={!creating && <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setCreating(true)}>{t('New automation')}</Button>} />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} onOpenElement={onOpenElement} />
+        {/* Each Strategy's own AI work, beside the automations. */}
+        <div className="px-6 py-6">
+        <FoldSection title={t('When a run finishes')} count={String(strategies.length)}>
+        <p className="mb-2 text-[12px] text-muted-foreground">{t('What each Strategy’s AI work does when a run finishes.')}</p>
         {error && <p role="alert" className="mb-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
         {loading ? (
           <p role="status" className="text-[13px] text-muted-foreground">{t('Loading…')}</p>
@@ -98,7 +105,8 @@ export function AutomationView({ onOpenStrategy, onOpenElement }: { onOpenStrate
             ))}
           </ul>
         )}
-        </section>
+        </FoldSection>
+        </div>
       </div>
     </div>
   );
