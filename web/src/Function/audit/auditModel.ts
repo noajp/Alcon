@@ -432,8 +432,31 @@ export interface CorrectionEnvelope {
   maxAttempts: number;
 }
 
+/** v3: the verifier's result on ONE declared Checks item (server:
+ *  _shared/runVerdict.ts). */
+export type VerdictCheckResult = 'pass' | 'partial' | 'fail';
+
+export interface VerdictCheck {
+  /** The item's text as the definition declared it, verbatim. */
+  item: string;
+  result: VerdictCheckResult;
+}
+
+/** v3: the verifier's depth judgement on ONE artifact it was shown —
+ *  substantial | thin | empty, against the definition's Output
+ *  section. A judgement, not a score (D8); the code-computed size
+ *  signal lives in the Evaluation model, labelled as size. */
+export type VerdictDepth = 'substantial' | 'thin' | 'empty';
+
+export interface VerdictDeliverable {
+  artifactId: string;
+  depth: VerdictDepth;
+  /** The verifier's one-line reason for the depth it gave. */
+  note: string;
+}
+
 export interface RunVerdict {
-  v: 1 | 2;
+  v: 1 | 2 | 3;
   result: RunVerdictResult;
   /** Who judged. 'verifier' = the separate check; 'none' = nobody did. */
   source: 'verifier' | 'none';
@@ -479,9 +502,20 @@ export interface RunVerdict {
    *  refused in the run's final slice. Absent when nothing was
    *  refused, and on every unscoped run. */
   chain?: { denied: number };
+  /** v3 only, optional within it: the verifier's per-item results on
+   *  the Checks items the run's definition declared, in declaration
+   *  order — empty when it declares none. Present only when a check
+   *  ran; absent on v1/v2 records and on unchecked v3 ones. */
+  checks?: VerdictCheck[];
+  /** v3 only, optional within it: the verifier's depth judgement per
+   *  artifact it was shown, in the order shown — empty when it was
+   *  shown none. Same presence rule as `checks`. */
+  deliverables?: VerdictDeliverable[];
 }
 
 const VERDICT_RESULTS: readonly string[] = ['pass', 'fail', 'unchecked'];
+const VERDICT_CHECK_RESULTS: readonly string[] = ['pass', 'partial', 'fail'];
+const VERDICT_DEPTHS: readonly string[] = ['substantial', 'thin', 'empty'];
 const VERDICT_SOURCES: readonly string[] = ['verifier', 'none'];
 const VERDICT_OUTCOMES: readonly string[] = ['completed', 'partial', 'blocked'];
 const VERDICT_REASONS: readonly string[] = ['revisions-exhausted', 'verify-unavailable', 'outcome-not-completed', 'external-model'];
@@ -527,7 +561,7 @@ function parseCorrectionEnvelope(raw: unknown): CorrectionEnvelope | null {
 export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  if (r.v !== 1 && r.v !== 2) return null;
+  if (r.v !== 1 && r.v !== 2 && r.v !== 3) return null;
   if (typeof r.result !== 'string' || !VERDICT_RESULTS.includes(r.result)) return null;
   if (typeof r.source !== 'string' || !VERDICT_SOURCES.includes(r.source)) return null;
   if (!(r.model === null || typeof r.model === 'string')) return null;
@@ -542,7 +576,7 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!(e.verifyStepIdx === null || (typeof e.verifyStepIdx === 'number' && Number.isInteger(e.verifyStepIdx)))) return null;
   if (!Array.isArray(e.artifactIds) || !e.artifactIds.every((id) => typeof id === 'string')) return null;
   const base: RunVerdict = {
-    v: r.v as 1 | 2,
+    v: r.v as 1 | 2 | 3,
     result: r.result as RunVerdictResult,
     source: r.source as RunVerdict['source'],
     model: r.model as string | null,
@@ -554,7 +588,7 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     evidence: { verifyStepIdx: e.verifyStepIdx as number | null, artifactIds: [...(e.artifactIds as string[])] },
   };
   if (r.v === 1) return base;
-  // v2 must carry its accounting exactly, as the server writes it.
+  // v2 and v3 must carry the claim accounting exactly, as the server writes it.
   const claims = r.claims;
   if (!claims || typeof claims !== 'object' || Array.isArray(claims)) return null;
   const c = claims as Record<string, unknown>;
@@ -604,6 +638,42 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     const denied = (chain as Record<string, unknown>).denied;
     if (typeof denied !== 'number' || !Number.isInteger(denied) || denied < 0) return null;
     out = { ...out, chain: { denied } };
+  }
+  if (r.v === 2) return out;
+  // v3's scoring blocks, the same: optional within v3 (absent = the
+  // finish was not checked), exact when present — a checks entry
+  // names a non-empty declared item at most once; a deliverables
+  // entry names one of the record's own evidence artifacts at most
+  // once, with a depth from the vocabulary and its note.
+  if (r.checks !== undefined) {
+    if (!Array.isArray(r.checks)) return null;
+    const seen = new Set<string>();
+    const checks: VerdictCheck[] = [];
+    for (const entry of r.checks) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+      const ce = entry as Record<string, unknown>;
+      if (typeof ce.item !== 'string' || !ce.item || seen.has(ce.item)) return null;
+      if (typeof ce.result !== 'string' || !VERDICT_CHECK_RESULTS.includes(ce.result)) return null;
+      seen.add(ce.item);
+      checks.push({ item: ce.item, result: ce.result as VerdictCheckResult });
+    }
+    out = { ...out, checks };
+  }
+  if (r.deliverables !== undefined) {
+    if (!Array.isArray(r.deliverables)) return null;
+    const shownIds = new Set(base.evidence.artifactIds);
+    const seen = new Set<string>();
+    const deliverables: VerdictDeliverable[] = [];
+    for (const entry of r.deliverables) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+      const de = entry as Record<string, unknown>;
+      if (typeof de.artifactId !== 'string' || !shownIds.has(de.artifactId) || seen.has(de.artifactId)) return null;
+      if (typeof de.depth !== 'string' || !VERDICT_DEPTHS.includes(de.depth)) return null;
+      if (typeof de.note !== 'string') return null;
+      seen.add(de.artifactId);
+      deliverables.push({ artifactId: de.artifactId, depth: de.depth as VerdictDepth, note: de.note });
+    }
+    out = { ...out, deliverables };
   }
   return out;
 }

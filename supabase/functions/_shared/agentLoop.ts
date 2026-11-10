@@ -143,7 +143,22 @@ export interface LoopDeps {
   nudge?: string;
 }
 
-export interface Verdict { pass: boolean; gaps: string[] }
+export interface Verdict {
+  pass: boolean;
+  gaps: string[];
+  /**
+   * The v3 scoring the verifier gave in the same answer (run-agent/
+   * verify.ts reads it; _shared/runVerdict.ts defines the sealed
+   * shapes): one result per Checks item as the answer named it —
+   * alignment to the declared items is the driver's, at its seam —
+   * and one depth per artifact, named by TITLE here because the
+   * verifier never sees artifact ids. Optional: a verdict from the
+   * mechanical check, or an answer without the blocks, carries none,
+   * and the loop's pass/fail behaviour never depends on them.
+   */
+  checks?: { item: string; result: "pass" | "partial" | "fail" }[];
+  deliverables?: { artifactTitle: string; depth: "substantial" | "thin" | "empty"; note: string }[];
+}
 
 /** How many times a run's "completed" may be sent back before it stands. */
 export const MAX_REVISIONS = 2;

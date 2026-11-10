@@ -29,12 +29,49 @@
 // finish was sealed — the dispatch-time comparison that tells a
 // standing pass from a stale one (the unit-return rule). Both absent
 // on records written before they existed, and never invented for them.
+//
+// v3 (the Evaluation tab's PR3) adds the verifier's STRUCTURED scoring,
+// given in the same check that produced pass/fail — never a second
+// call: one result per Checks item the definition declared, and one
+// depth judgement per artifact the verifier was shown. The rubric is
+// the definition's own Checks + Output sections — declared, hash-bound
+// and owner-approved through the existing definition lifecycle; there
+// is no other rubric store. Both blocks are optional within v3: they
+// exist only when a check actually ran, so an unchecked record carries
+// neither, and records written before v3 read exactly as before. Depth
+// is the verifier's judgement (substantial | thin | empty, D8) — there
+// is deliberately no numeric score; the code-computed size signal
+// lives in the Evaluation tab's model, labelled as size, beside it.
 
 import type { ClaimCheck } from "./finishClaims.ts";
 import { parseCorrectionEnvelope, type CorrectionEnvelope } from "./correctionEnvelope.ts";
 import type { VerifyTally } from "./verifyReads.ts";
 
 export type RunVerdictResult = "pass" | "fail" | "unchecked";
+
+/** v3: the verifier's result on ONE declared Checks item. */
+export type VerdictCheckResult = "pass" | "partial" | "fail";
+
+/** One scored Checks item: the item's text as the definition declared
+ *  it (verbatim — the aggregation key on the reading side), and the
+ *  verifier's result on it. */
+export interface VerdictCheck {
+  item: string;
+  result: VerdictCheckResult;
+}
+
+/** v3: the verifier's depth judgement on ONE artifact it was shown,
+ *  against the definition's Output section and the Element's ask.
+ *  `empty` — no content beyond a heading/outline; `thin` — content
+ *  that does not cover the declared shape; `substantial` — it does. */
+export type VerdictDepth = "substantial" | "thin" | "empty";
+
+export interface VerdictDeliverable {
+  artifactId: string;
+  depth: VerdictDepth;
+  /** The verifier's one-line reason for the depth it gave. */
+  note: string;
+}
 
 export type RunVerdictReason =
   | "revisions-exhausted"    // last check failed; the finish stood anyway
@@ -43,7 +80,7 @@ export type RunVerdictReason =
   | "external-model";        // runs on an external model have no verifier
 
 export interface RunVerdict {
-  v: 1 | 2;
+  v: 1 | 2 | 3;
   result: RunVerdictResult;
   /** Who judged. 'verifier' = the separate check; 'none' = nobody did. */
   source: "verifier" | "none";
@@ -110,11 +147,38 @@ export interface RunVerdict {
    * runs, and every unscoped one.
    */
   chain?: { denied: number };
+  /**
+   * v3 only, and optional within it: the verifier's per-item results
+   * on the Checks items the run's definition declared, in declaration
+   * order — empty when the definition declares no items. Present only
+   * when a check ran (the blocks ride the check, never the record's
+   * other paths). Absent on v1/v2 records and on unchecked v3 ones.
+   */
+  checks?: VerdictCheck[];
+  /**
+   * v3 only, and optional within it: the verifier's depth judgement
+   * per artifact it was shown (evidence.artifactIds), in the order
+   * shown — empty when it was shown none. Same presence rule as
+   * `checks`. The size signal is NOT sealed here: size is computed by
+   * code from the artifact rows on the reading side and labelled as
+   * size, never merged into this judgement (D8).
+   */
+  deliverables?: VerdictDeliverable[];
 }
 
 export interface VerdictInputs {
-  /** The last verdict the verifier returned for this run, and when. */
-  lastCheck: { pass: boolean; gaps: string[]; model: string; checkedAt: string; verifyStepIdx: number | null; artifactIds: string[] } | null;
+  /** The last verdict the verifier returned for this run, and when.
+   *   Its v3 scoring blocks arrive ALIGNED by the driver (verify.ts'
+   *   alignVerdictScoring): checks holds one entry per item in
+   *   `checksItems`, deliverables one per id in `artifactIds` — this
+   *   module seals them, it does not re-derive them. */
+  lastCheck: {
+    pass: boolean; gaps: string[]; model: string; checkedAt: string; verifyStepIdx: number | null; artifactIds: string[];
+    /** The definition's declared Checks items, in declaration order. */
+    checksItems?: readonly string[];
+    checks?: readonly VerdictCheck[];
+    deliverables?: readonly VerdictDeliverable[];
+  } | null;
   /** The verifier was attempted for the standing finish but returned nothing. */
   checkAttempted: boolean;
   revisions: number;
@@ -166,13 +230,39 @@ const chainFields = (input: VerdictInputs): Pick<RunVerdict, "chain"> => (
   input.chainDenied && input.chainDenied > 0 ? { chain: { denied: input.chainDenied } } : {}
 );
 
+/**
+ * The v3 scoring blocks, sealed from the check that ran — and only
+ * from it: an unchecked record (noCheck) never calls this, so a finish
+ * nobody checked carries no per-item results and no depth judgements.
+ * The derivation the record pins: a declared item the check did not
+ * score counts as `fail` (an unscored item is not a satisfied one —
+ * partial would flatter it, pass would invent it); an artifact the
+ * check was shown but gave no depth for gets none invented — it is
+ * simply absent from the block, and the reading side shows that
+ * absence. Both blocks are present (possibly empty) whenever a check
+ * ran, so "checked, nothing declared / nothing shown" reads as []
+ * rather than as the v2-era absence.
+ */
+const scoringFields = (check: NonNullable<VerdictInputs["lastCheck"]>): Pick<RunVerdict, "checks" | "deliverables"> => {
+  const scored = new Map((check.checks ?? []).map((c) => [c.item, c.result] as const));
+  const checks: VerdictCheck[] = (check.checksItems ?? []).map((item) => ({
+    item,
+    result: scored.get(item) ?? "fail",
+  }));
+  const shown = new Set(check.artifactIds);
+  const deliverables: VerdictDeliverable[] = (check.deliverables ?? [])
+    .filter((d) => shown.has(d.artifactId))
+    .map((d) => ({ artifactId: d.artifactId, depth: d.depth, note: d.note }));
+  return { checks, deliverables };
+};
+
 const correctionFields = (input: VerdictInputs): Pick<RunVerdict, "corrections" | "inputsHash"> => ({
   ...(input.corrections?.length ? { corrections: input.corrections.map((c) => ({ ...c, unit: { ...c.unit }, reason: [...c.reason], evidence: { ...c.evidence, artifactIds: [...c.evidence.artifactIds] } })) } : {}),
   ...(input.inputsHash ? { inputsHash: input.inputsHash } : {}),
 });
 
 const noCheck = (input: VerdictInputs, reason: RunVerdictReason): RunVerdict => ({
-  v: 2,
+  v: 3,
   result: "unchecked",
   source: "none",
   model: null,
@@ -201,7 +291,7 @@ export function buildRunVerdict(input: VerdictInputs): RunVerdict {
   const check = input.lastCheck;
   if (check) {
     return {
-      v: 2,
+      v: 3,
       result: check.pass ? "pass" : "fail",
       source: "verifier",
       model: check.model,
@@ -215,6 +305,7 @@ export function buildRunVerdict(input: VerdictInputs): RunVerdict {
       ...verifyFields(input),
       ...correctionFields(input),
       ...chainFields(input),
+      ...scoringFields(check),
     };
   }
   // Attempted or not, from the record's side the fact is the same: the
@@ -223,6 +314,8 @@ export function buildRunVerdict(input: VerdictInputs): RunVerdict {
 }
 
 const RESULTS: readonly string[] = ["pass", "fail", "unchecked"];
+const CHECK_RESULTS: readonly string[] = ["pass", "partial", "fail"];
+const DEPTHS: readonly string[] = ["substantial", "thin", "empty"];
 const SOURCES: readonly string[] = ["verifier", "none"];
 const OUTCOMES: readonly string[] = ["completed", "partial", "blocked"];
 const REASONS: readonly string[] = ["revisions-exhausted", "verify-unavailable", "outcome-not-completed", "external-model"];
@@ -234,7 +327,7 @@ const REASONS: readonly string[] = ["revisions-exhausted", "verify-unavailable",
 export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  if (r.v !== 1 && r.v !== 2) return null;
+  if (r.v !== 1 && r.v !== 2 && r.v !== 3) return null;
   if (typeof r.result !== "string" || !RESULTS.includes(r.result)) return null;
   if (typeof r.source !== "string" || !SOURCES.includes(r.source)) return null;
   if (!(r.model === null || typeof r.model === "string")) return null;
@@ -249,7 +342,7 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
   if (!(e.verifyStepIdx === null || (typeof e.verifyStepIdx === "number" && Number.isInteger(e.verifyStepIdx)))) return null;
   if (!Array.isArray(e.artifactIds) || !e.artifactIds.every((id) => typeof id === "string")) return null;
   const base: RunVerdict = {
-    v: r.v as 1 | 2,
+    v: r.v as 1 | 2 | 3,
     result: r.result as RunVerdictResult,
     source: r.source as RunVerdict["source"],
     model: r.model as string | null,
@@ -261,8 +354,9 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     evidence: { verifyStepIdx: e.verifyStepIdx as number | null, artifactIds: [...(e.artifactIds as string[])] },
   };
   if (r.v === 1) return base;
-  // v2 must carry its accounting exactly: counts are non-negative integers
-  // that cannot exceed the total, and the findings are strings.
+  // v2 and v3 must carry the claim accounting exactly: counts are
+  // non-negative integers that cannot exceed the total, and the
+  // findings are strings.
   const claims = r.claims;
   if (!claims || typeof claims !== "object" || Array.isArray(claims)) return null;
   const c = claims as Record<string, unknown>;
@@ -316,6 +410,45 @@ export function parseRunVerdict(raw: unknown): RunVerdict | null {
     const ct = chain as Record<string, unknown>;
     if (!count(ct.denied)) return null;
     out = { ...out, chain: { denied: ct.denied as number } };
+  }
+  if (r.v === 2) return out;
+  // v3's scoring blocks: optional within v3 (absent = the finish was
+  // not checked — the blocks ride the check), and exact when present.
+  // A checks entry names a non-empty declared item, at most once, with
+  // a result from the vocabulary; a deliverables entry names one of
+  // the artifacts in this record's own evidence (the verifier can only
+  // have judged what it was shown), at most once, with a depth from
+  // the vocabulary and its note. Stray scoring keys on a v1/v2 record
+  // never reach here — those versions return above, as written.
+  if (r.checks !== undefined) {
+    if (!Array.isArray(r.checks)) return null;
+    const seen = new Set<string>();
+    const checks: VerdictCheck[] = [];
+    for (const entry of r.checks) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const ce = entry as Record<string, unknown>;
+      if (typeof ce.item !== "string" || !ce.item || seen.has(ce.item)) return null;
+      if (typeof ce.result !== "string" || !CHECK_RESULTS.includes(ce.result)) return null;
+      seen.add(ce.item);
+      checks.push({ item: ce.item, result: ce.result as VerdictCheckResult });
+    }
+    out = { ...out, checks };
+  }
+  if (r.deliverables !== undefined) {
+    if (!Array.isArray(r.deliverables)) return null;
+    const shownIds = new Set(base.evidence.artifactIds);
+    const seen = new Set<string>();
+    const deliverables: VerdictDeliverable[] = [];
+    for (const entry of r.deliverables) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+      const de = entry as Record<string, unknown>;
+      if (typeof de.artifactId !== "string" || !shownIds.has(de.artifactId) || seen.has(de.artifactId)) return null;
+      if (typeof de.depth !== "string" || !DEPTHS.includes(de.depth)) return null;
+      if (typeof de.note !== "string") return null;
+      seen.add(de.artifactId);
+      deliverables.push({ artifactId: de.artifactId, depth: de.depth as VerdictDepth, note: de.note });
+    }
+    out = { ...out, deliverables };
   }
   return out;
 }

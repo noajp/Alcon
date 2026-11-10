@@ -489,3 +489,107 @@ describe('definitions at work', () => {
     expect(report.definitions[0].calibration).toBeNull();
   });
 });
+
+describe('verdict v3 scoring aggregation (PR3)', () => {
+  function v3Verdict(over: Partial<RunVerdict> = {}): RunVerdict {
+    return verdict({
+      v: 3,
+      checks: [],
+      deliverables: [],
+      ...over,
+    });
+  }
+
+  it('aggregates per-Checks-item results across the period’s scored runs, worst first', () => {
+    const o1 = outcome({ element_id: 'e1' });
+    const o2 = outcome({ element_id: 'e1' });
+    const report = build({
+      outcomes: [o1, o2],
+      runs: [
+        run({ id: o1.run_id, verdict: v3Verdict({ checks: [
+          { item: '根拠を挙げる', result: 'pass' },
+          { item: '価格を税込で書く', result: 'fail' },
+        ] }) }),
+        run({ id: o2.run_id, verdict: v3Verdict({ checks: [
+          { item: '根拠を挙げる', result: 'partial' },
+          { item: '価格を税込で書く', result: 'fail' },
+        ] }) }),
+      ],
+    });
+    expect(report.headline.scoring.scoredRuns).toBe(2);
+    // Worst first: the twice-failed item leads the once-partial one.
+    expect(report.checksItems).toEqual([
+      { item: '価格を税込で書く', pass: 0, partial: 0, fail: 2, scored: 2 },
+      { item: '根拠を挙げる', pass: 1, partial: 1, fail: 0, scored: 2 },
+    ]);
+    expect(report.headline.scoring.checksItems).toEqual(report.checksItems);
+  });
+
+  it('counts depth judgements and the thin/empty total over scored runs only', () => {
+    const scored = outcome({ element_id: 'e1' });
+    const unscored = outcome({ element_id: 'e1' });
+    const report = build({
+      outcomes: [scored, unscored],
+      runs: [
+        run({ id: scored.run_id, verdict: v3Verdict({
+          evidence: { verifyStepIdx: 1, artifactIds: ['a1', 'a2', 'a3'] },
+          deliverables: [
+            { artifactId: 'a1', depth: 'thin', note: '見出しだけ' },
+            { artifactId: 'a2', depth: 'empty', note: '中身がない' },
+            { artifactId: 'a3', depth: 'substantial', note: '揃っている' },
+          ],
+        }) }),
+        // A v2 verdict: no blocks — it neither scores nor dilutes.
+        run({ id: unscored.run_id, verdict: verdict() }),
+      ],
+    });
+    expect(report.headline.scoring.scoredRuns).toBe(1);
+    expect(report.headline.scoring.depthCounts).toEqual({ substantial: 1, thin: 1, empty: 1 });
+    expect(report.headline.scoring.thinDeliverables).toBe(2);
+  });
+
+  it('attaches depth to a deliverable only where the verdict judged THAT artifact — size stays a separate fact', () => {
+    const o = outcome({ element_id: 'e1' });
+    const report = build({
+      outcomes: [o],
+      runs: [run({ id: o.run_id, verdict: v3Verdict({
+        evidence: { verifyStepIdx: 1, artifactIds: ['a-judged', 'a-shown-only'] },
+        deliverables: [{ artifactId: 'a-judged', depth: 'thin', note: '表の見出しだけ' }],
+      }) })],
+      artifacts: [
+        // Long but judged thin: depth and size disagree, and both stand.
+        artifact({ id: 'a-judged', run_id: o.run_id, content: 'x'.repeat(400) }),
+        // Shown to the verifier but given no depth: none is invented.
+        artifact({ id: 'a-shown-only', run_id: o.run_id, content: 'x'.repeat(400) }),
+      ],
+    });
+    const byId = new Map(report.deliverables.map((d) => [d.artifact.id, d]));
+    expect(byId.get('a-judged')!.depth).toEqual({ depth: 'thin', note: '表の見出しだけ' });
+    expect(byId.get('a-judged')!.size.short).toBe(false);
+    expect(byId.get('a-shown-only')!.depth).toBeNull();
+    expect(byId.get('a-shown-only')!.verifier).not.toBeNull();
+    // The worst-run expansion carries the same deliverable evaluation.
+    const el = report.objects.flatMap((ob) => ob.elements).find((e) => e.elementId === 'e1')!;
+    const wr = el.worstRuns.find((r) => r.runId === o.run_id);
+    expect(wr?.artifacts.find((d) => d.artifact.id === 'a-judged')?.depth).toEqual({ depth: 'thin', note: '表の見出しだけ' });
+  });
+
+  it('before v3 (and for unchecked v3 runs) the scoring is absent, not zero', () => {
+    const v2run = outcome({ element_id: 'e1' });
+    const unchecked = outcome({ element_id: 'e1', verdict_result: 'unchecked' });
+    const report = build({
+      outcomes: [v2run, unchecked],
+      runs: [
+        run({ id: v2run.run_id, verdict: verdict() }),
+        run({ id: unchecked.run_id, verdict: v3Verdict({ result: 'unchecked', source: 'none', checks: undefined, deliverables: undefined }) }),
+      ],
+    });
+    expect(report.headline.scoring).toEqual({
+      scoredRuns: 0,
+      checksItems: [],
+      depthCounts: { substantial: 0, thin: 0, empty: 0 },
+      thinDeliverables: 0,
+    });
+    expect(report.checksItems).toEqual([]);
+  });
+});

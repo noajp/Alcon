@@ -13,11 +13,14 @@ const BASE = { lastCheck: null, checkAttempted: false, revisions: 0, finish: { o
 describe('buildRunVerdict', () => {
   it('records a checked pass with its evidence', () => {
     const v = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true, revisions: 1 });
-    expect(v).toMatchObject({ v: 2, result: 'pass', source: 'verifier', model: 'claude-test', gaps: [], revisions: 1, checkedAt: CHECK.checkedAt, outcome: 'completed', reason: null });
+    // v3 since the Evaluation PR3: new records are sealed as v3 (the
+    // claim accounting below is unchanged from v2, and v1/v2 records
+    // still parse exactly as written — see the parser pins below).
+    expect(v).toMatchObject({ v: 3, result: 'pass', source: 'verifier', model: 'claude-test', gaps: [], revisions: 1, checkedAt: CHECK.checkedAt, outcome: 'completed', reason: null });
     expect(v.evidence).toEqual({ verifyStepIdx: 12, artifactIds: ['a1', 'a2'] });
   });
 
-  it('carries the claim accounting on every v2 record, checked or not', () => {
+  it('carries the claim accounting on every record since v2, checked or not', () => {
     const v = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true });
     expect(v.claims).toEqual({ total: 2, sourced: 1, stale: 0 });
     expect(v.claimGaps).toEqual(['主張「X」に出典がありません']);
@@ -69,7 +72,7 @@ describe('parseRunVerdict', () => {
 
   const MALFORMED: unknown[] = [
     null, undefined, 'pass', [], {},
-    { ...built, v: 3 },
+    { ...built, v: 4 },
     { ...built, v: undefined },
     { ...built, claims: undefined },
     { ...built, claims: null },
@@ -284,5 +287,98 @@ describe('verdict chain accounting (B10)', () => {
     const older = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true });
     expect(parseRunVerdict(older)?.chain).toBeUndefined();
     expect(webParseRunVerdict(older)).toEqual(parseRunVerdict(older));
+  });
+});
+
+describe('verdict v3 scoring (Evaluation PR3)', () => {
+  // The verifier scored one of the two declared items and both shown
+  // artifacts — plus one artifact it was never shown, which code must
+  // never seal (the record's evidence is the bound).
+  const SCORED = {
+    ...CHECK,
+    checksItems: ['件数を満たす', '出典を付ける'],
+    checks: [{ item: '件数を満たす', result: 'partial' }],
+    deliverables: [
+      { artifactId: 'a1', depth: 'thin', note: '見出しだけで中身がない' },
+      { artifactId: 'a2', depth: 'substantial', note: '型どおりに揃っている' },
+      { artifactId: 'a-never-shown', depth: 'empty', note: 'shown されていない' },
+    ],
+  };
+
+  it('seals per-item results in declaration order; an unscored declared item derives to fail', () => {
+    const v = buildRunVerdict({ ...BASE, lastCheck: SCORED, checkAttempted: true });
+    expect(v.v).toBe(3);
+    expect(v.checks).toEqual([
+      { item: '件数を満たす', result: 'partial' },
+      // 出典を付ける was declared but not scored: not satisfied —
+      // fail, never pass (invented) and never partial (flattering).
+      { item: '出典を付ける', result: 'fail' },
+    ]);
+  });
+
+  it('seals depth only for artifacts in the check’s own evidence', () => {
+    const v = buildRunVerdict({ ...BASE, lastCheck: SCORED, checkAttempted: true });
+    expect(v.deliverables).toEqual([
+      { artifactId: 'a1', depth: 'thin', note: '見出しだけで中身がない' },
+      { artifactId: 'a2', depth: 'substantial', note: '型どおりに揃っている' },
+    ]);
+  });
+
+  it('a checked finish with nothing declared and nothing shown seals empty blocks, not absent ones', () => {
+    const v = buildRunVerdict({ ...BASE, lastCheck: CHECK, checkAttempted: true });
+    expect(v.checks).toEqual([]);
+    expect(v.deliverables).toEqual([]);
+  });
+
+  it('an unchecked v3 record carries neither block — nobody scored it', () => {
+    for (const v of [
+      buildRunVerdict({ ...BASE, checkAttempted: true }),
+      buildRunVerdict({ ...BASE, finish: { outcome: 'partial' } }),
+      buildRunVerdict({ ...BASE, external: true }),
+    ]) {
+      expect(v.v).toBe(3);
+      expect(v.checks).toBeUndefined();
+      expect(v.deliverables).toBeUndefined();
+    }
+  });
+
+  it('round-trips through both parsers, and rejects malformed blocks on both', () => {
+    const built = buildRunVerdict({ ...BASE, lastCheck: SCORED, checkAttempted: true });
+    expect(parseRunVerdict(JSON.parse(JSON.stringify(built)))).toEqual(built);
+    expect(webParseRunVerdict(JSON.parse(JSON.stringify(built)))).toEqual(built);
+    for (const bad of [
+      { ...built, checks: 'two' },
+      { ...built, checks: null },
+      { ...built, checks: [{ item: '件数を満たす', result: 'great' }] },
+      { ...built, checks: [{ item: '', result: 'pass' }] },
+      { ...built, checks: [{ item: '件数を満たす', result: 'pass' }, { item: '件数を満たす', result: 'fail' }] },
+      { ...built, checks: [{ result: 'pass' }] },
+      { ...built, deliverables: 'deep' },
+      { ...built, deliverables: null },
+      { ...built, deliverables: [{ artifactId: 'a1', depth: 'deep', note: 'x' }] },
+      // a9 is not in this record's evidence: the verifier cannot have judged it.
+      { ...built, deliverables: [{ artifactId: 'a9', depth: 'thin', note: 'x' }] },
+      { ...built, deliverables: [{ artifactId: 'a1', depth: 'thin', note: 'x' }, { artifactId: 'a1', depth: 'empty', note: 'y' }] },
+      { ...built, deliverables: [{ artifactId: 'a1', depth: 'thin', note: 3 }] },
+      { ...built, deliverables: [{ artifactId: 'a1', depth: 'thin' }] },
+    ]) {
+      expect(parseRunVerdict(bad)).toBeNull();
+      expect(webParseRunVerdict(bad)).toBeNull();
+    }
+  });
+
+  it('v2 records still read exactly as written — no scoring invented, stray v3 keys dropped with the version', () => {
+    const v2 = {
+      v: 2, result: 'pass', source: 'verifier', model: 'claude-old', gaps: [], revisions: 0,
+      checkedAt: '2026-11-05T01:00:00Z', outcome: 'completed', reason: null,
+      evidence: { verifyStepIdx: 4, artifactIds: ['a1'] },
+      claims: { total: 1, sourced: 1, stale: 0 }, claimGaps: [],
+    };
+    expect(parseRunVerdict(v2)).toEqual(v2);
+    expect(webParseRunVerdict(v2)).toEqual(v2);
+    expect(parseRunVerdict(v2)?.checks).toBeUndefined();
+    const stray = { ...v2, checks: [{ item: 'x', result: 'pass' }], deliverables: [{ artifactId: 'a1', depth: 'thin', note: 'n' }] };
+    expect(parseRunVerdict(stray)).toEqual(v2);
+    expect(webParseRunVerdict(stray)).toEqual(v2);
   });
 });

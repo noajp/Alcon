@@ -478,6 +478,95 @@ describe('verifier', () => {
     expect(verify.VERIFY_SYSTEM).toContain('コードが機械的に検査済み');
     expect(verify.VERIFY_SYSTEM).toContain('unconfirmed');
   });
+
+  it('v3: the schema gains the scoring blocks as optional properties — pass/gaps stay the only required answer', () => {
+    expect(verify.VERDICT_SCHEMA.required).toEqual(['pass', 'gaps']);
+    expect(Object.keys(verify.VERDICT_SCHEMA.properties)).toEqual(['pass', 'gaps', 'checks', 'deliverables']);
+    expect(verify.VERDICT_SCHEMA.properties.checks.items.properties.result.enum).toEqual(['pass', 'partial', 'fail']);
+    expect(verify.VERDICT_SCHEMA.properties.deliverables.items.properties.depth.enum).toEqual(['substantial', 'thin', 'empty']);
+    // The model names artifacts by title — it never sees their ids.
+    expect(Object.keys(verify.VERDICT_SCHEMA.properties.deliverables.items.properties)).toEqual(['artifactTitle', 'depth', 'note']);
+  });
+
+  it('v3: the prompt names the declared Checks items and the Output shape as the scoring frame, and the system defines thin/empty', () => {
+    const p = verify.verifyPrompt({
+      element: { title: '資料を作る', description: '10 ページの提案資料' }, intents: [],
+      finish: { outcome: 'completed', summary: '作った', message: '保存した' },
+      artifacts: [{ id: 'a1', title: '提案資料', content: '# 表紙' }], usedWeb: false,
+      checksItems: ['根拠資料を 3 件以上挙げる', '価格を税込で書く'],
+      outputShape: { format: 'markdown', body: '# 概要\n# 根拠\n# 価格' },
+    });
+    for (const t of ['根拠資料を 3 件以上挙げる', '価格を税込で書く', 'format: markdown', '# 根拠']) expect(p).toContain(t);
+    expect(verify.VERIFY_SYSTEM).toContain('substantial');
+    expect(verify.VERIFY_SYSTEM).toContain('thin');
+    expect(verify.VERIFY_SYSTEM).toContain('empty');
+    expect(verify.VERIFY_SYSTEM).toContain('見出しやアウトラインだけで');
+  });
+
+  it('v3: readVerdict reads the scoring blocks tolerantly — off-vocabulary entries drop, the verdict stands', () => {
+    const v = verify.readVerdict(JSON.stringify({
+      pass: false, gaps: ['不足'],
+      checks: [
+        { item: '件数を満たす', result: 'partial' },
+        { item: '言い換えた項目', result: 'great' },
+        { item: '', result: 'pass' },
+        'junk',
+      ],
+      deliverables: [
+        { artifactTitle: '提案資料', depth: 'thin', note: '見出しだけ' },
+        { artifactTitle: '壊れた成果物', depth: 'deep', note: 'x' },
+        { artifactTitle: '注のない成果物', depth: 'empty' },
+      ],
+    }));
+    expect(v).toEqual({
+      pass: false, gaps: ['不足'],
+      checks: [{ item: '件数を満たす', result: 'partial' }],
+      deliverables: [{ artifactTitle: '提案資料', depth: 'thin', note: '見出しだけ' }],
+    });
+    // No blocks in the answer: no blocks on the verdict (not empty ones).
+    const plain = verify.readVerdict('{"pass":true,"gaps":[]}');
+    expect(plain?.checks).toBeUndefined();
+    expect(plain?.deliverables).toBeUndefined();
+  });
+
+  it('v3: alignVerdictScoring binds the answer to the declared items and the shown artifacts — code, not the model, owns the mapping', () => {
+    const verdict = {
+      pass: true, gaps: [],
+      checks: [
+        { item: '宣言されていない項目', result: 'pass' },
+        { item: '項目 B', result: 'fail' },
+        { item: '項目 A', result: 'pass' },
+      ],
+      deliverables: [
+        { artifactTitle: '同名', depth: 'thin', note: '先勝ち' },
+        { artifactTitle: '同名', depth: 'empty', note: '二件目には付けない' },
+        { artifactTitle: '提示されていない', depth: 'empty', note: '落ちる' },
+        { artifactTitle: '資料', depth: 'substantial', note: '揃っている' },
+      ],
+    };
+    const aligned = verify.alignVerdictScoring(verdict, {
+      checksItems: ['項目 A', '項目 B', '項目 C'],
+      artifacts: [
+        { id: 'a1', title: '同名' },
+        { id: 'a2', title: '同名' },
+        { id: 'a3', title: '資料' },
+      ],
+    });
+    // Declaration order, declared items only; 項目 C unscored stays
+    // unscored here — the seal derives its fail.
+    expect(aligned.checks).toEqual([
+      { item: '項目 A', result: 'pass' },
+      { item: '項目 B', result: 'fail' },
+    ]);
+    // Titles map to ids; a shared title judges the FIRST artifact
+    // only — a2 keeps no judgement rather than a borrowed one.
+    expect(aligned.deliverables).toEqual([
+      { artifactId: 'a1', depth: 'thin', note: '先勝ち' },
+      { artifactId: 'a3', depth: 'substantial', note: '揃っている' },
+    ]);
+    // Absent blocks stay absent.
+    expect(verify.alignVerdictScoring({ pass: true, gaps: [] }, { checksItems: ['項目 A'], artifacts: [] })).toEqual({});
+  });
 });
 
 describe('agent tools', () => {
