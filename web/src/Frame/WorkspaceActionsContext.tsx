@@ -3,8 +3,11 @@
 import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react';
 
 type CreateKind = 'object' | 'table' | 'notebook';
+/** Where a new Object is made from: the Domain to preset, and the Strategy
+ *  it goes under (a Strategy's Board). */
+export interface CreateObjectContext { domainId?: string | null; strategy?: { id: string; name: string } | null }
 interface WorkspaceActions {
-  openCreate: (kind: CreateKind) => void;
+  openCreate: (kind: CreateKind, context?: CreateObjectContext) => void;
   subscribeTableCreate: (open: () => void) => () => void;
 }
 
@@ -13,7 +16,7 @@ const WorkspaceActionsContext = createContext<WorkspaceActions | null>(null);
 /** Creation requests are scoped to this workspace. Data invalidation remains
  * in the existing stores; this context only routes UI actions to their owner. */
 export function WorkspaceActionsProvider({ onOpenCreateObject, onOpenCreateNotebook, children }: {
-  onOpenCreateObject: () => void;
+  onOpenCreateObject: (context?: CreateObjectContext) => void;
   onOpenCreateNotebook?: () => void;
   children: ReactNode;
 }) {
@@ -22,8 +25,8 @@ export function WorkspaceActionsProvider({ onOpenCreateObject, onOpenCreateNoteb
     tableOpeners.current.add(open);
     return () => { tableOpeners.current.delete(open); };
   }, []);
-  const openCreate = useCallback((kind: CreateKind) => {
-    if (kind === 'object') onOpenCreateObject();
+  const openCreate = useCallback((kind: CreateKind, context?: CreateObjectContext) => {
+    if (kind === 'object') onOpenCreateObject(context);
     else if (kind === 'notebook') onOpenCreateNotebook?.();
     else tableOpeners.current.forEach(open => open());
   }, [onOpenCreateObject, onOpenCreateNotebook]);

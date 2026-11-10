@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useNowMinute } from '@/Function/shared/useNow';
 import { advanceFromElement } from '@/AIP/ai/agentData';
-import { createElement, updateElement, type ElementWithDetails } from '@/hooks/useSupabase';
+import { updateElement, type ElementWithDetails } from '@/hooks/useSupabase';
+import { CREATE_ELEMENT_EVENT, type CreateElementDetail } from '@/Frame/QuickAddElementLauncher';
 import { useElementChainRows } from '@/hooks/initiativeMissionData';
 import { useRunRounds } from '@/hooks/definitionData';
 import { ExecutionChain, chainStatusOf, emptyChain, type ChainStatus } from '@/ActivitySpace/execution/chain/ExecutionChain';
@@ -119,14 +120,10 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
     }
   };
 
-  const addToColumn = async (status: ChainStatus, objectId: string) => {
-    setError(null);
-    try {
-      await createElement({ title: t('Untitled'), status, object_id: objectId });
-      refetch();
-    } catch {
-      setError(t('Could not add an Element here.'));
-    }
+  // A column's "+" opens the new-Element popup with the Object and the
+  // column's Status preset.
+  const addToColumn = (status: ChainStatus, objectId: string) => {
+    window.dispatchEvent(new CustomEvent<CreateElementDetail>(CREATE_ELEMENT_EVENT, { detail: { objectId, status } }));
   };
 
   const handOver = async (element: FleetElement) => {
@@ -175,7 +172,7 @@ export function DomainChain({ elements, objects, domainId, canEdit, onRefresh, o
       <ExecutionChain orientation={orientation}
         className={orientation === 'horizontal' ? 'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2' : 'flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2'}
         onDropStatus={canEdit ? (status, id) => void dropToStatus(status, id) : undefined}
-        columnAction={canEdit && objectRows.length > 0 ? (status) => <AddElementMenu status={status} objects={objectRows} onAdd={(s, oid) => void addToColumn(s, oid)} /> : undefined}
+        columnAction={canEdit && objectRows.length > 0 ? (status) => <AddElementMenu status={status} objects={objectRows} onAdd={addToColumn} /> : undefined}
         columns={columns} />
       <ExecutePlanDialog target={executeTarget} open={executeTarget !== null}
         onOpenChange={(next) => { if (!next) setExecuteTarget(null); }}

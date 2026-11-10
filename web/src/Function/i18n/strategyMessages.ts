@@ -321,7 +321,6 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Send answer': ['答えを送る', '답변 보내기', 'Envoyer la réponse', 'Enviar respuesta'],
   'Answer sent': ['答えを送りました', '답변을 보냈습니다', 'Réponse envoyée', 'Respuesta enviada'],
   'Could not send the answer.': ['答えを送れませんでした。', '답변을 보내지 못했습니다.', 'Impossible d’envoyer la réponse.', 'No se pudo enviar la respuesta.'],
-  'Could not add an Object here.': ['ここに Object を追加できませんでした。', '여기에 Object를 추가하지 못했습니다.', 'Impossible d’ajouter un Object ici.', 'No se pudo añadir un Object aquí.'],
   'Could not add an Element here.': ['ここに Element を追加できませんでした。', '여기에 Element를 추가하지 못했습니다.', 'Impossible d’ajouter un Element ici.', 'No se pudo añadir un Element aquí.'],
   'Started {n} AI runs.': ['AI の実行を {n} 件始めました。', 'AI 실행을 {n}건 시작했습니다.', '{n} exécutions IA lancées.', 'Se iniciaron {n} ejecuciones de IA.'],
   'Run {n} ready with AI': ['準備できた {n} 件を AI で実行', '준비된 {n}건을 AI로 실행', 'Exécuter les {n} prêts avec l’IA', 'Ejecutar con IA los {n} listos'],

@@ -3,12 +3,11 @@
 import { useMemo } from 'react';
 import { Plus } from '@/ui/icons';
 import { Button } from '@/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
-import { NavDomainIcon, NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
+import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { Chip } from '../element/board/BoardColumn';
 import { ExecutionChain, emptyChain } from './ExecutionChain';
 import { objectStatusOf } from './objectStatus';
@@ -18,7 +17,8 @@ import { objectStatusOf } from './objectStatus';
 // Strategy's draw it — one level above an Object's own Board, whose
 // cards are its Elements. An Object's column is read, not set, so the
 // cards do not drag: moving an Object is moving its work. A new Object
-// has no work yet, so the "+" stands on Backlog, where it lands.
+// has no work yet, so the "+" stands on Backlog, where it lands; it opens
+// the same new-Object popup as everywhere else.
 
 export interface BoardObject {
   id: string;
@@ -27,7 +27,7 @@ export interface BoardObject {
   color?: string | null;
 }
 
-export function ObjectBoard({ objects, elements, via, orientation, onOpenObject, addTo, className }: {
+export function ObjectBoard({ objects, elements, via, orientation, onOpenObject, onAdd, className }: {
   objects: BoardObject[];
   /** The Elements under these Objects; each counts toward its Object. */
   elements: readonly { object_id?: string | null; status?: string | null }[];
@@ -35,8 +35,8 @@ export function ObjectBoard({ objects, elements, via, orientation, onOpenObject,
   via?: ReadonlyMap<string, { name: string }>;
   orientation: BoardOrientation;
   onOpenObject?: (objectId: string) => void;
-  /** Where a new Object can go, and what makes one. Absent: no "+". */
-  addTo?: { domains: { id: string; name: string }[]; onAdd: (domainId: string) => void };
+  /** Opens the new-Object popup. Absent: no "+". */
+  onAdd?: () => void;
   className?: string;
 }) {
   const { t } = useI18n();
@@ -77,36 +77,9 @@ export function ObjectBoard({ objects, elements, via, orientation, onOpenObject,
   }, [objects, elements, via, onOpenObject, t]);
 
   return <ExecutionChain orientation={orientation} className={className} columns={columns}
-    columnAction={addTo && addTo.domains.length > 0 ? (status) => (status === 'backlog' ? <AddObjectMenu {...addTo} /> : null) : undefined} />;
-}
-
-/** The Backlog's "+": a new Object, in the one Domain there is, or in the
- *  Domain picked. */
-function AddObjectMenu({ domains, onAdd }: { domains: { id: string; name: string }[]; onAdd: (domainId: string) => void }) {
-  const { t } = useI18n();
-  const label = t('Add Object');
-  if (domains.length === 1) {
-    return (
-      <Button variant="ghost" size="icon-xs" type="button" title={label} aria-label={label} onClick={() => onAdd(domains[0].id)}>
+    columnAction={onAdd ? (status) => (status === 'backlog' ? (
+      <Button variant="ghost" size="icon-xs" type="button" title={t('Add Object')} aria-label={t('Add Object')} onClick={onAdd}>
         <Plus className="h-3.5 w-3.5" />
       </Button>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-xs" type="button" title={label} aria-label={label}>
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[160px]">
-        {domains.map((d) => (
-          <DropdownMenuItem key={d.id} onClick={() => onAdd(d.id)} className="gap-2 text-[13px]">
-            <NavDomainIcon size={12} />
-            <span className="truncate">{d.name}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+    ) : null) : undefined} />;
 }
