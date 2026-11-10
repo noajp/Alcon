@@ -10,7 +10,6 @@ import type { StrategyDelegation } from '@/types/database';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { Button } from '@/ui/button';
-import { ChevronLeft } from '@/ui/icons';
 import { SETTINGS_ISLAND } from '@/shared/designTokens';
 import { useAutomations } from '@/hooks/automationData';
 import { setStrategyDefinition, useDefinitions } from '@/hooks/definitionData';
@@ -29,7 +28,11 @@ const CHOICES: { value: StrategyDelegation; label: string }[] = [
   { value: 'auto', label: 'Verified results go on to the next step' },
 ];
 
-export function AutomationSettings() {
+export function AutomationSettings({ onOpenElement }: {
+  /** Opens an Element a start made (the main Automation screen passes
+   *  its navigation; Settings passes none, and starts then just read). */
+  onOpenElement?: (id: string) => void;
+} = {}) {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const automations = useAutomations(spaceId);
@@ -38,16 +41,11 @@ export function AutomationSettings() {
   const opened = openId ? automations.data.find((a) => a.id === openId) ?? null : null;
 
   if (opened) {
+    // The builder carries its own header (back, the automation's name,
+    // its verbs) — no second breadcrumb above it.
     return (
-      <div className="space-y-2">
-        <button type="button" onClick={() => setOpenId(null)}
-          className="inline-flex items-center gap-1 rounded-md px-1 text-[13px] text-muted-foreground hover:text-foreground">
-          <ChevronLeft size={14} />{t('Automations')}
-          <span className="text-foreground">/ {opened.name}</span>
-        </button>
-        <div className={`${SETTINGS_ISLAND} flex flex-col overflow-hidden`}>
-          <AutomationsSection spaceId={spaceId} creating={false} onCreatingChange={setCreating} openId={opened.id} onOpen={setOpenId} />
-        </div>
+      <div className={`${SETTINGS_ISLAND} flex flex-col overflow-hidden`}>
+        <AutomationsSection spaceId={spaceId} creating={false} onCreatingChange={setCreating} openId={opened.id} onOpen={setOpenId} onOpenElement={onOpenElement} />
       </div>
     );
   }
@@ -60,7 +58,7 @@ export function AutomationSettings() {
           {!creating && <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setCreating(true)}>{t('New automation')}</Button>}
         </div>
         <div className={`${SETTINGS_ISLAND} overflow-hidden`}>
-          <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} openId={null} onOpen={setOpenId} />
+          <AutomationsSection spaceId={spaceId} creating={creating} onCreatingChange={setCreating} openId={null} onOpen={setOpenId} onOpenElement={onOpenElement} />
         </div>
       </section>
       <StrategyRunSettings />
