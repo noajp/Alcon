@@ -93,7 +93,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     items: [
       { id: 'notebook', label: 'Notebook', icon: NavNoteIcon },
       { id: 'table', label: 'Table', icon: NavTableIcon },
-      { id: 'team', label: 'People', icon: NavTeamsIcon },
+      { id: 'team', label: 'Team', icon: NavTeamsIcon },
       { id: 'calendar', label: 'Calendar', icon: NavCalendarIcon },
       { id: 'workload', label: 'Workload', icon: NavWorkloadIcon },
     ],

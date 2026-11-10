@@ -34,7 +34,7 @@ Alcon の中心は AIP の統制（ハーネス・アクション・承認・記
 |---|---|---|---|---|
 | **Strategy** | 何を達成し、どう勝つか | Strategy（入れ子にできる） | 活動（action） | 戦略 |
 | **Execution** | 実際の行動 | Domain → Object → Element | 仕事（work） | 作戦 |
-| **Sustainment** | 活動を続けるための道具 | Artifacts / People / Table / Calendar | 労働（labor） | 兵站 |
+| **Sustainment** | 活動を続けるための道具 | Artifacts / Team / Table / Calendar | 労働（labor） | 兵站 |
 
 - **Strategy**：目的・前提・判断・成功条件を持つ。担当と進捗は持たない
 - **Domain**：活動の場（部署・事業・案件の領域）

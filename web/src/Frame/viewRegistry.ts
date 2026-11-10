@@ -75,7 +75,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   tables:        { label: 'Table',       icon: NavTableIcon },
   files:         { label: 'Artifacts',   icon: NavFilesIcon },
   slides:        { label: 'Slides',      icon: NavSlidesIcon },
-  team:          { label: 'People',      icon: NavTeamsIcon },
+  team:          { label: 'Team',        icon: NavTeamsIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },
