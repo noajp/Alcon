@@ -1099,6 +1099,9 @@ const APP_MESSAGES: Record<string, Row> = {
   'Settings saved': ['保存しました', '저장했습니다', 'Réglages enregistrés', 'Ajustes guardados'],
   "Couldn't save the settings: {error}": ['保存できませんでした: {error}', '저장할 수 없었습니다: {error}', 'Impossible d’enregistrer les réglages : {error}', 'No se pudo guardar la configuración: {error}'],
   'Unknown error': ['不明なエラー', '알 수 없는 오류', 'Erreur inconnue', 'Error desconocido'],
+  'Parent Strategies': ['親Strategy', '부모 Strategy', 'Strategies parentes', 'Strategies madres'],
+  'Grandparent Strategies': ['祖父母Strategy', '조부모 Strategy', 'Strategies grands-parents', 'Strategies abuelas'],
+  'Ancestor Strategies': ['祖先Strategy', '조상 Strategy', 'Strategies ancêtres', 'Strategies ancestras'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));
