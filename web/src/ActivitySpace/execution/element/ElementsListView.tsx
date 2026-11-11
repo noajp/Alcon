@@ -19,6 +19,7 @@ import { EmptyState } from '@/Function/shared/EmptyState';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ElementsList } from '@/ActivitySpace/execution/element/ElementsList';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
+import { DomainChain } from '@/ActivitySpace/execution/domain/DomainChain';
 import { ElementDrilldown } from '@/ActivitySpace/execution/element/ElementDrilldown';
 import { useFilteredElements } from '@/ActivitySpace/execution/element/useFilteredElements';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
@@ -51,30 +52,31 @@ function TabLoading() {
 }
 const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
 const CalendarView = dynamic(() => import('@/ActivitySpace/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
-const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
 
 
 // View modes for the Domain-wide Elements view. We reuse the same
 // `ObjectTabType` union as Object detail tabs so this view can share
 // the shell `TabBar` and look identical to the Object-level Elements
 // tab. The 'elements' mode renders the flat "All Elements" list; the
-// rest pivot the same data into Gantt / Calendar / Workers. (The board
-// arrangement lives in the Execution Chain now, not here.)
-const VIEW_MODES: ObjectTabType[] = ['elements', 'gantt', 'calendar', 'workers', 'custom_view'];
+// rest pivot the same data into a Board (Status columns) / Gantt /
+// Calendar / Workers.
+const VIEW_MODES: ObjectTabType[] = ['elements', 'flow', 'gantt', 'calendar', 'workers'];
 const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
   elements: 'All Elements',
+  flow: 'Board',
   gantt: 'Gantt',
   calendar: 'Calendar',
   workers: 'Workers',
-  custom_view: 'Custom view',
 };
 
 function isViewMode(t: ObjectTabType): boolean {
   return VIEW_MODES.includes(t);
 }
 
-const DEFAULT_VISIBLE_TABS: ObjectTabType[] = ['elements'];
+const DEFAULT_VISIBLE_TABS: ObjectTabType[] = ['elements', 'flow'];
 const VISIBLE_TABS_KEY = 'elements:visibleTabs';
+/** Tabs saved before the list had a Board gain it once, after the list. */
+const BOARD_ADDED_KEY = 'elements:boardAdded';
 const ACTIVE_TAB_KEY = 'elements:activeTab';
 
 function loadVisibleTabs(): ObjectTabType[] {
@@ -84,8 +86,13 @@ function loadVisibleTabs(): ObjectTabType[] {
     if (!raw) return DEFAULT_VISIBLE_TABS;
     // Migrate legacy 'list' keys → 'elements'.
     const parsed = (JSON.parse(raw) as string[]).map((t) => (t === 'list' ? 'elements' : t)) as ObjectTabType[];
-    const valid = parsed.filter(isViewMode);
-    return valid.length > 0 ? Array.from(new Set(valid)) : DEFAULT_VISIBLE_TABS;
+    const valid = Array.from(new Set(parsed.filter(isViewMode)));
+    if (valid.length === 0) return DEFAULT_VISIBLE_TABS;
+    if (!window.localStorage.getItem(BOARD_ADDED_KEY)) {
+      window.localStorage.setItem(BOARD_ADDED_KEY, '1');
+      if (!valid.includes('flow')) valid.splice(valid.indexOf('elements') + 1, 0, 'flow');
+    }
+    return valid;
   } catch {
     return DEFAULT_VISIBLE_TABS;
   }
@@ -631,6 +638,14 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
           />
         </div>
       )}
+      {effectiveViewMode === 'flow' && (
+        <div className="flex-1 overflow-hidden">
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Board')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
+            {openElement => <DomainChain elements={filteredElements} objects={explorerData?.objects ?? []} domainId={activeDomainId ?? null} canEdit
+              onRefresh={onRefresh} onOpenElement={openElement} />}
+          </ElementDrilldown>
+        </div>
+      )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
           <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
@@ -641,18 +656,8 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       {effectiveViewMode === 'calendar' && (
         <div className="flex-1 overflow-hidden">
           <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Calendar')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
-            {openElement => <CalendarView elements={filteredElements} onElementClick={(el) => openElement(el.id)} onRefresh={onRefresh} />}
+            {openElement => <CalendarView defaultMode="month" elements={filteredElements} onElementClick={(el) => openElement(el.id)} onRefresh={onRefresh} />}
           </ElementDrilldown>
-        </div>
-      )}
-      {effectiveViewMode === 'custom_view' && (
-        <div className="flex-1 h-full overflow-hidden">
-          <CustomView
-            key={activeDomainId ? `elements-domain:${activeDomainId}` : 'elements-domain'}
-            scopeId={activeDomainId ? `elements-domain:${activeDomainId}` : 'elements-domain'}
-            scopeLabel={activeDomainName ?? 'Domain'}
-            elements={allElementsFlat}
-          />
         </div>
       )}
       {effectiveViewMode === 'workers' && (

@@ -10,11 +10,12 @@ import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import type { CalendarEvent } from '@/hooks/calendarEventData';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import type { ElementWithDetails, AlconObject } from '@/types/database';
+import type { ElementWithDetails, AlconObject, ElementStatus } from '@/types/database';
 import { calendarEntries, occursOn, layoutTimedEntries, layoutWeekSpans, type CalendarEntry } from './schedule';
 import { COLOR_PALETTE } from './calendarColorPalette';
 import { updateElement } from '@/hooks/useSupabase';
-import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
+import { statusColor } from '@/shared/designTokens';
+import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -27,6 +28,8 @@ interface CalendarViewProps {
   /** The day the grid is on, when a parent (the Calendar sidebar) owns it. */
   date?: Date;
   onDateChange?: (date: Date) => void;
+  /** The view it opens at: Day for a person's own, Month for an Object's. */
+  defaultMode?: CalendarMode;
   /** The Space's events (plans that are not work), drawn filled. */
   events?: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
@@ -36,13 +39,19 @@ interface CalendarViewProps {
   onCreateEvent?: (slot: { date: string; startMinutes: number | null; endMinutes?: number }) => void;
 }
 
-type CalendarMode = 'day' | 'week' | 'month';
-
-// Soft card pair per status — the subtle ground plus the status hue, straight
+export type CalendarMode = 'day' | 'week' | 'month';
 // off the STATUS table so a calendar card and a list-row mark agree.
-function statusCardClasses(status?: string | null): string {
-  const meta = STATUS[status as StatusKey] ?? STATUS.todo;
-  return `${meta.bg} text-foreground`;
+// A bar's ground: its color mixed into the card strongly enough to stand
+// off the grid in both themes (the status "subtle" tints vanish on a dark card).
+function barGround(color: string): string {
+  return `color-mix(in srgb, ${color} 38%, var(--card))`;
+}
+
+// The rim and lift that make a bar sit on the grid rather than in it.
+function barEdge(color: string): React.CSSProperties {
+  // Per side, not the shorthand: the bar sets its own left edge after this.
+  const rim = `1px solid color-mix(in srgb, ${color} 60%, var(--card))`;
+  return { borderTop: rim, borderRight: rim, borderBottom: rim, boxShadow: 'var(--shadow-card)' };
 }
 
 // Day names follow the interface language (Settings > Language); `day` is
@@ -54,7 +63,7 @@ function weekdayLabel(locale: string, day: number): string {
 // Convert hex to soft pastel inline style (bg + text)
 function pastelFromHex(hex: string): { backgroundColor: string; color: string; dotColor: string } {
   return {
-    backgroundColor: `color-mix(in srgb, ${hex} 16%, var(--surface-bg))`,
+    backgroundColor: barGround(hex),
     color: 'var(--text-primary)',
     dotColor: hex,
   };
@@ -109,7 +118,7 @@ function formatTimeShort(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange, events, onEventClick, onCreateEvent }: CalendarViewProps) {
+export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange, events, onEventClick, onCreateEvent, defaultMode = 'week' }: CalendarViewProps) {
   const { t, locale } = useI18n();
   const elements = useMemo(() => calendarEntries(sourceElements, objects, events), [sourceElements, objects, events]);
   const onElementClick = (entry: CalendarEntry) => {
@@ -126,7 +135,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
   };
   const [selectedElement, setSelectedElement] = useState<CalendarEntry | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [mode, setMode] = useState<CalendarMode>('week');
+  const [mode, setMode] = useState<CalendarMode>(defaultMode);
   // Day-cell scheduler — click an empty spot on a day to drop an unscheduled
   // Element there (sets its due_date). Anchored at the click position.
   const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
@@ -309,11 +318,11 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       const p = pastelFromHex(element.color);
       return {
         className: '',
-        style: { backgroundColor: p.backgroundColor, color: p.color, borderLeft: `3px solid ${p.dotColor}` },
+        style: { ...barEdge(p.dotColor), backgroundColor: p.backgroundColor, color: p.color, borderLeft: `3px solid ${p.dotColor}` },
         dotColor: p.dotColor,
       };
     }
-    return { className: statusCardClasses(element.status), style: { borderLeft: `3px solid ${statusColor(element.status)}` }, dotColor: undefined };
+    return { className: 'text-foreground', style: { ...barEdge(statusColor(element.status)), backgroundColor: barGround(statusColor(element.status)), borderLeft: `3px solid ${statusColor(element.status)}` }, dotColor: undefined };
   };
 
   const today = new Date();
@@ -494,7 +503,6 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                           <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
                             {dayElements.map(element => {
                               const statusKey = element.status || 'todo';
-                              const dotColor = element.color || statusColor(statusKey);
                               return (
                                 <button
                                   key={element.id}
@@ -521,22 +529,16 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
                                   className="w-full text-left px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors duration-150"
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span
-                                      className="w-2 h-2 rounded-full flex-shrink-0"
-                                      style={{ backgroundColor: dotColor }}
-                                    />
+                                    {/* Work wears the Status mark it has everywhere; an event, its fill. */}
+                                    {element.event
+                                      ? <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent-default)' }} />
+                                      : <ElementProgressMark status={statusKey as ElementStatus} size={13} />}
                                     <span
                                       className={`truncate flex-1 ${
                                         element.status === 'done' ? 'opacity-60' : ''
                                       }`}
                                     >
                                       {element.title}
-                                    </span>
-                                    <span
-                                      className="text-[10px] text-muted-foreground flex-shrink-0"
-                                      style={{ color: statusColor(statusKey) }}
-                                    >
-                                      {t(statusLabel(statusKey))}
                                     </span>
                                   </div>
                                 </button>

@@ -48,6 +48,8 @@ interface GanttViewProps {
   /** Opens an Element's detail from its row or bar. A drag on the bar never
    *  opens it. Omit and a click only selects the row. */
   onElementOpen?: (element: ElementWithDetails) => void;
+  /** The zoom it opens at. A Strategy's Gantt opens by quarter. */
+  defaultZoom?: ZoomLevel;
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -203,6 +205,7 @@ export function GanttView({
   onElementOpen,
   phases = EMPTY_PHASES,
   milestones = EMPTY_MILESTONES,
+  defaultZoom = 'day',
 }: GanttViewProps) {
   // Bars persist their dates through this callback. Defaults to updateElement
   // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
@@ -215,7 +218,7 @@ export function GanttView({
       onItemUpdate ? onItemUpdate(id, u) : updateElement(id, u),
     [onItemUpdate],
   );
-  const [zoom, setZoom] = useState<ZoomLevel>('day');
+  const [zoom, setZoom] = useState<ZoomLevel>(defaultZoom);
   const [zoomScale, setZoomScale] = useState(1);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [selectedElement, setSelectedElement] = useState<string | null>(null);

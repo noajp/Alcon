@@ -23,7 +23,6 @@ import { SummaryView } from '@/ActivitySpace/execution/object/summary/SummaryVie
 import { OverviewView } from '@/ActivitySpace/execution/object/overview/OverviewView';
 import { GanttView } from '@/ActivitySpace/execution/element/gantt';
 import { ResourceView } from '@/ActivitySpace/people/workload/ResourceView';
-import { CustomView } from '@/ActivitySpace/execution/element/custom';
 import { useCustomColumns } from '@/Function/property/useCustomColumns';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
@@ -49,7 +48,7 @@ import { createQuickAddElements, toQuickAddTemplates } from '@/Function/shared/e
 // without a branch here ('note') keeps its current rendering.
 const KNOWN_OBJECT_TAB_TYPES: ReadonlySet<string> = new Set([
   'summary', 'elements', 'overview', 'gantt', 'calendar', 'workers',
-  'resource', 'custom_view', 'note', 'flow',
+  'resource', 'note', 'flow',
 ]);
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
@@ -612,6 +611,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
+              defaultMode="month"
               elements={filteredElements}
               onRefresh={onRefresh}
               onElementClick={(el) => setDetailElementId(el.id)}
@@ -637,17 +637,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           </div>
         )}
 
-        {/* CustomView Tab Content */}
-        {activeTab?.tab_type === 'custom_view' && (
-          <div className="flex-1 h-full overflow-hidden bg-card">
-            <CustomView
-              key={`object:${object.id}`}
-              scopeId={`object:${object.id}`}
-              scopeLabel={object.name}
-              elements={allElements}
-            />
-          </div>
-        )}
 
 
       </div>

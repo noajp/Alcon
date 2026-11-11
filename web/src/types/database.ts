@@ -812,7 +812,6 @@ export type ObjectTabType =
   | 'calendar'
   | 'workers'
   | 'resource'
-  | 'custom_view'
   | 'note'
   | 'flow'
 

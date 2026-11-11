@@ -100,7 +100,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
       {error && <div role="alert" className="px-4 py-2 text-sm text-destructive">{t('Could not load the calendar.')} <Button size="xs" variant="ghost" onClick={() => { void domainQuery.refetch(); void fetchMine(); }}>{t('Retry')}</Button></div>}
       {loading && <div role="status" className="px-4 py-2 text-sm text-muted-foreground">{t('Loading schedules…')}</div>}
       <div className="flex-1 min-h-0 overflow-hidden" aria-busy={loading}>
-        <CalendarView objects={selection.mine ? [] : scoped.objects} onObjectClick={object => {
+        <CalendarView defaultMode="day" objects={selection.mine ? [] : scoped.objects} onObjectClick={object => {
           const domainId = domainIds.find(id => explorers[domainIds.indexOf(id)]?.data?.objects.some(item => item.id === object.id));
           onNavigate?.({ objectId: object.id, objectDomainId: domainId ?? null });
           onViewChange?.('objects');

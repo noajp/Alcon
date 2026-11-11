@@ -230,6 +230,6 @@ describe('no surface keeps a status palette of its own', () => {
     const palette = src('ActivitySpace/calendar/calendarColorPalette.ts');
     expect(palette).toMatch(/export const COLOR_PALETTE = \[/);
     const calendar = src('ActivitySpace/calendar/CalendarView.tsx');
-    expect(calendar).toMatch(/element\.color \|\| statusColor\(/);
+    expect(calendar).toMatch(/if \(element\.color\) \{\n\s*const p = pastelFromHex\(element\.color\)/);
   });
 });

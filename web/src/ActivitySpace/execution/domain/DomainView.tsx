@@ -56,7 +56,6 @@ function TabLoading() {
 const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false, loading: () => <TabLoading /> });
 const CalendarView = dynamic(() => import('@/ActivitySpace/calendar/CalendarView').then((m) => m.CalendarView), { ssr: false, loading: () => <TabLoading /> });
 const ResourceView = dynamic(() => import('@/ActivitySpace/people/workload/ResourceView').then((m) => m.ResourceView), { ssr: false, loading: () => <TabLoading /> });
-const CustomView = dynamic(() => import('@/ActivitySpace/execution/element/custom').then((m) => m.CustomView), { ssr: false, loading: () => <TabLoading /> });
 
 
 // Per-Domain — each Domain remembers its own active tab + visible tabs (keyed
@@ -79,11 +78,10 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   // Resource and Workers are one view: Team.
   workers: { domainTitle: 'Team', objectTitle: 'Team' },
   resource: { domainTitle: 'Team', objectTitle: 'Team' },
-  custom_view: { domainTitle: 'Custom view', objectTitle: 'Custom view' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
   flow: { domainTitle: 'Board', objectTitle: 'Board' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'calendar', 'resource', 'workers'];
 const OBJECT_CREATE_TAB_TYPES: ObjectTabType[] = ALL_TAB_TYPES;
 // Object tabs that show its Elements through the Elements tab's Filter / Display.
 const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'gantt', 'calendar'];
@@ -616,7 +614,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     return (
       <div className="flex-1 overflow-hidden">
         <ElementDrilldown key={domainId} label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>
-          {openElement => <CalendarView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+          {openElement => <CalendarView defaultMode="month" elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
     );
@@ -648,19 +646,6 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
             hideHeader
           />}
         </ElementDrilldown>
-      </div>
-    );
-  }
-
-  if (activeType === 'custom_view') {
-    return (
-      <div className="flex-1 overflow-hidden">
-        <CustomView
-          key={domainId ? `domain:${domainId}` : 'domain'}
-          scopeId={domainId ? `domain:${domainId}` : 'domain'}
-          scopeLabel="Domain"
-          elements={allElements}
-        />
       </div>
     );
   }
