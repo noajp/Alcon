@@ -167,7 +167,6 @@
   /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
      than --shadow-island, which is reserved for cards. */
   --shadow-button: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 1px 2px rgba(0, 0, 0, 0.22), 0 3px 8px -2px color-mix(in srgb, var(--accent-default) 55%, transparent);
-  --shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 12px -8px rgba(15, 17, 22, 0.14);
   --surface-well: color-mix(in srgb, var(--surface-rail) 70%, transparent);
   --shadow-overlay: 0 1px 2px rgba(15, 17, 22, 0.06), 0 6px 16px -2px rgba(15, 17, 22, 0.10), 0 24px 48px -12px rgba(15, 17, 22, 0.20);
 
@@ -270,7 +269,6 @@
   --overlay-glass: color-mix(in srgb, var(--surface-overlay) 74%, transparent);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 28px -16px rgba(0, 0, 0, 0.7);
   --shadow-control: inset 0 1px 0 var(--gloss-edge), 0 1px 2px rgba(0, 0, 0, 0.36);
-  --shadow-bar: 0 8px 14px -10px rgba(0, 0, 0, 0.7);
   --surface-well: color-mix(in srgb, var(--surface-rail) 45%, transparent);
   --shadow-overlay: inset 0 1px 0 var(--gloss-edge), 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 28px -4px rgba(0, 0, 0, 0.45), 0 32px 64px -16px rgba(0, 0, 0, 0.6);
 
@@ -701,15 +699,8 @@ button, a, input, select, textarea {
     border-top-color: var(--gloss-rim-top);
     box-shadow: var(--shadow-overlay);
   }
-  /* The bar across the top of a pane: its path and verbs. The page scrolls
-     under it, so it casts a short shadow down onto the page. */
-  .gloss-bar {
-    position: relative;
-    z-index: 1;
-    background-image: var(--gloss-sheen);
-    border-bottom: 1px solid var(--gloss-rim);
-    box-shadow: var(--shadow-bar);
-  }
+  /* The bar across the top of a pane: its path and verbs, over one dividing line. */
+  .gloss-bar { border-bottom: 1px solid var(--gloss-rim); }
   /* A well: a block of the page set apart by a rim and a trace of tone, not
      raised. For the groups inside a pane — raising every one of them would
      leave nothing to stand out. */
