@@ -301,12 +301,12 @@ export function WidgetFrame({
         )}
 
         {variant === 'section' && (
-          // A section of the page, not a box on it: the main column is
-          // already one island, and a bordered box inside it is a card in a
-          // card. The heading and its body are one block, held together by
-          // spacing; arrange mode's dashed outline shows the block's edge
-          // when it can be picked up and moved.
-          <section className="relative">
+          // A section of the page, set in a well: a rim and a trace of tone
+          // mark where the block starts and ends, without raising it — the
+          // main column is already one island, and a raised card inside it
+          // is a card in a card. Arrange mode's dashed outline shows the
+          // block's edge when it can be picked up and moved.
+          <section className="gloss-well relative rounded-lg px-4 pb-3 pt-2">
             <div className="flex h-8 items-center justify-between gap-3">
               <h2 className={`${FONT.lg} min-w-0 truncate text-foreground`}>{title}</h2>
               {headerNode}

@@ -181,11 +181,11 @@ export function statusLabel(status?: string | null): string {
 
 // ============================================
 // Card styles
-// Borders over Shadows — no box-shadow on cards.
+// A card is a gloss island: lit rim, sheen, soft shadow (globals.css).
 // Hover: border brightens, background stays.
 // ============================================
 export const CARD =
-  'rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)]';
+  'gloss-island gloss-sheen rounded-lg bg-[var(--surface-rail)]';
 
 export const CARD_HOVER =
   'hover:border-[var(--border-strong)] transition-colors duration-[120ms]';
@@ -196,10 +196,10 @@ export const CARD_FLAT = 'rounded-lg bg-[var(--surface-rail)] border border-bord
 /** A settings property island: the #803 Chain-card float, for a group of
  *  setting rows floating on the page ground (--surface-bg). */
 export const SETTINGS_ISLAND =
-  'rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-island)]';
+  'gloss-island gloss-sheen rounded-lg bg-card dark:bg-[var(--surface-rail)]';
 /** Shared geometry for Object and Element quick creation. */
 export const QUICK_CREATE = {
-  panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-lg bg-popover/95 backdrop-blur-md border border-border p-4',
+  panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-lg gloss-overlay p-4',
   header: 'flex items-center gap-2 mb-2',
   context: 'inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground',
   title: 'quick-create-title block w-full bg-transparent px-0 py-1 text-lg text-foreground placeholder:text-muted-foreground/60 resize-none',

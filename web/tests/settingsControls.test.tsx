@@ -133,7 +133,7 @@ describe('SettingsIsland', () => {
       </SettingsIsland>,
     );
     expect(screen.getByRole('heading', { name: 'General' })).toBeTruthy();
-    expect(container.querySelector('[class*="shadow-[var(--shadow-island)]"]')).toBeTruthy();
+    expect(container.querySelector('.gloss-island')).toBeTruthy();
   });
 });
 
