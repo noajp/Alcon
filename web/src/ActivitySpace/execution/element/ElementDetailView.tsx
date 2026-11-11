@@ -142,6 +142,9 @@ interface ElementDetailViewProps {
 }
 
 /** Dependencies can be followed from every detail host, including Inbox and Calendar. */
+/** A chip under the title, in the Label chips' form (listTable LabelChip). */
+const TITLE_CHIP = 'inline-flex h-[22px] items-center gap-1.5 rounded-full border border-[var(--border-default)] px-2 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-muted/50 hover:text-foreground data-[state=open]:bg-muted/50';
+
 export function ElementDetailView(props: ElementDetailViewProps) {
   const userId = useCurrentUserId();
   const activeSpace = useActiveSpaceId();
@@ -785,11 +788,12 @@ function ElementDetailBody({
             {element.parent_id && onOpenElement && <ParentLine parentId={element.parent_id} onOpen={onOpenElement} />}
             <ApprovalRequestBanner element={element} onRefresh={onRefresh} />
             {layout === 'reader' && <div className="mb-5 flex flex-wrap items-center gap-2">
+              {/* Status and Priority as chips, in the Label chips' own form. */}
               <StatusPicker element={element} onChanged={handleStatusChange} trigger={
-                <Button variant="secondary"><ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />{t(currentStatus.label)}</Button>
+                <button type="button" className={TITLE_CHIP}><ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={11} />{t(currentStatus.label)}</button>
               } />
               <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="secondary"><PriorityMark priority={element.priority} />{t(currentPriority.label)}</Button></DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild><button type="button" className={TITLE_CHIP}><span className="flex shrink-0 scale-[0.8]"><PriorityMark priority={element.priority} /></span>{t(currentPriority.label)}</button></DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   {priorityOptions.map(opt => <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2"><PriorityMark priority={opt.priority} />{t(opt.label)}</DropdownMenuItem>)}
                 </DropdownMenuContent>
