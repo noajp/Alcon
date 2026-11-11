@@ -1,8 +1,8 @@
 'use client';
 
 import { inboxRowText } from './inboxRow';
+import { Panel, PanelBody, PanelHeader } from '@/Function/shared/PanelLayout';
 
-import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useState } from 'react';
 import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from '@/ui/icons';
 import type { Notification } from '@/hooks/useSupabase';
@@ -51,19 +51,13 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
   const rows = visible.slice(0, renderLimit);
 
   return (
-    <section aria-label={t('Notifications')}>
-      {/* The page's title row: Inbox heads the list, level with the other
-          pages' 50px headers (the island beside it shows the open one). */}
-      <header className="sticky -top-1 z-10 -mx-1.5 -mt-1 mb-1 flex h-[50px] items-center gap-1.5 border-b border-border/60 bg-card px-3">
-        <SidebarReveal />
-        <h2 className="text-[13px] font-medium text-foreground">{t('Inbox')}</h2>
-        {inbox.unreadCount > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">{inbox.unreadCount}</span>}
-        <div className="flex-1" />
-        <ButtonAppearanceProvider appearance="navigation">
+    <Panel label={t('Notifications')}>
+      {/* The title row stays; the list scrolls under it. */}
+      <PanelHeader title={t('Inbox')} count={inbox.unreadCount} actions={<>
         <Button variant="ghost" size="icon-xs" disabled={inbox.unreadCount === 0} onClick={() => void inbox.markAllRead()} title={t('Mark all read')} aria-label={t('Mark all read')}><CheckCheck size={13} /></Button>
         <Button variant={inbox.unreadOnly ? 'secondary' : 'ghost'} size="icon-xs" aria-pressed={inbox.unreadOnly} onClick={() => { inbox.setUnreadOnly(!inbox.unreadOnly); setRenderLimit(RENDER_PAGE_SIZE); }} title={t('Unread only')} aria-label={t('Unread only')}><ListFilter size={13} /></Button>
-        </ButtonAppearanceProvider>
-      </header>
+      </>} />
+      <PanelBody>
       {inbox.loading ? <p role="status" className="py-8 text-center text-[12px] text-muted-foreground">{t('Loading…')}</p>
         : rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
         : <ul className="mt-1 space-y-0.5">
@@ -71,7 +65,8 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
             onSelect={n => { if (inbox.select(n)) onOpen?.(); }} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
         </ul>}
       {visible.length > renderLimit && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" onClick={() => setRenderLimit(limit => limit + RENDER_PAGE_SIZE)}>{t('Show more')}</Button></div>}
-    </section>
+      </PanelBody>
+    </Panel>
   );
 }
 
