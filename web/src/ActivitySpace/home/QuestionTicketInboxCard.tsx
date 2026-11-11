@@ -18,10 +18,20 @@ import { Textarea } from '@/ui/textarea';
 // the agent never phrases it. Only the run's starter may answer —
 // the engine refuses anyone else, and the card says so instead of
 // offering buttons it would refuse.
-export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
+export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting }: {
+  ticketId: string;
+  /** The answer landed: the Inbox re-reads what still waits. */
+  onAnswered?: () => void;
+  /** The other questions still waiting, once this one is answered: how
+   *  many, and how to open the next. null when none is left; undefined
+   *  while that is not known, and the card then says nothing about it. */
+  nextWaiting?: { count: number; open: () => void } | null;
+}) {
   const { t, locale } = useI18n();
   const { ticket, canAnswer, loading, error, refresh } = useQuestionTicket(ticketId);
   const [working, setWorking] = useState(false);
+  // What is on its way, so the pick shows as sent before the engine answers.
+  const [sending, setSending] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [freeText, setFreeText] = useState('');
   const [keep, setKeep] = useState(true);
@@ -43,6 +53,7 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
   const answer = async (choice: { option?: string; text?: string }) => {
     setFailed(false);
     setWorking(true);
+    setSending(choice.option ?? choice.text ?? null);
     try {
       await answerQuestionTicket({ runId: ticket.run_id, ticketId: ticket.id, ...choice, ...(view.standingTopic && !keep ? { keep: false } : {}) });
       // The resume marks the ticket answered as it takes the run up;
@@ -53,10 +64,12 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
         if (!now || now.status !== 'open') break;
       }
       await refresh();
+      onAnswered?.();
     } catch {
       setFailed(true);
     } finally {
       setWorking(false);
+      setSending(null);
     }
   };
 
@@ -94,6 +107,16 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
         </div>
       )}
 
+      {/* Answered: say what else waits, and take the person there — the
+          list is not something to go back and hunt through. */}
+      {view.status === 'answered' && nextWaiting !== undefined && (
+        <div className="mt-6">
+          {nextWaiting
+            ? <Button onClick={nextWaiting.open}>{t('Next question ({count} waiting)', { count: nextWaiting.count })}</Button>
+            : <p className={`${FONT.sm} text-muted-foreground`}>{t('Nothing else is waiting on you.')}</p>}
+        </div>
+      )}
+
       {view.status === 'open' && !canAnswer && (
         <p className={`mt-8 ${FONT.sm} text-muted-foreground`}>
           {t('Only the person who started this run can answer it.')}
@@ -105,7 +128,8 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
           {view.options.length > 0 && (
             <div className="flex flex-col items-start gap-2">
               {view.options.map((o) => (
-                <Button key={o.label} variant="secondary" disabled={working}
+                <Button key={o.label} variant={sending === o.label ? 'primary' : 'secondary'} disabled={working}
+                  aria-pressed={sending === o.label}
                   onClick={() => void answer({ option: o.label })} className="gap-2">
                   <span>{o.label}</span>
                   {o.recommended && <span className="text-[11px] text-muted-foreground">{t('Recommended')}</span>}
@@ -131,6 +155,7 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
               <span>{t('Use this answer from now on, so it is not asked again ({topic}). A rule already kept for this topic stays as it is.', { topic: view.standingTopic })}</span>
             </label>
           )}
+          {working && <p role="status" className={`${FONT.sm} text-[var(--status-info)]`}>{t('Sending your answer…')}</p>}
           {failed && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not send the answer. Try again.')}</p>}
         </div>
       )}

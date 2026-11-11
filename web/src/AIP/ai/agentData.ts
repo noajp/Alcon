@@ -455,6 +455,50 @@ export async function fetchQuestionTicketById(ticketId: string): Promise<Questio
   return (data as QuestionTicket) ?? null;
 }
 
+/** How many ticket ids one read names: the ids travel in the request's
+ *  URL, and a person with hundreds of questions must still get an answer. */
+const OPEN_TICKET_READ = 100;
+
+/** Which of these tickets still stand open (and inside their window). */
+async function fetchOpenQuestionTicketIds(ticketIds: readonly string[]): Promise<Set<string>> {
+  const open = new Set<string>();
+  const now = new Date().toISOString();
+  for (let i = 0; i < ticketIds.length; i += OPEN_TICKET_READ) {
+    const { data, error } = await supabase
+      .from('question_tickets')
+      .select('id')
+      .in('id', ticketIds.slice(i, i + OPEN_TICKET_READ))
+      .eq('status', 'open')
+      .gt('expires_at', now);
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: string }[]) open.add(row.id);
+  }
+  return open;
+}
+
+/** The open tickets among `ticketIds` — the Inbox's waiting group reads
+ *  this. Re-read whenever the set of tickets or any of `reread` changes
+ *  (the Inbox passes its pick counter, its refresh counter and the feed's
+ *  size: a pick, an answer sent, a notification arriving or leaving); the
+ *  values are compared one by one, so one rising as another falls still
+ *  re-reads. null until the first read lands, so a caller never shows
+ *  "nothing waits" on a guess. A failed read keeps the last answer. */
+export function useOpenQuestionTickets(ticketIds: readonly string[], reread: readonly number[]): ReadonlySet<string> | null {
+  const [open, setOpen] = useState<ReadonlySet<string> | null>(null);
+  const key = [...ticketIds].sort().join(',');
+  const rereadKey = reread.join(':');
+  useEffect(() => {
+    let cancelled = false;
+    void fetchOpenQuestionTicketIds(key ? key.split(',') : []).then((next) => {
+      if (!cancelled) setOpen(next);
+    }).catch((error) => {
+      console.error('Failed to read open question tickets:', error);
+    });
+    return () => { cancelled = true; };
+  }, [key, rereadKey]);
+  return open;
+}
+
 /** Answer a run's question ticket: one of its options, or free text.
  *  The engine validates the answer against the ticket before the run
  *  is touched, and refuses anyone but the run's starter. */
