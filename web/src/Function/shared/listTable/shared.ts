@@ -25,12 +25,20 @@ export function rowLabels(labels: readonly string[] | null | undefined, shown = 
   return { shown: all.slice(0, shown), more: Math.max(0, all.length - shown) };
 }
 
+/** Pure. How wide Name is actually drawn. Its title track soaks up
+ *  whatever the other columns leave of the view, so a Name set to 400px
+ *  is often drawn far wider; when the view is narrower than the table
+ *  (it scrolls), Name is its set width. */
+export function nameTrackWidth(nameWidth: number, viewWidth: number, otherColumnsWidth: number): number {
+  return viewWidth > 0 ? Math.max(nameWidth, viewWidth - otherColumnsWidth) : nameWidth;
+}
+
 /** Pure. The width the rows' signals (comments, waits, labels) may take
- *  of the name column: all they need, as long as the title keeps at
- *  least half the column and never less than 160px. */
-export function signalsTrackWidth(measured: number, nameWidth: number): number {
-  const titleFloor = Math.max(160, Math.round(nameWidth / 2));
-  return Math.max(0, Math.min(measured, nameWidth - titleFloor));
+ *  of Name as it is drawn: all they need, as long as the title keeps at
+ *  least half of it and never less than 160px. */
+export function signalsTrackWidth(measured: number, drawnName: number): number {
+  const titleFloor = Math.max(160, Math.round(drawnName / 2));
+  return Math.max(0, Math.min(measured, drawnName - titleFloor));
 }
 
 export const EMPTY_WORKERS: Worker[] = [];
