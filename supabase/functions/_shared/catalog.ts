@@ -52,7 +52,6 @@ export const CATALOG: CatalogTool[] = [
   // that word (the panel, a Strategy conversation) — never to an
   // Element's run, whose learning enters as episodes at its finish.
   ...entries(MEMORY_TOOLS, "memory"),
-  ...entries((WIDGET_TOOLS as ToolDef[]).filter((t) => t.name === "tableData"), "table"),
   ...entries((WIDGET_TOOLS as ToolDef[]).filter((t) => t.name === "widgetBoard"), "board"),
 ];
 
