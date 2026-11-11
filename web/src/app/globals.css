@@ -142,13 +142,32 @@
   --motion-base:    150ms cubic-bezier(0.4, 0, 0.2, 1);
   --motion-slow:    220ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* ---- Shadow (per design spec) ---- */
-  --shadow-1: lch(0 0 0 / 0.02) 0px 2px 3px -1px, lch(0 0 0 / 0.04) 0px 1px 1px 0px;
+  /* ---- Gloss ----
+     Surfaces are lit from above. A raised thing carries three marks of it: a
+     rim whose top edge catches the light, a sheen that fades down its face,
+     and a soft layered shadow under it. On the light themes the lit edge is
+     white on white, so the shadow does the lifting; on the dark themes the
+     shadow sinks into the ground, so the edge and the sheen do. Every lift in
+     the app is one of the four below — island, control, accent button,
+     overlay — so the light stays in one place. */
+  --gloss-edge:    rgba(255, 255, 255, 0.9);   /* inner top highlight of a control */
+  --gloss-rim:     rgba(20, 22, 26, 0.09);     /* an island's outline */
+  --gloss-rim-top: rgba(20, 22, 26, 0.06);     /* …and its top edge */
+  --gloss-sheen:   linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 100%);
+  /* The accent button's face: light at the top, a trace of shade at the foot. */
+  --gloss-sheen-accent: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.08) 100%);
+  /* Menus, popovers, dialogs and toasts are glass: the page shows through, blurred. */
+  --overlay-glass: color-mix(in srgb, var(--surface-overlay) 80%, transparent);
+  --overlay-blur:  blur(20px) saturate(170%);
+
+  --shadow-1: 0 1px 1px rgba(15, 17, 22, 0.04), 0 2px 4px -1px rgba(15, 17, 22, 0.05), 0 12px 24px -14px rgba(15, 17, 22, 0.12);
   --shadow-island: var(--shadow-1);
+  /* A neutral control (a secondary button, the chosen tab, the chosen sidebar row). */
+  --shadow-control: inset 0 1px 0 var(--gloss-edge), 0 1px 1.5px rgba(15, 17, 22, 0.10);
   /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
-     than --shadow-island, which is reserved for cards. Same value in both themes: the button's own background
-     color carries the theme, not this shadow. */
-  --shadow-button: 0 1px 4px rgba(0, 0, 0, 0.35);
+     than --shadow-island, which is reserved for cards. */
+  --shadow-button: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 1px 2px rgba(0, 0, 0, 0.22), 0 3px 8px -2px color-mix(in srgb, var(--accent-default) 55%, transparent);
+  --shadow-overlay: 0 1px 2px rgba(15, 17, 22, 0.06), 0 6px 16px -2px rgba(15, 17, 22, 0.10), 0 24px 48px -12px rgba(15, 17, 22, 0.20);
 
   /* ---- Structural overlays ----
      Translucent tints layered onto an already-colored surface (a Gantt bar,
@@ -240,6 +259,16 @@
   --syntax-type:     #e6c46e;
   --syntax-property: #86d0df;
   --syntax-tag:      #f08a96;
+
+  /* ---- Gloss — Dark ---- */
+  --gloss-edge:    rgba(255, 255, 255, 0.08);
+  --gloss-rim:     rgba(255, 255, 255, 0.06);
+  --gloss-rim-top: rgba(255, 255, 255, 0.13);
+  --gloss-sheen:   linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0px, rgba(255, 255, 255, 0) 160px);
+  --overlay-glass: color-mix(in srgb, var(--surface-overlay) 74%, transparent);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 28px -16px rgba(0, 0, 0, 0.7);
+  --shadow-control: inset 0 1px 0 var(--gloss-edge), 0 1px 2px rgba(0, 0, 0, 0.36);
+  --shadow-overlay: inset 0 1px 0 var(--gloss-edge), 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 28px -4px rgba(0, 0, 0, 0.45), 0 32px 64px -16px rgba(0, 0, 0, 0.6);
 
   /* ---- Border — Dark ---- */
   --border-subtle:  rgba(255, 255, 255, 0.055);
@@ -527,7 +556,7 @@ textarea.quick-create-title {
 
 /* ---- Transitions ---- */
 button, a, input, select, textarea {
-  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast), box-shadow var(--motion-fast);
 }
 
 /* ---- Input borders ----
@@ -571,14 +600,14 @@ button, a, input, select, textarea {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 32px; padding: 0 12px; font-size: 14px; font-weight: 510;
   border-radius: var(--control-action-radius); cursor: pointer; border: 1px solid var(--border-default);
-  font-family: inherit; transition: background var(--motion-fast), opacity var(--motion-fast);
+  font-family: inherit; transition: background var(--motion-fast), opacity var(--motion-fast), box-shadow var(--motion-fast);
 }
 .btn:active { transform: scale(0.98); transition-duration: 80ms; }
 .btn:disabled { opacity: 0.4; pointer-events: none; }
 
-.btn-primary    { background: var(--accent-default); color: #ffffff; }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-secondary  { background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-default); }
+.btn-primary    { background: var(--accent-default) var(--gloss-sheen-accent); color: #ffffff; box-shadow: var(--shadow-button); border-color: transparent; }
+.btn-primary:hover { background: var(--accent-hover) var(--gloss-sheen-accent); }
+.btn-secondary  { background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-default); box-shadow: var(--shadow-control); }
 .btn-secondary:hover { border-color: var(--border-strong); }
 .btn-ghost      { background: transparent; color: var(--text-secondary); }
 .btn-ghost:hover { background: var(--surface-raised); color: var(--text-primary); }
@@ -634,7 +663,7 @@ button, a, input, select, textarea {
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ============================================
-   Shadcn/UI overrides — Borders over Shadows
+   Shadcn/UI overrides
    ============================================ */
 /* The popper wrapper only positions its content — never transition it, or the
    overlay visibly slides in from a corner when Radix sets the position. */
@@ -642,11 +671,35 @@ button, a, input, select, textarea {
   transition: none !important;
 }
 [data-radix-popper-content-wrapper] > * {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08) !important;
-  border: 1px solid var(--border-default) !important;
+  box-shadow: var(--shadow-overlay) !important;
+  border: 1px solid var(--gloss-rim) !important;
+  border-top-color: var(--gloss-rim-top) !important;
 }
-:is(.dark, .theme-midnight, .theme-carbon, .theme-graphite) [data-radix-popper-content-wrapper] > * {
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.24) !important;
+
+/* ---- Gloss surfaces ----
+   In @layer components so a caller's own utility (a background, a border)
+   still wins over them. */
+@layer components {
+  /* An island: the sidebar, the main pane, a card. Lit rim, soft shadow. */
+  .gloss-island {
+    border: 1px solid var(--gloss-rim);
+    border-top-color: var(--gloss-rim-top);
+    box-shadow: var(--shadow-island);
+  }
+  /* The sheen on its own, for a surface that already has its frame. */
+  .gloss-sheen { background-image: var(--gloss-sheen); }
+  /* Glass: a menu, a popover, a dialog, a toast. */
+  .gloss-overlay {
+    background-color: var(--overlay-glass);
+    -webkit-backdrop-filter: var(--overlay-blur);
+    backdrop-filter: var(--overlay-blur);
+    border: 1px solid var(--gloss-rim);
+    border-top-color: var(--gloss-rim-top);
+    box-shadow: var(--shadow-overlay);
+  }
+  /* A neutral raised control, and the accent one. */
+  .gloss-control { box-shadow: var(--shadow-control); }
+  .gloss-accent  { background-image: var(--gloss-sheen-accent); box-shadow: var(--shadow-button); }
 }
 
 @layer base {
@@ -663,6 +716,7 @@ button, a, input, select, textarea {
    gray — which is exactly the bug we just fixed.
    ============================================ */
 .app-sidebar {
+  background-image: var(--gloss-sheen);
   --foreground:           var(--text-primary);   /* near-black: #14161a */
   --muted-foreground:     #5A5A5C;               /* inactive gray */
   --sidebar-foreground:   #5A5A5C;

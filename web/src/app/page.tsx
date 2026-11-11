@@ -85,7 +85,7 @@ function AppShellSkeleton() {
         <div className="h-10 flex items-center gap-2 px-1.5">
           <div className="h-7 w-44 rounded-md bg-muted/60 animate-pulse" />
         </div>
-        <div className="flex-1 rounded-lg border border-border/30 bg-white dark:bg-card shadow-[var(--shadow-island)] p-4">
+        <div className="flex-1 rounded-lg gloss-island bg-white dark:bg-card p-4">
           <div className="flex flex-col gap-2.5 animate-pulse">
             <div className="h-5 w-40 rounded bg-muted/50 mb-2" />
             {Array.from({ length: 8 }).map((_, i) => (
@@ -800,7 +800,7 @@ function WorkspaceContent({
       <div className="relative flex-1 flex overflow-hidden">
         {/* The sidebar's frame. Not positioned, so the sidebar's drawer
             (absolute, measured from the row) escapes its clipping. */}
-        <div className="mt-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
+        <div className="mt-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg gloss-island">
         <AppSidebar
           onToggleSidebar={handleSidebarToggle}
           navigation={activeTab.navigation}
@@ -835,7 +835,7 @@ function WorkspaceContent({
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
         <div className="flex-1 flex overflow-hidden gap-1.5">
-          <div className="flex-1 flex overflow-hidden bg-white dark:bg-card rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
+          <div className="flex-1 flex overflow-hidden bg-white dark:bg-card rounded-lg gloss-island">
             {/* The open tool's own list (Tables, Artifacts, People …), left
                 of what it opens; the Workspace has none. */}
             {!createType && (

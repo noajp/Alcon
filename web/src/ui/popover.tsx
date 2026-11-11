@@ -31,7 +31,7 @@ function PopoverContent({
         sideOffset={sideOffset}
         className={cn(
           anchoredOverlayMotion,
-          "bg-popover text-popover-foreground z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-lg border p-4 shadow-md outline-hidden",
+          "gloss-overlay text-popover-foreground z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-lg border p-4 outline-hidden",
           className
         )}
         {...props}
