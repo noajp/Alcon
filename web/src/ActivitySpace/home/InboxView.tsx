@@ -109,7 +109,8 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
                 // The list and this pane re-read which questions still wait.
                 // The selection is not touched: the answer can land seconds
                 // later, when the person is already reading something else.
-                onAnswered={refreshInbox}
+                // The work beside it is re-read too: the resumed run moves it on.
+                onAnswered={() => { refreshInbox(); refreshWork(); }}
                 onWork={noteWork}
                 // The next one opens the way a row does (read, selected).
                 nextWaiting={otherWaiting === null ? undefined
