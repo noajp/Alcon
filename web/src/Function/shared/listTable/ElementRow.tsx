@@ -21,7 +21,7 @@ import { MessageIcon } from '@/Function/shared/conceptIcons';
 import { useUnreadCommentElementIds } from '@/hooks/notificationData';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { type DataColumn } from '@/Function/shared/listTable/useListColumns';
-import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED } from './shared';
+import { type ElementUpdate, DROP_LINE_CLASS, DROP_LINE_SQUARE, dropLineVar, ROW_ROUND_BASE, selectionSquareClass, STICKY_TINT_SELECTED, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, LEAD_CELL_SELECTED, rowLabels } from './shared';
 import { ElementCell, LabelChip } from './cells';
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -80,6 +80,7 @@ export const ElementRow = memo(function ElementRow({
   allCustomColumns, blockers,
 }: ElementRowProps) {
   const { t, locale } = useI18n();
+  const labelsShown = rowLabels(el.labels);
   const overdue = isOverdue(el.due_date, el.status === 'done');
   const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
   const unreadComments = useUnreadCommentElementIds().has(el.id);
@@ -215,8 +216,15 @@ export const ElementRow = memo(function ElementRow({
               <span className="tabular-nums">{blockers.length}</span>
             </span>
           )}
+          {/* The first labels, then a count: five chips on every row left
+              the title a handful of characters. All of them are in the
+              hover, and on the Element's page. */}
           {!!el.labels?.length && <span className="flex items-center gap-1" title={el.labels.join(', ')}>
-            {el.labels.map(label => <LabelChip key={label} label={label} />)}
+            {labelsShown.shown.map(label => <LabelChip key={label} label={label} />)}
+            {labelsShown.more > 0 && (
+              <span className="inline-flex h-[22px] shrink-0 items-center rounded-full border border-[var(--border-default)] px-2 text-[12px] font-normal tabular-nums text-[var(--text-secondary)]"
+                aria-label={t('{n} more labels', { n: labelsShown.more })}>+{labelsShown.more}</span>
+            )}
           </span>}
         </div>
       </td>

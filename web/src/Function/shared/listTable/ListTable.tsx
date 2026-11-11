@@ -16,7 +16,7 @@ import { ObjectIcon } from '@/Frame/icons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, NAME_MIN_WIDTH, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
-import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER } from './shared';
+import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, signalsTrackWidth } from './shared';
 import { ElementRow } from './ElementRow';
 import { reorderWithinSections } from './rowReorder';
 import { ObjectRow } from './ObjectRow';
@@ -519,14 +519,14 @@ export function ListTable({
   // Name is two tracks: the pinned title, then the rows' signals (comments,
   // labels…), which scroll with the data columns. The signals track is as
   // wide as the widest row's signals — measured once the rows are drawn and
-  // handed to the columns as --signals-w — but never leaves the title less
-  // than 160px.
+  // handed to the columns as --signals-w — but the title keeps at least
+  // half of Name (signalsTrackWidth): a row is read for its title first.
   useLayoutEffect(() => {
     const table = tableRef.current;
     if (!table) return;
     let w = 0;
     table.querySelectorAll<HTMLElement>('[data-row-signals]').forEach((el) => { w = Math.max(w, el.scrollWidth); });
-    table.style.setProperty('--signals-w', `${Math.max(0, Math.min(w, nameWidth - 160))}px`);
+    table.style.setProperty('--signals-w', `${signalsTrackWidth(w, nameWidth)}px`);
   }, [sortedSections, visibleColumns, nameWidth]);
   const titleWidth = `calc(${nameWidth}px - var(--signals-w, 0px))`;
   const packedWidth = 52 + nameWidth + visibleColumns.reduce((sum, c) => sum + drawnWidth(c), 0) + (hasTrailingCol ? 80 : 0);
