@@ -149,7 +149,7 @@ import {
   questionShortForm, restingSummaryFor, settleRunBlockedByQuestions, ticketContextOf,
   standingAnswerMemory, validateAskInput, validateTicketAnswer, type QuestionTicketRow,
 } from "../_shared/questionTickets.ts";
-import { runMemoryTool } from "../_shared/memoryTools.ts";
+import { writeDurableMemory } from "../_shared/memoryTools.ts";
 import {
   COMPENSATION_REASONS, compensationReportHasContent, compensationReportText,
   compensationSummaryOf, loadCompensationReport, mergeCompensationBatchOutcome,
@@ -3017,18 +3017,23 @@ async function execute(a: ExecArgs): Promise<void> {
     });
     const tickets = await loadQuestionTickets(admin, q.tickets.map((t) => t.ticketId));
     const byId = new Map(tickets.map((t) => [t.id, t]));
-    // A standing answer is kept as the person's own durable fact — by
-    // the engine, with the person's session, through the one memory
-    // writer. The agent has no hand in it: it declared the topic when
-    // it asked, the person saw that and answered. A failed write never
-    // holds the answer back; the step says the next run will ask again.
+    // A standing answer is kept as a durable fact — by the engine, with
+    // the person's session, through the one memory writer. The agent
+    // has no hand in it: it declared the topic when it asked, the
+    // person saw that and answered. Where the work belongs to a Space
+    // the fact is the Space's (who handles complaints is the
+    // organization's rule, and every run there reads the Space's
+    // index); work outside a Space keeps it as the person's own. A
+    // failed write never holds the answer back; the step says the next
+    // run will ask again.
     const answeredTicket = marked ? byId.get(answer.ticketId) : undefined;
     const standing = answeredTicket ? standingAnswerMemory(answeredTicket, answer.answer, answer.keep, new Date()) : null;
     if (standing) {
-      const kept = await runMemoryTool(userDb, "remember", { ...standing }, { agent: `${agentName}（AI）`, userId: user.id });
+      const kept = await writeDurableMemory(userDb, standing,
+        run.activity_space_id ? { scope: "space", spaceId: run.activity_space_id } : { scope: "personal" }, user.id);
       await addStep(admin, run.id, kept.ok ? "status" : "error",
         kept.ok ? `答えを次からも使う決まりとして残しました: ${standing.topic}` : `答えを決まりとして残せませんでした: ${standing.topic}`,
-        kept.ok ? standing.gist : `${kept.error ?? ""} 次の実行では同じ質問が出ます。`);
+        kept.ok ? standing.gist : `${kept.error} 次の実行では同じ質問が出ます。`);
     }
     const expired = tickets.filter((t) => t.status === "expired");
     if (!marked || expired.length) {

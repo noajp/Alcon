@@ -80,3 +80,39 @@ describe('memory migration', () => {
     expect(migration).toContain("alter table public.profiles add column if not exists memory_auto_capture boolean not null default true");
   });
 });
+
+// The search was first ranked by whole-text similarity, under which a
+// short query never reached the threshold against a memory's full
+// text — recall by query found nothing. 20261230090000 ranks by how
+// well either text is found inside the other, and keeps everything
+// else (scope, boosts, order, signature) as it was.
+describe('memory search migration (a short query inside a long memory)', () => {
+  const within = read('20261230090000_memory_search_within.sql');
+
+  it('is guarded for preview replay', () => {
+    expect(within).toContain("to_regclass('public.memories') is null");
+    expect(within).toContain('raise notice');
+  });
+
+  it('replaces the function in place: same signature, still the invoker’s', () => {
+    expect(within).toContain('create or replace function public.search_memories(');
+    expect(within).toContain('p_query text, p_space_id uuid default null, p_element_id uuid default null, p_limit integer default 20)');
+    expect(within).toContain('security invoker');
+    expect(within).not.toContain('security definer');
+  });
+
+  it('ranks by the query inside the memory and the memory’s headline inside the query', () => {
+    expect(within).toContain("extensions.word_similarity(coalesce(p_query, ''), m.search_text)");
+    expect(within).toContain("extensions.word_similarity(m.title || ' ' || coalesce(m.gist, ''), coalesce(p_query, ''))");
+    expect(within).toContain('found.rank >= 0.3');
+    expect(within).not.toContain('m.search_text %');
+  });
+
+  it('keeps the scope and the boosts', () => {
+    expect(within).toContain("m.status = 'active'");
+    expect(within).toContain("(p_space_id is null or m.activity_space_id = p_space_id or m.scope = 'personal')");
+    expect(within).toContain('m.element_id = p_element_id then 0.25');
+    expect(within).toContain("m.layer = 'durable' then 0.05");
+  });
+});
+
