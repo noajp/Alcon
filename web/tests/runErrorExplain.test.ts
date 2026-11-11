@@ -27,6 +27,9 @@ describe('explainRunError', () => {
     expect(ex.explainRunError('429 {"type":"error","error":{"type":"rate_limit_error","message":"..."}}').cause).toBe('rate_limit');
     expect(ex.explainRunError('529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}').cause).toBe('overloaded');
     expect(ex.explainRunError('402 Insufficient Balance').cause).toBe('balance');
+    // Mid-stream, the provider's error arrives as its body alone.
+    expect(ex.explainRunError('{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}').cause).toBe('overloaded');
+    expect(ex.explainRunError('{"type":"error","error":{"type":"api_error","message":"Internal server error"}}').cause).toBe('unknown');
     expect(ex.explainRunError('401 Unauthorized').cause).toBe('key');
     // A 429 that is really an empty quota is the balance, not a wait.
     expect(ex.explainRunError('429 {"error":{"type":"insufficient_quota","message":"You exceeded your current quota"}}').cause).toBe('balance');
