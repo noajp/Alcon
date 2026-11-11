@@ -272,10 +272,12 @@ export async function toggleReaction(params: {
   elementId?: string | null;
   commentId?: string | null;
   strategyId?: string | null;
+  objectId?: string | null;
 }): Promise<'added' | 'removed'> {
-  const { userId, emoji, elementId, commentId, strategyId } = params;
+  const { userId, emoji, elementId, commentId, strategyId, objectId } = params;
   let q = supabase.from('element_reactions').select('id').eq('user_id', userId).eq('emoji', emoji);
-  q = elementId ? q.eq('element_id', elementId) : strategyId ? q.eq('strategy_id', strategyId) : q.eq('comment_id', commentId!);
+  q = elementId ? q.eq('element_id', elementId) : strategyId ? q.eq('strategy_id', strategyId)
+    : objectId ? q.eq('object_id', objectId) : q.eq('comment_id', commentId!);
   const { data: existing } = await q.maybeSingle();
   if (existing) {
     await removeReaction(existing.id);
@@ -287,6 +289,7 @@ export async function toggleReaction(params: {
     element_id: elementId ?? null,
     comment_id: commentId ?? null,
     strategy_id: strategyId ?? null,
+    object_id: objectId ?? null,
   });
   return 'added';
 }
@@ -307,3 +310,19 @@ export function useStrategyReactions(strategyId: string) {
   return { reactions: query.data ?? NO_STRATEGY_REACTIONS, refresh };
 }
 const NO_STRATEGY_REACTIONS: ElementReaction[] = [];
+
+/** An Object's own reactions (element_reactions.object_id). */
+export function useObjectReactions(objectId: string) {
+  const qc = useQueryClient();
+  const key = useMemo(() => ['object-reactions', objectId] as const, [objectId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: async (): Promise<ElementReaction[]> => {
+      const { data, error } = await supabase.from('element_reactions').select('*').eq('object_id', objectId);
+      if (error) throw error;
+      return (data ?? []) as ElementReaction[];
+    },
+  });
+  const refresh = useCallback(() => qc.invalidateQueries({ queryKey: key }), [qc, key]);
+  return { reactions: query.data ?? NO_STRATEGY_REACTIONS, refresh };
+}

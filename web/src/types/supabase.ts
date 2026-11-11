@@ -3140,6 +3140,7 @@ export type Database = {
           element_id: string | null
           emoji: string
           id: string
+          object_id: string | null
           strategy_id: string | null
           user_id: string
         }
@@ -3149,6 +3150,7 @@ export type Database = {
           element_id?: string | null
           emoji: string
           id?: string
+          object_id?: string | null
           strategy_id?: string | null
           user_id: string
         }
@@ -3158,6 +3160,7 @@ export type Database = {
           element_id?: string | null
           emoji?: string
           id?: string
+          object_id?: string | null
           strategy_id?: string | null
           user_id?: string
         }
@@ -4783,6 +4786,63 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      object_comments: {
+        Row: {
+          author_id: string | null
+          author_kind: string
+          author_name: string | null
+          content: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          mentions: string[]
+          parent_id: string | null
+          object_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_kind?: string
+          author_name?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          mentions?: string[]
+          parent_id?: string | null
+          object_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          author_kind?: string
+          author_name?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          mentions?: string[]
+          parent_id?: string | null
+          object_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "object_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "object_comments_object_id_fkey"
+            columns: ["object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       object_domains: {
         Row: {

@@ -13,10 +13,9 @@ import { type BoardLayout } from './types';
 export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
   // The summary line under the name: how much is done and what is still open.
   band: [{ id: 'ov-progress', type: 'progress-band' }],
-  main: [
-    { id: 'ov-milestones', type: 'milestones' },
-    { id: 'ov-attachments', type: 'attachments' },
-  ],
+  // The document column is fixed on an Object's page (attachments,
+  // Milestones, Updates), so the board holds no main zone of its own.
+  main: [],
   rail: [
     // Intent above Properties: opening an Object should answer what it is
     // trying to win before it answers who owns it and when it is due.

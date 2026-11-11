@@ -88,6 +88,7 @@ interface ColumnOverrides {
   object_tabs: { tab_type: ObjectTabType }
   strategies: { status: StrategyStatus; scope: StrategyScope; delegation: StrategyDelegation }
   strategy_comments: { author_kind: CommentAuthorKind }
+  object_comments: { author_kind: CommentAuthorKind }
   phases: { status: PhaseStatus }
   tables: { status: DataTableStatus }
   table_columns: { type: DataTableColumnType }
@@ -343,6 +344,7 @@ interface RowChecks {
   strategies: Compatible<TableRow<'strategies'>, H.Strategy>
   strategy_objects: Compatible<TableRow<'strategy_objects'>, H.StrategyObject>
   strategy_comments: Compatible<TableRow<'strategy_comments'>, H.StrategyComment>
+  object_comments: Compatible<TableRow<'object_comments'>, H.ObjectComment>
   phases: Compatible<TableRow<'phases'>, H.Phase>
   tables: Compatible<TableRow<'tables'>, H.DataTable>
   table_columns: Compatible<TableRow<'table_columns'>, H.DataTableColumn>
