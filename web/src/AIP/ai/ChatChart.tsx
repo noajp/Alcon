@@ -23,7 +23,12 @@ import { CHART_CARD_CLASS, chartFileName, chartSlots, effectiveColor, withSlotCo
 
 const AXIS = { stroke: 'var(--text-secondary)', fontSize: 11, tickLine: false, axisLine: false } as const;
 const GRID = { stroke: 'color-mix(in oklab, var(--border-subtle), transparent 40%)', strokeDasharray: '2 5', vertical: false } as const;
-const LEGEND = { wrapperStyle: { fontSize: 11, paddingTop: 6 }, iconType: 'circle', iconSize: 8 } as const;
+// The legend's words stay in the text color: the dot carries the hue,
+// so a row of labels never turns into a row of competing colors.
+const LEGEND = {
+  wrapperStyle: { fontSize: 11, paddingTop: 6 }, iconType: 'circle', iconSize: 8,
+  formatter: (value: string) => <span style={{ color: 'var(--text-secondary)' }}>{value}</span>,
+} as const;
 const TOOLTIP = {
   contentStyle: { background: 'var(--surface-overlay)', borderColor: 'var(--border-subtle)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-overlay)' },
   labelStyle: { color: 'var(--text-secondary)' },
@@ -141,7 +146,10 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} fill={fillOf(i)} style={{ filter: glow }}
+              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} style={{ filter: glow }}
+                // Only the first series is washed; the others ride over it as
+                // lines, so overlapping fills never mix into a muddy grey.
+                fill={i === 0 ? fillOf(i) : 'transparent'}
                 activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </AreaChart>
           ) : (
@@ -153,6 +161,8 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
               <Tooltip {...TOOLTIP} cursor={{ fill: 'var(--surface-strong)' }} />
               {many && <Legend {...LEGEND} />}
               {series.map((key, i) => <Bar key={key} dataKey={key} fill={fillOf(i)} maxBarSize={30}
+                // Stacked segments part by a hairline of the card, so each reads as its own block.
+                stroke={spec.stacked ? 'var(--card)' : undefined} strokeWidth={spec.stacked ? 1.5 : 0}
                 // Stacked, only the top segment is rounded; side by side, every bar is.
                 radius={!spec.stacked || i === series.length - 1 ? [4, 4, 0, 0] : 0}
                 stackId={spec.stacked ? 's' : undefined} />)}
