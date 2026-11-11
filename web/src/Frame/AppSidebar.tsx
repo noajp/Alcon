@@ -174,6 +174,9 @@ export function AppSidebar({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+    // The panel inside the main island (Inbox's list, the AI's chats)
+    // takes the sidebar's width from this.
+    document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
   }, [width]);
 
   // The "+" at the top of the sidebar creates whatever the current mode is
@@ -225,12 +228,17 @@ export function AppSidebar({
         el.style.width = `${next}px`;
         el.style.opacity = closing ? '0.5' : '';
       }
+      document.documentElement.style.setProperty('--sidebar-width', `${next}px`);
     };
     const onUp = () => {
       setResizing(false);
       const el = sidebarRef.current;
       if (el) el.style.opacity = '';
-      if (closing) { if (el) el.style.width = `${startW}px`; onToggleSidebar?.(); }
+      if (closing) {
+        if (el) el.style.width = `${startW}px`;
+        document.documentElement.style.setProperty('--sidebar-width', `${startW}px`);
+        onToggleSidebar?.();
+      }
       else setWidth(next);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);

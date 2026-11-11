@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, MessageSquare, Pencil, SquarePen, Trash2 } from '@/ui/icons';
+import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, MessageSquare, Pencil, Pin, Plus, Search, SquarePen, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
-import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
+import { SidebarRow } from '@/Function/shared/SidebarRow';
+import { Panel, PanelBody, PanelGroup, PanelHeader, PanelSearch, usePinned } from '@/Function/shared/PanelLayout';
 import { useCopilotConversation } from '@/AIP/ai/CopilotProvider';
 import type { AiSessionSummary } from '@/hooks/useAiConversations';
 import { RenameInput } from '@/Function/shared/RenameInput';
@@ -13,10 +14,14 @@ import {
   ContextMenuSubTrigger, ContextMenuTrigger,
 } from '@/ui/context-menu';
 
+const PINNED = 'pinned';
+const RECENT = 'recent';
+
 /**
- * The AI screen's sidebar: this person's conversations in the Space, in two
- * layers — folders, and the conversations in them or loose below. Picking one
- * opens it on the AI screen; each row carries its actions on a right-click.
+ * The AI screen's list: its title, then New / Search / Folder; then the
+ * conversations — pinned first, then each folder (a section), then the rest
+ * by time, newest first. Picking one opens it on the AI screen; each row
+ * carries its actions on a right-click (pin, rename, move, delete).
  */
 export function AiSidebar({ onOpen }: { onOpen: () => void }) {
   const { t } = useI18n();
@@ -24,6 +29,9 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
   const { folders, sessions } = library;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const pins = usePinned('ai');
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
   // Radix hands focus back to the trigger as the menu closes; renaming after
   // that lets the field keep it.
   const startRename = (id: string) => { window.setTimeout(() => setRenaming(id), 0); };
@@ -75,6 +83,7 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
         </SidebarRow>
       </ContextMenuTrigger>
       <ContextMenuContent className="min-w-[180px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <ContextMenuItem onSelect={() => pins.toggle(session.id)}><Pin /> {t(pins.isPinned(session.id) ? 'Unpin' : 'Pin')}</ContextMenuItem>
         <ContextMenuItem onSelect={() => startRename(session.id)}><Pencil /> {t('Rename')}</ContextMenuItem>
         {(folders.length > 0) && (
           <ContextMenuSub>
@@ -95,20 +104,39 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
     </ContextMenu>
   );
 
-  const loose = sessions.filter((s) => !s.folder_id);
+  // Search narrows every list below to the conversations whose title has it.
+  const q = query.trim().toLowerCase();
+  const shown = q ? sessions.filter((s) => (s.title || '').toLowerCase().includes(q)) : sessions;
+  const pinnedSessions = pins.pinned.map((id) => shown.find((s) => s.id === id)).filter((s): s is AiSessionSummary => !!s);
+  // The rest by time, newest first: the conversations in no folder.
+  const recent = shown.filter((s) => !s.folder_id && !pins.isPinned(s.id))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const groupIds = [...folders.map((f) => f.id), RECENT];
 
   return (
-    <div className="mt-1">
+    <Panel label={t('AI')}>
+      <PanelHeader title={t('AI')} />
+      <PanelBody>
       <div className="flex flex-col">
-        <SidebarRow icon={<SquarePen size={15} />} label={t('New chat')} onClick={() => startChat()} />
-        <SidebarRow icon={<FolderPlus size={15} />} label={t('New folder')} onClick={() => void addFolder()} />
+        <SidebarRow icon={<Plus size={15} />} label={t('New')} onClick={() => startChat()} />
+        <SidebarRow icon={<Search size={15} />} label={t('Search')} active={searching} onClick={() => { setSearching((v) => !v); setQuery(''); }} />
+        <SidebarRow icon={<FolderPlus size={15} />} label={t('Folder')} onClick={() => void addFolder()} />
       </div>
+      {searching && <div className="mt-1.5"><PanelSearch value={query} onChange={setQuery} placeholder={t('Search conversations')} /></div>}
 
-      {folders.length > 0 && <SidebarSectionLabel>{t('Folders')}</SidebarSectionLabel>}
-      <div className="flex flex-col">
+      <PanelGroup title={t('Pinned')} open={!closed.has(PINNED)} onToggle={() => toggle(PINNED)} menu={[
+        { label: t('New section'), onSelect: () => void addFolder() },
+        { label: t('Collapse others'), onSelect: () => setClosed(new Set(groupIds)) },
+      ]}>
+        {pinnedSessions.length === 0
+          ? <p className="px-2.5 py-1 text-[12px] text-muted-foreground">{t('Right-click a conversation to pin it.')}</p>
+          : pinnedSessions.map((s) => sessionRow(s, false))}
+      </PanelGroup>
+
+      <div className="mt-3 flex flex-col">
         {folders.map((folder) => {
-          const inside = sessions.filter((s) => s.folder_id === folder.id);
-          const isOpen = !closed.has(folder.id);
+          const inside = shown.filter((s) => s.folder_id === folder.id && !pins.isPinned(s.id));
+          const isOpen = q ? true : !closed.has(folder.id);
           return (
             <div key={folder.id}>
               <ContextMenu>
@@ -132,11 +160,11 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
         })}
       </div>
 
-      {loose.length > 0 && <SidebarSectionLabel>{t('Conversations')}</SidebarSectionLabel>}
-      <div className="flex flex-col">
-        {loose.map((s) => sessionRow(s, false))}
-      </div>
+      <PanelGroup title={t('Recent')} open={q ? true : !closed.has(RECENT)} onToggle={() => toggle(RECENT)}>
+        {recent.map((s) => sessionRow(s, false))}
+      </PanelGroup>
       {library.error && <p role="alert" className="px-2.5 pt-2 text-[12px] text-[var(--status-danger)]">{library.error}</p>}
-    </div>
+      </PanelBody>
+    </Panel>
   );
 }
