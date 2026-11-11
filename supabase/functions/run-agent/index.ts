@@ -150,6 +150,7 @@ import {
   standingAnswerMemory, validateAskInput, validateTicketAnswer, type QuestionTicketRow,
 } from "../_shared/questionTickets.ts";
 import { writeDurableMemory } from "../_shared/memoryTools.ts";
+import { explainRunError, runErrorLine, SAME_CAUSE_QUIET_MS } from "../_shared/runErrorExplain.ts";
 import {
   COMPENSATION_REASONS, compensationReportHasContent, compensationReportText,
   compensationSummaryOf, loadCompensationReport, mergeCompensationBatchOutcome,
@@ -639,14 +640,29 @@ async function failRun(admin: SupabaseClient, run: Run, message: string) {
 
 /** An error mid-run pauses it: the transcript saved so far stays, and its starter can resume. */
 async function pauseOnError(admin: SupabaseClient, run: Run, message: string) {
-  await addStep(admin, run.id, "error", "エラーで一時停止しました", message);
-  await admin.from("agent_runs").update({ status: "paused", error: `エラーで一時停止しました: ${message.slice(0, 300)}`, continuation_token: null })
+  // What the person reads is what happened and who can put it right
+  // (runErrorExplain.ts); the provider's raw answer stays on the step.
+  const why = explainRunError(message);
+  const known = why.cause !== "unknown";
+  await addStep(admin, run.id, "error", why.title, known ? `${why.body}\n\n${message}` : message);
+  await admin.from("agent_runs").update({ status: "paused", error: runErrorLine(message), continuation_token: null })
     .eq("id", run.id).eq("status", "running");
   if (run.triggered_by) {
-    await admin.from("notifications").insert({
-      recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
-      title: "エージェントがエラーで一時停止しました", body: message.slice(0, 200),
-    }).then(() => {}, () => {});
+    // A cause that stops every run (an empty balance, a dead key) is told
+    // once while its notice still sits unread, not once per paused run.
+    let told = false;
+    if (known) {
+      const { data } = await admin.from("notifications").select("id")
+        .eq("recipient_id", run.triggered_by).eq("kind", "status_change").eq("title", why.title).eq("is_read", false)
+        .gte("created_at", new Date(Date.now() - SAME_CAUSE_QUIET_MS).toISOString()).limit(1);
+      told = (data ?? []).length > 0;
+    }
+    if (!told) {
+      await admin.from("notifications").insert({
+        recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
+        title: known ? why.title : "エージェントがエラーで一時停止しました", body: why.body.slice(0, 200),
+      }).then(() => {}, () => {});
+    }
   }
 }
 
