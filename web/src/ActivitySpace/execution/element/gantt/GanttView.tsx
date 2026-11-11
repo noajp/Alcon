@@ -631,7 +631,7 @@ export function GanttView({
                         <span className="shrink-0 flex items-center">
                           <ElementProgressMark status={element.status} progress={getElementProgress(element)} size={14} />
                         </span>
-                        <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                        <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
                           {element.title}
                         </span>
                         <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">
