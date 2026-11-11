@@ -55,7 +55,7 @@ export function ObjectBoard({ objects, elements, via, orientation, onOpenObject,
         key: o.id,
         node: (
           <button type="button" onClick={() => onOpenObject?.(o.id)}
-            className="block w-full rounded-lg border border-border bg-card px-3.5 py-3 text-left shadow-[var(--shadow-card)] transition-colors hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] dark:bg-[var(--surface-rail)]">
+            className="block w-full rounded-lg border border-border bg-card px-3.5 py-3.5 text-left shadow-[var(--shadow-card)] transition-colors hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] dark:bg-[var(--surface-rail)]">
             <span className="flex min-w-0 items-center gap-2">
               <ItemIcon icon={o.icon ?? null} color={o.color ?? null} size={14} fallback={<ObjectIcon size={14} />} />
               <span className="min-w-0 flex-1 truncate text-[14px] leading-[22px] text-foreground">{o.name}</span>

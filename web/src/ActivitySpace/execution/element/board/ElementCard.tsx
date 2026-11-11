@@ -360,7 +360,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         )}
         {extra}
 
-        <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/50 pt-3">
+        <div className="mt-5 flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
           <div className="flex min-w-0 items-center gap-1">
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
