@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Archive, Check } from '@/ui/icons';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -41,6 +41,24 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const elementId = selected?.element_id;
   const { detail, refresh } = useNotificationElement(elementId, revision);
 
+  // The Element the open question rests, told by the card once it has read
+  // its ticket — remembered with the ticket it belongs to, so a question
+  // just opened never shows the previous one's work.
+  const [work, setWork] = useState<{ ticketId: string; elementId: string | null } | null>(null);
+  const openTicketId = selected?.question_ticket_id ?? null;
+  const noteWork = useCallback((elementId: string | null) => {
+    if (openTicketId) setWork({ ticketId: openTicketId, elementId });
+  }, [openTicketId]);
+  const workElementId = work && work.ticketId === openTicketId ? work.elementId : null;
+  const { detail: workDetail, refresh: refreshWork } = useNotificationElement(workElementId, revision);
+  const openObjectFromReader = (objectId: string) => {
+    void openObject(objectId).catch(error => { console.error(error); return false; }).then(found => {
+      if (found) return;
+      onViewChange?.('objects');
+      onNavigate?.({ objectId });
+    });
+  };
+
   // Every island opens with the same 50px header, so the title line sits
   // level with the sidebar's Space row whichever view is showing.
   if (!selected) {
@@ -72,13 +90,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           domainName={null} objectPath={detail.element.objects ?? []} focusCommentId={selected.comment_id}
           onBack={() => selectInboxNotification(null)} onNavigateRoot={() => selectInboxNotification(null)}
           onRefresh={refresh}
-          onNavigateObject={objectId => {
-            void openObject(objectId).catch(error => { console.error(error); return false; }).then(found => {
-              if (found) return;
-              onViewChange?.('objects');
-              onNavigate?.({ objectId });
-            });
-          }}
+          onNavigateObject={openObjectFromReader}
         />
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">
@@ -86,17 +98,38 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           {detail && <Button variant="ghost" onClick={refresh}>{t('Retry')}</Button>}
         </div>
       ) : selected.question_ticket_id ? (
-        <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
-          <QuestionTicketInboxCard key={selected.question_ticket_id} ticketId={selected.question_ticket_id}
-            // The list and this pane re-read which questions still wait.
-            // The selection is not touched: the answer can land seconds
-            // later, when the person is already reading something else.
-            onAnswered={refreshInbox}
-            // The next one opens the way a row does (read, selected).
-            nextWaiting={otherWaiting === null ? undefined
-              : otherWaiting.length > 0 ? { count: otherWaiting.length, open: () => { select(otherWaiting[0]); } }
-              : null} />
-        </article>
+        // The question, and beside it the work it rests: what came in, what
+        // was drafted, what is left to do. Deciding who takes a complaint
+        // should not mean opening another notification to read it. On a
+        // narrow pane the work follows the question instead.
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto xl:flex-row xl:overflow-hidden">
+          <article className="w-full shrink-0 px-8 py-10 xl:min-w-0 xl:flex-1 xl:shrink xl:overflow-auto">
+            <div className="mx-auto w-full max-w-3xl">
+              <QuestionTicketInboxCard key={selected.question_ticket_id} ticketId={selected.question_ticket_id}
+                // The list and this pane re-read which questions still wait.
+                // The selection is not touched: the answer can land seconds
+                // later, when the person is already reading something else.
+                onAnswered={refreshInbox}
+                onWork={noteWork}
+                // The next one opens the way a row does (read, selected).
+                nextWaiting={otherWaiting === null ? undefined
+                  : otherWaiting.length > 0 ? { count: otherWaiting.length, open: () => { select(otherWaiting[0]); } }
+                  : null} />
+            </div>
+          </article>
+          {workElementId && workDetail?.element && (
+            <aside aria-label={t('The work this question is about')}
+              className="w-full shrink-0 border-t border-border/60 xl:flex xl:w-[46%] xl:min-w-[380px] xl:max-w-[640px] xl:flex-col xl:overflow-hidden xl:border-l xl:border-t-0">
+              <ElementDetailView
+                key={workElementId} element={workDetail.element} layout="reader"
+                domainName={null} objectPath={workDetail.element.objects ?? []}
+                onBack={() => selectInboxNotification(null)} onNavigateRoot={() => selectInboxNotification(null)}
+                onRefresh={refreshWork}
+                onNavigateObject={openObjectFromReader}
+              />
+            </aside>
+          )}
+        </div>
       ) : selected.agent_action_id ? (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
           <CopilotApprovalInboxCard key={selected.agent_action_id} actionId={selected.agent_action_id} />
