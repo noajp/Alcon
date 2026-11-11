@@ -800,7 +800,7 @@ function WorkspaceContent({
       <div className="relative flex-1 flex overflow-hidden">
         {/* The sidebar's frame. Not positioned, so the sidebar's drawer
             (absolute, measured from the row) escapes its clipping. */}
-        <div className="mt-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg gloss-island">
+        <div className="my-1.5 ml-1 mr-1.5 flex shrink-0 overflow-hidden rounded-lg gloss-island">
         <AppSidebar
           onToggleSidebar={handleSidebarToggle}
           navigation={activeTab.navigation}
@@ -827,7 +827,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className={`relative flex-1 flex flex-col overflow-hidden pt-1.5 pr-1.5`}>
+        <div className={`relative flex-1 flex flex-col overflow-hidden py-1.5 pr-1.5`}>
         {/* No strip above the content: back / forward are the browser's
             arrows (and ⌘[ / ⌘]). The sidebar closes by dragging the island
             over it; each page's title row then offers it back (⌘\\). */}
