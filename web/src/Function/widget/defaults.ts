@@ -9,25 +9,13 @@ import { type BoardLayout } from './types';
 // blocks can now be moved, removed, and added to.
 // =============================================================
 
-/** Object Overview. The spine (icon / title / description) is not a widget. */
+/** Object Overview. The spine (icon / title / description) is not a widget.
+ *  A new Object opens with its milestones and nothing else: progress,
+ *  attachments, intent and properties are there to add, not placed. */
 export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
-  // The summary line under the name: how much is done and what is still open.
-  band: [{ id: 'ov-progress', type: 'progress-band' }],
-  main: [
-    { id: 'ov-milestones', type: 'milestones' },
-    { id: 'ov-attachments', type: 'attachments' },
-  ],
-  rail: [
-    // Intent above Properties: opening an Object should answer what it is
-    // trying to win before it answers who owns it and when it is due.
-    { id: 'ov-approaches', type: 'approach-references' },
-    { id: 'ov-intent', type: 'campaign-intent' },
-    // The return leg. The Strategy's written intent says why this Object
-    // exists in prose; this says which decisions and assumptions actually
-    // reach it, and whether any of them needs somebody today.
-    { id: 'ov-trail', type: 'intent-trail' },
-    { id: 'ov-properties', type: 'object-properties' },
-  ],
+  band: [],
+  main: [{ id: 'ov-milestones', type: 'milestones' }],
+  rail: [],
 };
 
 /**
