@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { updateObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/Frame/icons';
-import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { PageIcon, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import {
@@ -150,7 +150,7 @@ export function OverviewView({
 
   return (
     <div className="h-full overflow-y-auto bg-card">
-      <div className="max-w-7xl mx-auto px-8 py-8">
+      <div className={PAGE_FRAME}>
         <WidgetSurface board={board} host={host} zones={SURFACE_ZONES}>
           {/* items-start: don't let the (often taller) rail stretch the main
               column. A stretched block column was the layout that made the
