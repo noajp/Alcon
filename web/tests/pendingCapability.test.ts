@@ -79,11 +79,13 @@ describe('note_pending_capability — the recording tool', () => {
           return { data: null, error: null };
         },
         then: (res: (v: { data: Row[]; error: null }) => unknown, rej?: (e: unknown) => unknown) => {
+          // An update answers with the rows it matched: the writer reads
+          // that to know the standing fact was really set aside.
+          const data = existing.filter((r) => [...filters.entries()].every(([k, v]) => r[k] === v));
           if (mode === 'update') {
             updated.push({ id: filters.get('id'), patch: payload });
-            return Promise.resolve({ data: [], error: null }).then(res, rej);
+            return Promise.resolve({ data, error: null }).then(res, rej);
           }
-          const data = existing.filter((r) => [...filters.entries()].every(([k, v]) => r[k] === v));
           return Promise.resolve({ data, error: null }).then(res, rej);
         },
       };

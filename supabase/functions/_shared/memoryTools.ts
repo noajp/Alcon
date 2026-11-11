@@ -98,15 +98,23 @@ export const MEMORY_TOOLS: ToolDef[] = [RECALL_TOOL, REMEMBER_TOOL, START_PROMOT
 
 interface MemoryToolRow {
   id: string; title: string; gist: string; body: string; kind: string; layer: string;
-  created_at: string; score?: number;
+  created_at: string; score?: number; scope?: string; activity_space_id?: string | null;
 }
 
-/** Executes one memory tool with the caller's client. Never throws. */
+/**
+ * Executes one memory tool with the caller's client. Never throws.
+ * `spaceId` is the entry's ambient Space (runCatalogTool threads it;
+ * the model never supplies it): recall inside a Space reads that
+ * Space's memories and the person's own, never another Space's — a
+ * person in two Spaces must not have one Space's standing fact answer
+ * the other's work.
+ */
 export async function runMemoryTool(
   db: SupabaseClient, name: string, input: Record<string, unknown>, actor: BoardActor,
+  spaceId: string | null = null,
 ): Promise<ToolResult> {
   try {
-    if (name === RECALL_TOOL.name) return await recall(db, input);
+    if (name === RECALL_TOOL.name) return await recall(db, input, spaceId);
     if (name === REMEMBER_TOOL.name) return await remember(db, input, actor);
     if (name === NOTE_PENDING_CAPABILITY_TOOL.name) return await notePendingCapability(db, input, actor);
     if (name === START_PROMOTION_TOOL.name) return await startPromotion(db, input, actor);
@@ -116,14 +124,16 @@ export async function runMemoryTool(
   }
 }
 
-async function recall(db: SupabaseClient, input: Record<string, unknown>): Promise<ToolResult> {
+async function recall(db: SupabaseClient, input: Record<string, unknown>, spaceId: string | null): Promise<ToolResult> {
   const id = typeof input.id === "string" && input.id.trim() ? input.id.trim() : null;
   if (id) {
     const { data, error } = await db.from("memories")
-      .select("id, title, gist, body, kind, layer, created_at")
+      .select("id, title, gist, body, kind, layer, created_at, scope, activity_space_id")
       .eq("id", id).eq("status", "active").maybeSingle();
     if (error) return { ok: false, error: error.message };
-    if (!data) return { ok: false, error: "その記憶は見つかりませんでした（消えたか、置き換えられた可能性があります）。" };
+    const outside = !!data && !!spaceId
+      && (data as MemoryToolRow).scope === "space" && (data as MemoryToolRow).activity_space_id !== spaceId;
+    if (!data || outside) return { ok: false, error: "その記憶は見つかりませんでした（消えたか、置き換えられた可能性があります）。" };
     const m = data as MemoryToolRow;
     // usedIds is how the driver learns what entered the context, so it
     // can record the use (steps + memory_uses) with its run's id — the
@@ -132,7 +142,7 @@ async function recall(db: SupabaseClient, input: Record<string, unknown>): Promi
   }
   const query = typeof input.query === "string" ? input.query.trim() : "";
   if (!query) return { ok: false, error: "query か id が必要です。" };
-  const { data, error } = await db.rpc("search_memories", { p_query: query, p_limit: 5 });
+  const { data, error } = await db.rpc("search_memories", { p_query: query, p_space_id: spaceId, p_limit: 5 });
   if (error) return { ok: false, error: error.message };
   const rows = (data ?? []) as MemoryToolRow[];
   return {
@@ -145,6 +155,85 @@ async function recall(db: SupabaseClient, input: Record<string, unknown>): Promi
   };
 }
 
+/** Where a durable memory is kept: a Space's shared memory, or one
+ *  person's own. */
+export type DurableHome = { scope: "space"; spaceId: string } | { scope: "personal" };
+
+/**
+ * Writes one durable memory at a person's word: the writer `remember`
+ * and `note_pending_capability` share, and the engine's when a person
+ * answers a question whose answer stands for later work
+ * (questionTickets.standingAnswerMemory). It runs with that person's
+ * session, so RLS decides whether they may write to the home and
+ * whether they may replace the fact that stands there.
+ *
+ * One topic holds one fact per home (the slot's unique index admits a
+ * single active durable), so a fact restated under the same topic
+ * takes the old one's place in this order: the old row is set aside,
+ * the new one is written pointing back at it, and when that write is
+ * refused the old fact is put back. The steps are separate statements,
+ * not one transaction: a call cut off between them leaves the topic
+ * without an active fact, which the next write fills. A fact the
+ * person may not set aside is not replaced.
+ *
+ * `replace: false` leaves a fact that already stands under the topic
+ * exactly as it is and writes nothing (`standing` names it) — for a
+ * writer whose topic was not chosen by the person (a standing answer:
+ * the agent named the topic, so it must not be able to steer an answer
+ * onto a rule the Space already holds).
+ *
+ * A keyed memory carries no fingerprint: the topic's slot is its
+ * identity, and a fingerprint would collide with the fact it replaces.
+ */
+export async function writeDurableMemory(
+  db: SupabaseClient, candidate: MemoryCandidate, home: DurableHome, userId: string,
+  opts: { replace?: boolean } = {},
+): Promise<{ ok: true; id: string; replaced: string | null } | { ok: false; error: string; standing?: string }> {
+  if (!scrubCandidate({ title: candidate.title, gist: candidate.gist, body: candidate.body }).clean) {
+    return { ok: false, error: "認証情報らしき内容が含まれるため保存しませんでした。値そのものではなく、性質だけを書いてください。" };
+  }
+  const topicKey = topicKeyOf(candidate.topic ?? null);
+  const spaceId = home.scope === "space" ? home.spaceId : null;
+  const ownerId = home.scope === "personal" ? userId : null;
+  const standing = db.from("memories")
+    .select("id, layer, status, scope, activity_space_id, user_id, topic_key")
+    .eq("status", "active").eq("scope", home.scope);
+  const { data: existing } = await (home.scope === "space"
+    ? standing.eq("activity_space_id", home.spaceId)
+    : standing.eq("user_id", userId));
+  const rows = (existing ?? []) as { id: string; layer: string; status: string; scope: "space" | "personal"; activity_space_id: string | null; user_id: string | null; topic_key: string | null }[];
+  const replaceId = supersedeTargetFor(topicKey, home.scope, spaceId, ownerId,
+    rows.map((r) => ({ ...r, layer: r.layer as "durable" | "episode", status: r.status as "active", user_id: r.user_id ?? "" })));
+  if (replaceId && opts.replace === false) {
+    return { ok: false, error: "この話題にはすでに記憶があります。", standing: replaceId };
+  }
+  if (replaceId) {
+    const { data: aside, error: asideError } = await db.from("memories")
+      .update({ status: "superseded", updated_at: new Date().toISOString() })
+      .eq("id", replaceId).eq("status", "active").select("id");
+    if (asideError || !aside?.length) {
+      return { ok: false, error: "この話題にはすでに記憶があり、置き換える権限がありません。その記憶を作った人か Space の管理者が、設定の記憶から直してください。" };
+    }
+  }
+  const { data: made, error } = await db.from("memories").insert({
+    layer: "durable", kind: candidate.kind, status: "active", scope: home.scope,
+    activity_space_id: spaceId, user_id: ownerId,
+    title: candidate.title, gist: candidate.gist, body: candidate.body, topic_key: topicKey,
+    fingerprint: topicKey ? null : fingerprintOf(candidate, home.scope, spaceId, ownerId),
+    integration_name: candidate.integrationName ?? null,
+    origin: "person", created_by: userId,
+    supersedes_id: replaceId,
+  }).select("id").single();
+  if (error || !made) {
+    if (replaceId) {
+      await db.from("memories").update({ status: "active", updated_at: new Date().toISOString() })
+        .eq("id", replaceId).eq("status", "superseded");
+    }
+    return { ok: false, error: error?.message ?? "保存できませんでした。" };
+  }
+  return { ok: true, id: (made as { id: string }).id, replaced: replaceId };
+}
+
 async function remember(db: SupabaseClient, input: Record<string, unknown>, actor: BoardActor): Promise<ToolResult> {
   if (!actor.userId) return { ok: false, error: "誰の記憶か分からないため保存できません。" };
   const kind = typeof input.kind === "string" && (MEMORY_KINDS as readonly string[]).includes(input.kind)
@@ -153,10 +242,6 @@ async function remember(db: SupabaseClient, input: Record<string, unknown>, acto
   const gist = typeof input.gist === "string" ? input.gist.trim().slice(0, 240) : "";
   const body = typeof input.body === "string" ? input.body.trim().slice(0, 2_000) : "";
   if (!kind || !title || !body) return { ok: false, error: "kind / title / body が必要です。" };
-  if (!scrubCandidate({ title, gist, body }).clean) {
-    return { ok: false, error: "認証情報らしき内容が含まれるため保存しませんでした。値そのものではなく、性質だけを書いてください。" };
-  }
-  const topicKey = topicKeyOf(typeof input.topic === "string" ? input.topic : null);
   const integrationName = typeof input.integrationName === "string" && input.integrationName.trim()
     ? input.integrationName.trim().slice(0, 120) : null;
   const candidate: MemoryCandidate = { kind, title, gist, body, topic: typeof input.topic === "string" ? input.topic : null, integrationName };
@@ -164,29 +249,12 @@ async function remember(db: SupabaseClient, input: Record<string, unknown>, acto
   // Whose memory is it? The person's own (personal), unless the person
   // is looking at a Space — the tool runs without a view context, so
   // the durable home remember can promise is the person's own. Space
-  // memories are born from Space work (capture) or shared from
-  // personal ones in the settings screen, where the body is shown
-  // before it crosses.
-  const { data: existing } = await db.from("memories")
-    .select("id, layer, status, scope, activity_space_id, user_id, topic_key")
-    .eq("scope", "personal").eq("status", "active");
-  const rows = (existing ?? []) as { id: string; layer: string; status: string; scope: "personal"; activity_space_id: null; user_id: string; topic_key: string | null }[];
-  const replaceId = supersedeTargetFor(topicKey, "personal", null, actor.userId,
-    rows.map((r) => ({ ...r, layer: r.layer as "durable" | "episode", status: r.status as "active" })));
-  const { data: made, error } = await db.from("memories").insert({
-    layer: "durable", kind, status: "active", scope: "personal", user_id: actor.userId,
-    title, gist, body, topic_key: topicKey,
-    fingerprint: fingerprintOf(candidate, "personal", null, actor.userId),
-    integration_name: integrationName,
-    origin: "person", created_by: actor.userId,
-    supersedes_id: replaceId,
-  }).select("id").single();
-  if (error || !made) return { ok: false, error: error?.message ?? "保存できませんでした。" };
-  if (replaceId) {
-    await db.from("memories").update({ status: "superseded", updated_at: new Date().toISOString() })
-      .eq("id", replaceId).eq("status", "active");
-  }
-  return { ok: true, data: { id: (made as { id: string }).id, remembered: title, ...(replaceId ? { replaced: replaceId } : {}) } };
+  // memories are born from Space work (capture, an answered standing
+  // question) or shared from personal ones in the settings screen,
+  // where the body is shown before it crosses.
+  const kept = await writeDurableMemory(db, candidate, { scope: "personal" }, actor.userId);
+  if (!kept.ok) return { ok: false, error: kept.error };
+  return { ok: true, data: { id: kept.id, remembered: title, ...(kept.replaced ? { replaced: kept.replaced } : {}) } };
 }
 
 /**
@@ -212,38 +280,14 @@ async function notePendingCapability(db: SupabaseClient, input: Record<string, u
   const title = `${preset} の ${command} が使えるようになったら`;
   const gist = rule.slice(0, 240);
   const body = `${rule}\n\n— 能力待ちの記録: ${preset} 連携の定義に ${command} が無いため保留中。使えるようになったら、このルールを効かせ始めるか人に確認する。`;
-  if (!scrubCandidate({ title, gist, body }).clean) {
-    return { ok: false, error: "認証情報らしき内容が含まれるため記録しませんでした。値そのものではなく、性質だけを書いてください。" };
-  }
   const candidate: MemoryCandidate = { kind: "procedure", title, gist, body, topic: topicKey, integrationName: preset };
-  const scoped = db.from("memories")
-    .select("id, layer, status, scope, activity_space_id, user_id, topic_key")
-    .eq("status", "active");
-  const { data: existing } = await (scope === "space"
-    ? scoped.eq("scope", "space").eq("activity_space_id", spaceId)
-    : scoped.eq("scope", "personal"));
-  const rows = (existing ?? []) as { id: string; layer: string; status: string; scope: "space" | "personal"; activity_space_id: string | null; user_id: string | null; topic_key: string | null }[];
-  const replaceId = supersedeTargetFor(topicKey, scope, spaceId, actor.userId,
-    rows.map((r) => ({ ...r, layer: r.layer as "durable" | "episode", status: r.status as "active", user_id: r.user_id ?? "" })));
-  const { data: made, error } = await db.from("memories").insert({
-    layer: "durable", kind: "procedure", status: "active", scope,
-    activity_space_id: spaceId, user_id: scope === "personal" ? actor.userId : null,
-    title, gist, body, topic_key: topicKey,
-    fingerprint: fingerprintOf(candidate, scope, spaceId, actor.userId),
-    integration_name: preset,
-    origin: "person", created_by: actor.userId,
-    supersedes_id: replaceId,
-  }).select("id").single();
-  if (error || !made) return { ok: false, error: error?.message ?? "記録できませんでした。" };
-  if (replaceId) {
-    await db.from("memories").update({ status: "superseded", updated_at: new Date().toISOString() })
-      .eq("id", replaceId).eq("status", "active");
-  }
+  const kept = await writeDurableMemory(db, candidate, spaceId ? { scope: "space", spaceId } : { scope: "personal" }, actor.userId);
+  if (!kept.ok) return { ok: false, error: kept.error };
   return {
     ok: true,
     data: {
-      id: (made as { id: string }).id, pendingCapability: { preset, command }, scope,
-      ...(replaceId ? { replaced: replaceId } : {}),
+      id: kept.id, pendingCapability: { preset, command }, scope,
+      ...(kept.replaced ? { replaced: kept.replaced } : {}),
     },
   };
 }

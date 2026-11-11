@@ -205,8 +205,9 @@ export function catalogDenyRefusal(name: string, input: Record<string, unknown>)
  * a call the entry may not run is refused, and one that needs approval runs
  * only when `approved` says the person approved this call. Never throws.
  * `spaceId` is the entry's ambient Space (the chat's context, a run's
- * Space), threaded to the tools whose scope is a Space — file search —
- * the way `actor` threads who is acting; the model never supplies it.
+ * Space), threaded to the tools whose scope is a Space — file search,
+ * memory recall — the way `actor` threads who is acting; the model
+ * never supplies it.
  */
 export async function runCatalogTool(
   db: SupabaseClient, name: string, input: Record<string, unknown>, actor: BoardActor,
@@ -220,7 +221,7 @@ export async function runCatalogTool(
   try {
     if (name === "campaignMeasure") return await runMeasureTool(db, input);
     if (name === "createElements") return await runBatchTool(db, input, actor);
-    if (tool.area === "memory") return await runMemoryTool(db, name, input, actor);
+    if (tool.area === "memory") return await runMemoryTool(db, name, input, actor, under.spaceId ?? null);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(db, name, input);
     switch (tool.area) {
       case "strategy":

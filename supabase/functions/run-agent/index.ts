@@ -147,8 +147,9 @@ import {
 import {
   ensureQuestionTicket, loadQuestionTicket, loadQuestionTickets, markQuestionAnswered,
   questionShortForm, restingSummaryFor, settleRunBlockedByQuestions, ticketContextOf,
-  validateAskInput, validateTicketAnswer, type QuestionTicketRow,
+  standingAnswerMemory, validateAskInput, validateTicketAnswer, type QuestionTicketRow,
 } from "../_shared/questionTickets.ts";
+import { writeDurableMemory } from "../_shared/memoryTools.ts";
 import {
   COMPENSATION_REASONS, compensationReportHasContent, compensationReportText,
   compensationSummaryOf, loadCompensationReport, mergeCompensationBatchOutcome,
@@ -390,7 +391,7 @@ Deno.serve(async (req: Request) => {
   let body: {
     runId?: string; advance?: string; ping?: boolean; resume?: boolean; continue?: boolean; token?: string; message?: string;
     decision?: { actionId?: string; approve?: boolean; inputHash?: string; note?: string; remember?: string[] };
-    answer?: { ticketId?: string; option?: string; text?: string };
+    answer?: { ticketId?: string; option?: string; text?: string; keep?: boolean };
     context?: CopilotContextLike; attachments?: Attachment[];
     definitionTest?: {
       action?: string; runId?: string; testId?: string; name?: string;
@@ -545,7 +546,7 @@ Deno.serve(async (req: Request) => {
   // must be one the ticket can take — a choice it offered, or the
   // person's own words. What the driver delivers is the validated
   // answer, never the raw request.
-  let validatedAnswer: { ticketId: string; answer: string } | null = null;
+  let validatedAnswer: { ticketId: string; answer: string; keep: boolean } | null = null;
   if (entry === "answer") {
     if (!answerAllowed(driver)) return json({ error: "この実行は質問への回答を受け付けません。" }, 400);
     const ticketId = typeof body.answer?.ticketId === "string" ? body.answer.ticketId : "";
@@ -559,7 +560,9 @@ Deno.serve(async (req: Request) => {
     if (!resting) return json({ error: "その質問は、この実行の現在の待ちには含まれていません。" }, 409);
     const v = validateTicketAnswer(ticket, { option: body.answer?.option, text: body.answer?.text });
     if ("error" in v) return json({ error: v.error }, 400);
-    validatedAnswer = { ticketId: ticket.id, answer: v.answer };
+    // keep: the person may hold a standing answer to this one run
+    // (the Inbox's "use this answer from now on", on by default).
+    validatedAnswer = { ticketId: ticket.id, answer: v.answer, keep: body.answer?.keep !== false };
   }
   if (entry === "message") {
     if (!messageAllowed(driver)) return json({ error: "この実行は会話ではありません。" }, 400);
@@ -750,7 +753,7 @@ interface ExecArgs {
    *  was claimed (the ticket is this run's, still open, and the answer
    *  is one the ticket can take): the exact words the driver delivers
    *  as the ask_question call's tool result. Null for every other entry. */
-  answer: { ticketId: string; answer: string } | null;
+  answer: { ticketId: string; answer: string; keep: boolean } | null;
 }
 
 async function execute(a: ExecArgs): Promise<void> {
@@ -3014,6 +3017,29 @@ async function execute(a: ExecArgs): Promise<void> {
     });
     const tickets = await loadQuestionTickets(admin, q.tickets.map((t) => t.ticketId));
     const byId = new Map(tickets.map((t) => [t.id, t]));
+    // A standing answer is kept as the Space's durable fact — by the
+    // engine, with the person's session, through the one memory writer
+    // (a question is only ever asked from a Space's run). The agent
+    // has no hand in the write, but it did name the topic, so the write
+    // never replaces a fact the Space already holds under it: that
+    // rule changes only where a person edits it (the memory settings).
+    // A write that does not happen never holds the answer back — this
+    // run still gets it — and the step says what stands for the next.
+    const answeredTicket = marked ? byId.get(answer.ticketId) : undefined;
+    const standing = answeredTicket && run.activity_space_id
+      ? standingAnswerMemory(answeredTicket, answer.answer, answer.keep, new Date()) : null;
+    if (standing && run.activity_space_id) {
+      const kept = await writeDurableMemory(userDb, standing,
+        { scope: "space", spaceId: run.activity_space_id }, user.id, { replace: false });
+      if (kept.ok) {
+        await addStep(admin, run.id, "status", `答えを次からも使う決まりとして残しました: ${standing.topic}`, standing.gist);
+      } else if (kept.standing) {
+        await addStep(admin, run.id, "status", `この話題にはすでに決まりがあるため、変えていません: ${standing.topic}`,
+          "今回の答えは、この仕事にだけ使います。決まりを変えるときは、設定の記憶から直してください。");
+      } else {
+        await addStep(admin, run.id, "error", `答えを決まりとして残せませんでした: ${standing.topic}`, kept.error);
+      }
+    }
     const expired = tickets.filter((t) => t.status === "expired");
     if (!marked || expired.length) {
       // The expiry took this ticket (or a sibling) between serve's
