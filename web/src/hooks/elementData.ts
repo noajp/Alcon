@@ -391,19 +391,6 @@ export function useSubElements(parentId: string | null) {
   });
 }
 
-/** The Element an Element is a Sub-element of. */
-export function useParentElement(parentId: string | null | undefined) {
-  return useQuery({
-    queryKey: ['element-parent', parentId],
-    enabled: !!parentId,
-    queryFn: async (): Promise<Pick<Element, 'id' | 'title' | 'status' | 'display_id' | 'object_id'> | null> => {
-      const { data, error } = await supabase.from('elements').select('id, title, status, display_id, object_id').eq('id', parentId!).maybeSingle();
-      if (error) throw error;
-      return data as Pick<Element, 'id' | 'title' | 'status' | 'display_id' | 'object_id'> | null;
-    },
-  });
-}
-
 /**
  * One Element by id, as the summary a reference to it needs: title,
  * status, display_id, its Object and its progress — the chat's created
