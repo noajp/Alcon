@@ -226,7 +226,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
       }}
       // Hover tints the card as a list row is tinted (the foreground at 6%,
       // laid over the card's own ground as an image so the ground stays).
-      className="group/card relative overflow-hidden rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-island)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
+      className="group/card relative overflow-hidden rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-card)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
     >
       {/* The track: the card's content in a full-width cell, the execute
           rail in a 112px cell after it, clipped by the root. Revealed,
