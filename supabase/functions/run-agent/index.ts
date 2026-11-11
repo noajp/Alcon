@@ -66,8 +66,7 @@ import {
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, githubTokens, pullUrlsIn, upsertCodeChange, withGithubToken, type GithubPull, type PullRef } from "../_shared/github.ts";
 import { DRIVE_TOOLS } from "../_shared/googleDrive.ts";
-import { RECORD_TOOLS } from "./records.ts";
-import { readRecords, saveRecords, strategyOfElement, strategyTableLines, type RecordScope } from "./recordStore.ts";
+import { readRecords, saveRecords, strategyOfElement, type RecordScope } from "./recordStore.ts";
 import { TOOL_SEARCH, needsToolSearch, toolParamsFor, withDeferral, type RunToolDef } from "../_shared/toolLoading.ts";
 import { ROUND_TOOL, approvalSummary, baseAgentTools, baseKindOf, integrationPrefix, INTEGRATION_SEPARATOR, uniqueToolName, webSteps, webTools } from "./agentTools.ts";
 import {
@@ -1392,7 +1391,7 @@ async function execute(a: ExecArgs): Promise<void> {
 
   // A connection's tools load when the model searches for them, once there are many.
   const liveTools: RunToolDef[] = withDeferral(
-    [...baseAgentTools(), ...(recordScope ? RECORD_TOOLS : []), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machineOffered ? MACHINE_TOOLS : [])],
+    [...baseAgentTools(), ...(parsed?.metric ? [ROUND_TOOL] : []), ...(runner ? RUNNER_TOOLS : []), ...(machineOffered ? MACHINE_TOOLS : [])],
     integrationDefs,
   );
   const tools: RunToolDef[] = run.transcript?.tools?.length ? run.transcript.tools : liveTools;
@@ -2869,7 +2868,7 @@ async function execute(a: ExecArgs): Promise<void> {
     // Resuming grants a fresh allowance on top of the turns already taken.
     if (a.body.resume) turnBudget = state.turns + maxTotalTurns;
   } else {
-    const ctx = await loadContext(userDb, run, integrationSummary, recordScope ? await strategyTableLines(userDb, recordScope.strategyId) : null, boundMeasures);
+    const ctx = await loadContext(userDb, run, integrationSummary, null, boundMeasures);
     const task = taskMessage(ctx);
     // The injected bodies count as uses of those memories (PR3).
     if (ctx.memoryUsedIds?.length) await noteMemoryUse(admin, run.id, ctx.memoryUsedIds);

@@ -28,14 +28,14 @@ describe('the tool catalog', () => {
     // Tools that only delete are never offered where deletes are not allowed.
     expect(offered('element').some((t) => t.effect === 'delete')).toBe(false);
     expect(offered('conversation').filter((t) => t.effect === 'delete').map((t) => t.name)).toEqual(['removeIntent']);
-    expect(names(offered('panel'))).toEqual(expect.arrayContaining(['deleteInitiative', 'deleteElement', 'tableData', 'widgetBoard']));
+    expect(names(offered('panel'))).toEqual(expect.arrayContaining(['deleteInitiative', 'deleteElement', 'widgetBoard']));
   });
 
   it('decides each call of a multi-action tool by its action', () => {
     const tool = (n: string) => catalog.catalogTool(n);
-    expect(catalog.effectOfCall(tool('tableData'), { action: 'list', entity: 'row' })).toBe('read');
-    expect(catalog.effectOfCall(tool('tableData'), { action: 'update', entity: 'row' })).toBe('write');
-    expect(catalog.effectOfCall(tool('tableData'), { action: 'delete', entity: 'table' })).toBe('delete');
+    expect(catalog.effectOfCall(tool('widgetBoard'), { action: 'list' })).toBe('read');
+    expect(catalog.effectOfCall(tool('widgetBoard'), { action: 'update' })).toBe('write');
+    expect(catalog.effectOfCall(tool('widgetBoard'), { action: 'delete' })).toBe('delete');
     expect(catalog.effectOfCall(tool('campaignMeasure'), { action: 'campaigns' })).toBe('read');
     // An action nobody knows counts as the most dangerous one.
     expect(catalog.effectOfCall(tool('widgetBoard'), { action: 'purge' })).toBe('delete');
@@ -52,9 +52,6 @@ describe('the tool catalog', () => {
     expect(d('campaignMeasure', { action: 'list' })).toBe('allow');
     for (const n of ['deleteElement', 'deleteObject', 'bulkDeleteElements', 'removeIntent', 'deleteInitiative']) expect(d(n), n).toBe('deny');
     expect(d('campaignMeasure', { action: 'delete' })).toBe('deny');
-    expect(d('tableData', { action: 'delete', entity: 'row' })).toBe('deny');
-    expect(d('tableData', { action: 'create', entity: 'row' })).toBe('deny');
-    expect(d('tableData', { action: 'get', entity: 'row' })).toBe('allow');
     expect(d('widgetBoard', { action: 'update' })).toBe('deny');
     expect(catalog.mayNeedApproval('element', 'addIntent')).toBe(true);
     expect(catalog.mayNeedApproval('element', 'createElement')).toBe(false);
@@ -66,7 +63,6 @@ describe('the tool catalog', () => {
     for (const n of ['addIntent', 'updateInitiative', 'createInitiative', 'writeInitiativeDefinition', 'removeIntent', 'writeFile']) expect(d(n), n).toBe('allow');
     for (const n of ['createElement', 'updateElement', 'deleteInitiative', 'createElements']) expect(d(n), n).toBe('deny');
     expect(d('campaignMeasure', { action: 'delete' })).toBe('deny');
-    expect(d('tableData', { action: 'update', entity: 'cell' })).toBe('deny');
   });
 
   it('lets the panel run everything the person can', () => {
@@ -106,7 +102,7 @@ describe('the tool catalog', () => {
 
   it('refuses at run time what the entry may not run, before touching the database', async () => {
     const db = { from: () => { throw new Error('the database was reached'); } };
-    const denied = await catalog.runCatalogTool(db as never, 'tableData', { action: 'delete', entity: 'table', id: 'x' }, { agent: 'x', userId: null }, { entry: 'element' });
+    const denied = await catalog.runCatalogTool(db as never, 'deleteElement', { elementId: 'x' }, { agent: 'x', userId: null }, { entry: 'element' });
     expect(denied).toMatchObject({ ok: false });
     expect(denied.error).toContain('ここからは実行できません');
     const waiting = await catalog.runCatalogTool(db as never, 'addIntent', { initiativeId: 'x', kind: 'decision', title: 't' }, { agent: 'x', userId: null }, { entry: 'element' });

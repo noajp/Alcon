@@ -48,7 +48,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     load: async () => (await import('./widgets/DesignWidget')).DesignWidget,
   },
   'deck': {
-    type: 'deck', label: 'Deck',
+    type: 'deck', label: 'Deck', retired: true,
     description: 'A Slides deck: its pages here, the full editor when opened full screen',
     group: 'content', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full',
     normalizeParams: (raw) => ({ deckId: typeof raw?.deckId === 'string' && raw.deckId.length <= 64 ? raw.deckId : null }),
@@ -71,7 +71,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     load: async () => (await import('./widgets/ArtifactsWidget')).ArtifactsWidget,
   },
   'note': {
-    type: 'note', label: 'Note',
+    type: 'note', label: 'Note', retired: true,
     description: 'A Note from Notebook, written in place',
     group: 'content', accepts: ['me', 'domain', 'object', 'initiative'], zones: ['main'], defaultSize: 'full', padded: false,
     normalizeParams: (raw) => ({ noteId: typeof raw?.noteId === 'string' && raw.noteId.length <= 64 ? raw.noteId : null }),
@@ -90,6 +90,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'data-view': {
     type: 'data-view',
     label: 'Data',
+    retired: true,
     description: 'Your table data as editable rows, grouped cards, or a chart',
     group: 'content',
     accepts: ['me', 'domain', 'object', 'element', 'initiative', 'phase'],
@@ -144,6 +145,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'linked-note': {
     type: 'linked-note',
     label: 'Linked Note',
+    retired: true,
     description: 'Pin a Note to this Object',
     group: 'content',
     accepts: ['object'],

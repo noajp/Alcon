@@ -120,10 +120,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   onNavigate({ objectId, objectDomainId: domainId ?? undefined });
                   onViewChange?.('objects');
                 }}
-                onOpenTable={(tableId) => {
-                  onNavigate({ tableId });
-                  onViewChange?.('tables');
-                }}
               />
             </div>
           )}

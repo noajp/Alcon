@@ -50,8 +50,5 @@ export function railModeOf(view: string): RailMode | null {
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
 
-/** The document tools, opened from Artifacts (and the command palette). */
-export const BAR_TOOLS: RailMode[] = ['notebook', 'slides'];
-
-/** The tools the command palette offers besides the document tools. */
-export const TOOL_MODES: RailMode[] = ['tables', 'files', 'team'];
+/** The tools the command palette offers. */
+export const TOOL_MODES: RailMode[] = ['team'];
