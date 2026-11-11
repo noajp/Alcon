@@ -1,10 +1,12 @@
 'use client';
 
 import { SidebarReveal } from '@/Function/shared/SidebarReveal';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from '@/ui/icons';
 import type { Notification } from '@/hooks/useSupabase';
 import { notificationKindMeta } from '@/Function/shared/notificationKinds';
+import { questionTicketIdsOf, splitInbox } from '@/Function/shared/inboxModel';
+import { useOpenQuestionTickets } from '@/AIP/ai/agentData';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/ui/dropdown-menu';
@@ -42,11 +44,25 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
   const { t, locale } = useI18n();
   const inbox = useInbox({ onNavigate, onViewChange });
   const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE);
+  // What waits on the person leads the list: questions whose ticket still
+  // stands open (inboxModel.ts). The tickets are re-read when a notification
+  // arrives or one is picked — an answer shows up as the run's next report.
+  const ticketIds = useMemo(() => questionTicketIdsOf(inbox.notifications), [inbox.notifications]);
+  const openTickets = useOpenQuestionTickets(ticketIds, inbox.revision + inbox.notifications.length);
+  const { waiting, rest } = useMemo(
+    () => splitInbox(inbox.notifications, openTickets ? new Set(openTickets.keys()) : null),
+    [inbox.notifications, openTickets],
+  );
   // Keep the notification being read in the unread view until the user leaves it.
+  // A waiting question stays whether or not it was read: reading is not answering.
   const visible = inbox.unreadOnly
-    ? inbox.notifications.filter(n => !n.is_read || n.id === inbox.selectedId)
-    : inbox.notifications;
+    ? rest.filter(n => !n.is_read || n.id === inbox.selectedId)
+    : rest;
   const rows = visible.slice(0, renderLimit);
+  const rowActions = {
+    onSelect: (n: Notification) => { if (inbox.select(n)) onOpen?.(); },
+    onToggleRead: inbox.toggleRead, onArchive: inbox.archive,
+  };
 
   return (
     <section aria-label={t('Notifications')}>
@@ -63,20 +79,37 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
         </ButtonAppearanceProvider>
       </header>
       {inbox.loading ? <p role="status" className="py-8 text-center text-[12px] text-muted-foreground">{t('Loading…')}</p>
-        : rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
-        : <ul className="mt-1 space-y-0.5">
-          {rows.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale}
-            onSelect={n => { if (inbox.select(n)) onOpen?.(); }} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
-        </ul>}
+        : waiting.length === 0 && rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
+        : <>
+          {waiting.length > 0 && (
+            <>
+              <h3 className="mt-2 flex items-center gap-1.5 px-2 text-[11px] font-medium text-[var(--status-info)]">
+                {t('Waiting on you')}<span className="tabular-nums">{waiting.length}</span>
+              </h3>
+              <ul className="mt-1 space-y-0.5">
+                {waiting.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale}
+                  waitingOn={openTickets?.get(n.question_ticket_id ?? '')?.elementTitle ?? null} waiting {...rowActions} />)}
+              </ul>
+              {rows.length > 0 && <h3 className="mt-3 px-2 text-[11px] font-medium text-muted-foreground">{t('Everything else')}</h3>}
+            </>
+          )}
+          <ul className="mt-1 space-y-0.5">
+            {rows.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale} {...rowActions} />)}
+          </ul>
+        </>}
       {visible.length > renderLimit && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" onClick={() => setRenderLimit(limit => limit + RENDER_PAGE_SIZE)}>{t('Show more')}</Button></div>}
     </section>
   );
 }
 
-function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, onArchive }: {
+function InboxRow({ notification: n, selected, locale, waiting = false, waitingOn = null, onSelect, onToggleRead, onArchive }: {
   notification: Notification;
   selected: boolean;
   locale: string;
+  /** A question still waiting for its answer: the question is shown whole
+   *  (two lines), and the line under it names the work it rests. */
+  waiting?: boolean;
+  waitingOn?: string | null;
   onSelect: (n: Notification) => void;
   onToggleRead: (n: Notification) => void;
   onArchive: (n: Notification) => void;
@@ -99,16 +132,18 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
         {/* What the notification is about leads; who sent it and what kind
             it is follow, small — a list of seven "Status" rows says nothing. */}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className={`min-w-0 flex-1 truncate text-[12px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{n.title}</span>
+          <span className={`flex gap-2 ${waiting ? 'items-start' : 'items-center'}`}>
+            <span className={`min-w-0 flex-1 text-[12px] ${waiting ? 'line-clamp-2 font-medium text-foreground' : `truncate ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}`}>{n.title}</span>
             <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
             {!n.is_read && <span aria-label={t('Unread')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
           </span>
-          <span className="block truncate text-[11px] text-muted-foreground">
-            {n.actor_name && <><span>{n.actor_name}</span> · </>}
-            <span>{t(meta.label)}</span>
-            {n.body && <> · <span>{n.body}</span></>}
-          </span>
+          {waiting && waitingOn
+            ? <span className="block truncate text-[11px] text-muted-foreground">{waitingOn}</span>
+            : <span className="block truncate text-[11px] text-muted-foreground">
+              {n.actor_name && <><span>{n.actor_name}</span> · </>}
+              <span>{t(meta.label)}</span>
+              {n.body && <> · <span>{n.body}</span></>}
+            </span>}
         </span>
       </button>
       <DropdownMenu>

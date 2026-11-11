@@ -455,6 +455,52 @@ export async function fetchQuestionTicketById(ticketId: string): Promise<Questio
   return (data as QuestionTicket) ?? null;
 }
 
+/** What an open question waits on: the work it rests. */
+export interface OpenQuestionTicket { elementId: string | null; elementTitle: string | null }
+
+/** Which of these tickets still stand open, each with the Element it
+ *  rests — the Inbox's waiting group reads this. One read for the
+ *  tickets, one for their Elements' titles. */
+export async function fetchOpenQuestionTickets(ticketIds: readonly string[]): Promise<Map<string, OpenQuestionTicket>> {
+  const open = new Map<string, OpenQuestionTicket>();
+  if (ticketIds.length === 0) return open;
+  const { data, error } = await supabase
+    .from('question_tickets')
+    .select('id, element_id')
+    .in('id', [...ticketIds])
+    .eq('status', 'open')
+    .gt('expires_at', new Date().toISOString());
+  if (error) throw error;
+  const rows = (data ?? []) as { id: string; element_id: string | null }[];
+  const elementIds = [...new Set(rows.map((r) => r.element_id).filter((id): id is string => !!id))];
+  const titles = new Map<string, string>();
+  if (elementIds.length > 0) {
+    const { data: elements } = await supabase.from('elements').select('id, title').in('id', elementIds);
+    for (const e of (elements ?? []) as { id: string; title: string }[]) titles.set(e.id, e.title);
+  }
+  for (const r of rows) open.set(r.id, { elementId: r.element_id, elementTitle: r.element_id ? titles.get(r.element_id) ?? null : null });
+  return open;
+}
+
+/** The open tickets among `ticketIds`, re-read whenever the set of
+ *  tickets or `revision` changes (a new notification, a pick in the
+ *  Inbox). null until the first read lands, so a caller never shows
+ *  "nothing waits" on a guess. A failed read keeps the last answer. */
+export function useOpenQuestionTickets(ticketIds: readonly string[], revision: number): Map<string, OpenQuestionTicket> | null {
+  const [open, setOpen] = useState<Map<string, OpenQuestionTicket> | null>(null);
+  const key = [...ticketIds].sort().join(',');
+  useEffect(() => {
+    let cancelled = false;
+    void fetchOpenQuestionTickets(key ? key.split(',') : []).then((next) => {
+      if (!cancelled) setOpen(next);
+    }).catch((error) => {
+      console.error('Failed to read open question tickets:', error);
+    });
+    return () => { cancelled = true; };
+  }, [key, revision]);
+  return open;
+}
+
 /** Answer a run's question ticket: one of its options, or free text.
  *  The engine validates the answer against the ticket before the run
  *  is touched, and refuses anyone but the run's starter. */
