@@ -89,7 +89,7 @@ import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
 import { CodeChangesSection } from '@/ActivitySpace/execution/codeChanges/CodeChangesSection';
-import { ParentLine, SubElementsSection } from './SubElementsSection';
+import { SubElementsSection } from './SubElementsSection';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ApprovalRequestBanner } from './ApprovalRequestBanner';
@@ -785,7 +785,6 @@ function ElementDetailBody({
                 placeholder={t('Element title')}
               />
             </div>
-            {element.parent_id && onOpenElement && <ParentLine parentId={element.parent_id} onOpen={onOpenElement} />}
             <ApprovalRequestBanner element={element} onRefresh={onRefresh} />
             {layout === 'reader' && <div className="mb-5 flex flex-wrap items-center gap-2">
               {/* Status and Priority as chips, in the Label chips' own form. */}

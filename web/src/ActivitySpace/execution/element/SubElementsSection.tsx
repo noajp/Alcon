@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import {
   addElementAssignee, createSubElement, noticeElementSaveFailed, removeElementAssignee, updateElement,
-  useAssignableWorkers, useParentElement, useSubElements, type SubElement, type Worker,
+  useAssignableWorkers, useSubElements, type SubElement, type Worker,
 } from '@/hooks/useSupabase';
 import type { Element } from '@/types/database';
 
@@ -138,22 +138,5 @@ function SubElementRow({ sub, workers, onOpen, onChanged }: {
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  );
-}
-
-/** "Sub-element of ◯ ELE-012 Parent title" under a Sub-element's title; the
- *  parent opens on a click. */
-export function ParentLine({ parentId, onOpen }: { parentId: string; onOpen: (id: string) => void }) {
-  const { t } = useI18n();
-  const { data: parent } = useParentElement(parentId);
-  if (!parent) return null;
-  return (
-    <button type="button" onClick={() => onOpen(parent.id)}
-      className="mt-2 flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground">
-      {t('Sub-element of')}
-      <ElementProgressMark status={parent.status} size={14} />
-      {parent.display_id && <span className="tabular-nums">{parent.display_id}</span>}
-      <span className="font-medium text-foreground">{parent.title}</span>
-    </button>
   );
 }

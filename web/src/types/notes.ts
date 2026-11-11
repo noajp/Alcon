@@ -16,6 +16,8 @@ export interface NoteNode {
   linkedObjectId?: string | null;
   /** auth user id of the creator — the Profile page lists a person's own notes. */
   createdBy?: string;
+  /** Last change, ISO — the Note list's Recent orders by it. */
+  updatedAt?: string;
 }
 
 export interface Brief {
