@@ -331,9 +331,20 @@ describe('a standing answer (the person’s word, kept by the engine)', () => {
   it('becomes one fact under the declared topic, in the person’s own words', () => {
     const m = qt.standingAnswerMemory(ticket({ standing_topic: '担当：クレーム' }), ' TAKA ', true, now);
     expect(m).toMatchObject({ kind: 'fact', topic: '担当：クレーム', gist: '担当：クレーム：TAKA' });
-    expect(m?.body).toContain('答え：TAKA');
-    expect(m?.body).toContain('聞いた質問：クレームの担当は誰ですか？');
+    // Whose words are whose stays readable in the body.
+    expect(m?.body).toContain('人の答え：TAKA');
+    expect(m?.body).toContain('AI が付けた話題：担当：クレーム');
+    expect(m?.body).toContain('AI が聞いた質問：クレームの担当は誰ですか？');
     expect(m?.body).toContain('2026-11-11');
+  });
+
+  it('keeps a rule’s worth of the answer and of the question, not a page', () => {
+    const long = { question: 'あ'.repeat(1000), context: { standing_topic: '担当：クレーム' } };
+    const m = qt.standingAnswerMemory(long, 'い'.repeat(4000), true, now);
+    expect(m?.body.length).toBeLessThan(1000);
+    expect(m?.body).toContain(`人の答え：${'い'.repeat(499)}…`);
+    expect(m?.body).toContain(`AI が聞いた質問：${'あ'.repeat(299)}…`);
+    expect(m?.gist.length).toBeLessThanOrEqual(240);
   });
 
   it('is not kept when no topic was declared, when the person held it to this run, or when the answer is empty', () => {

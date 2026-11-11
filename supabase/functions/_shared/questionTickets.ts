@@ -50,6 +50,11 @@ export const QUESTION_POLICY = {
   /** A standing answer's topic name: short enough to be a memory's
    *  topic, long enough to say what it settles. */
   maxStandingTopicChars: 80,
+  /** What a standing answer keeps of the answer and of the question:
+   *  a rule is a line or two, and a memory's body has a budget of its
+   *  own in every run's context. */
+  maxStandingAnswerChars: 500,
+  maxStandingQuestionChars: 300,
   /** The Chain's waiting line: the question's short form. */
   shortFormChars: 120,
 } as const;
@@ -227,10 +232,11 @@ export interface StandingAnswerMemory { kind: "fact"; topic: string; title: stri
 /**
  * Pure. The durable fact a person's answer becomes, or null when the
  * ticket declared no standing topic or the person kept the answer to
- * this one run. The words kept are the question as it was asked and
- * the answer exactly as the person gave it — nothing the agent
- * phrased after the fact. One topic holds one fact (the memory
- * store's own rule), so answering the same topic again replaces it.
+ * this one run. Whose words are whose is kept apart in the body: the
+ * answer is the person's (a choice they tapped, or what they wrote),
+ * the topic and the question are the agent's, and the body says so —
+ * nothing is phrased after the fact. Both are capped: a rule is short,
+ * and an answer too long to be one is kept only as far as the cap.
  */
 export function standingAnswerMemory(
   ticket: Pick<QuestionTicketRow, "question" | "context">,
@@ -242,13 +248,15 @@ export function standingAnswerMemory(
   const said = answer.trim();
   if (!keep || !topic || !said) return null;
   const day = now.toISOString().slice(0, 10);
-  const oneLine = said.replace(/\s+/g, " ");
+  const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+  const kept = cut(said, QUESTION_POLICY.maxStandingAnswerChars);
+  const asked = cut(ticket.question.trim(), QUESTION_POLICY.maxStandingQuestionChars);
   return {
     kind: "fact",
     topic,
     title: topic.slice(0, 40),
-    gist: `${topic}：${oneLine}`.slice(0, 240),
-    body: `決まり：${topic}\n答え：${said}\n\n聞いた質問：${ticket.question.trim()}\n決まった日：${day}（質問への人の回答）`,
+    gist: `${topic}：${kept.replace(/\s+/g, " ")}`.slice(0, 240),
+    body: `人の答え：${kept}\n\nAI が付けた話題：${topic}\nAI が聞いた質問：${asked}\n決まった日：${day}`,
   };
 }
 

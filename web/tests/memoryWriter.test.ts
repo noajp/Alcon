@@ -108,4 +108,64 @@ describe('writeDurableMemory', () => {
     expect(r.ok).toBe(false);
     expect(log).toEqual([]);
   });
+
+  it('with replace off, leaves the fact that stands under the topic and writes nothing', async () => {
+    const { db, log } = recordingDb({ existing: [standingInSpace] });
+    const r = await tools.writeDurableMemory(db, fact, { scope: 'space', spaceId: 'space-1' }, 'user-1', { replace: false });
+    expect(r).toMatchObject({ ok: false, standing: 'old' });
+    expect(log.map((o) => o.op)).toEqual(['select']);
+  });
+
+  it('with replace off, still writes when the topic is free', async () => {
+    const { db, log } = recordingDb();
+    const r = await tools.writeDurableMemory(db, fact, { scope: 'space', spaceId: 'space-1' }, 'user-1', { replace: false });
+    expect(r).toEqual({ ok: true, id: 'new', replaced: null });
+    expect(log.map((o) => o.op)).toEqual(['select', 'insert']);
+  });
+});
+
+// recall inside a Space reads that Space's memories and the person's
+// own — never another Space's. A person in two Spaces must not have
+// one Space's standing fact answer the other's work.
+describe('recall_memory is bounded by the entry’s Space', () => {
+  const actor = { agent: 'Athena', userId: 'user-1' };
+
+  function recallDb(row: Record<string, unknown> | null) {
+    const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
+    const db = {
+      rpc: (fn: string, args: Record<string, unknown>) => { rpcCalls.push({ fn, args }); return Promise.resolve({ data: [], error: null }); },
+      from: () => {
+        const b = { select: () => b, eq: () => b, maybeSingle: () => Promise.resolve({ data: row, error: null }) };
+        return b;
+      },
+    };
+    return { db, rpcCalls };
+  }
+
+  it('searches with the Space it runs in', async () => {
+    const { db, rpcCalls } = recallDb(null);
+    await tools.runMemoryTool(db, 'recall_memory', { query: '担当' }, actor, 'space-1');
+    expect(rpcCalls).toEqual([{ fn: 'search_memories', args: { p_query: '担当', p_space_id: 'space-1', p_limit: 5 } }]);
+  });
+
+  it('outside any Space searches what the person may read', async () => {
+    const { db, rpcCalls } = recallDb(null);
+    await tools.runMemoryTool(db, 'recall_memory', { query: '担当' }, actor);
+    expect(rpcCalls[0].args.p_space_id).toBeNull();
+  });
+
+  const memory = { id: 'm1', title: '担当：クレーム', gist: '', body: '人の答え：TAKA', kind: 'fact', layer: 'durable', created_at: '2026-11-11T00:00:00Z' };
+
+  it('does not read another Space’s memory by id', async () => {
+    const { db } = recallDb({ ...memory, scope: 'space', activity_space_id: 'space-2' });
+    const r = await tools.runMemoryTool(db, 'recall_memory', { id: 'm1' }, actor, 'space-1');
+    expect(r.ok).toBe(false);
+  });
+
+  it('reads its own Space’s memory and the person’s own by id', async () => {
+    const own = recallDb({ ...memory, scope: 'space', activity_space_id: 'space-1' });
+    expect((await tools.runMemoryTool(own.db, 'recall_memory', { id: 'm1' }, actor, 'space-1')).ok).toBe(true);
+    const personal = recallDb({ ...memory, scope: 'personal', activity_space_id: null });
+    expect((await tools.runMemoryTool(personal.db, 'recall_memory', { id: 'm1' }, actor, 'space-1')).ok).toBe(true);
+  });
 });

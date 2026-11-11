@@ -98,15 +98,23 @@ export const MEMORY_TOOLS: ToolDef[] = [RECALL_TOOL, REMEMBER_TOOL, START_PROMOT
 
 interface MemoryToolRow {
   id: string; title: string; gist: string; body: string; kind: string; layer: string;
-  created_at: string; score?: number;
+  created_at: string; score?: number; scope?: string; activity_space_id?: string | null;
 }
 
-/** Executes one memory tool with the caller's client. Never throws. */
+/**
+ * Executes one memory tool with the caller's client. Never throws.
+ * `spaceId` is the entry's ambient Space (runCatalogTool threads it;
+ * the model never supplies it): recall inside a Space reads that
+ * Space's memories and the person's own, never another Space's — a
+ * person in two Spaces must not have one Space's standing fact answer
+ * the other's work.
+ */
 export async function runMemoryTool(
   db: SupabaseClient, name: string, input: Record<string, unknown>, actor: BoardActor,
+  spaceId: string | null = null,
 ): Promise<ToolResult> {
   try {
-    if (name === RECALL_TOOL.name) return await recall(db, input);
+    if (name === RECALL_TOOL.name) return await recall(db, input, spaceId);
     if (name === REMEMBER_TOOL.name) return await remember(db, input, actor);
     if (name === NOTE_PENDING_CAPABILITY_TOOL.name) return await notePendingCapability(db, input, actor);
     if (name === START_PROMOTION_TOOL.name) return await startPromotion(db, input, actor);
@@ -116,14 +124,16 @@ export async function runMemoryTool(
   }
 }
 
-async function recall(db: SupabaseClient, input: Record<string, unknown>): Promise<ToolResult> {
+async function recall(db: SupabaseClient, input: Record<string, unknown>, spaceId: string | null): Promise<ToolResult> {
   const id = typeof input.id === "string" && input.id.trim() ? input.id.trim() : null;
   if (id) {
     const { data, error } = await db.from("memories")
-      .select("id, title, gist, body, kind, layer, created_at")
+      .select("id, title, gist, body, kind, layer, created_at, scope, activity_space_id")
       .eq("id", id).eq("status", "active").maybeSingle();
     if (error) return { ok: false, error: error.message };
-    if (!data) return { ok: false, error: "その記憶は見つかりませんでした（消えたか、置き換えられた可能性があります）。" };
+    const outside = !!data && !!spaceId
+      && (data as MemoryToolRow).scope === "space" && (data as MemoryToolRow).activity_space_id !== spaceId;
+    if (!data || outside) return { ok: false, error: "その記憶は見つかりませんでした（消えたか、置き換えられた可能性があります）。" };
     const m = data as MemoryToolRow;
     // usedIds is how the driver learns what entered the context, so it
     // can record the use (steps + memory_uses) with its run's id — the
@@ -132,7 +142,7 @@ async function recall(db: SupabaseClient, input: Record<string, unknown>): Promi
   }
   const query = typeof input.query === "string" ? input.query.trim() : "";
   if (!query) return { ok: false, error: "query か id が必要です。" };
-  const { data, error } = await db.rpc("search_memories", { p_query: query, p_limit: 5 });
+  const { data, error } = await db.rpc("search_memories", { p_query: query, p_space_id: spaceId, p_limit: 5 });
   if (error) return { ok: false, error: error.message };
   const rows = (data ?? []) as MemoryToolRow[];
   return {
@@ -160,15 +170,25 @@ export type DurableHome = { scope: "space"; spaceId: string } | { scope: "person
  * One topic holds one fact per home (the slot's unique index admits a
  * single active durable), so a fact restated under the same topic
  * takes the old one's place in this order: the old row is set aside,
- * the new one is written pointing back at it, and if that write fails
- * the old fact is put back — a failed restatement never leaves the
- * topic empty. A fact the person may not set aside is not replaced.
+ * the new one is written pointing back at it, and when that write is
+ * refused the old fact is put back. The steps are separate statements,
+ * not one transaction: a call cut off between them leaves the topic
+ * without an active fact, which the next write fills. A fact the
+ * person may not set aside is not replaced.
+ *
+ * `replace: false` leaves a fact that already stands under the topic
+ * exactly as it is and writes nothing (`standing` names it) — for a
+ * writer whose topic was not chosen by the person (a standing answer:
+ * the agent named the topic, so it must not be able to steer an answer
+ * onto a rule the Space already holds).
+ *
  * A keyed memory carries no fingerprint: the topic's slot is its
  * identity, and a fingerprint would collide with the fact it replaces.
  */
 export async function writeDurableMemory(
   db: SupabaseClient, candidate: MemoryCandidate, home: DurableHome, userId: string,
-): Promise<{ ok: true; id: string; replaced: string | null } | { ok: false; error: string }> {
+  opts: { replace?: boolean } = {},
+): Promise<{ ok: true; id: string; replaced: string | null } | { ok: false; error: string; standing?: string }> {
   if (!scrubCandidate({ title: candidate.title, gist: candidate.gist, body: candidate.body }).clean) {
     return { ok: false, error: "認証情報らしき内容が含まれるため保存しませんでした。値そのものではなく、性質だけを書いてください。" };
   }
@@ -184,6 +204,9 @@ export async function writeDurableMemory(
   const rows = (existing ?? []) as { id: string; layer: string; status: string; scope: "space" | "personal"; activity_space_id: string | null; user_id: string | null; topic_key: string | null }[];
   const replaceId = supersedeTargetFor(topicKey, home.scope, spaceId, ownerId,
     rows.map((r) => ({ ...r, layer: r.layer as "durable" | "episode", status: r.status as "active", user_id: r.user_id ?? "" })));
+  if (replaceId && opts.replace === false) {
+    return { ok: false, error: "この話題にはすでに記憶があります。", standing: replaceId };
+  }
   if (replaceId) {
     const { data: aside, error: asideError } = await db.from("memories")
       .update({ status: "superseded", updated_at: new Date().toISOString() })

@@ -3017,23 +3017,28 @@ async function execute(a: ExecArgs): Promise<void> {
     });
     const tickets = await loadQuestionTickets(admin, q.tickets.map((t) => t.ticketId));
     const byId = new Map(tickets.map((t) => [t.id, t]));
-    // A standing answer is kept as a durable fact — by the engine, with
-    // the person's session, through the one memory writer. The agent
-    // has no hand in it: it declared the topic when it asked, the
-    // person saw that and answered. Where the work belongs to a Space
-    // the fact is the Space's (who handles complaints is the
-    // organization's rule, and every run there reads the Space's
-    // index); work outside a Space keeps it as the person's own. A
-    // failed write never holds the answer back; the step says the next
-    // run will ask again.
+    // A standing answer is kept as the Space's durable fact — by the
+    // engine, with the person's session, through the one memory writer
+    // (a question is only ever asked from a Space's run). The agent
+    // has no hand in the write, but it did name the topic, so the write
+    // never replaces a fact the Space already holds under it: that
+    // rule changes only where a person edits it (the memory settings).
+    // A write that does not happen never holds the answer back — this
+    // run still gets it — and the step says what stands for the next.
     const answeredTicket = marked ? byId.get(answer.ticketId) : undefined;
-    const standing = answeredTicket ? standingAnswerMemory(answeredTicket, answer.answer, answer.keep, new Date()) : null;
-    if (standing) {
+    const standing = answeredTicket && run.activity_space_id
+      ? standingAnswerMemory(answeredTicket, answer.answer, answer.keep, new Date()) : null;
+    if (standing && run.activity_space_id) {
       const kept = await writeDurableMemory(userDb, standing,
-        run.activity_space_id ? { scope: "space", spaceId: run.activity_space_id } : { scope: "personal" }, user.id);
-      await addStep(admin, run.id, kept.ok ? "status" : "error",
-        kept.ok ? `答えを次からも使う決まりとして残しました: ${standing.topic}` : `答えを決まりとして残せませんでした: ${standing.topic}`,
-        kept.ok ? standing.gist : `${kept.error} 次の実行では同じ質問が出ます。`);
+        { scope: "space", spaceId: run.activity_space_id }, user.id, { replace: false });
+      if (kept.ok) {
+        await addStep(admin, run.id, "status", `答えを次からも使う決まりとして残しました: ${standing.topic}`, standing.gist);
+      } else if (kept.standing) {
+        await addStep(admin, run.id, "status", `この話題にはすでに決まりがあるため、変えていません: ${standing.topic}`,
+          "今回の答えは、この仕事にだけ使います。決まりを変えるときは、設定の記憶から直してください。");
+      } else {
+        await addStep(admin, run.id, "error", `答えを決まりとして残せませんでした: ${standing.topic}`, kept.error);
+      }
     }
     const expired = tickets.filter((t) => t.status === "expired");
     if (!marked || expired.length) {

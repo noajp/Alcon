@@ -128,7 +128,7 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
           {view.standingTopic && (
             <label className={`flex items-start gap-2 ${FONT.sm} text-muted-foreground`}>
               <input type="checkbox" checked={keep} disabled={working} onChange={(e) => setKeep(e.target.checked)} className="mt-0.5" />
-              <span>{t('Use this answer from now on, so it is not asked again ({topic})', { topic: view.standingTopic })}</span>
+              <span>{t('Use this answer from now on, so it is not asked again ({topic}). A rule already kept for this topic stays as it is.', { topic: view.standingTopic })}</span>
             </label>
           )}
           {failed && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not send the answer. Try again.')}</p>}

@@ -848,7 +848,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Or answer in your own words': ['または、自分の言葉で回答する', '또는 직접 답변 작성', 'Ou répondez avec vos propres mots', 'O responde con tus propias palabras'],
   'Answer in your own words': ['自分の言葉で回答する', '직접 답변 작성', 'Répondez avec vos propres mots', 'Responde con tus propias palabras'],
   'Send answer': ['回答を送る', '답변 보내기', 'Envoyer la réponse', 'Enviar respuesta'],
-  'Use this answer from now on, so it is not asked again ({topic})': ['この答えを次からも使い、聞き直さない（{topic}）', '이 답변을 앞으로도 사용하고 다시 묻지 않기 ({topic})', 'Utiliser cette réponse désormais, sans reposer la question ({topic})', 'Usar esta respuesta en adelante, sin volver a preguntar ({topic})'],
+  'Use this answer from now on, so it is not asked again ({topic}). A rule already kept for this topic stays as it is.': ['この答えを次からも使い、聞き直さない（{topic}）。この話題にすでに決まりがあるときは、決まりは変わりません。', '이 답변을 앞으로도 사용하고 다시 묻지 않기 ({topic}). 이 주제에 이미 정해진 규칙이 있으면 그 규칙은 바뀌지 않습니다.', 'Utiliser cette réponse désormais, sans reposer la question ({topic}). Une règle déjà enregistrée pour ce sujet reste inchangée.', 'Usar esta respuesta en adelante, sin volver a preguntar ({topic}). Una regla ya guardada para este tema no cambia.'],
   'Could not send the answer. Try again.': ['回答を送れませんでした。もう一度お試しください。', '답변을 보내지 못했습니다. 다시 시도하세요.', 'Impossible d’envoyer la réponse. Réessayez.', 'No se pudo enviar la respuesta. Inténtalo de nuevo.'],
   'Source': ['出どころ', '출처', 'Source', 'Origen'],
   'Material provenance': ['材料の出どころ', '재료의 출처', 'Provenance du matériau', 'Procedencia del material'],
