@@ -9,7 +9,6 @@ export {
 } from './WidgetFrame';
 export { useBoard } from './useBoard';
 export {
-  OBJECT_OVERVIEW_BOARD,
   HOME_BOARD,
   OBJECT_SUMMARY_BOARD,
   INITIATIVE_BOARD,

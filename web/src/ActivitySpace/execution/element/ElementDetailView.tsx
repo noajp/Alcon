@@ -83,7 +83,7 @@ const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/Frame/icons';
-import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_ACTION_ICON, PAGE_ACTION_ROW, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -827,7 +827,7 @@ function ElementDetailBody({
               heading — attached files, Sub-elements (always), then
               Dependencies — so the read order is the breakdown → what it
               waits on. */}
-          <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+          <div className={PAGE_ACTION_ROW}>
           <ButtonAppearanceProvider appearance="inline">
           <div className="flex items-center gap-0.5">
             {/* Reactions on this Element: the smile opens the palette; the chips end the row. */}
@@ -835,8 +835,7 @@ function ElementDetailBody({
 
             {/* Attach a file from this computer — it lists under the row and
                 opens through a short-lived link (attachments). */}
-            <AttachButton owner={{ kind: 'element', id: element.id }}
-              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50" />
+            <AttachButton owner={{ kind: 'element', id: element.id }} className={PAGE_ACTION_ICON} />
 
             {/* More to attach, kept off the page until chosen: a Note
                 (Document), a new deck (Slide), a pull request. */}

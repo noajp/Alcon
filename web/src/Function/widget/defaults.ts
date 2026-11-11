@@ -9,15 +9,6 @@ import { type BoardLayout } from './types';
 // blocks can now be moved, removed, and added to.
 // =============================================================
 
-/** Object Overview. The spine (icon / title / description) is not a widget.
- *  A new Object opens with its milestones and nothing else: progress,
- *  attachments, intent and properties are there to add, not placed. */
-export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
-  band: [],
-  main: [{ id: 'ov-milestones', type: 'milestones' }],
-  rail: [],
-};
-
 /**
  * Element detail. The rail's Properties / Labels / Activity islands are still
  * hand-placed — this board holds only what was missing: the decisions and

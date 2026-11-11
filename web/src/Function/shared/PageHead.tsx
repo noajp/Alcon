@@ -40,6 +40,12 @@ const PAGE_BODY = 'w-full max-w-7xl py-8 pl-[30px] pr-8';
 export const PAGE_TITLE = 'text-2xl leading-tight tracking-[-0.012em] text-foreground';
 export const PAGE_TITLE_WEIGHT = { fontWeight: 600 } as const;
 
+/** The one row under a page's description — attach a file, react, … as
+ *  quiet icons — and, at full width under it, what they added (the attached
+ *  files). `PAGE_ACTION_ICON` is one of its icons. */
+export const PAGE_ACTION_ROW = 'relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5';
+export const PAGE_ACTION_ICON = 'inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50';
+
 /**
  * Every concept page's layout: the document on the left (icon, title,
  * description, then what you can do), the concept's facts on the right as
