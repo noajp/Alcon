@@ -463,11 +463,15 @@ export async function answerQuestionTicket(opts: {
   ticketId: string;
   option?: string;
   text?: string;
+  /** false holds a standing answer to this one run; the engine keeps
+   *  it for later runs otherwise. */
+  keep?: boolean;
 }): Promise<void> {
   await invokeEngine({
     runId: opts.runId,
     answer: {
       ticketId: opts.ticketId,
+      ...(opts.keep === false ? { keep: false } : {}),
       ...(opts.option !== undefined ? { option: opts.option } : {}),
       ...(opts.text !== undefined ? { text: opts.text } : {}),
     },

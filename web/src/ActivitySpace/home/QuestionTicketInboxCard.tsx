@@ -24,6 +24,7 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
   const [freeText, setFreeText] = useState('');
+  const [keep, setKeep] = useState(true);
 
   if (error) return <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not read the question.')}</p>;
   if (loading && !ticket) return <p className={`${FONT.sm} text-muted-foreground`}>{t('Opening…')}</p>;
@@ -43,7 +44,7 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
     setFailed(false);
     setWorking(true);
     try {
-      await answerQuestionTicket({ runId: ticket.run_id, ticketId: ticket.id, ...choice });
+      await answerQuestionTicket({ runId: ticket.run_id, ticketId: ticket.id, ...choice, ...(view.standingTopic && !keep ? { keep: false } : {}) });
       // The resume marks the ticket answered as it takes the run up;
       // follow it briefly, then re-read the card at its rest.
       for (let i = 0; i < 15; i++) {
@@ -124,6 +125,12 @@ export function QuestionTicketInboxCard({ ticketId }: { ticketId: string }) {
               </Button>
             </div>
           </div>
+          {view.standingTopic && (
+            <label className={`flex items-start gap-2 ${FONT.sm} text-muted-foreground`}>
+              <input type="checkbox" checked={keep} disabled={working} onChange={(e) => setKeep(e.target.checked)} className="mt-0.5" />
+              <span>{t('Use this answer from now on, so it is not asked again ({topic})', { topic: view.standingTopic })}</span>
+            </label>
+          )}
           {failed && <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not send the answer. Try again.')}</p>}
         </div>
       )}

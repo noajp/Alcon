@@ -15,6 +15,9 @@ export interface QuestionTicketView {
   /** What decision turns on the answer, when the agent said. */
   decision: string | null;
   links: TicketLinkView[];
+  /** The topic this answer will be kept under for later runs, when the
+   *  agent declared one — the person may hold the answer to this run. */
+  standingTopic: string | null;
   options: TicketOptionView[];
   /** What the agent tried before asking — part of judging the ask. */
   tried: string;
@@ -41,10 +44,11 @@ function ticketOptionsOf(raw: unknown): TicketOptionView[] {
 }
 
 /** Pure. The ticket's context: the decision line and its links. */
-function ticketContextOf(raw: unknown): { decision: string | null; links: TicketLinkView[] } {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { decision: null, links: [] };
-  const c = raw as { decision?: unknown; links?: unknown };
+function ticketContextOf(raw: unknown): { decision: string | null; links: TicketLinkView[]; standingTopic: string | null } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { decision: null, links: [], standingTopic: null };
+  const c = raw as { decision?: unknown; links?: unknown; standing_topic?: unknown };
   const decision = text(c.decision).trim() || null;
+  const standingTopic = text(c.standing_topic).trim() || null;
   const links: TicketLinkView[] = [];
   if (Array.isArray(c.links)) {
     for (const l of c.links) {
@@ -54,16 +58,17 @@ function ticketContextOf(raw: unknown): { decision: string | null; links: Ticket
       links.push({ label, url: text((l as { url?: unknown }).url).trim() || null });
     }
   }
-  return { decision, links };
+  return { decision, links, standingTopic };
 }
 
 /** Pure. A ticket row as the Inbox card shows it. */
 export function questionTicketView(ticket: QuestionTicket): QuestionTicketView {
-  const { decision, links } = ticketContextOf(ticket.context);
+  const { decision, links, standingTopic } = ticketContextOf(ticket.context);
   return {
     question: ticket.question,
     decision,
     links,
+    standingTopic,
     options: ticketOptionsOf(ticket.options),
     tried: ticket.tried,
     status: ticket.status,

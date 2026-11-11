@@ -58,6 +58,10 @@ export const INTERNAL_TOOLS: ToolDef[] = [
             additionalProperties: false,
           },
         },
+        standing_topic: {
+          type: "string",
+          description: "この答えが今回限りでなく、同じ種類の仕事でこの先も使える決まりになるとき、その話題の名前（例：「担当：クレーム」「請求書の送付先」）。人が答えると、その答えが記憶に残り、次の実行は recall_memory で読めるので、同じことを聞き直さずに済む。聞く前に recall_memory で同じ話題を探すこと。今回の一件だけの質問には付けない",
+        },
         context: {
           type: "object",
           description: "人が判断するために必要な材料。要点だけを渡す（文章の塊ではなく、判断材料へのリンクとして）",

@@ -313,3 +313,33 @@ describe('questionTicketView (the Inbox card’s reading)', () => {
     expect(junk.links).toEqual([]);
   });
 });
+
+describe('a standing answer (the person’s word, kept by the engine)', () => {
+  const ticket = (context: unknown) => ({ question: 'クレームの担当は誰ですか？', context });
+  const now = new Date('2026-11-11T03:00:00Z');
+
+  it('validateAskInput keeps a declared topic in the context, and refuses an empty or oversized one', () => {
+    const base = { question: 'クレームの担当は誰ですか？', tried: 'listWorkers で確かめた' };
+    const ok = qt.validateAskInput({ ...base, standing_topic: '  担当： クレーム ' });
+    expect(ok.ok && ok.value.context.standing_topic).toBe('担当： クレーム');
+    expect(qt.validateAskInput({ ...base, standing_topic: '  ' }).ok).toBe(false);
+    expect(qt.validateAskInput({ ...base, standing_topic: 'あ'.repeat(81) }).ok).toBe(false);
+    const none = qt.validateAskInput(base);
+    expect(none.ok && 'standing_topic' in none.value.context).toBe(false);
+  });
+
+  it('becomes one fact under the declared topic, in the person’s own words', () => {
+    const m = qt.standingAnswerMemory(ticket({ standing_topic: '担当：クレーム' }), ' TAKA ', true, now);
+    expect(m).toMatchObject({ kind: 'fact', topic: '担当：クレーム', gist: '担当：クレーム：TAKA' });
+    expect(m?.body).toContain('答え：TAKA');
+    expect(m?.body).toContain('聞いた質問：クレームの担当は誰ですか？');
+    expect(m?.body).toContain('2026-11-11');
+  });
+
+  it('is not kept when no topic was declared, when the person held it to this run, or when the answer is empty', () => {
+    expect(qt.standingAnswerMemory(ticket({ decision: '担当を決める' }), 'TAKA', true, now)).toBeNull();
+    expect(qt.standingAnswerMemory(ticket({ standing_topic: '担当：クレーム' }), 'TAKA', false, now)).toBeNull();
+    expect(qt.standingAnswerMemory(ticket({ standing_topic: '担当：クレーム' }), '   ', true, now)).toBeNull();
+    expect(qt.standingAnswerMemory(ticket(null), 'TAKA', true, now)).toBeNull();
+  });
+});

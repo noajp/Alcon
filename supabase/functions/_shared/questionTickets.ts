@@ -47,6 +47,9 @@ export const QUESTION_POLICY = {
   maxAnswerChars: 4000,
   maxDecisionChars: 500,
   maxLinks: 5,
+  /** A standing answer's topic name: short enough to be a memory's
+   *  topic, long enough to say what it settles. */
+  maxStandingTopicChars: 80,
   /** The Chain's waiting line: the question's short form. */
   shortFormChars: 120,
 } as const;
@@ -55,7 +58,12 @@ export interface TicketOption { label: string; recommended?: boolean }
 
 export interface TicketLink { label: string; url?: string }
 
-export interface TicketContext { decision?: string; links?: TicketLink[] }
+/** standing_topic: when the agent declared that the answer settles more
+ *  than this one run (who handles complaints, which address invoices go
+ *  to), the topic the answer is kept under. A person's answer to such a
+ *  ticket is that person's word, so the engine — never the agent — keeps
+ *  it as a durable fact the next run reads (standingAnswerMemory). */
+export interface TicketContext { decision?: string; links?: TicketLink[]; standing_topic?: string }
 
 export interface QuestionTicketRow {
   id: string;
@@ -121,8 +129,9 @@ export function ticketOptionsOf(raw: unknown): TicketOption[] {
 /** Pure. The stored context of a ticket row, read defensively. */
 export function ticketContextOf(raw: unknown): TicketContext {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const c = raw as { decision?: unknown; links?: unknown };
+  const c = raw as { decision?: unknown; links?: unknown; standing_topic?: unknown };
   const decision = text(c.decision).trim();
+  const standingTopic = text(c.standing_topic).trim();
   const links: TicketLink[] = [];
   if (Array.isArray(c.links)) {
     for (const l of c.links) {
@@ -133,7 +142,7 @@ export function ticketContextOf(raw: unknown): TicketContext {
       links.push({ label, ...(url ? { url } : {}) });
     }
   }
-  return { ...(decision ? { decision } : {}), ...(links.length ? { links } : {}) };
+  return { ...(decision ? { decision } : {}), ...(links.length ? { links } : {}), ...(standingTopic ? { standing_topic: standingTopic } : {}) };
 }
 
 export type AskValidation = { ok: true; value: AskQuestion } | { ok: false; error: string };
@@ -201,7 +210,46 @@ export function validateAskInput(input: Record<string, unknown>): AskValidation 
       if (links.length) context.links = links;
     }
   }
+  if (input.standing_topic !== undefined && input.standing_topic !== null) {
+    const topic = text(input.standing_topic).trim().replace(/\s+/g, " ");
+    if (!topic) return { ok: false, error: "standing_topic は、この答えが今後も使える決まりのときにだけ、その話題名を書いてください。今回限りの質問なら付けません。" };
+    if (topic.length > QUESTION_POLICY.maxStandingTopicChars) {
+      return { ok: false, error: `standing_topic が長すぎます（${QUESTION_POLICY.maxStandingTopicChars} 文字まで）。話題の名前だけを書いてください。` };
+    }
+    context.standing_topic = topic;
+  }
   return { ok: true, value: { question, options, context, tried } };
+}
+
+/** The `remember` input a standing answer becomes. */
+export interface StandingAnswerMemory { kind: "fact"; topic: string; title: string; gist: string; body: string }
+
+/**
+ * Pure. The durable fact a person's answer becomes, or null when the
+ * ticket declared no standing topic or the person kept the answer to
+ * this one run. The words kept are the question as it was asked and
+ * the answer exactly as the person gave it — nothing the agent
+ * phrased after the fact. One topic holds one fact (the memory
+ * store's own rule), so answering the same topic again replaces it.
+ */
+export function standingAnswerMemory(
+  ticket: Pick<QuestionTicketRow, "question" | "context">,
+  answer: string,
+  keep: boolean,
+  now: Date,
+): StandingAnswerMemory | null {
+  const topic = ticketContextOf(ticket.context).standing_topic;
+  const said = answer.trim();
+  if (!keep || !topic || !said) return null;
+  const day = now.toISOString().slice(0, 10);
+  const oneLine = said.replace(/\s+/g, " ");
+  return {
+    kind: "fact",
+    topic,
+    title: topic.slice(0, 40),
+    gist: `${topic}：${oneLine}`.slice(0, 240),
+    body: `決まり：${topic}\n答え：${said}\n\n聞いた質問：${ticket.question.trim()}\n決まった日：${day}（質問への人の回答）`,
+  };
 }
 
 export type AnswerValidation = { ok: true; answer: string } | { ok: false; error: string };
