@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { AlertCircle, Check, CheckCheck, ChevronRight, Copy, FileText, Loader2, Pencil, RotateCcw } from '@/ui/icons';
+import { Check, CheckCheck, Code, Copy, FileText, Globe, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, Wrench } from '@/ui/icons';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import type { AgentAction } from '@/types/database';
 import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotCredentialAsk, CopilotMessage, ToolEvent } from './useAlconCopilot';
-import { toolVerb } from './copilotFiles';
+import { toolCardOf, type ToolCardKind } from './copilotToolCards';
+import { ToolCallCard, ToolCallGroup } from '@/Function/shared/ToolCallCard';
 import { splitAnswer } from './chartSpec';
 import { CHART_CARD_CLASS } from './chartColors';
 import { CreatedEntities } from './CreatedEntityCard';
@@ -294,48 +295,44 @@ function Elapsed({ since }: { since: number }) {
 }
 
 /**
- * The AI's work on the board, as steps. While it runs, the current step reads
- * live; once the answer is in, the steps fold into one line ("3 steps ▸")
- * that opens to show each, so the answer stays the thing to read.
+ * The AI's work, as tool call cards folded into one line ("Used 3 tools").
+ * While a call runs the line reads "Using tools…" with its timer; once the
+ * answer is in, the line stays folded so the answer is the thing to read,
+ * and opens to show each call with its arguments and what came back.
  */
 function ToolSteps({ events, live, answered }: { events: ToolEvent[]; live: boolean; answered: boolean }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  // When this turn's steps began — the first render that saw them.
-  const [started] = useState(() => Date.now());
-  const running = live ? events.find((e) => !e.result) : undefined;
-  const failed = events.filter((e) => e.result && !e.result.ok).length;
+  // A running card times itself from when it appears; a kept turn has no
+  // timings, so its cards show none.
+  const cards = events.map(toolCardOf);
+  const running = live && cards.some((c) => c.status === 'running');
   return (
-    <div className="text-[12px]">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-        className="flex items-center gap-1 rounded text-muted-foreground transition-colors hover:text-foreground">
-        <span>{events.length === 1 ? t('1 step') : t('{n} steps', { n: events.length })}</span>
-        {failed > 0 && <span className="text-[var(--status-danger)]">· {t('{n} failed', { n: failed })}</span>}
-        <ChevronRight size={12} className={`transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
-      </button>
-      {open && (
-        <ul className="mt-1 space-y-0.5 border-l border-border/60 pl-2.5 animate-fade-in">
-          {events.map((e, i) => <StepRow key={i} event={e} />)}
-        </ul>
-      )}
-      {running && <div className="mt-1"><Working label={toolVerb(running.name, running.input)} since={started} /></div>}
+    <div>
+      <ToolCallGroup>
+        {cards.map((c, i) => (
+          <ToolCallCard key={i} name={c.name} icon={<ToolKindIcon kind={c.kind} />}
+            summary={<ToolSummary verb={c.verb} subject={c.subject} />}
+            // A kept turn's call that never answered was stopped, not running.
+            status={live || c.status !== 'running' ? c.status : 'error'}
+            error={!live && c.status === 'running' ? t('Stopped') : c.error}
+            args={c.args} result={c.result} />
+        ))}
+      </ToolCallGroup>
       {live && !running && !answered && <div className="mt-1"><Working label="Thinking" /></div>}
     </div>
   );
 }
 
-function StepRow({ event }: { event: ToolEvent }) {
+function ToolSummary({ verb, subject }: { verb: string | null; subject: string | null }) {
   const { t } = useI18n();
-  const r = event.result;
-  const Icon = !r ? Loader2 : r.ok ? Check : AlertCircle;
-  const tone = !r ? 'text-muted-foreground' : r.ok ? 'text-muted-foreground' : 'text-[var(--status-danger)]';
-  const detail = r?.ok ? (r.rows != null ? t('{n} rows', { n: r.rows }) : null) : r?.error ?? null;
-  return (
-    <li className={`flex min-w-0 items-center gap-1.5 ${tone}`}>
-      <Icon size={11} className={`shrink-0 ${!r ? 'animate-spin' : ''}`} />
-      <span className="shrink-0">{t(toolVerb(event.name, event.input))}</span>
-      <span className="truncate font-mono text-[11px] opacity-70">{event.name}</span>
-      {detail && <span className="truncate opacity-80">· {detail}</span>}
-    </li>
-  );
+  return <>{[verb ? t(verb) : null, subject].filter(Boolean).join(' · ')}</>;
+}
+
+const KIND_ICON: Record<ToolCardKind, typeof Wrench> = {
+  web: Globe, fetch: FileText, code: Code, search: Search, read: Search, create: Plus, update: Pencil, delete: Trash2,
+};
+
+function ToolKindIcon({ kind }: { kind: ToolCardKind }) {
+  const Icon = KIND_ICON[kind] ?? Wrench;
+  return <Icon strokeWidth={1.6} />;
 }
