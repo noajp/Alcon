@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ExternalLink } from '@/ui/icons';
 import { FONT } from '@/shared/designTokens';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -18,8 +18,11 @@ import { Textarea } from '@/ui/textarea';
 // the agent never phrases it. Only the run's starter may answer —
 // the engine refuses anyone else, and the card says so instead of
 // offering buttons it would refuse.
-export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting }: {
+export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting, onWork }: {
   ticketId: string;
+  /** The Element this question rests, once the ticket is read (null when
+   *  it rests none): the Inbox shows that work beside the question. */
+  onWork?: (elementId: string | null) => void;
   /** The answer landed: the Inbox re-reads what still waits. */
   onAnswered?: () => void;
   /** The other questions still waiting, once this one is answered: how
@@ -35,6 +38,8 @@ export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting }: {
   const [failed, setFailed] = useState(false);
   const [freeText, setFreeText] = useState('');
   const [keep, setKeep] = useState(true);
+  const workElementId = ticket?.element_id ?? null;
+  useEffect(() => { if (ticket) onWork?.(workElementId); }, [ticket, workElementId, onWork]);
 
   if (error) return <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not read the question.')}</p>;
   if (loading && !ticket) return <p className={`${FONT.sm} text-muted-foreground`}>{t('Opening…')}</p>;
