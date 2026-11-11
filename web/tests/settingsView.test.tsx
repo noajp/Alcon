@@ -82,7 +82,7 @@ describe('one area per page', () => {
   it('a stub area is one compact placeholder island', () => {
     act(() => setActiveSettingsSection('objects'));
     const view = renderPage();
-    const island = [...view.container.querySelectorAll('div')].find((d) => d.className.includes('--shadow-island'));
+    const island = [...view.container.querySelectorAll('div')].find((d) => d.className.includes('gloss-island'));
     expect(island?.textContent).toContain('settings are coming soon.');
   });
 

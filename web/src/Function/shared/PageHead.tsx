@@ -29,8 +29,13 @@ export function PageIcon({ children }: { children: ReactNode }) {
 }
 
 /** The page frame: one width and one set of margins for every concept page,
- *  Element detail's — the text starts 30px in, under the header's path. */
-const PAGE_BODY = 'w-full max-w-7xl py-8 pl-[30px] pr-8';
+ *  Element detail's. On a wide pane the spare room is split unevenly, a
+ *  little over a third to the left: the document sits left of the middle,
+ *  where the eye comes from the sidebar, rather than against the left edge
+ *  or dead centre. On a narrow pane there is no spare room and the text
+ *  starts 30px in, under the header's path. */
+export const PAGE_FRAME = 'w-full max-w-7xl ml-[max(0px,calc((100%-80rem)*0.38))] pl-[30px] pr-8 py-8';
+const PAGE_BODY = PAGE_FRAME;
 
 /** A concept page's title type — the one place its size, tracking and colour
  *  are set. Pages that edit their title in a field of their own (Element,

@@ -6,7 +6,7 @@ import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, 
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/Frame/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
-import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ObjectIcon } from '@/Frame/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
@@ -467,7 +467,7 @@ function PhaseDetailView({
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto px-8 py-8 space-y-5">
+        <div className={`${PAGE_FRAME} space-y-5`}>
           <div>
             <PageIcon><NavPhaseIcon size={18} /></PageIcon>
             <input

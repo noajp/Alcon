@@ -1,13 +1,18 @@
 'use client';
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { Settings } from '@/ui/icons';
+import { LogOut, Settings } from '@/ui/icons';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { NavMyTasksIcon, NavNoteIcon } from './NavIcons';
+import { ProfileMenu } from './ProfileMenu';
 
 // The foot of the sidebar: who you are and whether this window is connected
-// — it opens the Profile — and beside it, the gear to Settings. Online and
+// — it opens the account card (ProfileMenu): the Profile from its header,
+// then Note and My Elements, then Settings and signing out — and beside
+// it, the gear to Settings. Online and
 // offline are the browser's own reading of the network, so what it says is
 // true of this window.
 
@@ -17,16 +22,26 @@ const subscribe = (fn: () => void) => {
   return () => { window.removeEventListener('online', fn); window.removeEventListener('offline', fn); };
 };
 
-export function MeFooter({ active, onOpen, onSettings }: { active: boolean; onOpen: () => void; onSettings?: () => void }) {
+export function MeFooter({ active, onOpen, onOpenView, onSettings }: {
+  active: boolean;
+  /** Open the Profile. */
+  onOpen: () => void;
+  /** Open one of the person's own screens (Note, My Elements). */
+  onOpenView: (view: string) => void;
+  onSettings?: () => void;
+}) {
   const { t } = useI18n();
-  const { user, profile } = useAuthContext();
+  const { user, profile, signOut } = useAuthContext();
+  const [menuOpen, setMenuOpen] = useState(false);
   const name = profile?.display_name || user?.email?.split('@')[0] || null;
   const avatarUrl = profile?.avatar_url;
   const me = useMemo(() => ({ name, avatar_url: avatarUrl }), [name, avatarUrl]);
   const online = useSyncExternalStore(subscribe, () => navigator.onLine, () => true);
   return (
     <div className="mx-1 mb-1.5 flex shrink-0 items-center gap-1">
-    <button type="button" onClick={onOpen} aria-pressed={active} title={t('Profile')}
+    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+    <PopoverTrigger asChild>
+    <button type="button" aria-pressed={active} aria-haspopup="menu" title={t('Profile')}
       className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors ${active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'}`}>
       <span className="relative shrink-0">
         <WorkerAvatar worker={me} size={26} />
@@ -38,6 +53,22 @@ export function MeFooter({ active, onOpen, onSettings }: { active: boolean; onOp
         <span className="block text-[11px] text-muted-foreground">{online ? t('Online') : t('Offline')}</span>
       </span>
     </button>
+    </PopoverTrigger>
+    <PopoverContent side="top" align="start" sideOffset={6} className="w-auto border-0 bg-transparent p-0 shadow-none">
+      <ProfileMenu
+        name={name ?? ''}
+        email={user?.email ?? ''}
+        avatar={<WorkerAvatar worker={me} size={32} />}
+        onOpenProfile={() => { setMenuOpen(false); onOpen(); }}
+        items={[
+          { id: 'note', label: t('Note'), icon: <NavNoteIcon size={16} />, onSelect: () => { setMenuOpen(false); onOpenView('note'); } },
+          { id: 'my-elements', label: t('My Elements'), icon: <NavMyTasksIcon size={16} />, onSelect: () => { setMenuOpen(false); onOpenView('my-elements'); } },
+          ...(onSettings ? [{ id: 'settings', label: t('Settings'), icon: <Settings size={16} />, separated: true, onSelect: () => { setMenuOpen(false); onSettings(); } }] : []),
+          { id: 'sign-out', label: t('Sign out'), icon: <LogOut size={16} />, separated: !onSettings, onSelect: () => { setMenuOpen(false); void signOut(); } },
+        ]}
+      />
+    </PopoverContent>
+    </Popover>
     {onSettings && (
       <button type="button" onClick={onSettings} title={t('Settings')} aria-label={t('Settings')}
         className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-foreground">

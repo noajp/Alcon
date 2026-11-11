@@ -20,7 +20,7 @@ export function Toaster() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="animate-fade-in pointer-events-auto flex w-full max-w-[380px] items-start gap-2 rounded-lg border border-[var(--border-strong)] bg-popover px-3 py-2.5 text-popover-foreground shadow-[var(--shadow-island)]"
+          className="animate-fade-in pointer-events-auto flex w-full max-w-[380px] items-start gap-2 gloss-overlay rounded-lg px-3 py-2.5 text-popover-foreground"
         >
           <AlertCircle size={16} className="mt-0.5 shrink-0 text-[var(--status-danger)]" />
           <div className="min-w-0 flex-1">

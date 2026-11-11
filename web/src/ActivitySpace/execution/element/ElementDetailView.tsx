@@ -745,7 +745,7 @@ function ElementDetailBody({
 
       {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
-        <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : "max-w-7xl pl-[30px] pr-8 py-8 flex gap-8"}>
+        <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : `${PAGE_FRAME} flex gap-8`}>
           <div className="flex-1 min-w-0 flex flex-col gap-8">
 
           {/* Title & description — under the concept's icon, like every concept page */}

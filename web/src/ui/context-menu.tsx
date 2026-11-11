@@ -87,7 +87,7 @@ function ContextMenuSubContent({
       data-slot="context-menu-sub-content"
       className={cn(
         anchoredOverlayMotion,
-        "bg-popover text-popover-foreground z-50 min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-lg border p-1 shadow-lg",
+        "gloss-overlay text-popover-foreground z-50 min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-lg border p-1",
         className
       )}
       {...props}
@@ -105,7 +105,7 @@ function ContextMenuContent({
         data-slot="context-menu-content"
         className={cn(
           anchoredOverlayMotion,
-          "bg-popover text-popover-foreground z-50 max-h-(--radix-context-menu-content-available-height) min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border p-1 shadow-md",
+          "gloss-overlay text-popover-foreground z-50 max-h-(--radix-context-menu-content-available-height) min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border p-1",
           className
         )}
         {...props}
