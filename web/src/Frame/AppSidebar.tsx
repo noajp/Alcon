@@ -518,7 +518,7 @@ export function AppSidebar({
         </nav></ButtonAppearanceProvider>
 
         {/* Who you are, at the foot; it opens the Profile. */}
-        <MeFooter active={railMode === 'personal'} onOpen={() => onViewChange('profile')} onSettings={onOpenSettings} />
+        <MeFooter active={railMode === 'personal'} onOpen={() => onViewChange('profile')} onOpenView={onViewChange} onSettings={onOpenSettings} />
 
 
         {!collapsed && (
