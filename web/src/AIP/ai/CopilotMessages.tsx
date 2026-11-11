@@ -12,6 +12,7 @@ import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, Cop
 import { toolCardOf, type ToolCardKind } from './copilotToolCards';
 import { ToolCallCard, ToolCallGroup } from '@/Function/shared/ToolCallCard';
 import { splitAnswer } from './chartSpec';
+import { ChatElementList } from './ChatElementList';
 import { CHART_CARD_CLASS } from './chartColors';
 import { CreatedEntities } from './CreatedEntityCard';
 import { ConnectRequestCard } from '@/AIP/connectors/ConnectRequestCard';
@@ -247,7 +248,9 @@ function Answer({ content, chartColors, settled, onChartColors }: {
         : p.kind === 'chart'
           ? <ChatChart key={i} spec={p.spec} colors={chartColors?.[ordinals[i]]} interactive={settled}
               onColorsChange={onChartColors ? (next) => onChartColors(ordinals[i], next) : undefined} />
-          : <div key={i} className={`h-52 ${CHART_CARD_CLASS} animate-pulse`} />)}
+          : p.kind === 'elements'
+            ? <ChatElementList key={i} items={p.items} />
+            : <div key={i} className={`h-52 ${CHART_CARD_CLASS} animate-pulse`} />)}
     </div>
   );
 }

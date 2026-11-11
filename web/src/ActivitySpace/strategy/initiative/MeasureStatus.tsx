@@ -10,9 +10,10 @@ const TONE: Record<MeasureSummaryTone, string> = {
 };
 
 /** Where a Strategy (or a group of Strategies) stands against its
- *  success conditions, for a list row. Renders nothing until loaded. */
+ *  success conditions, for a list row. Renders nothing until loaded, and
+ *  nothing for a Strategy that has none: the row is quiet, not labelled. */
 export function MeasureStatus({ tally, className = '' }: { tally: MeasureTally | undefined | null; className?: string }) {
-  if (!tally) return null;
+  if (!tally || tally.total === 0) return null;
   const { text, tone } = measureSummary(tally);
   return (
     <span className={`shrink-0 whitespace-nowrap tabular-nums ${TONE[tone]} ${className}`} title={measureTallyDetail(tally) || text}>
