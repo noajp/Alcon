@@ -17,6 +17,7 @@ import type { NavigationState } from '@/types/navigation';
 import { refreshInbox, selectInboxNotification, useInbox, useNotificationElement } from './useInbox';
 import { questionTicketIdsOf, splitInbox } from '@/Function/shared/inboxModel';
 import { useOpenQuestionTickets } from '@/AIP/ai/agentData';
+import { refreshAwaitingAnswers } from '@/hooks/awaitingAnswerData';
 
 interface InboxViewProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
@@ -110,7 +111,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
                 // The selection is not touched: the answer can land seconds
                 // later, when the person is already reading something else.
                 // The work beside it is re-read too: the resumed run moves it on.
-                onAnswered={() => { refreshInbox(); refreshWork(); }}
+                onAnswered={() => { refreshInbox(); refreshWork(); refreshAwaitingAnswers(); }}
                 onWork={noteWork}
                 // The next one opens the way a row does (read, selected).
                 nextWaiting={otherWaiting === null ? undefined
