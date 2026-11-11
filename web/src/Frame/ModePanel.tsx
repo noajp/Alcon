@@ -49,7 +49,7 @@ export function ModePanel({ activeView, navigation, onNavigate, onViewChange }: 
   if (!body) return null;
   return (
     <ButtonAppearanceProvider appearance="navigation">
-      <aside className="w-[240px] shrink-0 overflow-y-auto border-r border-[var(--gloss-rim)] bg-[var(--surface-well)] px-1.5 pb-3 pt-1">{body}</aside>
+      <aside className="w-[var(--sidebar-width)] shrink-0 overflow-y-auto border-r border-[var(--gloss-rim)] bg-[var(--surface-well)] px-1.5 pb-3 pt-1">{body}</aside>
     </ButtonAppearanceProvider>
   );
 }

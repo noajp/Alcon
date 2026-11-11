@@ -1,5 +1,7 @@
 'use client';
 
+import { inboxRowText } from './inboxRow';
+
 import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useState } from 'react';
 import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from '@/ui/icons';
@@ -84,6 +86,8 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
   const { t } = useI18n();
   const meta = notificationKindMeta(n.kind);
   const Icon = meta.icon;
+  // The list's read carries the Element each one is about (notificationData).
+  const text = inboxRowText(n as Notification & { element?: { title: string } | null });
   // The same two actions sit behind the row's "⋯" and a right-click, so the
   // menu is reachable with either hand.
   return (
@@ -99,16 +103,17 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
         {/* What the notification is about leads; who sent it and what kind
             it is follow, small — a list of seven "Status" rows says nothing. */}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className={`min-w-0 flex-1 truncate text-[12px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{n.title}</span>
-            <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
-            {!n.is_read && <span aria-label={t('Unread')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
+          {/* What it is about, then what happened and who, then the detail. */}
+          <span className="flex items-start gap-2">
+            <span className={`min-w-0 flex-1 line-clamp-2 break-words text-[12px] leading-[17px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{text.subject}</span>
+            <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="mt-px shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
+            {!n.is_read && <span aria-label={t('Unread')} className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
           </span>
-          <span className="block truncate text-[11px] text-muted-foreground">
-            {n.actor_name && <><span>{n.actor_name}</span> · </>}
-            <span>{t(meta.label)}</span>
-            {n.body && <> · <span>{n.body}</span></>}
+          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+            <span>{text.event ?? t(meta.label)}</span>
+            {n.actor_name && !text.event?.includes(n.actor_name) && <> · <span>{n.actor_name}</span></>}
           </span>
+          {text.detail && <span className="mt-0.5 line-clamp-2 break-all text-[11px] leading-4 text-muted-foreground/80">{text.detail}</span>}
         </span>
       </button>
       <DropdownMenu>
