@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, ArrowRight, FileText, Inbox, ListTodo, Plus, Settings } from '@/ui/icons';
 import { ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { BAR_TOOLS, MODE_META, TOOL_MODES } from '@/Frame/railApps';
+import { MODE_META, TOOL_MODES } from '@/Frame/railApps';
 import {
   CommandDialog,
   CommandInput,
@@ -60,7 +60,7 @@ const NAV_COMMANDS = [
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
   { id: 'domain-elements',      label: 'Domain Elements',    icon: ListTodo, view: 'domain-elements' },
   { id: 'objects',     label: 'Objects',            icon: ObjectIcon, view: 'objects' },
-  ...[...BAR_TOOLS, ...TOOL_MODES].map(mode => ({
+  ...TOOL_MODES.map(mode => ({
     id: mode, label: `Open ${MODE_META[mode].label}`, icon: MODE_META[mode].icon, view: MODE_META[mode].defaultView,
   })),
   { id: 'settings',     label: 'Settings',           icon: Settings, view: 'settings' },
@@ -168,8 +168,9 @@ export function CommandPalette({ returnTo, onNavigate, onViewChange, onOpenItem,
   const grouped = {
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
-    note:    results.filter(r => r.kind === 'note'),
-    file:    results.filter(r => r.kind === 'file'),
+    // Notes and files have no screen to open in the app's navigation now.
+    note:    [] as typeof results,
+    file:    [] as typeof results,
   };
   const visibleCreateCommands = filterCreateCommands(query);
   const navCommands = NAV_COMMANDS;
