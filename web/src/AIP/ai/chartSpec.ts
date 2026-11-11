@@ -19,7 +19,51 @@ export interface ChartSpec {
   stacked?: boolean;
 }
 
-export type AnswerPart = { kind: 'text'; text: string } | { kind: 'chart'; spec: ChartSpec } | { kind: 'pending' };
+export type AnswerPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'chart'; spec: ChartSpec }
+  | { kind: 'elements'; items: ElementListItem[] }
+  | { kind: 'pending' };
+
+/** One Element in an answer's list: what a card shows. The model writes
+ *
+ *   ```elements
+ *   [{"title":"…","status":"todo","assignees":["TAKA"]}]
+ *   ```
+ *
+ *  and the answer shows cards — the Status mark, the title, who is on it. */
+export interface ElementListItem {
+  title: string;
+  status: string;
+  assignees: string[];
+  due?: string;
+}
+
+const STATUSES = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled'];
+
+/** The list from the block's JSON, or null when it is not one. */
+function parseElementList(raw: string): ElementListItem[] | null {
+  let v: unknown;
+  try { v = JSON.parse(raw); } catch { return null; }
+  const rows = Array.isArray(v) ? v : (v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null);
+  if (!rows || rows.length === 0 || rows.length > MAX_ROWS) return null;
+  const out: ElementListItem[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+    const r = row as Record<string, unknown>;
+    const title = typeof r.title === 'string' ? r.title.trim() : '';
+    if (!title) return null;
+    const word = String(r.status ?? 'todo').toLowerCase().replace(/[\s-]+/g, '_');
+    const status = word === 'in_review' ? 'review' : STATUSES.includes(word) ? word : 'todo';
+    const who = Array.isArray(r.assignees) ? r.assignees : r.assignee != null ? [r.assignee] : [];
+    out.push({
+      title, status,
+      assignees: who.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()),
+      ...(typeof r.due === 'string' && r.due ? { due: r.due } : {}),
+    });
+  }
+  return out;
+}
 
 const TYPES: ChartType[] = ['bar', 'line', 'area', 'pie'];
 const MAX_ROWS = 200;
@@ -56,7 +100,7 @@ export function parseChartSpec(raw: string): ChartSpec | null {
   };
 }
 
-const FENCE = /```chart[^\n]*\n([\s\S]*?)```/g;
+const FENCE = /```(chart|elements)[^\n]*\n([\s\S]*?)```/g;
 
 /** Splits an answer into prose and charts. A chart block still being
  *  streamed (opened, not yet closed) is `pending`; a block that is not a
@@ -66,17 +110,19 @@ export function splitAnswer(content: string): AnswerPart[] {
   let last = 0;
   for (const m of content.matchAll(FENCE)) {
     const before = content.slice(last, m.index);
-    const spec = parseChartSpec(m[1]);
-    if (spec) {
+    const spec = m[1] === 'chart' ? parseChartSpec(m[2]) : null;
+    const items = m[1] === 'elements' ? parseElementList(m[2]) : null;
+    if (spec || items) {
       if (before.trim()) parts.push({ kind: 'text', text: before });
-      parts.push({ kind: 'chart', spec });
+      parts.push(spec ? { kind: 'chart', spec } : { kind: 'elements', items: items! });
     } else {
       parts.push({ kind: 'text', text: before + m[0] });
     }
     last = m.index! + m[0].length;
   }
   const rest = content.slice(last);
-  const open = rest.indexOf('```chart');
+  const opens = [rest.indexOf('```chart'), rest.indexOf('```elements')].filter((i) => i >= 0);
+  const open = opens.length ? Math.min(...opens) : -1;
   if (open >= 0) {
     if (rest.slice(0, open).trim()) parts.push({ kind: 'text', text: rest.slice(0, open) });
     parts.push({ kind: 'pending' });

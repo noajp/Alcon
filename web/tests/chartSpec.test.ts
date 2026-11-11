@@ -20,3 +20,25 @@ describe('AI chart blocks', () => {
     expect(bad[0]).toMatchObject({ kind: 'text' });
   });
 });
+
+describe('elements blocks', () => {
+  it('draws an elements block as a list, with statuses normalised', () => {
+    const parts = splitAnswer('前置き\n```elements\n[{"title":"原油見通し調査","status":"In Progress","assignees":["Claude"]},{"title":"確認","status":"In Review","assignee":"TAKA","due":"2026-11-20"}]\n```\n後書き');
+    expect(parts.map((p) => p.kind)).toEqual(['text', 'elements', 'text']);
+    const list = parts[1];
+    if (list.kind !== 'elements') throw new Error('not a list');
+    expect(list.items).toEqual([
+      { title: '原油見通し調査', status: 'in_progress', assignees: ['Claude'] },
+      { title: '確認', status: 'review', assignees: ['TAKA'], due: '2026-11-20' },
+    ]);
+  });
+
+  it('leaves a block that is not a list as code', () => {
+    const parts = splitAnswer('```elements\nnot json\n```');
+    expect(parts).toEqual([{ kind: 'text', text: '```elements\nnot json\n```' }]);
+  });
+
+  it('holds a place while the block is still streaming', () => {
+    expect(splitAnswer('一覧です\n```elements\n[{"title"').map((p) => p.kind)).toEqual(['text', 'pending']);
+  });
+});
