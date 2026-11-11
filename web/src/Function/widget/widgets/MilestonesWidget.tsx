@@ -41,13 +41,48 @@ function scopeObjects(host: WidgetProps['host']): { ids: string[]; names: Map<st
  * elsewhere they are read across the Objects in scope.
  */
 export function MilestonesWidget({ host }: WidgetProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { ids, names } = useMemo(() => scopeObjects(host), [host]);
   const { data: milestones, loading, error: loadError } = useObjectMilestones(ids);
   const objectId = host.subject.kind === 'object' ? host.subject.id : null;
   const editable = !!objectId && !host.readOnly;
-
   const [adding, setAdding] = useState(false);
+
+  useWidgetMeta(milestones.length > 0 ? String(milestones.length) : null);
+  // Read-only boards hide an empty widget; an Object's keeps its `+`. A read
+  // that failed is not "no milestones", so it stays visible and says so.
+  useWidgetEmpty(!editable && !loading && !loadError && milestones.length === 0);
+
+  return (
+    <>
+      {editable && (
+        <WidgetHeaderAction>
+          <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAdding(true)}>
+            <Plus size={14} />
+          </Button>
+        </WidgetHeaderAction>
+      )}
+      <MilestoneList ids={ids} names={names} objectId={objectId} editable={editable} adding={adding} onAddingChange={setAdding} />
+    </>
+  );
+}
+
+/** The milestones of some Objects, by month — the widget's body, and the
+ *  fixed Milestones section of an Object's page. With an Object it can add,
+ *  rename, re-date and delete them; `adding` opens the composer (the host
+ *  owns the "+"). */
+export function MilestoneList({ ids, names, objectId, editable, adding, onAddingChange }: {
+  ids: string[];
+  /** Object names, shown when the list spans several. */
+  names: Map<string, string>;
+  objectId: string | null;
+  editable: boolean;
+  adding: boolean;
+  onAddingChange: (adding: boolean) => void;
+}) {
+  const { t, locale } = useI18n();
+  const { data: milestones, loading, error: loadError } = useObjectMilestones(ids);
+  const setAdding = onAddingChange;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,11 +91,7 @@ export function MilestonesWidget({ host }: WidgetProps) {
     write().catch((e: unknown) => setError(e instanceof Error ? e.message : t('Could not save the milestone.')));
   };
 
-  useWidgetMeta(milestones.length > 0 ? String(milestones.length) : null);
-  // Read-only boards hide an empty widget; an Object's keeps its `+`. A read
-  // that failed is not "no milestones", so it stays visible and says so.
   const empty = !loading && !loadError && milestones.length === 0;
-  useWidgetEmpty(!editable && empty);
 
   const grouped = milestones.reduce<Array<[string, ObjectMilestone[]]>>((acc, m) => {
     const key = (parseDateOnly(m.date) ?? new Date()).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
@@ -72,13 +103,6 @@ export function MilestonesWidget({ host }: WidgetProps) {
 
   return (
     <div className="space-y-4 max-h-[360px] overflow-y-auto">
-      {editable && (
-        <WidgetHeaderAction>
-          <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAdding(true)}>
-            <Plus size={14} />
-          </Button>
-        </WidgetHeaderAction>
-      )}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       {loadError && <p role="alert" className="text-xs text-destructive">{t('Could not load milestones.')}</p>}
       {adding && objectId && (

@@ -7,7 +7,17 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
-import { updateObject } from '@/hooks/useSupabase';
+import { toggleReaction, updateObject, useWorkers } from '@/hooks/useSupabase';
+import { useObjectReactions } from '@/hooks/commentData';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { Button, ButtonAppearanceProvider } from '@/ui/button';
+import { Plus } from '@/ui/icons';
+import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
+import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
+import { PageSection } from '@/Function/shared/PageHead';
+import { MilestoneList } from '@/Function/widget/widgets/MilestonesWidget';
+import { ObjectCommentsPanel } from '../ObjectCommentsPanel';
 import { ObjectIcon } from '@/Frame/icons';
 import { PageIcon, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
@@ -21,21 +31,18 @@ import {
   type Zone,
 } from '@/Function/widget';
 
-/** Overview renders all three zones: a band above, the document column, the rail. */
-const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
+/** The band above (how it is going) and the rail beside; the document
+ *  column between them is fixed, as on an Element's page. */
+const SURFACE_ZONES: Zone[] = ['band', 'rail'];
 
 // =============================================================
-// Object Overview — a document with a widget board around it.
+// Object Overview — read like an Element's page.
 //
-// The spine is fixed and is NOT a widget: the Object's icon, its name, and
-// its description. Those are the Object, not a view of it, and a surface
-// whose every block can be removed has no identity left.
-//
-// Everything else — Properties, Strategy intent, Milestones —
-// is a placed widget. The default board (`OBJECT_OVERVIEW_BOARD`) reproduces
-// the hand-written layout block for block, so nothing moved when this became
-// a board; what changed is that the blocks can now be rearranged, removed,
-// and added to, and that any other surface can host the same ones.
+// The document column is fixed: the Object's icon and name, its
+// description, one quiet row (reactions, attaching a file) with the
+// attached files right under it, its Milestones, then its Updates — the
+// thread people and agents leave on it. The band under the name and the
+// rail beside (Properties, Strategy intent, …) stay a widget board.
 // =============================================================
 
 interface OverviewViewProps {
@@ -128,6 +135,22 @@ export function OverviewView({
   };
 
   const board = useBoard('object-overview', OBJECT_OVERVIEW_BOARD, object.id);
+  const { user } = useAuthContext();
+  const userId = user?.id ?? null;
+  const { reactions, refresh: refreshReactions } = useObjectReactions(object.id);
+  const reactWith = async (emoji: string) => {
+    if (!userId) return;
+    try {
+      await toggleReaction({ userId, emoji, objectId: object.id });
+      await refreshReactions();
+    } catch (err) {
+      console.error('Failed to react:', err);
+    }
+  };
+  const { data: workers } = useWorkers();
+  const [addingMilestone, setAddingMilestone] = useState(false);
+  const milestoneIds = useMemo(() => [object.id], [object.id]);
+  const milestoneNames = useMemo(() => new Map([[object.id, object.name]]), [object.id, object.name]);
 
   const host = useMemo<WidgetHost>(
     () => ({
@@ -192,7 +215,32 @@ export function OverviewView({
                   placeholder={t('Add description…')} onSave={handleDescriptionSave} />
               </section>
 
-              <WidgetZone zone="main" columns={1} />
+              {/* Under the description, as on an Element: one quiet row —
+                  reactions and attaching a file — then the attached files. */}
+              <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+                <ButtonAppearanceProvider appearance="inline">
+                  <div className="flex items-center gap-0.5">
+                    <ReactionPicker onToggle={(e) => void reactWith(e)} />
+                    <AttachButton owner={{ kind: 'object', id: object.id }}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+                    <ReactionChips reactions={reactions} userId={userId} onToggle={(e) => void reactWith(e)} />
+                  </div>
+                </ButtonAppearanceProvider>
+                <AttachmentList owner={{ kind: 'object', id: object.id }} />
+              </div>
+
+              <PageSection title={t('Milestones')} action={
+                <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAddingMilestone(true)}>
+                  <Plus size={14} />
+                </Button>
+              }>
+                <MilestoneList ids={milestoneIds} names={milestoneNames} objectId={object.id} editable
+                  adding={addingMilestone} onAddingChange={setAddingMilestone} />
+              </PageSection>
+
+              <PageSection title={t('Updates')}>
+                <ObjectCommentsPanel objectId={object.id} objectName={object.name} workers={workers} />
+              </PageSection>
             </div>
 
             {/* ───────────── Side column ───────────── */}

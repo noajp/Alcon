@@ -244,6 +244,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
           comment_id: commentId,
           element_id: null,
           strategy_id: null,
+          object_id: null,
           user_id: user.id,
           emoji,
           created_at: new Date().toISOString(),

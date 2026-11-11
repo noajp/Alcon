@@ -1128,6 +1128,7 @@ export interface ElementReaction {
   element_id: string | null
   comment_id: string | null
   strategy_id: string | null
+  object_id: string | null
   user_id: string
   emoji: string
   created_at: string
@@ -1137,6 +1138,7 @@ export interface ElementReactionInsert {
   element_id?: string | null
   comment_id?: string | null
   strategy_id?: string | null
+  object_id?: string | null
   user_id: string
   emoji: string
 }
@@ -2178,6 +2180,31 @@ export interface StrategyCommentInsert {
 export interface StrategyCommentUpdate {
   content?: string
   is_pinned?: boolean
+  mentions?: string[]
+}
+
+// Object thread — StrategyComment's shape, on an Object.
+export interface ObjectComment {
+  id: string
+  object_id: string
+  parent_id: string | null
+  author_id: string | null
+  author_kind: CommentAuthorKind
+  author_name: string | null
+  content: string
+  mentions: string[]   // user_id[]
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ObjectCommentInsert {
+  object_id: string
+  parent_id?: string | null
+  author_id?: string | null
+  author_kind?: CommentAuthorKind
+  author_name?: string | null
+  content: string
   mentions?: string[]
 }
 
