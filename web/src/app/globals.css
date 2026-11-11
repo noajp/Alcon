@@ -147,26 +147,22 @@
      rim whose top edge catches the light, a sheen that fades down its face,
      and a soft layered shadow under it. On the light themes the lit edge is
      white on white, so the shadow does the lifting; on the dark themes the
-     shadow sinks into the ground, so the edge and the sheen do. Every lift in
-     the app is one of the four below — island, control, accent button,
-     overlay — so the light stays in one place. */
-  --gloss-edge:    rgba(255, 255, 255, 0.9);   /* inner top highlight of a control */
+     shadow sinks into the ground, so the edge and the sheen do. Only
+     surfaces carry it — islands, cards and overlays. Buttons and other
+     controls stay flat: a lit button reads as chrome from another era. */
+  --gloss-edge:    rgba(255, 255, 255, 0.9);   /* inner top highlight of an overlay */
   --gloss-rim:     rgba(20, 22, 26, 0.09);     /* an island's outline */
   --gloss-rim-top: rgba(20, 22, 26, 0.06);     /* …and its top edge */
   --gloss-sheen:   linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 100%);
-  /* The accent button's face: light at the top, a trace of shade at the foot. */
-  --gloss-sheen-accent: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.08) 100%);
   /* Menus, popovers, dialogs and toasts are glass: the page shows through, blurred. */
   --overlay-glass: color-mix(in srgb, var(--surface-overlay) 80%, transparent);
   --overlay-blur:  blur(20px) saturate(170%);
 
   --shadow-1: 0 1px 1px rgba(15, 17, 22, 0.04), 0 2px 4px -1px rgba(15, 17, 22, 0.05), 0 12px 24px -14px rgba(15, 17, 22, 0.12);
   --shadow-island: var(--shadow-1);
-  /* A neutral control (a secondary button, the chosen tab, the chosen sidebar row). */
-  --shadow-control: inset 0 1px 0 var(--gloss-edge), 0 1px 1.5px rgba(15, 17, 22, 0.10);
   /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
      than --shadow-island, which is reserved for cards. */
-  --shadow-button: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 1px 2px rgba(0, 0, 0, 0.22), 0 3px 8px -2px color-mix(in srgb, var(--accent-default) 55%, transparent);
+  --shadow-button: 0 1px 4px rgba(0, 0, 0, 0.35);
   --surface-well: color-mix(in srgb, var(--surface-rail) 70%, transparent);
   --shadow-overlay: 0 1px 2px rgba(15, 17, 22, 0.06), 0 6px 16px -2px rgba(15, 17, 22, 0.10), 0 24px 48px -12px rgba(15, 17, 22, 0.20);
 
@@ -268,7 +264,6 @@
   --gloss-sheen:   linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0px, rgba(255, 255, 255, 0) 160px);
   --overlay-glass: color-mix(in srgb, var(--surface-overlay) 74%, transparent);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 28px -16px rgba(0, 0, 0, 0.7);
-  --shadow-control: inset 0 1px 0 var(--gloss-edge), 0 1px 2px rgba(0, 0, 0, 0.36);
   --surface-well: color-mix(in srgb, var(--surface-rail) 45%, transparent);
   --shadow-overlay: inset 0 1px 0 var(--gloss-edge), 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 28px -4px rgba(0, 0, 0, 0.45), 0 32px 64px -16px rgba(0, 0, 0, 0.6);
 
@@ -607,9 +602,9 @@ button, a, input, select, textarea {
 .btn:active { transform: scale(0.98); transition-duration: 80ms; }
 .btn:disabled { opacity: 0.4; pointer-events: none; }
 
-.btn-primary    { background: var(--accent-default) var(--gloss-sheen-accent); color: #ffffff; box-shadow: var(--shadow-button); border-color: transparent; }
-.btn-primary:hover { background: var(--accent-hover) var(--gloss-sheen-accent); }
-.btn-secondary  { background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-default); box-shadow: var(--shadow-control); }
+.btn-primary    { background: var(--accent-default); color: #ffffff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary  { background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-default); }
 .btn-secondary:hover { border-color: var(--border-strong); }
 .btn-ghost      { background: transparent; color: var(--text-secondary); }
 .btn-ghost:hover { background: var(--surface-raised); color: var(--text-primary); }
@@ -708,9 +703,6 @@ button, a, input, select, textarea {
     border: 1px solid var(--gloss-rim);
     background-color: var(--surface-well);
   }
-  /* A neutral raised control, and the accent one. */
-  .gloss-control { box-shadow: var(--shadow-control); }
-  .gloss-accent  { background-image: var(--gloss-sheen-accent); box-shadow: var(--shadow-button); }
 }
 
 @layer base {

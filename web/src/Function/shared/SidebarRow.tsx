@@ -18,7 +18,7 @@ import type { ComponentProps, ReactNode, Ref } from 'react';
 // =============================================================
 
 const STATE = {
-  active: 'gloss-control bg-sidebar-accent text-foreground',
+  active: 'bg-sidebar-accent text-foreground',
   idle: 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground has-[:focus-visible]:bg-sidebar-accent/50 has-[:focus-visible]:text-foreground',
 };
 

@@ -37,12 +37,12 @@ const buttonVariants = cva(
     variants: {
       shape: { action: CONTROL.actionRadius, tab: "rounded-full" },
       variant: {
-        /** Accent ground under the accent sheen. One primary action per button group. */
+        /** Accent ground. One primary action per button group. */
         primary:
-          "gloss-accent border-transparent hover:border-transparent bg-[var(--accent-default)] text-white hover:bg-[var(--accent-hover)]",
-        /** Neutral filled action, with the same fine border as every control and a lit top edge. */
+          "bg-[var(--accent-default)] text-white hover:bg-[var(--accent-hover)]",
+        /** Neutral filled action, with the same fine border as every control. */
         secondary:
-          "gloss-control bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]",
+          "bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]",
         /**
          * The toolbar default. Transparent and unframed at rest; the hover ground is
          * `--surface-strong` for the reason MenuShell documents — in the light
