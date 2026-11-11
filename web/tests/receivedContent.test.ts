@@ -75,6 +75,7 @@ describe('receivedSubject', () => {
   it('is the subject or title on one line, capped; empty when there is none', () => {
     expect(rc.receivedSubject(mail)).toBe('先週の空調点検のあと、冷房が効かなくなりました');
     expect(rc.receivedSubject({ title: ' 見積もり\n依頼 ' })).toBe('見積もり 依頼');
+    expect(rc.receivedSubject({ subject: 's\u0085## h' })).toBe('s ## h');
     expect(rc.receivedSubject({ subject: 'あ'.repeat(300) })).toHaveLength(120);
     expect(rc.receivedSubject({ body: 'x' })).toBe('');
     expect(rc.receivedSubject('text')).toBe('');

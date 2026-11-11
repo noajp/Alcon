@@ -65,10 +65,12 @@ export function toldOnce(cause: RunErrorCause): boolean {
 }
 
 /** The provider's answer opens with its HTTP status ("400 {...}",
- *  "402 Insufficient Balance"). An error that does not — a database
- *  write that failed, an exception in the run's own code — is not the
+ *  "402 Insufficient Balance") — or, when it arrives in the middle of a
+ *  stream that had already begun, is the error body alone
+ *  ({"type":"error",...}). An error that is neither — a database write
+ *  that failed, an exception in the run's own code — is not the
  *  provider's, whatever words it happens to contain. */
-const PROVIDER_ANSWER = /^\s*[45]\d{2}\b/;
+const PROVIDER_ANSWER = /^\s*(?:[45]\d{2}\b|\{\s*"type"\s*:\s*"error")/;
 
 const UNKNOWN_TITLE = "エラーで一時停止しました";
 
