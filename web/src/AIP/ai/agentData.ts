@@ -455,49 +455,46 @@ export async function fetchQuestionTicketById(ticketId: string): Promise<Questio
   return (data as QuestionTicket) ?? null;
 }
 
-/** What an open question waits on: the work it rests. */
-export interface OpenQuestionTicket { elementId: string | null; elementTitle: string | null }
+/** How many ticket ids one read names: the ids travel in the request's
+ *  URL, and a person with hundreds of questions must still get an answer. */
+const OPEN_TICKET_READ = 100;
 
-/** Which of these tickets still stand open, each with the Element it
- *  rests — the Inbox's waiting group reads this. One read for the
- *  tickets, one for their Elements' titles. */
-async function fetchOpenQuestionTickets(ticketIds: readonly string[]): Promise<Map<string, OpenQuestionTicket>> {
-  const open = new Map<string, OpenQuestionTicket>();
-  if (ticketIds.length === 0) return open;
-  const { data, error } = await supabase
-    .from('question_tickets')
-    .select('id, element_id')
-    .in('id', [...ticketIds])
-    .eq('status', 'open')
-    .gt('expires_at', new Date().toISOString());
-  if (error) throw error;
-  const rows = (data ?? []) as { id: string; element_id: string | null }[];
-  const elementIds = [...new Set(rows.map((r) => r.element_id).filter((id): id is string => !!id))];
-  const titles = new Map<string, string>();
-  if (elementIds.length > 0) {
-    const { data: elements } = await supabase.from('elements').select('id, title').in('id', elementIds);
-    for (const e of (elements ?? []) as { id: string; title: string }[]) titles.set(e.id, e.title);
+/** Which of these tickets still stand open (and inside their window). */
+async function fetchOpenQuestionTicketIds(ticketIds: readonly string[]): Promise<Set<string>> {
+  const open = new Set<string>();
+  const now = new Date().toISOString();
+  for (let i = 0; i < ticketIds.length; i += OPEN_TICKET_READ) {
+    const { data, error } = await supabase
+      .from('question_tickets')
+      .select('id')
+      .in('id', ticketIds.slice(i, i + OPEN_TICKET_READ))
+      .eq('status', 'open')
+      .gt('expires_at', now);
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: string }[]) open.add(row.id);
   }
-  for (const r of rows) open.set(r.id, { elementId: r.element_id, elementTitle: r.element_id ? titles.get(r.element_id) ?? null : null });
   return open;
 }
 
-/** The open tickets among `ticketIds`, re-read whenever the set of
- *  tickets or `revision` changes (a new notification, a pick in the
- *  Inbox). null until the first read lands, so a caller never shows
- *  "nothing waits" on a guess. A failed read keeps the last answer. */
-export function useOpenQuestionTickets(ticketIds: readonly string[], revision: number): Map<string, OpenQuestionTicket> | null {
-  const [open, setOpen] = useState<Map<string, OpenQuestionTicket> | null>(null);
+/** The open tickets among `ticketIds` — the Inbox's waiting group reads
+ *  this. Re-read whenever the set of tickets, `revision` or `feedSize`
+ *  changes (a pick in the Inbox, an answer sent, a notification arriving
+ *  or leaving); the two are separate so one going up as the other goes
+ *  down still re-reads. null until the first read lands, so a caller
+ *  never shows "nothing waits" on a guess. A failed read keeps the last
+ *  answer. */
+export function useOpenQuestionTickets(ticketIds: readonly string[], revision: number, feedSize: number): ReadonlySet<string> | null {
+  const [open, setOpen] = useState<ReadonlySet<string> | null>(null);
   const key = [...ticketIds].sort().join(',');
   useEffect(() => {
     let cancelled = false;
-    void fetchOpenQuestionTickets(key ? key.split(',') : []).then((next) => {
+    void fetchOpenQuestionTicketIds(key ? key.split(',') : []).then((next) => {
       if (!cancelled) setOpen(next);
     }).catch((error) => {
       console.error('Failed to read open question tickets:', error);
     });
     return () => { cancelled = true; };
-  }, [key, revision]);
+  }, [key, revision, feedSize]);
   return open;
 }
 
