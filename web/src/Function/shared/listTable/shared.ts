@@ -16,7 +16,7 @@ export const EMPTY_ELEMENT_TYPES: string[] = [];
 /** How many labels a row shows before it counts the rest. A row is read
  *  for its title first; labels past the second are a number, and the
  *  full list is one hover (or the Element's page) away. */
-export const ROW_LABELS_SHOWN = 2;
+const ROW_LABELS_SHOWN = 2;
 
 /** Pure. A row's labels as it draws them: the first few, and how many
  *  more there are. */
