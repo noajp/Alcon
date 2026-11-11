@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -21,11 +21,36 @@ import { CHART_CARD_CLASS, chartFileName, chartSlots, effectiveColor, withSlotCo
 // on the message, never part of the spec. A settled chart can be
 // recolored from its card and downloaded as it looks.
 
-const AXIS = { stroke: 'var(--text-tertiary)', fontSize: 11, tickLine: false } as const;
+const AXIS = { stroke: 'var(--text-secondary)', fontSize: 11, tickLine: false, axisLine: false } as const;
+const GRID = { stroke: 'var(--border-subtle)', strokeDasharray: '3 4', vertical: false } as const;
+const LEGEND = { wrapperStyle: { fontSize: 11, paddingTop: 6 }, iconType: 'circle', iconSize: 8 } as const;
 const TOOLTIP = {
-  contentStyle: { background: 'var(--surface-overlay)', borderColor: 'var(--border-subtle)', borderRadius: 8, fontSize: 12 },
+  contentStyle: { background: 'var(--surface-overlay)', borderColor: 'var(--border-subtle)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-overlay)' },
   labelStyle: { color: 'var(--text-secondary)' },
 } as const;
+
+// A slot's glossy fill: lit at the top, the color itself through the
+// middle, deepened at the foot — so bars and slices read as solid,
+// polished shapes rather than flat paint.
+function Gloss({ id, color }: { id: string; color: string }) {
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" style={{ stopColor: `color-mix(in oklab, ${color}, white 30%)` }} />
+      <stop offset="45%" style={{ stopColor: color }} />
+      <stop offset="100%" style={{ stopColor: `color-mix(in oklab, ${color}, black 22%)` }} />
+    </linearGradient>
+  );
+}
+
+// An area's wash: the color strong at its line, fading to nothing.
+function Wash({ id, color }: { id: string; color: string }) {
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.55 }} />
+      <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+    </linearGradient>
+  );
+}
 
 const TOOLBAR_BUTTON =
   'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
@@ -46,6 +71,16 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
   const { type, data, series } = spec;
   const many = series.length > 1;
   const colorAt = (key: string, index: number) => effectiveColor(colors, key, index);
+  const gid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const fillOf = (index: number) => `url(#${gid}-${index})`;
+  const slots = type === 'pie' ? data.map((row, i) => ({ key: row.name, i })) : series.map((key, i) => ({ key, i }));
+  const defs = (wash: boolean) => (
+    <defs>
+      {slots.map(({ key, i }) => wash
+        ? <Wash key={key} id={`${gid}-${i}`} color={colorAt(key, i)} />
+        : <Gloss key={key} id={`${gid}-${i}`} color={colorAt(key, i)} />)}
+    </defs>
+  );
   return (
     <figure ref={figureRef} className={`${CHART_CARD_CLASS} group/chart p-3 animate-fade-in`}>
       {(spec.title || interactive) && (
@@ -65,42 +100,50 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
           )}
         </div>
       )}
-      <div className="h-48 w-full">
+      <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">
           {type === 'pie' ? (
             <PieChart>
+              {defs(false)}
               <Tooltip {...TOOLTIP} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="45%" outerRadius="80%" paddingAngle={1} stroke="var(--card)" strokeWidth={2}>
-                {data.map((row, i) => <Cell key={i} fill={colorAt(row.name, i)} />)}
+              <Legend {...LEGEND} />
+              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="56%" outerRadius="86%" paddingAngle={2} cornerRadius={4} stroke="none">
+                {data.map((row, i) => <Cell key={i} fill={fillOf(i)} />)}
               </Pie>
             </PieChart>
           ) : type === 'line' ? (
-            <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
-              <CartesianGrid stroke="var(--border-subtle)" vertical={false} />
+            <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+              <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
-              {many && <Legend wrapperStyle={{ fontSize: 11 }} />}
-              {series.map((key, i) => <Line key={key} dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} dot={false} />)}
+              {many && <Legend {...LEGEND} />}
+              {series.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2.5}
+                dot={{ r: 3, strokeWidth: 0, fill: colorAt(key, i) }} activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </LineChart>
           ) : type === 'area' ? (
-            <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
-              <CartesianGrid stroke="var(--border-subtle)" vertical={false} />
+            <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+              {defs(true)}
+              <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
-              {many && <Legend wrapperStyle={{ fontSize: 11 }} />}
-              {series.map((key, i) => <Area key={key} dataKey={key} stroke={colorAt(key, i)} fill={colorAt(key, i)} fillOpacity={0.15} />)}
+              {many && <Legend {...LEGEND} />}
+              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2.5} fill={fillOf(i)}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </AreaChart>
           ) : (
-            <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
-              <CartesianGrid stroke="var(--border-subtle)" vertical={false} />
+            <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }} barCategoryGap="22%">
+              {defs(false)}
+              <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} cursor={{ fill: 'var(--surface-strong)' }} />
-              {many && <Legend wrapperStyle={{ fontSize: 11 }} />}
-              {series.map((key, i) => <Bar key={key} dataKey={key} fill={colorAt(key, i)} radius={[4, 4, 0, 0]} stackId={spec.stacked ? 's' : undefined} />)}
+              {many && <Legend {...LEGEND} />}
+              {series.map((key, i) => <Bar key={key} dataKey={key} fill={fillOf(i)} maxBarSize={44}
+                // Stacked, only the top segment is rounded; side by side, every bar is.
+                radius={!spec.stacked || i === series.length - 1 ? [6, 6, 0, 0] : 0}
+                stackId={spec.stacked ? 's' : undefined} />)}
             </BarChart>
           )}
         </ResponsiveContainer>
@@ -261,7 +304,7 @@ async function exportChartPng(figure: HTMLElement, spec: ChartSpec, colors?: Rec
   liveEls.forEach((live, i) => {
     const cs = getComputedStyle(live);
     const target = cloneEls[i] as SVGElement;
-    for (const prop of ['fill', 'stroke', 'fill-opacity', 'stroke-opacity', 'font-size', 'font-family']) {
+    for (const prop of ['fill', 'stroke', 'fill-opacity', 'stroke-opacity', 'stop-color', 'stop-opacity', 'font-size', 'font-family']) {
       const value = cs.getPropertyValue(prop);
       if (value) target.style.setProperty(prop, value);
     }

@@ -4,12 +4,11 @@ import type { ChartSpec } from './chartSpec';
 // is the model's data and carries no colors; what a person picks is an
 // annotation on the message (CopilotMessage.chartColors), resolved here.
 //
-// The default family is built around the key color (the accent): the
-// accent first, then it lifted toward the text color and sunk toward
-// the card by turns — one family, far enough apart to tell slices
-// apart, so a chart reads as part of the UI rather than a rainbow. The
-// values are CSS expressions, not concrete colors; the PNG export
-// resolves them against the live document before drawing.
+// The default colors are the theme's chart hues — the accent first,
+// then the chart tokens, each a different hue — so series and slices
+// read apart at a glance. The values are CSS expressions, not concrete
+// colors; the PNG export resolves them against the live document
+// before drawing.
 
 /** The floating card a chat chart sits on — the Execution Chain
  *  cards' surface, verbatim (the ElementCard of PR 803). Shared here
@@ -18,9 +17,9 @@ import type { ChartSpec } from './chartSpec';
 export const CHART_CARD_CLASS =
   'rounded-lg border border-border bg-card shadow-[var(--shadow-island)] dark:bg-[var(--surface-rail)]';
 
-const lift = (pct: number) => `color-mix(in oklab, var(--accent-default), var(--text-primary) ${pct}%)`;
-const sink = (pct: number) => `color-mix(in oklab, var(--accent-default), var(--card) ${pct}%)`;
-const CHART_THEME_COLORS = ['var(--accent-default)', lift(40), sink(35), lift(65), lift(20), sink(55)];
+const CHART_THEME_COLORS = [
+  'var(--accent-default)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-1)',
+];
 
 /** One thing on a chart a person can recolor: a series, or — on a pie,
  *  where the single series is drawn per category — one row. `key` is

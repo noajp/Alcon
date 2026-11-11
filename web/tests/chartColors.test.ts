@@ -2,15 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { chartFileName, chartSlots, effectiveColor, withSlotColor } from '@/AIP/ai/chartColors';
 import type { ChartSpec } from '@/AIP/ai/chartSpec';
 
-// The default family, pinned literally: the accent, then lifted toward
-// the text color and sunk toward the card by turns.
+// The default colors, pinned literally: the accent, then the chart hues.
 const THEME = [
-  'var(--accent-default)',
-  'color-mix(in oklab, var(--accent-default), var(--text-primary) 40%)',
-  'color-mix(in oklab, var(--accent-default), var(--card) 35%)',
-  'color-mix(in oklab, var(--accent-default), var(--text-primary) 65%)',
-  'color-mix(in oklab, var(--accent-default), var(--text-primary) 20%)',
-  'color-mix(in oklab, var(--accent-default), var(--card) 55%)',
+  'var(--accent-default)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-1)',
 ];
 
 // A person's chart colors: resolution is the theme family unless a
