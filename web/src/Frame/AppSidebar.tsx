@@ -12,7 +12,7 @@ import { FONT } from '@/shared/designTokens';
 import { DomainAgentSettings } from '@/ActivitySpace/execution/domain/DomainAgentSettings';
 import { SettingsModal } from '@/Function/settings/SettingsModal';
 import { SegmentedControl, SettingField } from '@/Function/settings/SettingsControls';
-import { NavCalendarIcon, NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
+import { NavInboxIcon, NavStrategyIcon } from './sidebar/NavIcons';
 import { loadSidebarOrder, moveSidebarItem, saveSidebarOrder, type SidebarItem } from './sidebarOrder';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
@@ -408,9 +408,6 @@ export function AppSidebar({
                     return <SidebarRow active={activeView === 'inbox'} icon={<NavInboxIcon size={16} />} label={t('Inbox')}
                       meta={unreadCount > 0 ? unreadCount : undefined}
                       onClick={() => onViewChange('inbox')} />;
-                  case 'calendar':
-                    return <SidebarRow active={railMode === 'calendar'} icon={<NavCalendarIcon size={16} />} label={t('Calendar')}
-                      onClick={() => { if (railMode !== 'calendar') onViewChange('calendar'); }} />;
                   case 'strategy':
                     return <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
                       onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />;

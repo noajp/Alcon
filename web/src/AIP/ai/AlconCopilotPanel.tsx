@@ -380,9 +380,9 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               style={{ fontWeight: 400 }}
             />
             {streaming ? (
-              // One Stop face on every chat surface: the Square, as on
-              // ProfileAI — an X here read as "close the panel", which
-              // has its own X in the header.
+              // One Stop face on every chat surface: the Square — an X
+              // here read as "close the panel", which has its own X in
+              // the header.
               <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
                 <Square size={14} />
               </Button>
