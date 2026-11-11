@@ -240,9 +240,9 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
               {/* When the list is open on a phone it owns the whole row; hide
                   the editor pane (it reappears once a file is chosen). On ≥sm
                   both always show side by side. */}
-              <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${filesPaneOpen ? 'hidden sm:flex' : 'flex'}`}>
+              <div className={`relative flex-1 min-w-0 flex flex-col overflow-hidden ${filesPaneOpen ? 'hidden sm:flex' : 'flex'}`}>
               {selectedFile && (
-                <NoteContentStatus loading={contentLoading} saving={contentSaving} error={contentError} errorKind={errorKind} onRetry={retryContent} />
+                <NoteContentStatus quiet loading={contentLoading} saving={contentSaving} error={contentError} errorKind={errorKind} onRetry={retryContent} />
               )}
               {selectedFile && !contentLoading ? (
                 <PageView

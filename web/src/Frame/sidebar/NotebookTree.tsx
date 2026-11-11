@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FilePlus, FileText, FolderPlus, Pencil, Pin, Plus, Search, Trash2 } from '@/ui/icons';
+import { FilePlus, FolderPlus, Pencil, Pin, Plus, Search, Trash2 } from '@/ui/icons';
 import { NavNoteIcon } from '@/Frame/sidebar/NavIcons';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -164,7 +164,9 @@ export function NotebookTree({
   const pageRow = (page: NoteNode) => (
     <ContextMenu key={page.id}>
       <ContextMenuTrigger asChild>
-        <SidebarRow active={page.id === activeFileId} icon={<FileText size={14} />}>
+        {/* No icon: every row in these lists is a page, and a mark that is
+            the same on all of them says nothing. */}
+        <SidebarRow active={page.id === activeFileId}>
           <button type="button" onClick={() => openPage(page)} title={page.name} className="h-full min-w-0 flex-1 truncate text-left outline-none">
             {page.name || t('Untitled')}
           </button>
@@ -200,14 +202,16 @@ export function NotebookTree({
       </div>
       {searching && <div className="mt-1.5"><PanelSearch value={query} onChange={setQuery} placeholder={t('Search notes')} /></div>}
 
-      <PanelGroup title={t('Pinned')} open={!closed.has('pinned')} onToggle={() => toggleGroup('pinned')} menu={[
-        { label: t('New section'), onSelect: () => void addBook() },
-        { label: t('Collapse others'), onSelect: () => setClosed(new Set(['books', 'recent'])) },
-      ]}>
-        {pinnedPages.length === 0
-          ? <p className="px-2.5 py-1 text-[12px] text-muted-foreground">{t('Right-click a page to pin it.')}</p>
-          : pinnedPages.map(pageRow)}
-      </PanelGroup>
+      {/* Pinned exists once a page is pinned: an empty group is a heading
+          about nothing. Pinning itself is on every page's menu. */}
+      {pinnedPages.length > 0 && (
+        <PanelGroup title={t('Pinned')} open={!closed.has('pinned')} onToggle={() => toggleGroup('pinned')} menu={[
+          { label: t('New section'), onSelect: () => void addBook() },
+          { label: t('Collapse others'), onSelect: () => setClosed(new Set(['books', 'recent'])) },
+        ]}>
+          {pinnedPages.map(pageRow)}
+        </PanelGroup>
+      )}
 
       <PanelGroup title={t('Folders')} open={!closed.has('books')} onToggle={() => toggleGroup('books')}>
       <div className="mt-1 flex flex-col">
@@ -238,7 +242,7 @@ export function NotebookTree({
                 return (
                   <ContextMenu key={section.id}>
                     <ContextMenuTrigger asChild>
-                      <SidebarRow size="sm" active={active}
+                      <SidebarRow size="sm" active={active} className="pl-3"
                         icon={<span className={`h-3.5 w-[3px] rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />}>
                         {nameOrInput(section, () => openSection(folder.id, section.id), 'text-[12px] font-medium')}
                       </SidebarRow>

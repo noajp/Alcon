@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FileText, Pencil, Plus, Trash2 } from '@/ui/icons';
+import { Pencil, Plus, Trash2 } from '@/ui/icons';
 import type { NoteNode } from '@/types/notes';
 import { RenameInput } from '@/Function/shared/RenameInput';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -78,7 +78,6 @@ export function FilesPane({
                 selected ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
               ].join(' ')}
             >
-              <FileText size={14} className="shrink-0" />
               {renaming === file.id ? (
                 <RenameInput
                   initial={file.name}

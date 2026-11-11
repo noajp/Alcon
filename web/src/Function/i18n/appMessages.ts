@@ -37,8 +37,6 @@ const APP_MESSAGES: Record<string, Row> = {
   'Search notes': ['ノートを検索', '노트 검색', 'Rechercher des notes', 'Buscar notas'],
   'Collapse others': ['ほかを折りたたむ', '다른 항목 접기', 'Replier les autres', 'Contraer los demás'],
   'Recent': ['最近', '최근', 'Récents', 'Recientes'],
-  'Right-click a conversation to pin it.': ['会話を右クリックしてピン留めできます。', '대화를 마우스 오른쪽 버튼으로 클릭해 고정할 수 있습니다.', 'Clic droit sur une conversation pour l’épingler.', 'Haz clic derecho en una conversación para fijarla.'],
-  'Right-click a page to pin it.': ['ページを右クリックしてピン留めできます。', '페이지를 마우스 오른쪽 버튼으로 클릭해 고정할 수 있습니다.', 'Clic droit sur une page pour l’épingler.', 'Haz clic derecho en una página para fijarla.'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

@@ -76,6 +76,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },
-  ai:            { label: 'AI',          icon: NavAiIcon },
+  ai:            { label: 'Agent',       icon: NavAiIcon },
 };
 
