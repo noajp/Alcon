@@ -16,6 +16,8 @@ import { ObjectIcon } from '@/Frame/icons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { useListColumns, sortElements, NAME_COL_KEY, NAME_MIN_WIDTH, type ColumnId, type DataColumn, type ColumnEntity } from '@/Function/shared/listTable/useListColumns';
+import { refreshAwaitingAnswers, useAwaitingAnswerElementIds } from '@/hooks/awaitingAnswerData';
+import { useQuestionNotificationCount, useUnreadCommentElementIds } from '@/hooks/notificationData';
 import { EMPTY_CUSTOM_COLUMNS, EMPTY_ELEMENT_TYPES, EMPTY_WORKERS, EMPTY_ELEMENT_IDS, type ElementUpdate, type ListSection, HEADER_DRAG_PREFIX, OBJECT_DRAG_PREFIX, ROW_ROUND_BASE, STICKY_TINT_HOVER, LEAD_CELL, LEAD_CELL_HOVER, nameTrackWidth, signalsTrackWidth } from './shared';
 import { ElementRow } from './ElementRow';
 import { reorderWithinSections } from './rowReorder';
@@ -323,6 +325,18 @@ export function ListTable({
   // Passing an empty id list is what keeps the second fetch from happening.
   const ownBlockers = useElementBlockers(blockers ? EMPTY_ELEMENT_IDS : displayedElementIds);
   const elementBlockers = blockers ?? ownBlockers;
+  // Read here as well as in the rows: the table measures the rows' signals,
+  // so it has to know when one of them changes.
+  const awaitingAnswer = useAwaitingAnswerElementIds();
+  const unreadComments = useUnreadCommentElementIds();
+  // A question arriving in the Inbox is the moment a row starts to wait.
+  const questionNotices = useQuestionNotificationCount();
+  const seenQuestionNotices = useRef(questionNotices);
+  useEffect(() => {
+    if (seenQuestionNotices.current === questionNotices) return;
+    seenQuestionNotices.current = questionNotices;
+    refreshAwaitingAnswers();
+  }, [questionNotices]);
   const displayedObjectIdsRef = useRef<string[]>([]);
   // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
@@ -530,7 +544,10 @@ export function ListTable({
     let w = 0;
     table.querySelectorAll<HTMLElement>('[data-row-signals]').forEach((el) => { w = Math.max(w, el.scrollWidth); });
     table.style.setProperty('--signals-w', `${signalsTrackWidth(w, drawnName)}px`);
-  }, [sortedSections, visibleColumns, drawnName]);
+    // The rows' own signals arrive after the rows do (who waits on the
+    // viewer, unread comments, blockers): each is measured again when it
+    // lands, or a mark that came late would sit in a track of the old width.
+  }, [sortedSections, visibleColumns, drawnName, awaitingAnswer, unreadComments, elementBlockers]);
   const titleWidth = `calc(${nameWidth}px - var(--signals-w, 0px))`;
   const packedWidth = 52 + nameWidth + visibleColumns.reduce((sum, c) => sum + drawnWidth(c), 0) + (hasTrailingCol ? 80 : 0);
 

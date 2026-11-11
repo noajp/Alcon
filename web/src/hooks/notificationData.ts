@@ -283,6 +283,15 @@ export function useUnreadCommentElementIds(): ReadonlySet<string> {
     .map((n) => n.element_id!)), [notifications]);
 }
 
+/** How many questions the Inbox holds for the signed-in person — a number
+ *  that moves when a run asks one, so a list that marks the Elements
+ *  waiting on them knows to look again. */
+export function useQuestionNotificationCount(): number {
+  const userId = useCurrentUserId();
+  const { notifications } = useNotifications(userId);
+  return useMemo(() => notifications.filter((n) => n.kind === 'question').length, [notifications]);
+}
+
 /** Opening an Element reads its comments: its unread comment and mention
  *  notifications for this person become read. */
 export async function markElementCommentsRead(recipientId: string, elementId: string): Promise<void> {

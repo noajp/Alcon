@@ -11,8 +11,9 @@ import { getCurrentUserId, supabase } from '@/lib/supabase';
 // One store for every row and every list on the page — a row reads a
 // Set, it never asks the database. The store is read when a list first
 // shows, again when the tab is looked at after a while, and whenever
-// something says an answer was sent (refreshAwaitingAnswers). A read
-// that fails is not tried again until it would be stale anyway.
+// something says what waits may have changed (refreshAwaitingAnswers):
+// an answer sent from the Inbox, a question arriving there. A read that
+// fails is not tried again until it would be stale anyway.
 
 const STALE_MS = 30_000;
 const EMPTY: ReadonlySet<string> = new Set();
@@ -24,9 +25,15 @@ let owner: string | null = null;
  *  mounting one after another do not each try again. */
 let triedAt = 0;
 let reading = false;
+/** Asked to read again while a read was under way: that read may have
+ *  been answered before the change, so one more follows it. */
+let again = false;
 const listeners = new Set<() => void>();
 
+/** Hands the rows a new Set only when what it holds changed: every row
+ *  on the page reads it, and the same answer must not redraw them all. */
 function emit(next: ReadonlySet<string>) {
+  if (next.size === ids.size && [...next].every((id) => ids.has(id))) return;
   ids = next;
   listeners.forEach((fn) => fn());
 }
@@ -46,15 +53,17 @@ async function read(): Promise<void> {
     const userId = await getCurrentUserId();
     if (userId !== owner) { owner = userId; emit(EMPTY); }
     if (!userId) return;
-    // Only the run's starter can answer its question, so only their
-    // tickets count as waiting on them.
+    // Only the run's starter can answer its question, and only while the
+    // run still rests on it — a run that was stopped leaves its ticket
+    // open, and nobody can answer that. The Inbox card asks the same.
     const { data, error } = await supabase
       .from('question_tickets')
-      .select('element_id, agent_runs!inner(triggered_by)')
+      .select('element_id, agent_runs!inner(triggered_by, status)')
       .eq('status', 'open')
       .gt('expires_at', new Date().toISOString())
       .not('element_id', 'is', null)
       .eq('agent_runs.triggered_by', userId)
+      .eq('agent_runs.status', 'awaiting_input')
       .limit(500);
     if (error) throw error;
     emit(awaitingElementIds((data ?? []) as { element_id: string | null }[]));
@@ -64,6 +73,7 @@ async function read(): Promise<void> {
     console.error('Failed to read the Elements waiting for an answer:', error);
   } finally {
     reading = false;
+    if (again) { again = false; void read(); }
   }
 }
 
@@ -73,17 +83,36 @@ const onVisible = () => { if (document.visibilityState === 'visible') readIfStal
 /** Something changed what waits (an answer was sent): read again now. */
 export function refreshAwaitingAnswers(): void {
   triedAt = 0;
-  if (listeners.size > 0) void read();
+  if (listeners.size === 0) return;
+  if (reading) again = true; else void read();
+}
+
+/** Whoever signs out or in, the marks are theirs alone: the previous
+ *  person's are dropped at once, not at the next read. */
+let authSubscription: { unsubscribe: () => void } | null = null;
+function onAuthChange(userId: string | null) {
+  if (userId === owner) return;
+  owner = userId;
+  emit(EMPTY);
+  triedAt = 0;
+  if (userId && listeners.size > 0) void read();
 }
 
 // One listener on the document for the whole store, however many rows
 // read it: there while anything is subscribed, gone with the last.
 function subscribe(listener: () => void) {
-  if (listeners.size === 0) document.addEventListener('visibilitychange', onVisible);
+  if (listeners.size === 0) {
+    document.addEventListener('visibilitychange', onVisible);
+    authSubscription = supabase.auth.onAuthStateChange((_event, session) => onAuthChange(session?.user?.id ?? null)).data.subscription;
+  }
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0) document.removeEventListener('visibilitychange', onVisible);
+    if (listeners.size === 0) {
+      document.removeEventListener('visibilitychange', onVisible);
+      authSubscription?.unsubscribe();
+      authSubscription = null;
+    }
   };
 }
 const snapshot = () => ids;
