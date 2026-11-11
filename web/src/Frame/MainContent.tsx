@@ -257,7 +257,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {/* The AI on a screen of its own — the same conversation as the pop-up. */}
           {activeActivity === 'ai' && <AlconCopilotPanel variant="page" open onOpenChange={() => {}} subject={aiSubject} onMinimize={onMinimizeAi} />}
 
-          {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
+          {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} />}
 
           {activeActivity === 'settings' && (
             <div className="flex-1 flex flex-col overflow-hidden">

@@ -3,7 +3,7 @@
 // record). A saved order is read leniently: an unknown row is dropped
 // and a row it never knew — one added since — joins at its default place.
 
-export const SIDEBAR_ITEMS = ['inbox', 'calendar', 'team', 'ai', 'strategy'] as const;
+export const SIDEBAR_ITEMS = ['inbox', 'team', 'ai', 'strategy'] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
 
 const KEY = 'alcon:sidebar-order';

@@ -6,12 +6,12 @@ import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { LogOut, Settings } from '@/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import { NavMyTasksIcon, NavNoteIcon } from './NavIcons';
+import { NavCalendarIcon, NavMyTasksIcon, NavNoteIcon } from './NavIcons';
 import { ProfileMenu } from './ProfileMenu';
 
 // The foot of the sidebar: who you are and whether this window is connected
 // — it opens the account card (ProfileMenu): the Profile from its header,
-// then Note and My Elements, then Settings and signing out — and beside
+// then Note, My Elements and Calendar, then Settings and signing out — and beside
 // it, the gear to Settings. Online and
 // offline are the browser's own reading of the network, so what it says is
 // true of this window.
@@ -63,6 +63,7 @@ export function MeFooter({ active, onOpen, onOpenView, onSettings }: {
         items={[
           { id: 'note', label: t('Note'), icon: <NavNoteIcon size={16} />, onSelect: () => { setMenuOpen(false); onOpenView('note'); } },
           { id: 'my-elements', label: t('My Elements'), icon: <NavMyTasksIcon size={16} />, onSelect: () => { setMenuOpen(false); onOpenView('my-elements'); } },
+          { id: 'calendar', label: t('Calendar'), icon: <NavCalendarIcon size={16} />, onSelect: () => { setMenuOpen(false); onOpenView('calendar'); } },
           ...(onSettings ? [{ id: 'settings', label: t('Settings'), icon: <Settings size={16} />, separated: true, onSelect: () => { setMenuOpen(false); onSettings(); } }] : []),
           { id: 'sign-out', label: t('Sign out'), icon: <LogOut size={16} />, separated: !onSettings, onSelect: () => { setMenuOpen(false); void signOut(); } },
         ]}

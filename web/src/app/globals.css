@@ -160,6 +160,9 @@
 
   --shadow-1: 0 1px 1px rgba(15, 17, 22, 0.04), 0 2px 4px -1px rgba(15, 17, 22, 0.05), 0 12px 24px -14px rgba(15, 17, 22, 0.12);
   --shadow-island: var(--shadow-1);
+  /* A card beside the page (the rail's Properties, Label, Activity): a
+     quieter lift than an island, so the rail does not stand above the page. */
+  --shadow-card: 0 1px 1px rgba(15, 17, 22, 0.03), 0 8px 16px -12px rgba(15, 17, 22, 0.08);
   /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
      than --shadow-island, which is reserved for cards. */
   --shadow-button: 0 1px 4px rgba(0, 0, 0, 0.35);
@@ -264,6 +267,7 @@
   --gloss-sheen:   linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0px, rgba(255, 255, 255, 0) 160px);
   --overlay-glass: color-mix(in srgb, var(--surface-overlay) 74%, transparent);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 28px -16px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.18), 0 8px 18px -14px rgba(0, 0, 0, 0.32);
   --surface-well: color-mix(in srgb, var(--surface-rail) 45%, transparent);
   --shadow-overlay: inset 0 1px 0 var(--gloss-edge), 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 28px -4px rgba(0, 0, 0, 0.45), 0 32px 64px -16px rgba(0, 0, 0, 0.6);
 

@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FileText, Sparkles } from '@/ui/icons';
+import { FileText } from '@/ui/icons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
-import { NavHomeIcon } from '@/Frame/sidebar/NavIcons';
+import { NavCalendarIcon, NavHomeIcon } from '@/Frame/sidebar/NavIcons';
 import { MyElementsView } from '@/ActivitySpace/home/MyElementsView';
 import { ProfileOverview } from '@/ActivitySpace/home/ProfileOverview';
 import { IslandHeader } from '@/Function/shared/MainIsland';
@@ -13,7 +13,7 @@ import { ViewTabs } from '@/Function/shared/ViewTabs';
 import { PageLayout } from '@/Function/shared/PageHead';
 import { useActivitySpaces, useSpaceRole } from '@/Function/space/data';
 import { useNowMinute } from '@/Function/shared/useNow';
-import { ProfileAI } from '@/AIP/ai/ProfileAI';
+import { MyCalendarView } from '@/ActivitySpace/home/MyCalendarView';
 import { useSelfWorker } from '@/hooks/teamData';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -24,16 +24,16 @@ interface Props {
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
   onOpenSettings: () => void;
-  activeDomainId?: string | null;
 }
 
-type ProfileTab = 'overview' | 'elements' | 'notes' | 'ai';
+type ProfileTab = 'overview' | 'elements' | 'notes' | 'calendar';
 
 // The Profile page is the person's own page, read like a contact card: the
 // avatar and name, who they are in this Space, a line of facts (their local
 // time, handle, email) and their bio; under it, tabs — an Overview of what
-// matters about their work now, their Elements, their Notes and their AI.
-export function ProfileView({ onNavigate, onViewChange, activeDomainId }: Props) {
+// matters about their work now, their Elements, their Notes and their
+// Calendar.
+export function ProfileView({ onNavigate, onViewChange }: Props) {
   const { t } = useI18n();
   const { user, profile } = useAuthContext();
   const spaceId = useActiveSpaceId();
@@ -64,9 +64,9 @@ export function ProfileView({ onNavigate, onViewChange, activeDomainId }: Props)
 
   const tabs: { id: ProfileTab; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
     { id: 'overview', label: 'Overview', icon: NavHomeIcon },
-    { id: 'elements', label: 'My Elements', icon: ElementIcon },
-    { id: 'notes', label: 'My Notes', icon: FileText },
-    { id: 'ai', label: 'AI', icon: Sparkles },
+    { id: 'elements', label: 'Elements', icon: ElementIcon },
+    { id: 'notes', label: 'Note', icon: FileText },
+    { id: 'calendar', label: 'Calendar', icon: NavCalendarIcon },
   ];
 
   return (
@@ -122,8 +122,8 @@ export function ProfileView({ onNavigate, onViewChange, activeDomainId }: Props)
             ))}
           </ul>}
       </div>
-      <div className={tab === 'ai' ? 'flex min-h-0 flex-1' : 'hidden'}>
-        <ProfileAI activeDomainId={activeDomainId} />
+      <div className={tab === 'calendar' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
+        {tab === 'calendar' && <MyCalendarView onNavigate={onNavigate} onViewChange={onViewChange} />}
       </div>
     </div>
   );
