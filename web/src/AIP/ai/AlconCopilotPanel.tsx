@@ -277,9 +277,11 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
         onPointerDown={floating ? (e) => { if (!(e.target as HTMLElement).closest('button')) startFloat(e, 'move'); } : undefined}
         className={`flex flex-shrink-0 items-center gap-2 bg-card ${floating ? 'h-12 cursor-grab pl-4 pr-2 active:cursor-grabbing' : 'h-[50px] px-3 border-b border-border/60'}`}
       >
-        <span className="text-[13px] font-semibold text-foreground">{t('AI')}</span>
-        {subject?.kind === 'slides' && <span className="text-[12px] text-muted-foreground">· Slides</span>}
-        {subject?.kind === 'strategy' && <span className="max-w-40 truncate text-[12px] text-muted-foreground">· {strategyName ?? t('Strategy')}</span>}
+        {/* On its own screen the list beside it carries the name; only the
+            pop-up, which stands alone, says what it is. */}
+        {floating && <span className="text-[13px] font-semibold text-foreground">{t('Agent')}</span>}
+        {subject?.kind === 'slides' && <span className="text-[12px] text-muted-foreground">{floating ? '· ' : ''}Slides</span>}
+        {subject?.kind === 'strategy' && <span className="max-w-40 truncate text-[12px] text-muted-foreground">{floating ? '· ' : ''}{strategyName ?? t('Strategy')}</span>}
         <div className="flex-1" />
         {subject?.kind !== 'slides' && messages.length > 0 && (
           <Button size="sm" type="button" variant="ghost" onClick={() => newConversation()} title={t('Start a new conversation')}>

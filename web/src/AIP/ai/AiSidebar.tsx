@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, MessageSquare, Pencil, Pin, Plus, Search, SquarePen, Trash2 } from '@/ui/icons';
+import { ChevronRight, Folder as FolderIcon, FolderInput, FolderPlus, Pencil, Pin, Plus, Search, SquarePen, Trash2 } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { SidebarRow } from '@/Function/shared/SidebarRow';
@@ -78,7 +78,9 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
   const sessionRow = (session: AiSessionSummary, nested: boolean) => (
     <ContextMenu key={session.id}>
       <ContextMenuTrigger asChild>
-        <SidebarRow active={session.id === sessionId} size={nested ? 'sm' : 'md'} icon={<MessageSquare size={14} />} className={nested ? 'pl-3' : undefined}>
+        {/* No icon: every row here is a conversation, and a mark that is the
+            same on all of them says nothing. The name starts the row. */}
+        <SidebarRow active={session.id === sessionId} size={nested ? 'sm' : 'md'} className={nested ? 'pl-3' : undefined}>
           {nameOrInput(session.id, session.title || t('Untitled'), (v) => void library.renameSession(session.id, v), () => open(session.id))}
         </SidebarRow>
       </ContextMenuTrigger>
@@ -114,8 +116,8 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
   const groupIds = [...folders.map((f) => f.id), RECENT];
 
   return (
-    <Panel label={t('AI')}>
-      <PanelHeader title={t('AI')} />
+    <Panel label={t('Agent')}>
+      <PanelHeader title={t('Agent')} />
       <PanelBody>
       <div className="flex flex-col">
         <SidebarRow icon={<Plus size={15} />} label={t('New')} onClick={() => startChat()} />
@@ -124,14 +126,16 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
       </div>
       {searching && <div className="mt-1.5"><PanelSearch value={query} onChange={setQuery} placeholder={t('Search conversations')} /></div>}
 
-      <PanelGroup title={t('Pinned')} open={!closed.has(PINNED)} onToggle={() => toggle(PINNED)} menu={[
-        { label: t('New section'), onSelect: () => void addFolder() },
-        { label: t('Collapse others'), onSelect: () => setClosed(new Set(groupIds)) },
-      ]}>
-        {pinnedSessions.length === 0
-          ? <p className="px-2.5 py-1 text-[12px] text-muted-foreground">{t('Right-click a conversation to pin it.')}</p>
-          : pinnedSessions.map((s) => sessionRow(s, false))}
-      </PanelGroup>
+      {/* Pinned exists once something is pinned: an empty group is a heading
+          about nothing. Pinning itself is on every conversation's menu. */}
+      {pinnedSessions.length > 0 && (
+        <PanelGroup title={t('Pinned')} open={!closed.has(PINNED)} onToggle={() => toggle(PINNED)} menu={[
+          { label: t('New section'), onSelect: () => void addFolder() },
+          { label: t('Collapse others'), onSelect: () => setClosed(new Set(groupIds)) },
+        ]}>
+          {pinnedSessions.map((s) => sessionRow(s, false))}
+        </PanelGroup>
+      )}
 
       <div className="mt-3 flex flex-col">
         {folders.map((folder) => {

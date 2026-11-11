@@ -202,10 +202,30 @@ export const Bot = glyph('Bot', {
   line: <path d="M8 3.4V5" />,
 });
 
-const FOLDER_SHAPE = <path d="M2.5 4.25c0-.69.56-1.25 1.25-1.25h2.6c.33 0 .65.13.88.37l.95.95c.24.23.55.36.88.36h3.19c.69 0 1.25.56 1.25 1.25v6.82c0 .69-.56 1.25-1.25 1.25h-8.5c-.69 0-1.25-.56-1.25-1.25Z" />;
+// A folder is two things: a back with its tab, and a front that closes over
+// it. Drawn as one blob it is a rectangle with a bump; drawn as two, with a
+// sliver of space between, the tab reads as a tab and the front as a panel
+// with its own rounded corners. What a folder does (add, move into) is cut
+// into the front.
+const FOLDER_SHAPE = (
+  <>
+    <path d="M2.5 5.95V4.25c0-.69.56-1.25 1.25-1.25h2.6c.33 0 .65.13.88.37l.95.95c.24.23.55.36.88.36h3.19c.69 0 1.25.56 1.25 1.25v.02Z" />
+    <rect x="2.5" y="6.85" width="11" height="6.4" rx="1.3" />
+  </>
+);
 export const Folder = glyph('Folder', { solid: FOLDER_SHAPE });
-export const FolderPlus = glyph('FolderPlus', { solid: FOLDER_SHAPE, cut: <path d="M8 6.75v4M6 8.75h4" strokeWidth={1.3} /> });
-export const FolderInput = glyph('FolderInput', { solid: FOLDER_SHAPE, cut: <path d="M5.75 8.75h4.25M8.25 7l1.75 1.75L8.25 10.5" strokeWidth={1.3} /> });
+// Adding a folder and moving into one are things you do, so they are drawn
+// as lines — the same weight as the plus and the magnifier they sit beside
+// in a menu or a list of actions, where a solid block among lines looks out
+// of step even when it is centred. The outline is the folder; what is done
+// to it sits inside, a little finer.
+const FOLDER_OUTLINE = 'M3.1 5v6.15a1.25 1.25 0 0 0 1.25 1.25h7.3a1.25 1.25 0 0 0 1.25-1.25V6.5a1.25 1.25 0 0 0-1.25-1.25H8.6a1 1 0 0 1-.72-.31l-.74-.83a1 1 0 0 0-.74-.36H4.35A1.25 1.25 0 0 0 3.1 5Z';
+export const FolderPlus = glyph('FolderPlus', {
+  line: <><path d={FOLDER_OUTLINE} /><path d="M8 7.4v2.9M6.55 8.85h2.9" strokeWidth={1.3} /></>,
+});
+export const FolderInput = glyph('FolderInput', {
+  line: <><path d={FOLDER_OUTLINE} /><path d="M6.1 8.85h3.7M8.45 7.5l1.4 1.35-1.4 1.35" strokeWidth={1.3} /></>,
+});
 
 export const Inbox = glyph('Inbox', {
   solid: <path d="M4.4 2.75h7.2c.6 0 1.13.4 1.3.98l1.35 4.6c.03.1.05.2.05.3v3.37a1.25 1.25 0 0 1-1.25 1.25H2.95a1.25 1.25 0 0 1-1.25-1.25V8.63c0-.1.02-.2.05-.3l1.35-4.6c.17-.58.7-.98 1.3-.98Z" />,

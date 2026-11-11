@@ -41,7 +41,7 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   // Team holds its load too ('workload' still opens it).
   team:      { label: 'Team',      icon: NavTeamsIcon, defaultView: 'team', views: ['team', 'workload'] },
   calendar:  { label: 'Calendar',  icon: NavCalendarIcon, defaultView: 'calendar', views: ['calendar', 'schedule'] },
-  ai:        { label: 'AI',        icon: NavAiIcon, defaultView: 'ai', views: ['ai'] },
+  ai:        { label: 'Agent',     icon: NavAiIcon, defaultView: 'ai', views: ['ai'] },
 };
 
 /** Navigation, highlighting and the launcher read the same mode definitions. */
