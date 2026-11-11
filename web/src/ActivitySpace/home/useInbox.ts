@@ -22,9 +22,13 @@ interface InboxSelection {
   /** Bumps on every pick so the reader restarts its navigation trail even
    *  when the same notification is chosen again. */
   revision: number;
+  /** Bumps when something outside the feed changed what the Inbox shows
+   *  (a question answered): both panes re-read it, and the selection and
+   *  the reader's trail stay exactly where they are. */
+  refreshed: number;
 }
 
-let selection: InboxSelection = { selectedId: null, unreadOnly: false, revision: 0 };
+let selection: InboxSelection = { selectedId: null, unreadOnly: false, revision: 0, refreshed: 0 };
 const listeners = new Set<() => void>();
 
 function emit(next: InboxSelection) {
@@ -43,6 +47,12 @@ export function selectInboxNotification(id: string | null) {
   emit({ ...selection, selectedId: id, revision: selection.revision + 1 });
 }
 
+/** Ask both Inbox panes to re-read what waits, without touching which
+ *  notification is open. */
+export function refreshInbox() {
+  emit({ ...selection, refreshed: selection.refreshed + 1 });
+}
+
 function useInboxSelection(): InboxSelection {
   return useSyncExternalStore(subscribe, getSelection, getSelection);
 }
@@ -58,7 +68,7 @@ interface InboxNavigation {
 export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
   const { user } = useAuthContext();
   const { notifications, unreadCount, loading, reload, setNotifications } = useNotifications(user?.id ?? null);
-  const { selectedId, unreadOnly, revision } = useInboxSelection();
+  const { selectedId, unreadOnly, revision, refreshed } = useInboxSelection();
   const selected = notifications.find(n => n.id === selectedId) ?? null;
   const openObject = useOpenObject({ onNavigate, onViewChange });
 
@@ -106,7 +116,7 @@ export function useInbox({ onNavigate, onViewChange }: InboxNavigation = {}) {
 
   const setUnreadOnly = useCallback((value: boolean) => emit({ ...selection, unreadOnly: value }), []);
 
-  return { notifications, unreadCount, loading, selected, selectedId, revision, unreadOnly, select, openObject, archive, toggleRead, markAllRead, setUnreadOnly };
+  return { notifications, unreadCount, loading, selected, selectedId, revision, refreshed, unreadOnly, select, openObject, archive, toggleRead, markAllRead, setUnreadOnly };
 }
 
 /** The Element a notification points at, re-read when the reader asks. */

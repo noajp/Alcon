@@ -477,15 +477,16 @@ async function fetchOpenQuestionTicketIds(ticketIds: readonly string[]): Promise
 }
 
 /** The open tickets among `ticketIds` — the Inbox's waiting group reads
- *  this. Re-read whenever the set of tickets, `revision` or `feedSize`
- *  changes (a pick in the Inbox, an answer sent, a notification arriving
- *  or leaving); the two are separate so one going up as the other goes
- *  down still re-reads. null until the first read lands, so a caller
- *  never shows "nothing waits" on a guess. A failed read keeps the last
- *  answer. */
-export function useOpenQuestionTickets(ticketIds: readonly string[], revision: number, feedSize: number): ReadonlySet<string> | null {
+ *  this. Re-read whenever the set of tickets or any of `reread` changes
+ *  (the Inbox passes its pick counter, its refresh counter and the feed's
+ *  size: a pick, an answer sent, a notification arriving or leaving); the
+ *  values are compared one by one, so one rising as another falls still
+ *  re-reads. null until the first read lands, so a caller never shows
+ *  "nothing waits" on a guess. A failed read keeps the last answer. */
+export function useOpenQuestionTickets(ticketIds: readonly string[], reread: readonly number[]): ReadonlySet<string> | null {
   const [open, setOpen] = useState<ReadonlySet<string> | null>(null);
   const key = [...ticketIds].sort().join(',');
+  const rereadKey = reread.join(':');
   useEffect(() => {
     let cancelled = false;
     void fetchOpenQuestionTicketIds(key ? key.split(',') : []).then((next) => {
@@ -494,7 +495,7 @@ export function useOpenQuestionTickets(ticketIds: readonly string[], revision: n
       console.error('Failed to read open question tickets:', error);
     });
     return () => { cancelled = true; };
-  }, [key, revision, feedSize]);
+  }, [key, rereadKey]);
   return open;
 }
 

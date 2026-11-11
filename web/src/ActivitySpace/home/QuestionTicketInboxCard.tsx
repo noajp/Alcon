@@ -18,12 +18,13 @@ import { Textarea } from '@/ui/textarea';
 // the agent never phrases it. Only the run's starter may answer —
 // the engine refuses anyone else, and the card says so instead of
 // offering buttons it would refuse.
-export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting = null }: {
+export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting }: {
   ticketId: string;
   /** The answer landed: the Inbox re-reads what still waits. */
   onAnswered?: () => void;
   /** The other questions still waiting, once this one is answered: how
-   *  many, and how to open the next. null when none is left. */
+   *  many, and how to open the next. null when none is left; undefined
+   *  while that is not known, and the card then says nothing about it. */
   nextWaiting?: { count: number; open: () => void } | null;
 }) {
   const { t, locale } = useI18n();
@@ -108,7 +109,7 @@ export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting = nu
 
       {/* Answered: say what else waits, and take the person there — the
           list is not something to go back and hunt through. */}
-      {view.status === 'answered' && (
+      {view.status === 'answered' && nextWaiting !== undefined && (
         <div className="mt-6">
           {nextWaiting
             ? <Button onClick={nextWaiting.open}>{t('Next question ({count} waiting)', { count: nextWaiting.count })}</Button>

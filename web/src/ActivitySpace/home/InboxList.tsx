@@ -48,7 +48,7 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
   // stands open (inboxModel.ts). The tickets are re-read when a notification
   // arrives, when one is picked, and when the question card sends an answer.
   const ticketIds = useMemo(() => questionTicketIdsOf(inbox.notifications), [inbox.notifications]);
-  const openTickets = useOpenQuestionTickets(ticketIds, inbox.revision, inbox.notifications.length);
+  const openTickets = useOpenQuestionTickets(ticketIds, [inbox.revision, inbox.refreshed, inbox.notifications.length]);
   const { waiting, rest } = useMemo(() => splitInbox(inbox.notifications, openTickets), [inbox.notifications, openTickets]);
   // Keep the notification being read in the unread view until the user leaves it.
   // A waiting question stays whether or not it was read: reading is not answering.
