@@ -290,7 +290,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
         )}
         {floating && onExpand && (
           <Button size="icon-sm" type="button" variant="ghost" onClick={onExpand}
-            title={t('Open the AI screen')} aria-label={t('Open the AI screen')} className="text-muted-foreground">
+            title={t('Open the Agent screen')} aria-label={t('Open the Agent screen')} className="text-muted-foreground">
             <Maximize2 size={14} />
           </Button>
         )}
@@ -302,7 +302,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
         )}
         {!page && (
           <Button size="icon-sm" type="button" variant="ghost" onClick={() => onOpenChange(false)}
-            title={`${t('Hide AI')} (⌘L)`} aria-label={t('Hide AI')} className="text-muted-foreground">
+            title={`${t('Hide Agent')} (⌘L)`} aria-label={t('Hide Agent')} className="text-muted-foreground">
             <X size={14} />
           </Button>
         )}

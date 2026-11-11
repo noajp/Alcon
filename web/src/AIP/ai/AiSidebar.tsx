@@ -79,8 +79,9 @@ export function AiSidebar({ onOpen }: { onOpen: () => void }) {
     <ContextMenu key={session.id}>
       <ContextMenuTrigger asChild>
         {/* No icon: every row here is a conversation, and a mark that is the
-            same on all of them says nothing. The name starts the row. */}
-        <SidebarRow active={session.id === sessionId} size={nested ? 'sm' : 'md'} className={nested ? 'pl-3' : undefined}>
+            same on all of them says nothing. The name starts the row; one
+            inside a folder starts a step right of the folder's own name. */}
+        <SidebarRow active={session.id === sessionId} size={nested ? 'sm' : 'md'} className={nested ? 'pl-11' : undefined}>
           {nameOrInput(session.id, session.title || t('Untitled'), (v) => void library.renameSession(session.id, v), () => open(session.id))}
         </SidebarRow>
       </ContextMenuTrigger>
