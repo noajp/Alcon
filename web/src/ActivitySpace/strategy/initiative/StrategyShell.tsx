@@ -20,7 +20,7 @@ import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon, NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { PageIcon, PageSection, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
+import { PageIcon, PageSection, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { IndexList, IndexRow } from '@/Function/shared/IndexList';
@@ -1020,11 +1020,11 @@ function StrategyDetailView({
           // A scrolling report page like the Overview, not a bounded
           // board: the records of finished runs, aggregated by the
           // Strategy's element set (StrategyEvaluationPanel).
-          <div className="max-w-7xl mx-auto px-8 py-8">
+          <div className={PAGE_FRAME}>
             <StrategyEvaluationPanel objects={missionProps.objects} />
           </div>
         ) : (
-        <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className={PAGE_FRAME}>
         <InitiativeBoard surface="campaign" defaults={INITIATIVE_BOARD} subjectId={strategy.id} host={host} zones={BOARD_ZONES}>
         {/* items-start: the island does not stretch the document column. */}
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
