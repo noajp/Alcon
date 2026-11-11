@@ -169,6 +169,18 @@ describe('applyWorkspaceDelta', () => {
     expect(qc.getQueryData<unknown[]>(['strategy-comments', 'st1'])!.length).toBe(0);
   });
 
+  it('an Object comment lands on its thread', () => {
+    const qc = seed();
+    qc.setQueryData(['object-comments', 'ob1'], []);
+    qc.setQueryData(['object-comments', 'ob2'], []);
+    applyWorkspaceDelta(qc, ctx, delta('object_comments', 'INSERT', { id: 'oc1', object_id: 'ob1', content: 'x' }));
+    applyWorkspaceDelta(qc, ctx, delta('object_comments', 'INSERT', { id: 'oc1', object_id: 'ob1', content: 'x' })); // duplicate delivery
+    expect(qc.getQueryData<unknown[]>(['object-comments', 'ob1'])!.length).toBe(1);
+    expect(qc.getQueryData<unknown[]>(['object-comments', 'ob2'])!.length).toBe(0);
+    applyWorkspaceDelta(qc, ctx, delta('object_comments', 'DELETE', {}, { id: 'oc1' }));
+    expect(qc.getQueryData<unknown[]>(['object-comments', 'ob1'])!.length).toBe(0);
+  });
+
   it('a personal Element homed in an Object reaches both My Elements and the tree', () => {
     const qc = seed();
     applyWorkspaceDelta(qc, ctx, delta('elements', 'INSERT', { id: 'p3', object_id: 'obj-a', owner_id: 'me', title: 'both' }));

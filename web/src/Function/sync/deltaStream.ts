@@ -32,6 +32,7 @@ import type {
   ElementComment,
   ElementReaction,
   ElementWithDetails,
+  ObjectComment,
   StrategyComment,
   Worker,
 } from '@/types/database';
@@ -60,7 +61,7 @@ const WORKSPACE_TABLES = [
   'objects', 'workers', 'domains', 'worker_availability',
   'domain_members', 'object_members', 'activity_space_members', 'object_domains',
   'membership_invitations', 'boards', 'board_placements', 'widgets', 'widget_documents', 'tables', 'table_columns', 'table_rows', 'table_cells',
-  'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments',
+  'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments', 'object_comments',
   'phases', 'domain_approaches', 'approach_conditions', 'approach_contributions', 'approach_assessments', 'approach_reviews',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
   'intent_escalations', 'intent_alignments', 'intent_audits', 'intent_predictions', 'intent_resources',
@@ -463,6 +464,25 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       if (!strategyId) return;
       const c = row as unknown as StrategyComment;
       forEachList<StrategyComment>(qc, { queryKey: ['strategy-comments', strategyId] }, (list) => {
+        const at = list.findIndex((x) => x.id === c.id);
+        if (at === -1) return d.type === 'INSERT' ? [...list, c] : list;
+        return list.map((x, i) => (i === at ? { ...x, ...c } : x));
+      });
+      return;
+    }
+
+    case 'object_comments': {
+      if (!id) return;
+      const objectId = row.object_id as string | undefined;
+      if (d.type === 'DELETE') {
+        forEachList<ObjectComment>(qc, { queryKey: ['object-comments'] }, (list) =>
+          list.some((c) => c.id === id) ? list.filter((c) => c.id !== id) : list,
+        );
+        return;
+      }
+      if (!objectId) return;
+      const c = row as unknown as ObjectComment;
+      forEachList<ObjectComment>(qc, { queryKey: ['object-comments', objectId] }, (list) => {
         const at = list.findIndex((x) => x.id === c.id);
         if (at === -1) return d.type === 'INSERT' ? [...list, c] : list;
         return list.map((x, i) => (i === at ? { ...x, ...c } : x));

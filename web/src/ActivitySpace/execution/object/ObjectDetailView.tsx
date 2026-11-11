@@ -565,7 +565,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {/* Overview Tab Content — Project Overview (Asana-style) */}
         {activeTab?.tab_type === 'overview' && (
           <div className="flex-1 overflow-auto bg-card">
-            <OverviewView object={object} onRefresh={onRefresh} />
+            <OverviewView object={object} elements={allElements} onRefresh={onRefresh}
+              onOpenStrategy={(strategyId) => { onNavigate({ strategyId }); onViewChange?.('strategy'); }} />
           </div>
         )}
 

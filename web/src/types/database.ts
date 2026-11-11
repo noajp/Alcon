@@ -2147,6 +2147,34 @@ export interface StrategyChildInsert {
 }
 
 // Strategy thread — same shape as ElementComment so one renderer serves both.
+// An Object's thread (object_comments) — the same shape as an Element's and
+// a Strategy's, so one panel renders all three.
+export interface ObjectComment {
+  id: string
+  object_id: string
+  parent_id: string | null
+  author_id: string | null
+  author_kind: CommentAuthorKind
+  author_name: string | null
+  content: string
+  mentions: string[]   // user_id[]
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ObjectCommentInsert {
+  id?: string
+  object_id: string
+  parent_id?: string | null
+  author_id?: string | null
+  author_kind?: CommentAuthorKind
+  author_name?: string | null
+  content: string
+  mentions?: string[]
+  is_pinned?: boolean
+}
+
 // author_id is null for an ai_agent (the FK points at auth.users and an agent
 // has no auth user); author_kind + author_name say who wrote it instead.
 export interface StrategyComment {

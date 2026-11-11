@@ -20,11 +20,13 @@ import {
   type ElementReaction,
   type Worker,
 } from '@/hooks/useSupabase';
+import type { CommentThread, ThreadComment } from '@/hooks/commentData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons, usePreference } from '@/Function/settings/preferencesStore';
 
-interface ElementCommentsPanelProps {
-  elementId: string;
+interface CommentsPanelProps<C extends ThreadComment> {
+  /** The thread shown: an Element's, an Object's. */
+  thread: CommentThread<C>;
   workers: Worker[];           // for @mentions autocomplete
   onCountChange?: (n: number) => void;
   /** Arrived here from a notification about one particular comment: bring it
@@ -59,14 +61,32 @@ interface MentionCandidate {
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, workers, onCountChange, focusCommentId, onAskAgent, waitingOnAnswer = false, refreshKey, sendOptions }: ElementCommentsPanelProps) {
+/** An Element's thread. */
+export function ElementCommentsPanel({ elementId, ...rest }: { elementId: string } & Omit<CommentsPanelProps<ElementComment>, 'thread'>) {
+  const { comments, loading, reload, setComments } = useElementComments(elementId);
+  const thread = useMemo<CommentThread<ElementComment>>(() => ({
+    comments, loading, reload, setComments,
+    create: (comment) => createElementComment({ element_id: elementId, author_kind: 'human', ...comment }),
+    remove: deleteElementComment,
+    setPinned: async (id, pinned) => { await updateElementComment(id, { is_pinned: pinned }); },
+    reactions: true,
+  }), [comments, loading, reload, setComments, elementId]);
+  return <CommentsPanel thread={thread} {...rest} />;
+}
+
+/**
+ * A comment thread and its composer: comments oldest first with the pinned
+ * ones on top, @ to name a person (or, with `onAskAgent`, an AI), pin and
+ * delete from each comment's menu, emoji where the thread takes them.
+ */
+export function CommentsPanel<C extends ThreadComment>({ thread, workers, onCountChange, focusCommentId, onAskAgent, waitingOnAnswer = false, refreshKey, sendOptions }: CommentsPanelProps<C>) {
   const { t } = useI18n();
   const aiWorkers = useMemo(() => workers.filter((w) => w.type === 'ai_agent').map((w) => ({ id: w.id, name: w.name })), [workers]);
   const humanNames = useMemo(() => workers.filter((w) => w.type === 'human').map((w) => w.name), [workers]);
   const [askOutcome, setAskOutcome] = useState<AgentStartOutcome | 'handed' | null>(null);
   const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
   const { user, profile } = useAuthContext();
-  const { comments, loading, reload, setComments } = useElementComments(elementId);
+  const { comments, loading, reload, setComments } = thread;
   // The agent posts as it works: re-read when its run moves on, without
   // remounting (a half-written comment and open folds stay as they are).
   useEffect(() => { if (refreshKey) void reload(); }, [refreshKey, reload]);
@@ -103,7 +123,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
   // Load reactions for visible comments. Reactions are read per comment id,
   // so with no comments left there is nothing to clear.
   useEffect(() => {
-    if (comments.length === 0) return;
+    if (!thread.reactions || comments.length === 0) return;
     let cancelled = false;
     fetchCommentReactions(comments.map(c => c.id))
       .then(rows => {
@@ -117,13 +137,13 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       })
       .catch(console.error);
     return () => { cancelled = true; };
-  }, [comments]);
+  }, [comments, thread.reactions]);
 
   // The @ list: the agent first (@AI, then this Element's AI Workers by
   // name), then people. Picking an agent turns the comment into its next
   // instruction (agentMention); picking a person notifies them.
   // The AI asked and the Element waits: the newest comment is the AI's.
-  const newest = comments.reduce<ElementComment | null>((a, c) => (!a || c.created_at > a.created_at ? c : a), null);
+  const newest = comments.reduce<C | null>((a, c) => (!a || c.created_at > a.created_at ? c : a), null);
   const aiAsked = waitingOnAnswer && newest?.author_kind === 'ai_agent';
   // Every name a mention may carry, so the thread colours it whole.
   const mentionNames = useMemo(() => workers.map((w) => w.name).filter(Boolean) as string[], [workers]);
@@ -189,14 +209,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       const mentions = mentionedUserIds(draft, workers);
       const authorName = formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames());
       const content = getCachedConvertEmoticons() ? convertEmoticons(draft.trim()) : draft.trim();
-      const created = await createElementComment({
-        element_id: elementId,
-        author_id: user?.id ?? null,
-        author_kind: 'human',
-        author_name: authorName,
-        content,
-        mentions,
-      });
+      const created = await thread.create({ author_id: user?.id ?? null, author_name: authorName, content, mentions });
       // The delta stream may have landed the row already.
       setComments(prev => (prev.some(c => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
@@ -208,8 +221,8 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
       setAskOutcome(null);
       if (ask && onAskAgent) void onAskAgent({ prompt: content, commentId: created.id, workerId: ask.workerId }).then(setAskOutcome);
 
-      // Mentioned people are notified by the element_comments trigger
-      // (notify_element_comment) from the `mentions` written above.
+      // Mentioned people are notified by the thread's database trigger
+      // (notify_element_comment, …) from the `mentions` written above.
     } catch (e) {
       console.error(e);
     } finally {
@@ -219,13 +232,13 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
 
   const onDelete = async (id: string) => {
     setComments(prev => prev.filter(c => c.id !== id));
-    try { await deleteElementComment(id); }
+    try { await thread.remove(id); }
     catch (e) { console.error(e); reload(); }
   };
 
-  const onTogglePin = async (c: ElementComment) => {
+  const onTogglePin = async (c: C) => {
     setComments(prev => prev.map(x => x.id === c.id ? { ...x, is_pinned: !x.is_pinned } : x));
-    try { await updateElementComment(c.id, { is_pinned: !c.is_pinned }); }
+    try { await thread.setPinned(c.id, !c.is_pinned); }
     catch (e) { console.error(e); reload(); }
   };
 
@@ -288,7 +301,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
     return () => clearTimeout(t);
   }, [focusCommentId]);
 
-  const renderComment = (c: ElementComment) => {
+  const renderComment = (c: C) => {
             const myReactions = (reactions[c.id] || []).filter(r => r.user_id === user?.id).map(r => r.emoji);
             const counts: Record<string, number> = {};
             for (const r of (reactions[c.id] || [])) counts[r.emoji] = (counts[r.emoji] || 0) + 1;
@@ -352,7 +365,7 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                     <CommentMenu align="end">
                       {(close) => (
                         <>
-                          <div className="flex items-center gap-0.5 px-1 py-0.5">
+                          {thread.reactions && <div className="flex items-center gap-0.5 px-1 py-0.5">
                             {QUICK_EMOJI.map((emoji) => (
                               <button
                                 key={emoji}
@@ -363,8 +376,8 @@ export function ElementCommentsPanel({ elementId, workers, onCountChange, focusC
                                 {emoji}
                               </button>
                             ))}
-                          </div>
-                          <div className={CommentMenuSeparator} />
+                          </div>}
+                          {thread.reactions && <div className={CommentMenuSeparator} />}
                           <CommentMenuItem
                             icon={<Pin size={12} />}
                             label={c.is_pinned ? t('Unpin') : t('Pin')}

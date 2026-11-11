@@ -4,7 +4,7 @@ import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
-import type { ElementComment, ElementCommentActivity, ElementCommentInsert, ElementCommentUpdate, ElementReaction, ElementReactionInsert } from '@/types/database';
+import type { CommentAuthorKind, ElementComment, ElementCommentActivity, ElementCommentInsert, ElementCommentUpdate, ElementReaction, ElementReactionInsert } from '@/types/database';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -153,6 +153,41 @@ export function useElementComments(elementId: string | null) {
     reload,
     setComments,
   };
+}
+
+// ============================================
+// A comment thread, whatever it hangs off.
+//
+// An Element's, an Object's and a Strategy's comments are rows of the same
+// shape in tables of their own. The panel that shows a thread reads and
+// writes it through this, so it is one panel for all of them.
+// ============================================
+export interface ThreadComment {
+  id: string
+  parent_id: string | null
+  author_id: string | null
+  author_kind: CommentAuthorKind
+  author_name: string | null
+  content: string
+  mentions: string[]
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CommentThread<C extends ThreadComment = ThreadComment> {
+  comments: C[]
+  loading: boolean
+  reload: () => Promise<void>
+  /** Writes into the cache, for an optimistic change and its undo. */
+  setComments: (update: C[] | ((prev: C[]) => C[])) => void
+  /** A new comment by the signed-in person. */
+  create: (comment: { author_id: string | null; author_name: string; content: string; mentions: string[] }) => Promise<C>
+  remove: (id: string) => Promise<void>
+  setPinned: (id: string, pinned: boolean) => Promise<void>
+  /** Whether comments here take emoji (element_reactions holds them for an
+   *  Element's comments only). */
+  reactions: boolean
 }
 
 export type { ElementCommentActivity };
