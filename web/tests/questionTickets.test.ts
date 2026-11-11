@@ -347,6 +347,16 @@ describe('a standing answer (the person’s word, kept by the engine)', () => {
     expect(m?.gist.length).toBeLessThanOrEqual(240);
   });
 
+  it('never cuts through the middle of a character', () => {
+    const emoji = { question: '🙂'.repeat(400), context: { standing_topic: '🙂'.repeat(60) } };
+    const m = qt.standingAnswerMemory(emoji, '🙂'.repeat(600), true, now);
+    const whole = (text: string) => !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(text);
+    expect(whole(m?.title ?? '')).toBe(true);
+    expect(whole(m?.gist ?? '')).toBe(true);
+    expect(whole(m?.body ?? '')).toBe(true);
+    expect(Array.from(m?.title ?? '')).toHaveLength(40);
+  });
+
   it('is not kept when no topic was declared, when the person held it to this run, or when the answer is empty', () => {
     expect(qt.standingAnswerMemory(ticket({ decision: '担当を決める' }), 'TAKA', true, now)).toBeNull();
     expect(qt.standingAnswerMemory(ticket({ standing_topic: '担当：クレーム' }), 'TAKA', false, now)).toBeNull();

@@ -248,14 +248,19 @@ export function standingAnswerMemory(
   const said = answer.trim();
   if (!keep || !topic || !said) return null;
   const day = now.toISOString().slice(0, 10);
-  const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
-  const kept = cut(said, QUESTION_POLICY.maxStandingAnswerChars);
-  const asked = cut(ticket.question.trim(), QUESTION_POLICY.maxStandingQuestionChars);
+  // Cut by character, not by UTF-16 unit: a cut through the middle of
+  // an emoji leaves half a character, which the database refuses.
+  const cut = (text: string, max: number, mark = "") => {
+    const chars = Array.from(text);
+    return chars.length > max ? `${chars.slice(0, max - mark.length).join("")}${mark}` : text;
+  };
+  const kept = cut(said, QUESTION_POLICY.maxStandingAnswerChars, "…");
+  const asked = cut(ticket.question.trim(), QUESTION_POLICY.maxStandingQuestionChars, "…");
   return {
     kind: "fact",
     topic,
-    title: topic.slice(0, 40),
-    gist: `${topic}：${kept.replace(/\s+/g, " ")}`.slice(0, 240),
+    title: cut(topic, 40),
+    gist: cut(`${topic}：${kept.replace(/\s+/g, " ")}`, 240),
     body: `人の答え：${kept}\n\nAI が付けた話題：${topic}\nAI が聞いた質問：${asked}\n決まった日：${day}`,
   };
 }
