@@ -194,8 +194,8 @@ function write(key: string, v: string) {
 }
 
 export function getCachedTimelineScale(): TimelineScale {
-  if (typeof window === 'undefined') return 'month';
-  return localStorage.getItem(TIMELINE_SCALE_KEY) === 'quarter' ? 'quarter' : 'month';
+  if (typeof window === 'undefined') return 'quarter';
+  return localStorage.getItem(TIMELINE_SCALE_KEY) === 'month' ? 'month' : 'quarter';
 }
 export function setCachedTimelineScale(v: TimelineScale) { write(TIMELINE_SCALE_KEY, v); }
 export function getCachedTimelineMonthsBack(): number { return readInt(TIMELINE_BACK_KEY, TIMELINE_MONTHS_BACK_RANGE); }

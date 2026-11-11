@@ -5,7 +5,7 @@ import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, close
 import { SortableContext, useSortable, horizontalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { constrainTabDrag } from './tabDrag';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, FileText, Flag, Columns3 } from '@/ui/icons';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, FileText, Columns3 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { CollapsingTabs } from '@/Function/shared/CollapsingTabs';
@@ -47,7 +47,6 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   calendar:    { title: 'Calendar',   Icon: Calendar },
   workers:     { title: 'Team',       Icon: Users },
   resource:    { title: 'Team',       Icon: Users },
-  custom_view: { title: 'Custom view', Icon: Flag },
   note:        { title: 'Note',       Icon: FileText },
   flow:        { title: 'Board',      Icon: Columns3 },
 };
@@ -59,7 +58,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
 // (open NotePicker → persist note_id → render embed) isn't wired here yet —
 // the type stays in the union for the Element detail's Note link.
 const CREATE_TAB_ORDER: ObjectTabType[] = [
-  'overview', 'elements', 'flow', 'gantt', 'calendar', 'workers', 'custom_view',
+  'overview', 'elements', 'flow', 'gantt', 'calendar', 'workers',
 ];
 
 interface ContextMenu {

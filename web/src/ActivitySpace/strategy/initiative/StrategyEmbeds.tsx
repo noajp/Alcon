@@ -56,7 +56,7 @@ function ObjectsGantt({ objects, onChanged }: { objects: AlconObjectWithChildren
   if (!objects.length) return <p className="rounded-md border border-border/60 px-3 py-2.5 text-[13px] text-muted-foreground">{t('No Objects yet.')}</p>;
   return (
     <div className="h-[320px] overflow-hidden rounded-md border border-border/60">
-      <GanttView elements={bars} leftHeaderLabel="Objects" onRefresh={onChanged}
+      <GanttView defaultZoom="quarter" elements={bars} leftHeaderLabel="Objects" onRefresh={onChanged}
         onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })} />
     </div>
   );

@@ -14,7 +14,7 @@ import type { ElementWithDetails, AlconObject } from '@/types/database';
 import { calendarEntries, occursOn, layoutTimedEntries, layoutWeekSpans, type CalendarEntry } from './schedule';
 import { COLOR_PALETTE } from './calendarColorPalette';
 import { updateElement } from '@/hooks/useSupabase';
-import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
+import { statusColor, statusLabel } from '@/shared/designTokens';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -27,6 +27,8 @@ interface CalendarViewProps {
   /** The day the grid is on, when a parent (the Calendar sidebar) owns it. */
   date?: Date;
   onDateChange?: (date: Date) => void;
+  /** The view it opens at: Day for a person's own, Month for an Object's. */
+  defaultMode?: CalendarMode;
   /** The Space's events (plans that are not work), drawn filled. */
   events?: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
@@ -36,13 +38,12 @@ interface CalendarViewProps {
   onCreateEvent?: (slot: { date: string; startMinutes: number | null; endMinutes?: number }) => void;
 }
 
-type CalendarMode = 'day' | 'week' | 'month';
-
-// Soft card pair per status — the subtle ground plus the status hue, straight
+export type CalendarMode = 'day' | 'week' | 'month';
 // off the STATUS table so a calendar card and a list-row mark agree.
-function statusCardClasses(status?: string | null): string {
-  const meta = STATUS[status as StatusKey] ?? STATUS.todo;
-  return `${meta.bg} text-foreground`;
+// A bar's ground: its color mixed into the card strongly enough to stand
+// off the grid in both themes (the status "subtle" tints vanish on a dark card).
+function barGround(color: string): string {
+  return `color-mix(in srgb, ${color} 38%, var(--card))`;
 }
 
 // Day names follow the interface language (Settings > Language); `day` is
@@ -54,7 +55,7 @@ function weekdayLabel(locale: string, day: number): string {
 // Convert hex to soft pastel inline style (bg + text)
 function pastelFromHex(hex: string): { backgroundColor: string; color: string; dotColor: string } {
   return {
-    backgroundColor: `color-mix(in srgb, ${hex} 16%, var(--surface-bg))`,
+    backgroundColor: barGround(hex),
     color: 'var(--text-primary)',
     dotColor: hex,
   };
@@ -109,7 +110,7 @@ function formatTimeShort(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange, events, onEventClick, onCreateEvent }: CalendarViewProps) {
+export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh, date, onDateChange, events, onEventClick, onCreateEvent, defaultMode = 'week' }: CalendarViewProps) {
   const { t, locale } = useI18n();
   const elements = useMemo(() => calendarEntries(sourceElements, objects, events), [sourceElements, objects, events]);
   const onElementClick = (entry: CalendarEntry) => {
@@ -126,7 +127,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
   };
   const [selectedElement, setSelectedElement] = useState<CalendarEntry | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [mode, setMode] = useState<CalendarMode>('week');
+  const [mode, setMode] = useState<CalendarMode>(defaultMode);
   // Day-cell scheduler — click an empty spot on a day to drop an unscheduled
   // Element there (sets its due_date). Anchored at the click position.
   const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
@@ -313,7 +314,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
         dotColor: p.dotColor,
       };
     }
-    return { className: statusCardClasses(element.status), style: { borderLeft: `3px solid ${statusColor(element.status)}` }, dotColor: undefined };
+    return { className: 'text-foreground', style: { backgroundColor: barGround(statusColor(element.status)), borderLeft: `3px solid ${statusColor(element.status)}` }, dotColor: undefined };
   };
 
   const today = new Date();
