@@ -874,6 +874,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Nothing else is waiting on you.': ['ほかに判断待ちはありません。', '더 기다리는 판단이 없습니다.', 'Plus rien n’attend votre décision.', 'No hay nada más esperando tu decisión.'],
   '{n} more labels': ['ほかに {n} 個のラベル', '라벨 {n}개 더', '{n} autres étiquettes', '{n} etiquetas más'],
   'The work this question is about': ['この質問が関わる仕事', '이 질문이 관련된 작업', 'Le travail concerné par cette question', 'El trabajo al que se refiere esta pregunta'],
+  'Needs you': ['あなた待ち', '내 차례', 'Vous attend', 'Te espera'],
+  'A question about this Element is waiting for your answer, in the Inbox.': ['この Element についての質問が、受信箱であなたの回答を待っています。', '이 Element에 대한 질문이 받은편지함에서 답변을 기다리고 있습니다.', 'Une question sur cet Element attend votre réponse dans la boîte de réception.', 'Una pregunta sobre este Element espera tu respuesta en la bandeja de entrada.'],
   'Could not send the answer. Try again.': ['回答を送れませんでした。もう一度お試しください。', '답변을 보내지 못했습니다. 다시 시도하세요.', 'Impossible d’envoyer la réponse. Réessayez.', 'No se pudo enviar la respuesta. Inténtalo de nuevo.'],
   'Source': ['出どころ', '출처', 'Source', 'Origen'],
   'Material provenance': ['材料の出どころ', '재료의 출처', 'Provenance du matériau', 'Procedencia del material'],
