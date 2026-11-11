@@ -81,3 +81,42 @@ describe('receivedSubject', () => {
     expect(rc.receivedSubject(null)).toBe('');
   });
 });
+
+describe('what a reader may take for a line break', () => {
+  it('quotes after every kind of line break, not only CR and LF', () => {
+    const body = ['a', 'b', 'c', 'd', 'e', 'f'].join('|').replace(/\|/g, () => seps.shift() as string);
+    const lines = quoted(rc.renderReceived({ body }, 100_000));
+    expect(lines).toEqual(['> a', '> b', '> c', '> d', '> e', '> f']);
+  });
+  const seps = ['\u2028', '\u2029', '\u0085', '\v', '\f'];
+});
+
+describe('nothing received is dropped or flattened', () => {
+  it('keeps a key named __proto__', () => {
+    const payload = JSON.parse('{"__proto__": {"secret": "x"}, "body": "b"}');
+    const out = rc.renderReceived(payload, 100_000);
+    expect(out).toContain('"__proto__"');
+    expect(out).toContain('"secret": "x"');
+    expect(quoted(out).every((l: string) => l.startsWith('>'))).toBe(true);
+  });
+
+  it('keeps the lines of a multi-line value it does not recognise', () => {
+    const out = rc.renderReceived({ body: 'b', notes: 'line1\nline2\n    code' }, 100_000);
+    expect(out).toContain('"notes": "line1\\nline2\\n    code"');
+    expect(out).not.toContain('notes：line1 line2 code');
+  });
+});
+
+describe('receivedTitle', () => {
+  it('leads with what it is about, then the automation', () => {
+    expect(rc.receivedTitle(mail, '問い合わせの受付')).toBe('先週の空調点検のあと、冷房が効かなくなりました — 問い合わせの受付');
+    expect(rc.receivedTitle({ body: 'x' }, '問い合わせの受付')).toBe('');
+  });
+
+  it('is capped by whole characters', () => {
+    const title = rc.receivedTitle({ subject: 'a' + '🙂'.repeat(119) }, 'あ'.repeat(200));
+    expect(Array.from(title)).toHaveLength(200);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(title)).toBe(false);
+  });
+});
+

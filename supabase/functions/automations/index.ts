@@ -64,7 +64,7 @@ import { nextCronRun } from "../_shared/cron.ts";
 import { inQuietHours, nextHeartbeatAt, quietAdjusted, quietHoursOf } from "../_shared/heartbeatSchedule.ts";
 import { sessionFor } from "../_shared/actAs.ts";
 import { checkHarness, parseDefinition } from "../_shared/definition.ts";
-import { receivedSubject, renderReceived } from "../_shared/receivedContent.ts";
+import { receivedTitle, renderReceived } from "../_shared/receivedContent.ts";
 import { usableDefinition } from "../_shared/definitionResolution.ts";
 import { appendDecisionResults, type LoopState, type Msg, type PendingApproval } from "../_shared/agentLoop.ts";
 import { expiredApprovalResults, withApprovalDecision } from "../_shared/copilotSession.ts";
@@ -267,7 +267,7 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
     if (!workerId) return await fail("この Space に、Alcon で動く AI Worker がいません。");
 
     const now = new Date();
-    const subject = receivedSubject(payload);
+    const receivedAs = receivedTitle(payload, a.name);
     const how = source === "webhook" ? "外部からの受信で" : source === "manual" ? "手動で" : "予定の時刻に";
     // What was received, written for the person who opens the Element as
     // much as for the run: who, about what, when, then the words — all of
@@ -281,9 +281,7 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
         new Intl.DateTimeFormat("ja-JP", { timeZone: a.timezone, year: "numeric", month: "numeric", day: "numeric" }).format(now));
     const title = a.title_template
       ? renderTemplate(a.title_template).slice(0, 200) || `${a.name} — ${stamp(now, a.timezone)}`
-      // What it is about leads: a list of these Elements shows the start
-      // of each title, and the automation's name is the same on all of them.
-      : subject ? `${subject} — ${a.name}`.slice(0, 200) : `${a.name} — ${stamp(now, a.timezone)}`;
+      : receivedAs || `${a.name} — ${stamp(now, a.timezone)}`;
     const workflowText = steps ? `\n\n## ワークフロー\nこの順に進めてください。\n\n${steps}` : "";
     const description = a.description_template
       ? `${renderTemplate(a.description_template)}${workflowText}${input}`

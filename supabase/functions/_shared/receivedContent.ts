@@ -38,9 +38,17 @@ function pick(payload: Record<string, unknown>, keys: readonly string[]): { key:
   return null;
 }
 
+/** Every character a reader may take for a line break: CR, LF, and the
+ *  vertical tab, form feed, NEL and Unicode line/paragraph separators. */
+const LINE_BREAK = /\r\n?|[\n\v\f\u0085\u2028\u2029]/g;
+
 /** Pure. One quoted block: every line prefixed, blank lines kept. */
 const quote = (text: string): string =>
-  text.replace(/\r\n?/g, "\n").split("\n").map((line) => (line ? `> ${line}` : ">")).join("\n");
+  text.replace(LINE_BREAK, "\n").split("\n").map((line) => (line ? `> ${line}` : ">")).join("\n");
+
+/** Pure. Whether a value spans lines — such a value keeps its shape
+ *  (as JSON) rather than being flattened onto a field's line. */
+const multiLine = (text: string): boolean => text.search(LINE_BREAK) !== -1;
 
 /** Pure. A one-line value, so a field can never break out of its line. */
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
@@ -51,6 +59,15 @@ export function receivedSubject(payload: unknown, max = 120): string {
   if (!isRecord(payload)) return "";
   const subject = pick(payload, SUBJECT_KEYS);
   return subject ? Array.from(oneLine(subject.value)).slice(0, max).join("") : "";
+}
+
+/** Pure. The Element's title for a received content: what it is about
+ *  leads, the automation's name follows — a list of these Elements
+ *  shows the start of each title, and the name is the same on all of
+ *  them. Capped by whole characters. Empty when there is no subject. */
+export function receivedTitle(payload: unknown, automationName: string, max = 200): string {
+  const subject = receivedSubject(payload);
+  return subject ? Array.from(`${subject} — ${automationName}`).slice(0, max).join("") : "";
 }
 
 /**
@@ -79,11 +96,13 @@ export function renderReceived(payload: unknown, maxChars: number): string {
     const body = pick(payload, BODY_KEYS);
     if (body) used.add(body.key);
     // Whatever else came along: simple values as lines, the rest as JSON.
-    const nested: Record<string, unknown> = {};
+    // The holder has no prototype, so a key named __proto__ is kept as
+    // a key like any other instead of vanishing into the object.
+    const nested: Record<string, unknown> = Object.create(null);
     for (const [key, value] of Object.entries(payload)) {
       if (used.has(key)) continue;
       const simple = scalar(value);
-      if (simple !== null) lines.push(`${oneLine(key)}：${oneLine(simple)}`);
+      if (simple !== null && !multiLine(simple)) lines.push(`${oneLine(key)}：${simple}`);
       else if (value !== null && value !== undefined && value !== "") nested[key] = value;
     }
     if (body) {
