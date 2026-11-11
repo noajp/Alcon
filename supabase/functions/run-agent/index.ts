@@ -150,7 +150,7 @@ import {
   standingAnswerMemory, validateAskInput, validateTicketAnswer, type QuestionTicketRow,
 } from "../_shared/questionTickets.ts";
 import { writeDurableMemory } from "../_shared/memoryTools.ts";
-import { explainRunError, runErrorLine, SAME_CAUSE_QUIET_MS } from "../_shared/runErrorExplain.ts";
+import { explainRunError, runErrorLine, SAME_CAUSE_QUIET_MS, toldOnce } from "../_shared/runErrorExplain.ts";
 import {
   COMPENSATION_REASONS, compensationReportHasContent, compensationReportText,
   compensationSummaryOf, loadCompensationReport, mergeCompensationBatchOutcome,
@@ -649,11 +649,14 @@ async function pauseOnError(admin: SupabaseClient, run: Run, message: string) {
     .eq("id", run.id).eq("status", "running");
   if (run.triggered_by) {
     // A cause that stops every run (an empty balance, a dead key) is told
-    // once while its notice still sits unread, not once per paused run.
+    // once while its notice still sits in the Inbox unread, not once per
+    // paused run. A passing cause is told for each run: each has to be
+    // taken up again on its own.
     let told = false;
-    if (known) {
+    if (toldOnce(why.cause)) {
       const { data } = await admin.from("notifications").select("id")
-        .eq("recipient_id", run.triggered_by).eq("kind", "status_change").eq("title", why.title).eq("is_read", false)
+        .eq("recipient_id", run.triggered_by).eq("kind", "status_change").eq("title", why.title)
+        .eq("is_read", false).eq("is_archived", false)
         .gte("created_at", new Date(Date.now() - SAME_CAUSE_QUIET_MS).toISOString()).limit(1);
       told = (data ?? []).length > 0;
     }

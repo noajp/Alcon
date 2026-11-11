@@ -14,7 +14,10 @@ describe('explainRunError', () => {
     expect(e.cause).toBe('balance');
     expect(e.title).toBe('AI の利用残高がなくなったため、止まっています');
     expect(e.body).toContain('残高を足す');
-    expect(e.body).toContain('Resume');
+    expect(e.body).toContain('続きから再開');
+    // The same words are shown on an Element, in a conversation and in the Inbox.
+    expect(e.body).not.toContain('Element');
+    expect(e.body).not.toContain('Resume');
     expect(e.title + e.body).not.toContain('{');
     expect(e.title + e.body).not.toContain('req_');
   });
@@ -23,7 +26,11 @@ describe('explainRunError', () => {
     expect(ex.explainRunError('401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}').cause).toBe('key');
     expect(ex.explainRunError('429 {"type":"error","error":{"type":"rate_limit_error","message":"..."}}').cause).toBe('rate_limit');
     expect(ex.explainRunError('529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}').cause).toBe('overloaded');
-    expect(ex.explainRunError('insufficient_quota: You exceeded your current quota').cause).toBe('balance');
+    expect(ex.explainRunError('402 Insufficient Balance').cause).toBe('balance');
+    expect(ex.explainRunError('401 Unauthorized').cause).toBe('key');
+    // A 429 that is really an empty quota is the balance, not a wait.
+    expect(ex.explainRunError('429 {"error":{"type":"insufficient_quota","message":"You exceeded your current quota"}}').cause).toBe('balance');
+    expect(ex.explainRunError('429 {"error":{"type":"engine_overloaded_error","message":"The engine is currently overloaded"}}').cause).toBe('overloaded');
   });
 
   it('does not guess: an unrecognised error keeps its own words', () => {
@@ -33,6 +40,10 @@ describe('explainRunError', () => {
     expect(ex.explainRunError('row 4290 could not be written').cause).toBe('unknown');
     expect(ex.explainRunError('Element 401 が見つかりません').cause).toBe('unknown');
     expect(ex.explainRunError('ELE-429 を更新できませんでした（503 行目）').cause).toBe('unknown');
+    // Not the provider's answer, whatever words it carries.
+    expect(ex.explainRunError('経過を保存できませんでした: Invalid API key').cause).toBe('unknown');
+    expect(ex.explainRunError('経過を保存できませんでした: Service Unavailable').cause).toBe('unknown');
+    expect(ex.explainRunError('Strategy を読めませんでした: rate limit exceeded').cause).toBe('unknown');
   });
 });
 
@@ -50,3 +61,14 @@ describe('runErrorLine', () => {
     expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(line)).toBe(false);
   });
 });
+
+describe('toldOnce', () => {
+  it('holds for what stops every run, not for what passes', () => {
+    expect(ex.toldOnce('balance')).toBe(true);
+    expect(ex.toldOnce('key')).toBe(true);
+    expect(ex.toldOnce('rate_limit')).toBe(false);
+    expect(ex.toldOnce('overloaded')).toBe(false);
+    expect(ex.toldOnce('unknown')).toBe(false);
+  });
+});
+

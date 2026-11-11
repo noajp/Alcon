@@ -5,9 +5,9 @@
 // body — which says neither what happened nor who can put it right.
 // This reads the raw message for the causes that are somebody's to fix
 // (the AI provider's balance, its key, its rate limit, its load) and
-// says, for each, what happened and what to do. A cause is read from
-// the provider's own words, or from the status code the message opens
-// with — never from a number that merely appears somewhere in it. Anything it does not
+// says, for each, what happened and what to do. Only a message that
+// opens with an HTTP status is read as the provider's answer; within
+// it, the cause is the provider's own words or that status. Anything it does not
 // recognise keeps the plain "paused on an error" wording with the raw
 // text beside it, so nothing is hidden behind a guess.
 //
@@ -25,38 +25,57 @@ export interface RunErrorExplanation {
   body: string;
 }
 
+// The wording names no place to press: the same explanation is shown on
+// an Element's run, in a Strategy conversation and in the Inbox.
 const CAUSES: { cause: Exclude<RunErrorCause, "unknown">; test: RegExp; title: string; body: string }[] = [
   {
     cause: "balance",
-    test: /credit balance is too low|insufficient[_ ](balance|quota|credits?)|billing[_ ]hard[_ ]limit|payment required|^\s*402\b/i,
+    test: /credit balance is too low|insufficient[_ ](balance|quota|credits?)|exceeded your current quota|billing[_ ]hard[_ ]limit|payment required|^402\b/i,
     title: "AI の利用残高がなくなったため、止まっています",
-    body: "AI の提供元で残高を足すと動かせます。足したあと、この Element の Resume で続きから再開します。それまで、AI に任せた仕事はどれも進みません。",
+    body: "AI の提供元で残高を足すと動かせます。足したあと、止まった仕事は続きから再開できます。それまで、AI に任せた仕事はどれも進みません。",
   },
   {
     cause: "key",
-    test: /invalid x-api-key|invalid api key|incorrect api key|authentication_error/i,
+    test: /invalid x-api-key|invalid api key|incorrect api key|authentication_error|^401\b/i,
     title: "AI につなぐ鍵が使えないため、止まっています",
-    body: "AI の提供元の鍵が無効か、取り消されています。設定で鍵を入れ直したあと、この Element の Resume で続きから再開します。",
-  },
-  {
-    cause: "rate_limit",
-    test: /rate[_ ]limit|too many requests|^\s*429\b/i,
-    title: "AI の利用が一時的に上限に達したため、止まっています",
-    body: "少し待ってから、この Element の Resume で続きから再開してください。何度も起きるときは、AI の提供元で上限を確かめてください。",
+    body: "AI の提供元の鍵が無効か、取り消されています。設定で鍵を入れ直すと、止まった仕事は続きから再開できます。それまで、AI に任せた仕事はどれも進みません。",
   },
   {
     cause: "overloaded",
-    test: /overloaded_error|\boverloaded\b|service unavailable|^\s*(529|503)\b/i,
+    test: /overloaded|service unavailable|^(529|503)\b/i,
     title: "AI の提供元が混み合っているため、止まっています",
-    body: "こちらで直すものはありません。少し待ってから、この Element の Resume で続きから再開してください。",
+    body: "こちらで直すものはありません。少し待ってから、止まった仕事を再開してください。",
+  },
+  {
+    cause: "rate_limit",
+    test: /rate[_ ]limit|too many requests|^429\b/i,
+    title: "AI の利用が一時的に上限に達したため、止まっています",
+    body: "少し待ってから、止まった仕事を再開してください。何度も起きるときは、AI の提供元で上限を確かめてください。",
   },
 ];
+
+/** The causes that stop every run until somebody acts. These are told
+ *  once; a passing one (a rate limit, a busy provider) is told for each
+ *  run it stopped, since each has to be taken up again on its own. */
+const STOPS_EVERY_RUN: ReadonlySet<RunErrorCause> = new Set(["balance", "key"]);
+
+/** Pure. Whether one notice stands for every run this cause stops. */
+export function toldOnce(cause: RunErrorCause): boolean {
+  return STOPS_EVERY_RUN.has(cause);
+}
+
+/** The provider's answer opens with its HTTP status ("400 {...}",
+ *  "402 Insufficient Balance"). An error that does not — a database
+ *  write that failed, an exception in the run's own code — is not the
+ *  provider's, whatever words it happens to contain. */
+const PROVIDER_ANSWER = /^\s*[45]\d{2}\b/;
 
 const UNKNOWN_TITLE = "エラーで一時停止しました";
 
 /** Pure. What a raw run error means for the person who started it. */
 export function explainRunError(raw: string): RunErrorExplanation {
-  const hit = CAUSES.find((c) => c.test.test(raw));
+  const answer = PROVIDER_ANSWER.test(raw) ? raw.trim() : null;
+  const hit = answer ? CAUSES.find((c) => c.test.test(answer)) : undefined;
   if (hit) return { cause: hit.cause, title: hit.title, body: hit.body };
   return { cause: "unknown", title: UNKNOWN_TITLE, body: raw };
 }
