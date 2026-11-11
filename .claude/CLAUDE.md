@@ -76,7 +76,7 @@ root 直下は `supabase/`（migrations と functions。ここにだけ置く）
 7. **Object のネスト禁止**。Element の multi-homing は `object_id` + `element_objects` の二重書き
 8. 日付は `Function/shared/dateUtils.ts` を通す。Phase の期間は `end_date` 当日を含める。暦日を `new Date('yyyy-MM-dd')` で読まない
 9. 色はトークン（`globals.css` / `shared/designTokens.ts`）だけ。「Task」と呼ばず「Element」。recharts を使うコンポーネントは `'use client'`
-10. **AI の入口**：汎用の AI は AI 画面（Copilot）だけに置き、画面ごとに汎用チャットを置かない。対象に結び付いた AI の仕事（Strategy の会話、Planner、Element の実行）は置ける。ただし、対象の範囲に限られ、成果が記録として残り、承認の境界を越えないものだけ。Copilot は開いている対象を文脈として受け取るが、入口は AI 画面のまま。どの機能も AI なしで動くように作る
+10. **AI の入口**：汎用の AI は Agent 画面（Copilot）だけに置き、画面ごとに汎用チャットを置かない。対象に結び付いた AI の仕事（Strategy の会話、Planner、Element の実行）は置ける。ただし、対象の範囲に限られ、成果が記録として残り、承認の境界を越えないものだけ。Copilot は開いている対象を文脈として受け取るが、入口は Agent 画面のまま。どの機能も AI なしで動くように作る
 
 ## Supabase
 
