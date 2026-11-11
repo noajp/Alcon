@@ -16,7 +16,8 @@ async function fetchNotifications(opts: {
 }): Promise<Notification[]> {
   let q = supabase
     .from('notifications')
-    .select('*')
+    // The Element it is about, so the list can say what each one concerns.
+    .select('*, element:elements(title)')
     .eq('recipient_id', opts.recipientId)
     .eq('is_archived', false)
     .order('created_at', { ascending: false });

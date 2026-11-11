@@ -1,10 +1,14 @@
 'use client';
 
-import { SidebarReveal } from '@/Function/shared/SidebarReveal';
-import { useState } from 'react';
+import { inboxRowText } from './inboxRow';
+import { Panel, PanelBody, PanelHeader } from '@/Function/shared/PanelLayout';
+
+import { useMemo, useState } from 'react';
 import { Archive, Check, CheckCheck, Inbox, ListFilter, MoreHorizontal } from '@/ui/icons';
 import type { Notification } from '@/hooks/useSupabase';
 import { notificationKindMeta } from '@/Function/shared/notificationKinds';
+import { questionTicketIdsOf, splitInbox } from '@/Function/shared/inboxModel';
+import { useOpenQuestionTickets } from '@/AIP/ai/agentData';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/ui/dropdown-menu';
@@ -42,34 +46,52 @@ export function InboxList({ onNavigate, onViewChange, onOpen }: InboxListProps) 
   const { t, locale } = useI18n();
   const inbox = useInbox({ onNavigate, onViewChange });
   const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE);
+  // What waits on the person leads the list: questions whose ticket still
+  // stands open (inboxModel.ts). The tickets are re-read when a notification
+  // arrives, when one is picked, and when the question card sends an answer.
+  const ticketIds = useMemo(() => questionTicketIdsOf(inbox.notifications), [inbox.notifications]);
+  const openTickets = useOpenQuestionTickets(ticketIds, [inbox.revision, inbox.refreshed, inbox.notifications.length]);
+  const { waiting, rest } = useMemo(() => splitInbox(inbox.notifications, openTickets), [inbox.notifications, openTickets]);
   // Keep the notification being read in the unread view until the user leaves it.
+  // A waiting question stays whether or not it was read: reading is not answering.
   const visible = inbox.unreadOnly
-    ? inbox.notifications.filter(n => !n.is_read || n.id === inbox.selectedId)
-    : inbox.notifications;
+    ? rest.filter(n => !n.is_read || n.id === inbox.selectedId)
+    : rest;
   const rows = visible.slice(0, renderLimit);
+  const rowActions = {
+    onSelect: (n: Notification) => { if (inbox.select(n)) onOpen?.(); },
+    onToggleRead: inbox.toggleRead, onArchive: inbox.archive,
+  };
 
   return (
-    <section aria-label={t('Notifications')}>
-      {/* The page's title row: Inbox heads the list, level with the other
-          pages' 50px headers (the island beside it shows the open one). */}
-      <header className="sticky -top-1 z-10 -mx-1.5 -mt-1 mb-1 flex h-[50px] items-center gap-1.5 border-b border-border/60 bg-card px-3">
-        <SidebarReveal />
-        <h2 className="text-[13px] font-medium text-foreground">{t('Inbox')}</h2>
-        {inbox.unreadCount > 0 && <span className="text-[11px] tabular-nums text-muted-foreground">{inbox.unreadCount}</span>}
-        <div className="flex-1" />
-        <ButtonAppearanceProvider appearance="navigation">
+    <Panel label={t('Notifications')}>
+      {/* The title row stays; the list scrolls under it. */}
+      <PanelHeader title={t('Inbox')} count={inbox.unreadCount} actions={<>
         <Button variant="ghost" size="icon-xs" disabled={inbox.unreadCount === 0} onClick={() => void inbox.markAllRead()} title={t('Mark all read')} aria-label={t('Mark all read')}><CheckCheck size={13} /></Button>
         <Button variant={inbox.unreadOnly ? 'secondary' : 'ghost'} size="icon-xs" aria-pressed={inbox.unreadOnly} onClick={() => { inbox.setUnreadOnly(!inbox.unreadOnly); setRenderLimit(RENDER_PAGE_SIZE); }} title={t('Unread only')} aria-label={t('Unread only')}><ListFilter size={13} /></Button>
-        </ButtonAppearanceProvider>
-      </header>
+      </>} />
+      <PanelBody>
       {inbox.loading ? <p role="status" className="py-8 text-center text-[12px] text-muted-foreground">{t('Loading…')}</p>
-        : rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
-        : <ul className="mt-1 space-y-0.5">
-          {rows.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale}
-            onSelect={n => { if (inbox.select(n)) onOpen?.(); }} onToggleRead={inbox.toggleRead} onArchive={inbox.archive} />)}
-        </ul>}
+        : waiting.length === 0 && rows.length === 0 ? <p className="px-2 py-8 text-center text-[12px] text-muted-foreground">{t(inbox.unreadOnly ? "You're all caught up!" : 'No notifications yet.')}</p>
+        : <>
+          {waiting.length > 0 && (
+            <>
+              <h3 className="mt-2 flex items-center gap-1.5 px-2 text-[11px] font-medium text-[var(--status-info)]">
+                {t('Waiting on you')}<span className="tabular-nums">{waiting.length}</span>
+              </h3>
+              <ul className="mt-1 space-y-0.5">
+                {waiting.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale} {...rowActions} />)}
+              </ul>
+              {rows.length > 0 && <h3 className="mt-3 px-2 text-[11px] font-medium text-muted-foreground">{t('Everything else')}</h3>}
+            </>
+          )}
+          <ul className="mt-1 space-y-0.5">
+            {rows.map(n => <InboxRow key={n.id} notification={n} selected={inbox.selectedId === n.id} locale={locale} {...rowActions} />)}
+          </ul>
+        </>}
       {visible.length > renderLimit && <div className="flex justify-center py-2"><Button variant="ghost" size="xs" onClick={() => setRenderLimit(limit => limit + RENDER_PAGE_SIZE)}>{t('Show more')}</Button></div>}
-    </section>
+      </PanelBody>
+    </Panel>
   );
 }
 
@@ -84,6 +106,8 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
   const { t } = useI18n();
   const meta = notificationKindMeta(n.kind);
   const Icon = meta.icon;
+  // The list's read carries the Element each one is about (notificationData).
+  const text = inboxRowText(n as Notification & { element?: { title: string } | null });
   // The same two actions sit behind the row's "⋯" and a right-click, so the
   // menu is reachable with either hand.
   return (
@@ -99,16 +123,17 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
         {/* What the notification is about leads; who sent it and what kind
             it is follow, small — a list of seven "Status" rows says nothing. */}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className={`min-w-0 flex-1 truncate text-[12px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{n.title}</span>
-            <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
-            {!n.is_read && <span aria-label={t('Unread')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
+          {/* What it is about, then what happened and who, then the detail. */}
+          <span className="flex items-start gap-2">
+            <span className={`min-w-0 flex-1 line-clamp-2 break-words text-[12px] leading-[17px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{text.subject}</span>
+            <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="mt-px shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
+            {!n.is_read && <span aria-label={t('Unread')} className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
           </span>
-          <span className="block truncate text-[11px] text-muted-foreground">
-            {n.actor_name && <><span>{n.actor_name}</span> · </>}
-            <span>{t(meta.label)}</span>
-            {n.body && <> · <span>{n.body}</span></>}
+          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+            <span>{text.event ?? t(meta.label)}</span>
+            {n.actor_name && !text.event?.includes(n.actor_name) && <> · <span>{n.actor_name}</span></>}
           </span>
+          {text.detail && <span className="mt-0.5 line-clamp-2 break-all text-[11px] leading-4 text-muted-foreground/80">{text.detail}</span>}
         </span>
       </button>
       <DropdownMenu>

@@ -43,6 +43,7 @@ function rowToNode(r: NoteRow): NoteNode {
     parentId: r.parent_id,
     linkedObjectId: r.linked_object_id ?? null,
     createdBy: r.created_by,
+    updatedAt: r.updated_at,
   };
 }
 

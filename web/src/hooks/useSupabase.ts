@@ -72,7 +72,6 @@ export {
   isElementSaveRefused,
   useElementBlockers,
   useElementById,
-  useParentElement,
   useSubElements,
   type SubElement,
 } from '@/hooks/elementData';

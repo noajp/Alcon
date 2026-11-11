@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Archive, Check } from '@/ui/icons';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -13,7 +14,9 @@ import { HeartbeatInboxCard } from './HeartbeatInboxCard';
 import { useInvitation } from '@/Function/membership/invitations';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
-import { selectInboxNotification, useInbox, useNotificationElement } from './useInbox';
+import { refreshInbox, selectInboxNotification, useInbox, useNotificationElement } from './useInbox';
+import { questionTicketIdsOf, splitInbox } from '@/Function/shared/inboxModel';
+import { useOpenQuestionTickets } from '@/AIP/ai/agentData';
 
 interface InboxViewProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
@@ -24,7 +27,17 @@ interface InboxViewProps {
  *  that picks it lives in the AppSidebar (`InboxList`). */
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const { t, locale } = useI18n();
-  const { selected, revision, toggleRead, archive, openObject } = useInbox({ onNavigate, onViewChange });
+  const { selected, revision, refreshed, notifications, select, toggleRead, archive, openObject } = useInbox({ onNavigate, onViewChange });
+  // What still waits on the person besides the open notification, so an
+  // answered question can lead straight to the next (inboxModel.ts).
+  const ticketIds = useMemo(() => questionTicketIdsOf(notifications), [notifications]);
+  const openTickets = useOpenQuestionTickets(ticketIds, [revision, refreshed, notifications.length]);
+  // null while the open tickets are not known: the card then says nothing
+  // about what else waits, rather than "nothing" on a guess.
+  const otherWaiting = useMemo(
+    () => (openTickets ? splitInbox(notifications, openTickets).waiting.filter(n => n.id !== selected?.id) : null),
+    [notifications, openTickets, selected?.id],
+  );
   const elementId = selected?.element_id;
   const { detail, refresh } = useNotificationElement(elementId, revision);
 
@@ -74,7 +87,15 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
         </div>
       ) : selected.question_ticket_id ? (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
-          <QuestionTicketInboxCard key={selected.question_ticket_id} ticketId={selected.question_ticket_id} />
+          <QuestionTicketInboxCard key={selected.question_ticket_id} ticketId={selected.question_ticket_id}
+            // The list and this pane re-read which questions still wait.
+            // The selection is not touched: the answer can land seconds
+            // later, when the person is already reading something else.
+            onAnswered={refreshInbox}
+            // The next one opens the way a row does (read, selected).
+            nextWaiting={otherWaiting === null ? undefined
+              : otherWaiting.length > 0 ? { count: otherWaiting.length, open: () => { select(otherWaiting[0]); } }
+              : null} />
         </article>
       ) : selected.agent_action_id ? (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
