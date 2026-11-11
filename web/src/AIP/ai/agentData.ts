@@ -461,7 +461,7 @@ export interface OpenQuestionTicket { elementId: string | null; elementTitle: st
 /** Which of these tickets still stand open, each with the Element it
  *  rests — the Inbox's waiting group reads this. One read for the
  *  tickets, one for their Elements' titles. */
-export async function fetchOpenQuestionTickets(ticketIds: readonly string[]): Promise<Map<string, OpenQuestionTicket>> {
+async function fetchOpenQuestionTickets(ticketIds: readonly string[]): Promise<Map<string, OpenQuestionTicket>> {
   const open = new Map<string, OpenQuestionTicket>();
   if (ticketIds.length === 0) return open;
   const { data, error } = await supabase
