@@ -50,8 +50,9 @@ const quote = (text: string): string =>
  *  (as JSON) rather than being flattened onto a field's line. */
 const multiLine = (text: string): boolean => text.search(LINE_BREAK) !== -1;
 
-/** Pure. A one-line value, so a field can never break out of its line. */
-const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
+/** Pure. A one-line value, so a field can never break out of its line:
+ *  every run of white space — and NEL, which \s leaves out — is a space. */
+const oneLine = (text: string): string => text.replace(/[\s\u0085]+/g, " ").trim();
 
 /** Pure. What the received content is about, for the Element's title:
  *  its subject (or title), on one line, capped. Empty when it has none. */
