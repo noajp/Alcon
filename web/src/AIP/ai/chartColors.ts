@@ -15,7 +15,7 @@ import type { ChartSpec } from './chartSpec';
  *  so the streaming placeholders in CopilotMessages match the settled
  *  chart without importing the (lazily loaded) renderer. */
 export const CHART_CARD_CLASS =
-  'rounded-lg border border-border bg-card shadow-[var(--shadow-island)] dark:bg-[var(--surface-rail)]';
+  'rounded-lg border border-border bg-card shadow-[var(--shadow-card)] dark:bg-[var(--surface-rail)]';
 
 const CHART_THEME_COLORS = [
   'var(--accent-default)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-1)',

@@ -22,22 +22,21 @@ import { CHART_CARD_CLASS, chartFileName, chartSlots, effectiveColor, withSlotCo
 // recolored from its card and downloaded as it looks.
 
 const AXIS = { stroke: 'var(--text-secondary)', fontSize: 11, tickLine: false, axisLine: false } as const;
-const GRID = { stroke: 'var(--border-subtle)', strokeDasharray: '3 4', vertical: false } as const;
+const GRID = { stroke: 'color-mix(in oklab, var(--border-subtle), transparent 40%)', strokeDasharray: '2 5', vertical: false } as const;
 const LEGEND = { wrapperStyle: { fontSize: 11, paddingTop: 6 }, iconType: 'circle', iconSize: 8 } as const;
 const TOOLTIP = {
   contentStyle: { background: 'var(--surface-overlay)', borderColor: 'var(--border-subtle)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-overlay)' },
   labelStyle: { color: 'var(--text-secondary)' },
 } as const;
 
-// A slot's glossy fill: lit at the top, the color itself through the
-// middle, deepened at the foot — so bars and slices read as solid,
-// polished shapes rather than flat paint.
+// A slot's fill: lit at the top and fading to a translucent foot, so a
+// bar or slice glows against the dark card instead of sitting on it
+// like flat paint. No darkening anywhere — nothing reads as a shadow.
 function Gloss({ id, color }: { id: string; color: string }) {
   return (
     <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" style={{ stopColor: `color-mix(in oklab, ${color}, white 30%)` }} />
-      <stop offset="45%" style={{ stopColor: color }} />
-      <stop offset="100%" style={{ stopColor: `color-mix(in oklab, ${color}, black 22%)` }} />
+      <stop offset="0%" style={{ stopColor: `color-mix(in oklab, ${color}, white 18%)`, stopOpacity: 1 }} />
+      <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.45 }} />
     </linearGradient>
   );
 }
@@ -46,9 +45,19 @@ function Gloss({ id, color }: { id: string; color: string }) {
 function Wash({ id, color }: { id: string; color: string }) {
   return (
     <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.55 }} />
-      <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+      <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.6 }} />
+      <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.02 }} />
     </linearGradient>
+  );
+}
+
+// A soft glow around a line or a slice: the shape blurred under itself.
+function Glow({ id }: { id: string }) {
+  return (
+    <filter id={id} x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
   );
 }
 
@@ -73,12 +82,14 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
   const colorAt = (key: string, index: number) => effectiveColor(colors, key, index);
   const gid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const fillOf = (index: number) => `url(#${gid}-${index})`;
+  const glow = `url(#${gid}-glow)`;
   const slots = type === 'pie' ? data.map((row, i) => ({ key: row.name, i })) : series.map((key, i) => ({ key, i }));
   const defs = (wash: boolean) => (
     <defs>
       {slots.map(({ key, i }) => wash
         ? <Wash key={key} id={`${gid}-${i}`} color={colorAt(key, i)} />
         : <Gloss key={key} id={`${gid}-${i}`} color={colorAt(key, i)} />)}
+      <Glow id={`${gid}-glow`} />
     </defs>
   );
   return (
@@ -107,19 +118,20 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
               {defs(false)}
               <Tooltip {...TOOLTIP} />
               <Legend {...LEGEND} />
-              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="56%" outerRadius="86%" paddingAngle={2} cornerRadius={4} stroke="none">
+              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="66%" outerRadius="86%" paddingAngle={3} cornerRadius={3} stroke="none" style={{ filter: glow }}>
                 {data.map((row, i) => <Cell key={i} fill={fillOf(i)} />)}
               </Pie>
             </PieChart>
           ) : type === 'line' ? (
             <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+              {defs(true)}
               <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2.5}
-                dot={{ r: 3, strokeWidth: 0, fill: colorAt(key, i) }} activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
+              {series.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} style={{ filter: glow }}
+                dot={{ r: 2.5, strokeWidth: 0, fill: colorAt(key, i) }} activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </LineChart>
           ) : type === 'area' ? (
             <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
@@ -129,7 +141,7 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2.5} fill={fillOf(i)}
+              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} fill={fillOf(i)} style={{ filter: glow }}
                 activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </AreaChart>
           ) : (
@@ -140,9 +152,9 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} cursor={{ fill: 'var(--surface-strong)' }} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Bar key={key} dataKey={key} fill={fillOf(i)} maxBarSize={44}
+              {series.map((key, i) => <Bar key={key} dataKey={key} fill={fillOf(i)} maxBarSize={30}
                 // Stacked, only the top segment is rounded; side by side, every bar is.
-                radius={!spec.stacked || i === series.length - 1 ? [6, 6, 0, 0] : 0}
+                radius={!spec.stacked || i === series.length - 1 ? [4, 4, 0, 0] : 0}
                 stackId={spec.stacked ? 's' : undefined} />)}
             </BarChart>
           )}
