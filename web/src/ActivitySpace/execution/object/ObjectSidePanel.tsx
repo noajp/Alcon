@@ -11,6 +11,7 @@ import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ObjectPropertiesWidget } from '@/Function/widget/widgets/ObjectPropertiesWidget';
+import { ProgressPanel } from '@/Function/shared/ProgressPanel';
 import type { WidgetHost } from '@/Function/widget/types';
 import type { AlconObjectWithChildren, ObjectDependency } from '@/types/database';
 
@@ -56,6 +57,13 @@ export function ObjectSidePanel({ object, objects, links, onOpen, onOpenElement,
         <section className="rounded-lg border border-border/60 p-3">
           <ObjectPropertiesWidget host={host} />
         </section>
+
+        {elements.length > 0 && (
+          <section className="rounded-lg border border-border/60 p-3">
+            <h3 className="mb-2.5 text-[12px] font-medium text-muted-foreground">{t('Progress')}</h3>
+            <ProgressPanel elements={elements} end={object.due_date} />
+          </section>
+        )}
 
         <DependencyList title={t('Waits for')} object={object} objects={objects} links={links} side="blocker" />
         <DependencyList title={t('Blocks')} object={object} objects={objects} links={links} side="blocked" />
