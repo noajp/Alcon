@@ -62,7 +62,7 @@ const CalendarView = dynamic(() => import('@/ActivitySpace/calendar/CalendarView
 // Calendar / Workers.
 const VIEW_MODES: ObjectTabType[] = ['elements', 'flow', 'gantt', 'calendar', 'workers'];
 const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
-  elements: 'All Elements',
+  elements: 'Elements',
   flow: 'Board',
   gantt: 'Timeline',
   calendar: 'Calendar',

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { moveSidebarItem, normalizeSidebarOrder, SIDEBAR_ITEMS } from '@/Frame/sidebarOrder';
 
 describe('normalizeSidebarOrder', () => {
-  it('starts from Inbox, Team, AI, Strategy', () => {
-    expect(normalizeSidebarOrder(null)).toEqual(['inbox', 'team', 'ai', 'strategy']);
+  it('starts from Inbox, AI, Strategy', () => {
+    expect(normalizeSidebarOrder(null)).toEqual(['inbox', 'ai', 'strategy']);
   });
   it('keeps a saved order, drops unknown and repeated rows, and places new ones by default', () => {
-    expect(normalizeSidebarOrder(['strategy', 'ai', 'audit', 'ai', 'inbox'])).toEqual(['strategy', 'ai', 'inbox', 'team']);
+    expect(normalizeSidebarOrder(['strategy', 'team', 'audit', 'strategy'])).toEqual(['inbox', 'ai', 'strategy']);
     expect(normalizeSidebarOrder([...SIDEBAR_ITEMS].reverse())).toEqual([...SIDEBAR_ITEMS].reverse());
   });
 });

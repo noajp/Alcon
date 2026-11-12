@@ -6,7 +6,7 @@ import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Sparkles, 
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import {
   NavStrategyIcon, NavPhaseIcon, NavAutomationIcon,
-  NavTeamsIcon, NavCalendarIcon, NavWorkloadIcon,
+  NavCalendarIcon, NavWorkloadIcon,
 } from '@/Frame/sidebar/NavIcons';
 
 // Shared Settings navigation model + a tiny external store for the area
@@ -92,7 +92,6 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
   {
     title: 'Sustainment settings',
     items: [
-      { id: 'team', label: 'Team', icon: NavTeamsIcon },
       { id: 'calendar', label: 'Calendar', icon: NavCalendarIcon },
       { id: 'workload', label: 'Workload', icon: NavWorkloadIcon },
     ],
