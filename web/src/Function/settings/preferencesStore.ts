@@ -206,3 +206,12 @@ export function getCachedTimelineTodayMarker(): boolean { return readBool(TIMELI
 export function setCachedTimelineTodayMarker(v: boolean) { write(TIMELINE_TODAY_KEY, v ? '1' : '0'); }
 export function getCachedTimelineProgressFill(): boolean { return readBool(TIMELINE_FILL_KEY, true); }
 export function setCachedTimelineProgressFill(v: boolean) { write(TIMELINE_FILL_KEY, v ? '1' : '0'); }
+
+// Charts (Settings > Preferences > Chart colors): which palette every chart
+// draws in. Kept in this browser, like the font size.
+const CHART_PALETTE_KEY = 'alcon:pref:chart-palette';
+export function getCachedChartPalette(): string {
+  if (typeof window === 'undefined') return 'key-red';
+  return localStorage.getItem(CHART_PALETTE_KEY) ?? 'key-red';
+}
+export function setCachedChartPalette(v: string) { write(CHART_PALETTE_KEY, v); }
