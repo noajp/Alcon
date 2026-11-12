@@ -3,6 +3,7 @@ const mock = vi.hoisted(() => ({ from: vi.fn(), getUser: vi.fn() }));
 vi.mock('../src/lib/supabase', () => ({ supabase: { from: mock.from, auth: { getUser: mock.getUser } } }));
 import { readGeneratedAppContext } from '../src/hooks/generatedAppContext';
 import { summaryApp } from '../src/Function/widget/generated/summaryApp';
+import { CANVAS_TEMPLATES } from '../src/Function/widget/generated/templates';
 import { parseAppSource } from '../src/Function/widget/generated/model';
 type Row = Record<string, unknown>;
 let tables: Record<string, Row[]>;
@@ -66,5 +67,12 @@ describe('generated app scoped data', () => {
     expect(() => new (Object.getPrototypeOf(async function() {}).constructor)(summaryApp.js)).not.toThrow();
     expect(() => parseAppSource({ ...summaryApp, usesObjectData: 'yes' })).toThrow();
     expect(parseAppSource({ ...summaryApp, usesObjectData: undefined }).usesObjectData).toBeUndefined();
+  });
+
+  it('every built-in canvas is a valid app whose code compiles', () => {
+    for (const tpl of CANVAS_TEMPLATES) {
+      expect(() => parseAppSource(tpl.source), tpl.id).not.toThrow();
+      expect(() => new (Object.getPrototypeOf(async function() {}).constructor)(tpl.source.js), tpl.id).not.toThrow();
+    }
   });
 });

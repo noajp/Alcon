@@ -179,6 +179,7 @@ function SortableWidget({
         isDragging={isDragging}
         onLongPress={() => setArranging(true)}
         onRemove={remove}
+        onRename={def.renamable && !host.readOnly ? (next) => board.setParams(instance.id, { ...params, title: next }) : undefined}
         // New params or a new subject are a new attempt: a caught error clears on its own.
         resetKey={`${bodyKey}|${JSON.stringify(params)}`}
         onRetry={() => setRetriedBody(() => reloadWidgetComponent(instance.type))}

@@ -90,6 +90,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Example: A dashboard of this Object’s progress by status and assignee. Or: a whiteboard where we can place and drag sticky notes.': ['例：この Object の進捗をステータス別・担当者別に見るダッシュボード。または：付箋を置いて動かせるホワイトボード。', '예: 이 Object의 진행 상황을 상태별·담당자별로 보는 대시보드. 또는: 포스트잇을 놓고 옮길 수 있는 화이트보드.', 'Exemple : un tableau de bord de l’avancement de cet Object par statut et par responsable. Ou : un tableau blanc où placer et déplacer des post-it.', 'Ejemplo: un panel del progreso de este Object por estado y responsable. O: una pizarra donde colocar y arrastrar notas adhesivas.'],
   'Describe your canvas': ['キャンバスの内容を伝える', '캔버스 설명', 'Décrivez votre canevas', 'Describe tu lienzo'],
   'Draw it': ['描く', '그리기', 'Dessiner', 'Dibujar'],
+  'Whiteboard': ['ホワイトボード', '화이트보드', 'Tableau blanc', 'Pizarra'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

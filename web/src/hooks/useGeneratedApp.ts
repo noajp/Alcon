@@ -4,7 +4,7 @@ import { readGeneratedAppContext } from './generatedAppContext';
 import { useSessionUserId, useWidgetDocument, useWidgetViewerState } from './useWidgetDocument';
 import { supabase } from '@/lib/supabase';
 import { parseAppSource, parseAppState, sourceDigest, stableJson, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
-import { summaryApp } from '@/Function/widget/generated/summaryApp';
+import { CANVAS_TEMPLATES } from '@/Function/widget/generated/templates';
 
 /** The app everyone on the widget sees. */
 type SharedApp = { current: AppSource | null; previous: AppSource | null };
@@ -68,7 +68,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     return () => { alive = false; };
   }, [current]);
   const currentDigest = current && digest?.of === current ? digest.value : null;
-  const known = !!current && stableJson(current) === stableJson(summaryApp);
+  const known = !!current && CANVAS_TEMPLATES.some((tpl) => stableJson(current) === stableJson(tpl.source));
   const dataConnected = known || (!!currentDigest && own.value?.dataApproved === currentDigest);
   // Until the digest is known the answer is not "not connected" but "not yet known".
   const identifying = !!current && !known && digest?.of !== current;
@@ -82,6 +82,8 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
 
   return {
     app, state: data.value ?? {}, loading: loading || identifying, dataConnected,
+    /** The shared app is one of the built-in templates, unchanged. */
+    knownTemplate: known,
     connectData: () => serial(async () => {
       if (!currentDigest) throw new Error('Object data cannot be connected in this browser context.');
       await saveOwn({ dataApproved: currentDigest });

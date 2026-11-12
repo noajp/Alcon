@@ -6,7 +6,7 @@ import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useGeneratedApp } from '@/hooks/useGeneratedApp';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
-import { summaryApp } from '../generated/summaryApp';
+import { CANVAS_TEMPLATES } from '../generated/templates';
 import { AppRuntime } from '../generated/AppRuntime';
 import type { WidgetProps } from '../types';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -57,7 +57,13 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
           secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />{t('Previous version')}</Button>}
         />
       </form>
-      {!source && <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(async () => { await store.useTemplate(summaryApp); setPrompt(''); latestPrompt.current = ''; })}>{t('Use the project summary')}</Button>}
+      {/* Ready-made canvases: known code, in place at once, no AI. */}
+      {!source && <div className="flex flex-wrap gap-1.5">
+        {CANVAS_TEMPLATES.map((tpl) => (
+          <Button key={tpl.id} variant="secondary" size="sm" disabled={locked}
+            onClick={() => void run(async () => { await store.useTemplate(tpl.source); setPrompt(''); latestPrompt.current = ''; })}>{t(tpl.label)}</Button>
+        ))}
+      </div>}
     </div>}
     {app?.draft_app && <div className="flex flex-wrap items-center gap-2">
       <p className="mr-auto text-xs text-muted-foreground">{t('Preview · only you see this until you use it. It then replaces the app for everyone.')}</p>
@@ -65,7 +71,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>{t('Discard preview')}</Button>
     </div>}
     {source?.usesObjectData && (app?.draft_app || store.dataConnected
-      ? <p className="text-xs text-muted-foreground">{t('Object data connected · Reads this Object’s Elements, related Strategies and Intents with your access permissions. Data reflects the time it was fetched.')}</p>
+      ? store.knownTemplate ? null : <p className="text-xs text-muted-foreground">{t('Object data connected · Reads this Object’s Elements, related Strategies and Intents with your access permissions. Data reflects the time it was fetched.')}</p>
       : <div className="flex flex-wrap items-center gap-2">
         <p className="mr-auto text-xs text-muted-foreground">{t('Object data not connected · Once connected, this version reads this Object’s Elements, related Strategies and Intents with your access, and can save what it reads where everyone on this widget sees it.')}</p>
         <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.connectData())}>{t('Connect Object data')}</Button>

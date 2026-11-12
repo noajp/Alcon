@@ -113,6 +113,8 @@ export interface WidgetFrameProps {
   onLongPress: () => void;
   /** Absent when this viewer may not take the widget off the board. */
   onRemove?: () => void;
+  /** Present when the heading can be renamed in place. */
+  onRename?: (title: string) => void;
   /** A change here clears a caught render error (the widget's params, its subject). */
   resetKey?: unknown;
   /** Runs before a failed body is mounted again, e.g. to rebuild a lazy component whose load failed. */
@@ -159,6 +161,7 @@ export function WidgetFrame({
   padded = true,
   onLongPress,
   onRemove,
+  onRename,
   resetKey,
   onRetry,
   children,
@@ -294,7 +297,13 @@ export function WidgetFrame({
           // block's edge when it can be picked up and moved.
           <section className="gloss-well relative rounded-lg px-4 pb-3 pt-2">
             <div className="flex h-8 items-center justify-between gap-3">
-              <h2 className={`${FONT.lg} min-w-0 truncate text-foreground`}>{title}</h2>
+              {onRename ? (
+                // Written over in place; saved on leaving the field or Enter.
+                <input key={title} defaultValue={title} data-no-arrange aria-label={title} maxLength={80}
+                  onBlur={(e) => { const next = e.target.value.trim(); if (next && next !== title) onRename(next); else e.target.value = title; }}
+                  onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = title; e.currentTarget.blur(); } }}
+                  className={`${FONT.lg} no-focus-ring -mx-1 min-w-0 flex-1 truncate rounded border-0 bg-transparent px-1 py-0 text-foreground hover:bg-muted/40 focus:bg-muted/40`} />
+              ) : <h2 className={`${FONT.lg} min-w-0 truncate text-foreground`}>{title}</h2>}
               {headerNode}
             </div>
             <div className={padded ? 'pt-2' : 'pt-1'}>{body}</div>
