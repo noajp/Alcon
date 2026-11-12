@@ -43,7 +43,7 @@ const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
   summary:     { title: 'Dashboard',  Icon: BarChart3 },
   elements:    { title: 'List',       Icon: List },
   overview:    { title: 'Overview',   Icon: ClipboardList },
-  gantt:       { title: 'Gantt',      Icon: GanttChart },
+  gantt:       { title: 'Timeline',   Icon: GanttChart },
   calendar:    { title: 'Calendar',   Icon: Calendar },
   workers:     { title: 'Team',       Icon: Users },
   resource:    { title: 'Team',       Icon: Users },

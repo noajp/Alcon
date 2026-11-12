@@ -6,7 +6,8 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNod
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { CalendarDays, ZoomIn, ZoomOut } from '@/ui/icons';
+import { CalendarDays, X, ZoomIn, ZoomOut } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { ObjectIcon } from '@/Frame/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
@@ -57,8 +58,15 @@ interface GanttViewProps {
   /** Dependencies between rows, by row id: `to` waits for `from`. Drawn as a
    *  curve from the end of one bar to the start of the other, in the danger
    *  color when `conflict` (the dates break the order). */
-  links?: { from: string; to: string; conflict?: boolean }[];
+  links?: GanttLink[];
+  /** Present when the viewer may add a dependency: a bar grows a handle at
+   *  its end; dragging it onto another bar asks for `to` to wait for `from`. */
+  onLinkCreate?: (from: string, to: string) => void;
+  /** Present when the viewer may remove one, from the mark on its line. */
+  onLinkRemove?: (link: GanttLink) => void;
 }
+
+export interface GanttLink { id?: string; from: string; to: string; conflict?: boolean }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 
@@ -197,7 +205,7 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, local
 // An Object row is laid out as Linear lays out a project: its name on a
 // line of its own, a quiet bar under it, and its milestones' names under
 // the bar — so the row is tall and the bar is slim.
-const EMPTY_LINKS: { from: string; to: string; conflict?: boolean }[] = [];
+const EMPTY_LINKS: GanttLink[] = [];
 const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 88, bar: 30 } } as const;
 const OBJECT_TITLE_TOP = 8;   // px from the row's top to the name line
 const OBJECT_BAR_TOP = 32;    // px from the row's top to the bar
@@ -225,10 +233,36 @@ export function GanttView({
   defaultZoom = 'day',
   rowScale = 'element',
   links = EMPTY_LINKS,
+  onLinkCreate,
+  onLinkRemove,
 }: GanttViewProps) {
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
   const objectRows = rowScale === 'object';
+  // Drawing a dependency: from a bar's end handle to wherever the pointer is,
+  // in the timeline's own coordinates; released over another bar, it links.
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null);
+  const linkCreateRef = useRef(onLinkCreate);
+  useEffect(() => { linkCreateRef.current = onLinkCreate; }, [onLinkCreate]);
+  const linkingFrom = linking?.from ?? null;
+  useEffect(() => {
+    if (!linkingFrom) return;
+    const point = (e: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : null;
+    };
+    const move = (e: MouseEvent) => { const p = point(e); if (p) setLinking({ from: linkingFrom, ...p }); };
+    const up = (e: MouseEvent) => {
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-bar-id]')?.getAttribute('data-bar-id');
+      if (target && target !== linkingFrom) linkCreateRef.current?.(linkingFrom, target);
+      setLinking(null);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+  }, [linkingFrom]);
+
   /** Where a row's bar starts, from the row's top. */
   const barTopOf = (rowTop: number) => rowTop + (objectRows ? OBJECT_BAR_TOP : (ROW_H - BAR_H) / 2);
   // Bars persist their dates through this callback. Defaults to updateElement
@@ -360,6 +394,28 @@ export function GanttView({
       width: duration * pxPerDay,
     };
   }, [dateRange.start, pxPerDay, dragging, dragDaysDelta]);
+
+  /** A dependency's line: out of the blocker's end, into the waiting bar's
+   *  start, as an S-curve that loops back when the waiting bar starts early. */
+  const linkGeometry = (link: GanttLink) => {
+    const source = elements.find((el) => el.id === link.from);
+    const target = elements.find((el) => el.id === link.to);
+    const sourcePos = source && getBarPosition(source);
+    const targetPos = target && getBarPosition(target);
+    const sourceTop = layout.tops.get(link.from);
+    const targetTop = layout.tops.get(link.to);
+    if (!sourcePos || !targetPos || sourceTop === undefined || targetTop === undefined) return null;
+    const sx = sourcePos.left + Math.max(sourcePos.width, 20);
+    const sy = barTopOf(sourceTop) + BAR_H / 2;
+    const tx = targetPos.left;
+    const ty = barTopOf(targetTop) + BAR_H / 2;
+    const reach = Math.min(90, Math.max(36, Math.abs(tx - sx) / 2));
+    return {
+      sx, sy, tx, ty,
+      d: `M ${sx} ${sy} C ${sx + reach} ${sy}, ${tx - reach} ${ty}, ${tx} ${ty}`,
+      stroke: link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 80%, transparent)',
+    };
+  };
 
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent, elementId: string, type: 'move' | 'resize-start' | 'resize-end') => {
@@ -759,6 +815,7 @@ export function GanttView({
             }}
           >
             <div
+              ref={canvasRef}
               className="relative"
               // Fill to at least the scroll viewport so the day grid lines,
               // weekend tints and today-line span the full height — not just
@@ -1020,6 +1077,7 @@ export function GanttView({
                         selectedElement === element.id ? 'border-[var(--accent-default)] ring-1 ring-[var(--accent-default)]/40'
                           : isBlocked ? 'border-[var(--status-danger)]/50' : 'border-border/70 hover:border-[var(--border-strong)]'
                       } ${isDraggingThis ? 'border-[var(--accent-default)] shadow-lg' : ''}`}
+                      data-bar-id={element.id}
                       style={{
                         left: barPos.left,
                         width: barWidth,
@@ -1085,6 +1143,17 @@ export function GanttView({
                       )}
                     </div>
 
+                    {onLinkCreate && !dragging && (
+                      // The dependency handle: drag it onto the bar that waits for this one.
+                      <button type="button" title={t('Drag to add dependency')} aria-label={t('Drag to add dependency')}
+                        className="absolute z-20 size-3 cursor-crosshair rounded-full border border-[var(--accent-default)] bg-card opacity-40 transition-opacity hover:opacity-100"
+                        style={{ left: barPos.left + barWidth + 8, top: barTopOf(top) + (BAR_H - 12) / 2 }}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); e.stopPropagation();
+                          const rect = canvasRef.current?.getBoundingClientRect();
+                          if (rect) setLinking({ from: element.id, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                        }} />
+                    )}
                     {/* Assignee avatars — sibling of the bar, not a child:
                         the bar has overflow-hidden (for the progress fill's
                         clip) and this deliberately overlaps its right edge,
@@ -1123,29 +1192,27 @@ export function GanttView({
                   </marker>
                 </defs>
                 {links.map((link) => {
-                  const source = elements.find((el) => el.id === link.from);
-                  const target = elements.find((el) => el.id === link.to);
-                  const sourcePos = source && getBarPosition(source);
-                  const targetPos = target && getBarPosition(target);
-                  const sourceTop = layout.tops.get(link.from);
-                  const targetTop = layout.tops.get(link.to);
-                  if (!sourcePos || !targetPos || sourceTop === undefined || targetTop === undefined) return null;
-                  const sx = sourcePos.left + Math.max(sourcePos.width, 20);
-                  const sy = barTopOf(sourceTop) + BAR_H / 2;
-                  const tx = targetPos.left;
-                  const ty = barTopOf(targetTop) + BAR_H / 2;
-                  // An S-curve out of the blocker's end and into the waiting
-                  // bar's start; it loops back when the waiting bar starts early.
-                  const reach = Math.max(36, Math.abs(tx - sx) / 2);
-                  const stroke = link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 70%, transparent)';
+                  const g = linkGeometry(link);
+                  if (!g) return null;
                   return (
                     <g key={`link-${link.from}-${link.to}`}>
-                      <path d={`M ${sx} ${sy} C ${sx + reach} ${sy}, ${tx - reach} ${ty}, ${tx} ${ty}`} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />
-                      <circle cx={sx} cy={sy} r="2.5" fill={stroke} />
-                      <circle cx={tx} cy={ty} r="2.5" fill={stroke} />
+                      <path d={g.d} fill="none" stroke={g.stroke} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 5" />
+                      <circle cx={g.sx} cy={g.sy} r="2.5" fill={g.stroke} />
+                      <circle cx={g.tx} cy={g.ty} r="2.5" fill={g.stroke} />
                     </g>
                   );
                 })}
+                {linking && (() => {
+                  const source = elements.find((el) => el.id === linking.from);
+                  const pos = source && getBarPosition(source);
+                  const top = layout.tops.get(linking.from);
+                  if (!pos || top === undefined) return null;
+                  const sx = pos.left + Math.max(pos.width, 20);
+                  const sy = barTopOf(top) + BAR_H / 2;
+                  const reach = Math.min(90, Math.max(36, Math.abs(linking.x - sx) / 2));
+                  return <path d={`M ${sx} ${sy} C ${sx + reach} ${sy}, ${linking.x - reach} ${linking.y}, ${linking.x} ${linking.y}`}
+                    fill="none" stroke="var(--accent-default)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 5" />;
+                })()}
                 {elements.map(element => {
                   const deps = getDependencies(element);
                   const targetPos = getBarPosition(element);
@@ -1178,6 +1245,46 @@ export function GanttView({
                   });
                 })}
               </svg>
+
+              {/* Each dependency's mark, at the middle of its line: what waits
+                  for what, and the way to remove it. */}
+              {links.map((link) => {
+                const g = linkGeometry(link);
+                if (!g) return null;
+                const source = elements.find((el) => el.id === link.from);
+                const target = elements.find((el) => el.id === link.to);
+                return (
+                  <DropdownMenu key={`mark-${link.from}-${link.to}`}>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" aria-label={`${source?.title ?? ''} → ${target?.title ?? ''}`}
+                        className="absolute z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card transition-transform hover:scale-125"
+                        style={{ left: (g.sx + g.tx) / 2, top: (g.sy + g.ty) / 2, borderColor: g.stroke }}>
+                        <span className="h-px w-1.5" style={{ backgroundColor: g.stroke }} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[240px]">
+                      <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground">
+                        <ItemIcon icon={source?.icon ?? null} color={source?.color ?? null} size={14} fallback={<ObjectIcon size={14} />} />
+                        <span className="min-w-0 truncate">{source?.title}</span>
+                      </div>
+                      <div className="px-2 py-1 text-[12px] text-muted-foreground">{t('Blocking')}</div>
+                      <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground">
+                        <ItemIcon icon={target?.icon ?? null} color={target?.color ?? null} size={14} fallback={<ObjectIcon size={14} />} />
+                        <span className="min-w-0 truncate">{target?.title}</span>
+                      </div>
+                      {link.conflict && <div className="px-2 py-1 text-[12px] text-[var(--status-danger)]">{t('Dates overlap')}</div>}
+                      {onLinkRemove && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="gap-2 text-[13px]" onSelect={() => onLinkRemove(link)}>
+                            <X size={14} />{t('Remove dependency')}
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })}
             </div>
           </div>
         </div>
