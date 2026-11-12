@@ -3,7 +3,7 @@
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FileDown, PanelLeftClose, PanelLeftOpen } from '@/ui/icons';
+import { FileDown, PanelLeft } from '@/ui/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import {
   NoteEditor,
@@ -125,17 +125,13 @@ export function PageView({
       <div className="relative flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
         {onToggleFilesPane && (
           <div className="absolute left-2">
-            <ButtonAppearanceProvider appearance="navigation">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={onToggleFilesPane}
-                title={filesPaneOpen ? t('Hide page list') : t('Show page list')}
-                aria-label={filesPaneOpen ? t('Hide page list') : t('Show page list')}
-              >
-                {filesPaneOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-              </Button>
-            </ButtonAppearanceProvider>
+            {/* The same mark and weight as the title row's sidebar button. */}
+            <button type="button" onClick={onToggleFilesPane} aria-pressed={filesPaneOpen}
+              title={filesPaneOpen ? t('Hide page list') : t('Show page list')}
+              aria-label={filesPaneOpen ? t('Hide page list') : t('Show page list')}
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <PanelLeft size={15} />
+            </button>
           </div>
         )}
         <div ref={toolbarPortalRef} className="flex items-center justify-center" />
