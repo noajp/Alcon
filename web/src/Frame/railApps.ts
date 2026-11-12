@@ -50,5 +50,6 @@ export function railModeOf(view: string): RailMode | null {
     MODE_META[mode].views.some(id => id === view)) ?? null;
 }
 
-/** The tools the command palette offers. */
-export const TOOL_MODES: RailMode[] = ['team'];
+/** The tools the command palette offers. None today: who is in what is a
+ *  Domain's Members tab, not a screen of its own. */
+export const TOOL_MODES: RailMode[] = [];

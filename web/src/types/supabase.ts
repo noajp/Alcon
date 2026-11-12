@@ -2725,6 +2725,7 @@ export type Database = {
           identifier: string | null
           label_colors: Json
           name: string
+          note: string | null
           object_type_icons: Json
           object_types: string[]
           order_index: number | null
@@ -2747,6 +2748,7 @@ export type Database = {
           identifier?: string | null
           label_colors?: Json
           name: string
+          note?: string | null
           object_type_icons?: Json
           object_types?: string[]
           order_index?: number | null
@@ -2769,6 +2771,7 @@ export type Database = {
           identifier?: string | null
           label_colors?: Json
           name?: string
+          note?: string | null
           object_type_icons?: Json
           object_types?: string[]
           order_index?: number | null

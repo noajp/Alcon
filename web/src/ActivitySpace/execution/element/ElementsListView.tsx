@@ -62,9 +62,9 @@ const CalendarView = dynamic(() => import('@/ActivitySpace/calendar/CalendarView
 // Calendar / Workers.
 const VIEW_MODES: ObjectTabType[] = ['elements', 'flow', 'gantt', 'calendar', 'workers'];
 const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
-  elements: 'All Elements',
+  elements: 'Elements',
   flow: 'Board',
-  gantt: 'Gantt',
+  gantt: 'Timeline',
   calendar: 'Calendar',
   workers: 'Workers',
 };
@@ -648,7 +648,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Gantt')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
+          <ElementDrilldown key={activeDomainId ?? 'none'} label={t('Timeline')} onNavigate={onNavigate} onViewChange={onViewChange} domainName={activeDomainName} onDetailChange={setDrillDetailOpen}>
             {openElement => <GanttView elements={filteredElements} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} onElementOpen={(el) => openElement(el.id)} />}
           </ElementDrilldown>
         </div>

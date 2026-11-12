@@ -419,11 +419,6 @@ export function AppSidebar({
                   case 'strategy':
                     return <SidebarRow active={activeView === 'strategy'} icon={<NavStrategyIcon size={16} />} label={t('Strategy')}
                       onClick={() => { onNavigate({ strategyId: null }); onViewChange('strategy'); }} />;
-                  default: {
-                    const { label, icon: Icon, defaultView } = MODE_META[item];
-                    return <SidebarRow active={railMode === item} icon={<Icon size={16} />} label={t(label)}
-                      onClick={() => { if (railMode !== item) onViewChange(defaultView); }} />;
-                  }
                 }
               })();
               const over = rowDrop?.item === item && draggedRow !== null && draggedRow !== item ? rowDrop.place : null;
