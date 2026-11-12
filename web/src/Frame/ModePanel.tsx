@@ -1,6 +1,5 @@
 'use client';
 
-import { NotebookTree } from './sidebar/NotebookTree';
 import { railModeOf } from '@/Frame/railApps';
 import { SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 import { PanelBody } from '@/Function/shared/PanelLayout';
@@ -16,7 +15,7 @@ import { ButtonAppearanceProvider } from '@/ui/button';
 // app's sidebar stays the Workspace on every screen; this column is the tool's.
 
 /** The open tool's list, or nothing for the Workspace and personal pages. */
-export function ModePanel({ activeView, navigation, onNavigate, onViewChange }: {
+export function ModePanel({ activeView, onNavigate, onViewChange }: {
   activeView: string;
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -27,11 +26,8 @@ export function ModePanel({ activeView, navigation, onNavigate, onViewChange }: 
 
   let body: React.ReactNode = null;
   switch (mode) {
-    case 'notebook':
-      // With no notebook (or page) open, Note is the list of notebooks: no panel.
-      body = !navigation.noteFolderId && !navigation.noteId ? null : <NotebookTree activeFolderId={navigation.noteFolderId ?? null} activeSectionId={navigation.noteSectionId ?? null}
-        activeFileId={navigation.noteId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />;
-      break;
+    // Note needs no list beside it: it opens on its notebooks, and an open
+    // notebook carries its Sections inside its own page.
     case 'inbox':
       body = <InboxList onNavigate={onNavigate} onViewChange={onViewChange} onOpen={() => onViewChange('inbox')} />;
       break;

@@ -359,6 +359,13 @@ export function useNotes() {
     void getQueryClient().invalidateQueries({ queryKey: ['note-header', id] });
   }, [reload]);
 
+  /** Sets (or, with null, clears) a node's icon — a notebook's mark. */
+  const setNodeIcon = useCallback(async (id: string, icon: string | null) => {
+    updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, icon: icon ?? undefined } : n)));
+    const { error } = await supabase.from('notes').update({ icon }).eq('id', id);
+    if (error) { void reload(); throw error; }
+  }, [reload, updateNodes]);
+
   const deleteNode = useCallback(async (id: string) => {
     // Drop the node and every descendant (folder → sections → files) so the
     // local tree matches the DB's ON DELETE CASCADE in one pass.
@@ -399,6 +406,7 @@ export function useNotes() {
     reload,
     createNode,
     renameNode,
+    setNodeIcon,
     deleteNode,
     setLinkedObject,
   };

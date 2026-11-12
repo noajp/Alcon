@@ -1,13 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronLeft, FilePlus, Pencil, Plus, Trash2 } from '@/ui/icons';
-import { Button } from '@/ui/button';
+import { FilePlus, Pencil, Plus, Trash2 } from '@/ui/icons';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { RenameInput } from '@/Function/shared/RenameInput';
-import { sectionsInFolder, filesInFolder, resolveSectionSelection } from '@/ActivitySpace/artifacts/notebook/noteTree';
+import { sectionsInFolder, filesInFolder, resolveSectionSelection } from './noteTree';
 import type { NoteNode } from '@/types/notes';
 import {
   ContextMenu,
@@ -18,15 +17,14 @@ import {
 } from '@/ui/context-menu';
 import type { NavigationState } from '@/types/navigation';
 import { SidebarRow } from '@/Function/shared/SidebarRow';
-import { Panel, PanelBody } from '@/Function/shared/PanelLayout';
+import { PanelBody } from '@/Function/shared/PanelLayout';
 
-// The open notebook's panel: its name (with the way back to the list of
-// notebooks), then its Sections — picking one decides which pages the main
-// pane lists, and the highlighted row is the Section the pane actually
-// shows. "New section" adds one with a first page, ready to write. A
-// Section's right-click carries New page / Rename / Delete. With no
-// notebook open there is no panel: the main pane is the list of them.
-export function NotebookTree({
+// An open notebook's Sections, as the column left of its pages: picking
+// one decides which pages the list beside it shows, and the highlighted row
+// is the Section actually shown. "New section" adds one with a first page,
+// ready to write. A Section's right-click carries New page / Rename /
+// Delete. The notebook itself is named in the header above.
+export function SectionsPane({
   activeFolderId,
   activeSectionId,
   activeFileId,
@@ -97,14 +95,7 @@ export function NotebookTree({
   };
 
   return (
-    <Panel label={book.name}>
-      <header className="flex h-[50px] shrink-0 items-center gap-1 border-b border-border/60 bg-card px-2">
-        <Button variant="ghost" size="icon-xs" aria-label={t('Notebooks')} title={t('Notebooks')}
-          onClick={() => go({ noteFolderId: null, noteSectionId: null, noteId: null })}>
-          <ChevronLeft size={15} />
-        </Button>
-        <h2 className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground" title={book.name}>{book.name}</h2>
-      </header>
+    <aside aria-label={t('Sections')} className="flex w-56 shrink-0 flex-col overflow-hidden border-r border-border/40 bg-[var(--surface-well)]">
       <PanelBody>
         <div className="flex flex-col">
           {sections.map((section) => {
@@ -139,6 +130,6 @@ export function NotebookTree({
           <SidebarRow icon={<Plus size={15} />} label={t('New section')} onClick={() => void addSection()} />
         </div>
       </PanelBody>
-    </Panel>
+    </aside>
   );
 }

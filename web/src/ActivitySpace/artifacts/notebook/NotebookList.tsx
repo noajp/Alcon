@@ -9,6 +9,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { IslandHeader } from '@/Function/shared/MainIsland';
 import { RenameInput } from '@/Function/shared/RenameInput';
+import { ItemIconButton } from '@/Function/shared/itemIcon/IconPicker';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { useNotes } from '@/hooks/useNotesDb';
 import type { NoteNode } from '@/types/notes';
@@ -22,7 +23,7 @@ export function NotebookList({ onOpenBook }: {
   onOpenBook: (folderId: string) => void;
 }) {
   const { t } = useI18n();
-  const { nodes, createNode, renameNode, deleteNode } = useNotes();
+  const { nodes, createNode, renameNode, deleteNode, setNodeIcon } = useNotes();
   const [renaming, setRenaming] = useState<string | null>(null);
 
   const books = useMemo(() => nodes.filter((n) => n.type === 'folder').map((book) => {
@@ -70,7 +71,11 @@ export function NotebookList({ onOpenBook }: {
                   <tr className="cursor-pointer transition-colors hover:bg-foreground/[0.04]" onClick={() => { if (renaming !== book.id) onOpenBook(book.id); }}>
                     <td className="px-[30px] py-2.5">
                       <span className="flex min-w-0 items-center gap-3">
-                        <span className="flex shrink-0 text-muted-foreground"><NavNoteIcon size={16} /></span>
+                        {/* The notebook's own icon; a click on it changes it (and does not open the notebook). */}
+                        <span className="flex shrink-0 text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+                          <ItemIconButton size={16} value={{ icon: book.icon ?? null, color: null }} defaultIcon={<NavNoteIcon size={16} />}
+                            onChange={(next) => void setNodeIcon(book.id, next.icon).catch((e) => console.error('Failed to set notebook icon', e))} />
+                        </span>
                         {renaming === book.id ? (
                           <RenameInput initial={book.name}
                             onCommit={(v) => { if (v && v !== book.name) void renameNode(book.id, v); setRenaming(null); }}
