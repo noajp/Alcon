@@ -2718,12 +2718,14 @@ export type Database = {
           color: string | null
           created_at: string
           description: string | null
+          element_type_icons: Json
           element_types: Json
           icon: string | null
           id: string
           identifier: string | null
           label_colors: Json
           name: string
+          object_type_icons: Json
           object_types: string[]
           order_index: number | null
           phase_defaults: Json
@@ -2738,12 +2740,14 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          element_type_icons?: Json
           element_types?: Json
           icon?: string | null
           id?: string
           identifier?: string | null
           label_colors?: Json
           name: string
+          object_type_icons?: Json
           object_types?: string[]
           order_index?: number | null
           phase_defaults?: Json
@@ -2758,12 +2762,14 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          element_type_icons?: Json
           element_types?: Json
           icon?: string | null
           id?: string
           identifier?: string | null
           label_colors?: Json
           name?: string
+          object_type_icons?: Json
           object_types?: string[]
           order_index?: number | null
           phase_defaults?: Json

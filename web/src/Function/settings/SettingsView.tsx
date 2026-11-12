@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
 import { CHART_PALETTES } from '@/Function/shared/chartPalette';
+import { TypeSettings } from './TypeSettings';
 import { getCachedChartPalette, setCachedChartPalette, usePreference } from './preferencesStore';
 import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize, POINTER_CURSOR_KEY } from './appearanceOptions';
 import { TeamSettings } from './TeamSettings';
@@ -100,12 +101,13 @@ export function SettingsView() {
       case 'initiative': return <InitiativeJudgementSettings />;
       case 'phase': return <PhaseDefaultsSettings />;
       case 'domain': return <TeamSettings />;
+      case 'objects': return <TypeSettings kind="object" />;
       case 'elements': {
         const tab = tabFor(item);
         return (
           <>
             <AreaTabs item={item} value={tab} onChange={(next) => setAreaTabs((prev) => ({ ...prev, [item.id]: next }))} />
-            {tab === 'templates' ? <ElementTemplateSettings /> : <LabelSettings />}
+            {tab === 'templates' ? <ElementTemplateSettings /> : tab === 'labels' ? <LabelSettings /> : <TypeSettings kind="element" />}
             <SlaPointerRow />
           </>
         );

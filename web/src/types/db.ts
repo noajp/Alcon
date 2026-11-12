@@ -55,6 +55,8 @@ interface ColumnOverrides {
     privacy: DomainPrivacy
     ai_config: DomainAIConfig | null
     element_types: string[]
+    element_type_icons: Record<string, string>
+    object_type_icons: Record<string, string>
     label_colors: Record<string, string>
     risk_thresholds: DomainRiskThresholds
     phase_defaults: DomainPhaseDefaults

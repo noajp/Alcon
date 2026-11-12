@@ -13,6 +13,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QuickAddElementPopup } from '@/ActivitySpace/execution/element/QuickAddElementPopup';
 
+// The Type pill's icons are read from the Domains; this test has none.
+vi.mock('@/Function/shared/elementTypeIcon', () => ({ useTypeIcons: () => new Map(), TypeMark: () => null }));
+
 afterEach(cleanup);
 
 function setup(overrides: Partial<Parameters<typeof QuickAddElementPopup>[0]> = {}) {

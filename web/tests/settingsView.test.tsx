@@ -19,6 +19,7 @@ vi.mock('@/Function/settings/ActivitySpaceSettings', () => ({ ActivitySpaceSetti
 vi.mock('@/Function/settings/MemberSettings', () => ({ MemberSettings: () => 'Member panel' }));
 vi.mock('@/Function/settings/NotificationSettings', () => ({ NotificationSettings: () => 'Notifications panel' }));
 vi.mock('@/Function/settings/LabelSettings', () => ({ LabelSettings: () => 'Labels panel' }));
+vi.mock('@/Function/settings/TypeSettings', () => ({ TypeSettings: ({ kind }: { kind: string }) => `Types panel: ${kind}` }));
 vi.mock('@/Function/automation/AutomationSettings', () => ({ AutomationSettings: () => 'Automation panel' }));
 vi.mock('@/Function/settings/ElementTemplateSettings', () => ({ ElementTemplateSettings: () => 'Templates panel' }));
 vi.mock('@/Function/settings/StrategySettingsPanels', () => ({
@@ -80,7 +81,7 @@ describe('one area per page', () => {
   });
 
   it('a stub area is one compact placeholder island', () => {
-    act(() => setActiveSettingsSection('objects'));
+    act(() => setActiveSettingsSection('calendar'));
     const view = renderPage();
     const island = [...view.container.querySelectorAll('div')].find((d) => d.className.includes('gloss-island'));
     expect(island?.textContent).toContain('settings are coming soon.');
@@ -95,9 +96,17 @@ describe('one area per page', () => {
 });
 
 describe('in-area segmented controls', () => {
-  it('swaps the Elements body between Labels and Templates', () => {
+  it('Objects is its types', () => {
+    act(() => setActiveSettingsSection('objects'));
+    renderPage();
+    expect(screen.getByText('Types panel: object')).toBeTruthy();
+  });
+
+  it('swaps the Elements body between Types, Labels and Templates', () => {
     act(() => setActiveSettingsSection('elements'));
     renderPage();
+    expect(screen.getByText('Types panel: element')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Labels' }));
     expect(screen.getByText('Labels panel')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'Templates' }));
     expect(screen.getByText('Templates panel')).toBeTruthy();

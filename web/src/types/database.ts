@@ -61,6 +61,10 @@ export interface Domain {
   activity_space_id: string | null  // owning ActivitySpace (company / enterprise)
   ai_config: DomainAIConfig | null
   element_types: string[]       // Element (Task層) の型カタログ (Task / Human ...)
+  /** Type name → its icon ('glyph:…', 'lucide:…' or an emoji). A name with no entry shows the Element mark. */
+  element_type_icons?: Record<string, string>
+  /** The same, for Object types. */
+  object_type_icons?: Record<string, string>
   object_types: string[]        // Object (Project層) の型カタログ (Project / Strategy ...) — element_types とは別レイヤー
   label_colors: Record<string, string>  // Label 名 → パレットキー (e.g. {"Bug":"red"})。色は Domain 共通
   risk_thresholds: DomainRiskThresholds // Settings > Elements > SLAs。未設定は {}（DB 既定）

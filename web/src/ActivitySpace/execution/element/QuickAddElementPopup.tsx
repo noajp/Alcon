@@ -19,6 +19,7 @@ import { ElementIcon, ObjectIcon as BoxIcon } from '@/Function/shared/conceptIco
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { PriorityPicker } from '@/Function/shared/PriorityPicker';
+import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
 import { labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
@@ -153,6 +154,7 @@ export function QuickAddElementPopup({
   canSaveToPersonal = false,
 }: QuickAddElementPopupProps) {
   const { t } = useI18n();
+  const typeIcons = useTypeIcons('element');
   const [text, setText] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<string | null>(defaultType);
@@ -407,6 +409,7 @@ export function QuickAddElementPopup({
             <DropdownMenu {...menuProps('type')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!type)}>
+                  <TypeMark type={type} icons={typeIcons} size={12} />
                   <span>{type ?? t('Type')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
@@ -415,6 +418,7 @@ export function QuickAddElementPopup({
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Type')}</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
+                    <TypeMark type={t} icons={typeIcons} size={13} />
                     <span className="flex-1 truncate">{t}</span>
                     {type === t && <Check size={12} />}
                   </DropdownMenuItem>

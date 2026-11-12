@@ -82,7 +82,7 @@ import {
 const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { ElementTypeIcon, ObjectIcon } from '@/Frame/icons';
+import { ObjectIcon } from '@/Frame/icons';
 import { PageSection, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -112,6 +112,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { formatElementDate, parseDateOnly, toDateOnlyString, formatAge } from '@/Function/shared/dateUtils';
 import { MessageIcon } from '@/Function/shared/conceptIcons';
+import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
 
 interface ElementDetailViewProps {
   /** A notification reader stacks supplementary properties below the activity. */
@@ -1298,6 +1299,7 @@ function TypePicker({
   onCreate: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const typeIcons = useTypeIcons('element');
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1331,7 +1333,7 @@ function TypePicker({
         <button className="w-full">
           <RailRow
             name={t('Type')}
-            icon={<ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />}
+            icon={<TypeMark type={value} icons={typeIcons} size={14} />}
             label={value ?? t('Set type')}
             placeholder={!value}
             dense
@@ -1355,7 +1357,7 @@ function TypePicker({
               onClick={() => pick(opt)}
               className="w-full flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground/90 rounded-md hover:bg-muted/60 text-left transition-colors"
             >
-              <ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <TypeMark type={opt} icons={typeIcons} size={14} />
               <span className="flex-1 truncate">{opt}</span>
               {value === opt && <Check size={12} className="text-muted-foreground shrink-0" />}
             </button>
