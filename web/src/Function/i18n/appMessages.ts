@@ -54,6 +54,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Create type': ['種類を作成', '유형 만들기', 'Créer un type', 'Crear tipo'],
   'Types say what kind of Element something is. Each Domain keeps its own list, and an icon for each.': ['種類は、その Element が何であるかを表します。Domain ごとに一覧とアイコンを持ちます。', '유형은 Element가 무엇인지 나타냅니다. Domain마다 목록과 아이콘을 가집니다.', 'Les types disent ce qu’est un Element. Chaque Domain garde sa liste et une icône pour chacun.', 'Los tipos dicen qué es un Element. Cada Domain guarda su lista y un icono para cada uno.'],
   'Types say what kind of Object something is. Each Domain keeps its own list, and an icon for each.': ['種類は、その Object が何であるかを表します。Domain ごとに一覧とアイコンを持ちます。', '유형은 Object가 무엇인지 나타냅니다. Domain마다 목록과 아이콘을 가집니다.', 'Les types disent ce qu’est un Object. Chaque Domain garde sa liste et une icône pour chacun.', 'Los tipos dicen qué es un Object. Cada Domain guarda su lista y un icono para cada uno.'],
+  'Write the Domain’s note…': ['Domain のノートを書く…', 'Domain 노트를 작성…', 'Écrire la note du Domain…', 'Escribe la nota del Domain…'],
+  'No note yet.': ['ノートはまだありません。', '아직 노트가 없습니다.', 'Pas encore de note.', 'Aún no hay nota.'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

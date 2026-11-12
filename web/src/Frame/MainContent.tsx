@@ -171,6 +171,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               opening on Overview. */}
           {activeActivity === 'domain-overview' && (
             <DomainView
+              surface="domain"
               navigation={{ ...navigation, objectId: null }}
               onNavigate={(nav) => { onNavigate(nav); if (nav.objectId) onViewChange?.('objects'); }}
               onRefresh={onRefresh}
@@ -216,6 +217,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'objects' && (
             <DomainView
+              surface="objects"
               navigation={navigation}
               onNavigate={onNavigate}
               onRefresh={onRefresh}

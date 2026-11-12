@@ -111,9 +111,9 @@ afterEach(() => {
 });
 
 describe('AppSidebar fixed top block', () => {
-  it('renders Inbox → Team → Agent → Strategy by default', () => {
+  it('renders Inbox → Agent → Strategy by default', () => {
     renderSidebar();
-    const order = ['Inbox', 'Team', 'Agent', 'Strategy'].map(rowOf);
+    const order = ['Inbox', 'Agent', 'Strategy'].map(rowOf);
     for (let i = 0; i < order.length - 1; i++) {
       expect(
         order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,

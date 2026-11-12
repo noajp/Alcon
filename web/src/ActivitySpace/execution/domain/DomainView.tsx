@@ -33,6 +33,7 @@ import {
   type ListControlsState,
 } from '@/Function/shared/listControls';
 import { DomainOverview } from './DomainOverview';
+import { DomainNote } from './DomainNote';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
 import { ObjectBoard, type BoardObject } from '@/ActivitySpace/execution/chain/ObjectBoard';
@@ -79,12 +80,19 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
   // Resource and Workers are one view: Team.
-  workers: { domainTitle: 'Team', objectTitle: 'Team' },
+  workers: { domainTitle: 'Member', objectTitle: 'Member' },
   resource: { domainTitle: 'Team', objectTitle: 'Team' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
   flow: { domainTitle: 'Board', objectTitle: 'Board' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'flow', 'gantt', 'calendar', 'resource', 'workers'];
+// The two screens a Domain is read on. Its own page is about the Domain:
+// what it is, its Note, who is in it. The Objects screen is the work: the
+// Objects as a list, a Board and a Timeline.
+const DOMAIN_PAGE_TABS: ObjectTabType[] = ['overview', 'note', 'workers'];
+const OBJECTS_PAGE_DEFAULT_TABS: ObjectTabType[] = ['elements', 'flow', 'gantt'];
+const OBJECTS_PAGE_CREATE_TABS: ObjectTabType[] = ['elements', 'flow', 'gantt', 'calendar'];
+const NO_CREATE_TABS: ObjectTabType[] = [];
 const OBJECT_CREATE_TAB_TYPES: ObjectTabType[] = ALL_TAB_TYPES;
 // Object tabs that show its Elements through the Elements tab's Filter / Display.
 const OBJECT_FILTERED_TABS: ObjectTabType[] = ['elements', 'gantt', 'calendar'];
@@ -143,6 +151,8 @@ interface DomainViewProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onRefresh?: () => void;
+  /** Which screen this is: the Domain's own page, or its Objects. */
+  surface: 'domain' | 'objects';
   activeDomainId?: string | null;
   /** Switch the active top-level activity — e.g. the Object Overview's
    *  "Strategy" property row jumps out to the Strategy surface. */
@@ -155,7 +165,7 @@ interface DomainViewProps {
  * Calendar, etc. are now Domain-scoped views, with the same tab choice
  * carrying through when the user drills into a specific Object.
  */
-export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
+export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange, surface }: DomainViewProps) {
   const explorerData = useExplorerData();
   const { t } = useI18n();
   const { openCreate } = useWorkspaceActions();
@@ -175,7 +185,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   const [domainActiveType, setDomainActiveType] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return DEFAULT_DOMAIN_TAB;
     const saved = window.localStorage.getItem(`${DOMAIN_TAB_PREFIX}${activeDomainId ?? 'none'}`);
-    return saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB;
+    return saved && (ALL_TAB_TYPES.includes(saved as ObjectTabType) || saved === 'note') ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB;
   });
   const [objectActiveType, setObjectActiveType] = useState<ObjectTabType>('overview');
   const [domainVisibleTypes, setDomainVisibleTypes] = useState<ObjectTabType[]>(() =>
@@ -188,7 +198,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem(`${DOMAIN_TAB_PREFIX}${domainKey}`);
-    setDomainActiveType(saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB);
+    setDomainActiveType(saved && (ALL_TAB_TYPES.includes(saved as ObjectTabType) || saved === 'note') ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB);
     setDomainVisibleTypes(withDomainTabs(loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${domainKey}`, DEFAULT_DOMAIN_TAB_TYPES)));
   }, [domainKey]);
 
@@ -233,7 +243,8 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
   });
   const objectFields = fieldQuery.data?.filter((field) => field.object_id === selectedObject?.id);
 
-  const activeType = selectedObject ? objectActiveType : domainActiveType;
+  const onDomainPage = surface === 'domain' && !selectedObject;
+  const onObjectsPage = surface === 'objects' && !selectedObject;
   const setActiveTypeOnly = (t: ObjectTabType) => {
     if (selectedObject) {
       setObjectActiveType(t);
@@ -253,9 +264,16 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
       .filter((t, i, all) => all.indexOf(t) === i)
     : domainVisibleTypes;
   const sanitizedVisibleTabTypes = rawVisibleTabTypes.filter((type) => ALL_TAB_TYPES.includes(type));
-  const visibleTabTypes = sanitizedVisibleTabTypes.length > 0
+  const baseTabTypes = sanitizedVisibleTabTypes.length > 0
     ? sanitizedVisibleTabTypes
     : (selectedObject ? DEFAULT_OBJECT_TAB_TYPES : DEFAULT_DOMAIN_TAB_TYPES);
+  const objectsPageTabs = baseTabTypes.filter((type) => !DOMAIN_PAGE_TABS.includes(type));
+  const visibleTabTypes = onDomainPage ? DOMAIN_PAGE_TABS
+    : onObjectsPage ? (objectsPageTabs.length > 0 ? objectsPageTabs : OBJECTS_PAGE_DEFAULT_TABS)
+    : baseTabTypes;
+  // The remembered tab, when this screen has it; otherwise the screen's first.
+  const rememberedType = selectedObject ? objectActiveType : domainActiveType;
+  const activeType = visibleTabTypes.includes(rememberedType) ? rememberedType : visibleTabTypes[0];
 
   useEffect(() => {
     if (!selectedObject || objectVisibleTypesById[selectedObject.id]) return;
@@ -445,20 +463,21 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
-          onTabReorder={ids => setVisibleTabTypes(() => ids.map(id => tabs.find(t => t.id === id)!.tab_type))}
+          onTabReorder={onDomainPage ? undefined : (ids => setVisibleTabTypes(() => ids.map(id => tabs.find(t => t.id === id)!.tab_type)))}
           onTabSelect={(id) => {
             const t = tabs.find(x => x.id === id);
             if (t) setActiveTypeOnly(t.tab_type);
           }}
           onTabClose={(id) => {
             const t = tabs.find(x => x.id === id);
-            if (!t || t.tab_type === 'elements') return;
+            if (!t || t.tab_type === 'elements' || onDomainPage) return;
             // The Domain's Overview stays; an Object's can be closed.
             if (!selectedObject && t.tab_type === 'overview') return;
             removeVisibleTab(t.tab_type);
           }}
           onTabCreate={(type) => ensureVisibleTab(type)}
-          createOptions={selectedObject ? OBJECT_CREATE_TAB_TYPES : undefined}
+          // The Domain's own page has its three tabs and no "+".
+          createOptions={selectedObject ? OBJECT_CREATE_TAB_TYPES : onObjectsPage ? OBJECTS_PAGE_CREATE_TABS : NO_CREATE_TABS}
           createTitle={(type) => titleForTab(type, !!selectedObject)}
           rightSlot={
             <>
@@ -584,6 +603,10 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
         />
       </div>
     );
+  }
+
+  if (activeType === 'note') {
+    return <DomainNote key={domainId} domainId={domainId ?? null} />;
   }
 
   if (activeType === 'overview') {
