@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
+import { CHART_PALETTES } from '@/Function/shared/chartPalette';
+import { getCachedChartPalette, setCachedChartPalette, usePreference } from './preferencesStore';
 import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize, POINTER_CURSOR_KEY } from './appearanceOptions';
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
@@ -248,6 +250,7 @@ function PreferencesPanel() {
     const v = THEME_OPTIONS.find((o) => o.label === label)?.value;
     if (v) setTheme(v);
   };
+  const chartPalette = usePreference(getCachedChartPalette);
   const fontLabel = FONT_SIZES.find((f) => f.key === fontKey)?.label ?? 'Default';
   const setFontByLabel = (label: string) => {
     const f = FONT_SIZES.find((x) => x.label === label);
@@ -324,6 +327,13 @@ function PreferencesPanel() {
           value={fontLabel}
           options={FONT_SIZES.map((f) => f.label)}
           onChange={setFontByLabel}
+        />
+        <SelectRow
+          label={t('Chart colors')}
+          desc={t('The colors charts draw in, across the app')}
+          value={(CHART_PALETTES.find((p) => p.key === chartPalette) ?? CHART_PALETTES[0]).label}
+          options={CHART_PALETTES.map((p) => p.label)}
+          onChange={(label) => { const p = CHART_PALETTES.find((x) => x.label === label); if (p) setCachedChartPalette(p.key); }}
         />
         <ToggleRow
           label={t('Use pointer cursors')}
