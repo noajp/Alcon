@@ -19,6 +19,7 @@ import {
   filesInFolder,
   folderDisplayName,
 } from '@/ActivitySpace/artifacts/notebook/noteTree';
+import { NotebookList } from './NotebookList';
 
 import { PageView } from '@/ActivitySpace/artifacts/notebook/PageView';
 import { ObjectDraftDialog } from '@/ActivitySpace/artifacts/notebook/ObjectDraftDialog';
@@ -197,13 +198,11 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
 
   return (
             noteGridMode ? (
-            /* No notebook chosen yet — the list lives in the sidebar now, so
-               this pane just waits for a pick. */
-            <div className="flex-1 flex items-center justify-center bg-card px-6">
-              <p className="text-[13px] text-muted-foreground">
-                {t('Select a notebook from the sidebar.')}
-              </p>
-            </div>
+            /* No notebook chosen yet: Note opens on the list of them. */
+            <NotebookList
+              onOpenBook={(folderId) => onNavigate({ noteFolderId: folderId, noteSectionId: null, noteId: null })}
+              onOpenPage={(page) => onNavigate({ noteId: page.id })}
+            />
             ) : (
             <div className="relative flex-1 flex flex-col overflow-hidden bg-card">
             {/* Breadcrumb — the open Notebook's name. Books and Sections are

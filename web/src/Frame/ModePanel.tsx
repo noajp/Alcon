@@ -28,7 +28,8 @@ export function ModePanel({ activeView, navigation, onNavigate, onViewChange }: 
   let body: React.ReactNode = null;
   switch (mode) {
     case 'notebook':
-      body = <NotebookTree activeFolderId={navigation.noteFolderId ?? null} activeSectionId={navigation.noteSectionId ?? null}
+      // With no notebook (or page) open, Note is the list of notebooks: no panel.
+      body = !navigation.noteFolderId && !navigation.noteId ? null : <NotebookTree activeFolderId={navigation.noteFolderId ?? null} activeSectionId={navigation.noteSectionId ?? null}
         activeFileId={navigation.noteId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />;
       break;
     case 'inbox':
