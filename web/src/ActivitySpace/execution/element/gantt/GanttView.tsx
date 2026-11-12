@@ -13,6 +13,7 @@ import { ElementProgressMark, getElementProgress } from '@/Function/shared/Eleme
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { dragRange } from './ganttRange';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -192,7 +193,7 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, local
 // An Object row is laid out as Linear lays out a project: its name on a
 // line of its own, a quiet bar under it, and its milestones' names under
 // the bar — so the row is tall and the bar is slim.
-const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 78, bar: 20 } } as const;
+const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 88, bar: 30 } } as const;
 const OBJECT_TITLE_TOP = 8;   // px from the row's top to the name line
 const OBJECT_BAR_TOP = 32;    // px from the row's top to the bar
 const SECTION_HEADER_H = 32;
@@ -814,6 +815,37 @@ export function GanttView({
                 );
               })}
 
+              {/* A group's whole span: from its first start to its last due,
+                  drawn as a bracket on the group's own row, with the dates
+                  beside it — the Object's schedule read off its Elements. */}
+              {elementsBySection.map(({ key, name, elements: sectionElements }) => {
+                if (!name) return null;
+                const top = layout.sectionTops.get(key);
+                if (top === undefined) return null;
+                let first: Date | null = null;
+                let last: Date | null = null;
+                for (const el of sectionElements) {
+                  const a = parseDateOnly(el.start_date, null) ?? parseDateOnly(el.due_date, null);
+                  const b = parseDateOnly(el.due_date, null) ?? parseDateOnly(el.start_date, null);
+                  if (a && (!first || a < first)) first = a;
+                  if (b && (!last || b > last)) last = b;
+                }
+                if (!first || !last) return null;
+                const left = daysBetween(dateRange.start, first) * pxPerDay;
+                const width = Math.max((daysBetween(first, last) + 1) * pxPerDay, 12);
+                const color = 'color-mix(in oklab, var(--accent-default) 75%, transparent)';
+                return (
+                  <div key={`span-${key}`} className="pointer-events-none absolute z-[5]" style={{ left, width, top: top + 7 }}>
+                    <div className="h-[5px] rounded-[1px]" style={{ backgroundColor: color }} />
+                    <span className="absolute left-0 top-[5px] h-[6px] w-[6px]" style={{ backgroundColor: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+                    <span className="absolute right-0 top-[5px] h-[6px] w-[6px]" style={{ backgroundColor: color, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+                    <span className="absolute left-1/2 top-[8px] -translate-x-1/2 whitespace-nowrap text-[10px] tabular-nums text-muted-foreground">
+                      {formatDate(first, 'pill', locale)} – {formatDate(last, 'pill', locale)}
+                    </span>
+                  </div>
+                );
+              })}
+
               {/* Today line with pill label */}
               {(() => {
                 const daysFromStart = daysBetween(dateRange.start, startOfDay(new Date()));
@@ -872,7 +904,7 @@ export function GanttView({
                       return (
                         <div key={element.id} className="pointer-events-none absolute" style={{ left: 0, width: timelineWidth, top: top + OBJECT_TITLE_TOP }}>
                           <span className="sticky left-3 inline-flex max-w-[320px] items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
-                            <ObjectIcon size={13} className="shrink-0" />
+                            <span className="flex shrink-0"><ItemIcon icon={element.icon ?? null} color={element.color ?? null} size={13} fallback={<ObjectIcon size={13} />} /></span>
                             <span className="truncate">{element.title}</span>
                             <span className="shrink-0 text-[11px] font-normal text-muted-foreground/70">{t('No dates')}</span>
                           </span>
@@ -932,7 +964,7 @@ export function GanttView({
                       // name sticks to the pane's left edge inside it.
                       <div className="pointer-events-none absolute" style={{ left: barPos.left, width: Math.max(barWidth, 260), top: top + OBJECT_TITLE_TOP }}>
                         <span className="sticky left-3 inline-flex max-w-full items-center gap-1.5 text-[13px] font-medium text-foreground">
-                          <ObjectIcon size={13} className="shrink-0 text-muted-foreground" />
+                          <span className="flex shrink-0 text-muted-foreground"><ItemIcon icon={element.icon ?? null} color={element.color ?? null} size={13} fallback={<ObjectIcon size={13} />} /></span>
                           <span className="truncate">{element.title}</span>
                           {assignedWorkers.length > 0 && <WorkerAvatarStack workers={assignedWorkers} max={2} size={16} itemClassName="border-card" />}
                           {progress > 0 && <span className="shrink-0 text-[11px] font-normal tabular-nums text-muted-foreground">{Math.round(progress)}%</span>}

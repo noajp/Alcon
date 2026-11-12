@@ -41,6 +41,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Key color and red': ['キーカラーと赤', '키 컬러와 빨강', 'Couleur principale et rouge', 'Color principal y rojo'],
   'Key color': ['キーカラー', '키 컬러', 'Couleur principale', 'Color principal'],
   'Vivid': ['鮮やか', '선명하게', 'Vives', 'Vivos'],
+  'Open': ['開く', '열기', 'Ouvrir', 'Abrir'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],
