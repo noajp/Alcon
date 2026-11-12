@@ -12,10 +12,13 @@ import { Button, ButtonAppearanceProvider } from '@/ui/button';
 // not here.
 export function NotebookBreadcrumb({
   folderName,
+  sectionName,
   onBack,
   onAddFile,
 }: {
   folderName: string | null;
+  /** The Section shown, after the notebook's name. */
+  sectionName?: string | null;
   onBack: () => void;
   /** Create a new page in the active Section — the header "+". Hidden when
    *  omitted. */
@@ -32,7 +35,12 @@ export function NotebookBreadcrumb({
       >
         {folderName ?? t('Notebook')}
       </button>
-      <ChevronRight size={12} className="text-muted-foreground/40 shrink-0" />
+      {sectionName && (
+        <>
+          <ChevronRight size={12} className="text-muted-foreground/40 shrink-0" />
+          <span className="min-w-0 truncate px-1.5 text-[13px] font-medium text-foreground">{sectionName}</span>
+        </>
+      )}
       <div className="flex-1" />
       {onAddFile && (
         <ButtonAppearanceProvider appearance="navigation">

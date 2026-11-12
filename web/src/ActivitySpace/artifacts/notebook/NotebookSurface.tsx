@@ -209,6 +209,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
             {resolvedFolderId && (
               <NotebookBreadcrumb
                 folderName={folderDisplayName(nodes, resolvedFolderId)}
+                sectionName={activeSectionName}
                 onBack={() => onNavigate({ noteFolderId: null, noteSectionId: null, noteId: null })}
               />
             )}
