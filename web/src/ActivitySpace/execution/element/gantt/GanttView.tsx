@@ -866,6 +866,19 @@ export function GanttView({
                   // Undated row — full-width invisible lane; sweeping it
                   // schedules the element (preview bar while dragging).
                   if (!barPos) {
+                    // An undated Object only names itself: its dates are set on
+                    // the Object, not swept onto the timeline.
+                    if (objectRows) {
+                      return (
+                        <div key={element.id} className="pointer-events-none absolute" style={{ left: 0, width: timelineWidth, top: top + OBJECT_TITLE_TOP }}>
+                          <span className="sticky left-3 inline-flex max-w-[320px] items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+                            <ObjectIcon size={13} className="shrink-0" />
+                            <span className="truncate">{element.title}</span>
+                            <span className="shrink-0 text-[11px] font-normal text-muted-foreground/70">{t('No dates')}</span>
+                          </span>
+                        </div>
+                      );
+                    }
                     const isCreatingThis = creating?.elementId === element.id;
                     const previewFrom = isCreatingThis ? Math.min(creating.anchorDay, creating.currentDay) : 0;
                     const previewTo = isCreatingThis ? Math.max(creating.anchorDay, creating.currentDay) : 0;
@@ -882,15 +895,6 @@ export function GanttView({
                             setCreating({ elementId: element.id, anchorDay: day, currentDay: day, laneLeft: rect.left });
                           }}
                         />
-                        {objectRows && (
-                          <div className="pointer-events-none absolute" style={{ left: 0, width: timelineWidth, top: top + OBJECT_TITLE_TOP }}>
-                            <span className="sticky left-3 inline-flex max-w-[320px] items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
-                              <ObjectIcon size={13} className="shrink-0" />
-                              <span className="truncate">{element.title}</span>
-                              <span className="shrink-0 text-[11px] font-normal text-muted-foreground/70">{t('No dates')}</span>
-                            </span>
-                          </div>
-                        )}
                         {isCreatingThis && (
                           <div
                             className="absolute rounded-md border-2 border-dashed pointer-events-none z-10"
@@ -955,6 +959,21 @@ export function GanttView({
                         </div>
                       );
                     })}
+                    {isDraggingThis && (() => {
+                      // While a bar is dragged or stretched, the date each moving
+                      // edge lands on is named above it.
+                      const dayAt = (offset: number) => { const d = new Date(dateRange.start); d.setDate(d.getDate() + offset); return d; };
+                      const startDay = Math.round(barPos.left / pxPerDay);
+                      const endDay = startDay + Math.max(1, Math.round(barPos.width / pxPerDay)) - 1;
+                      const pill = 'pointer-events-none absolute z-30 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold leading-[18px] text-white';
+                      const pillTop = barTopOf(top) - 22;
+                      return (
+                        <>
+                          {dragging.type !== 'resize-end' && <span className={pill} style={{ left: barPos.left, top: pillTop }}>{formatDate(dayAt(startDay), 'pill', locale)}</span>}
+                          {dragging.type !== 'resize-start' && <span className={pill} style={{ left: barPos.left + barWidth, top: pillTop }}>{formatDate(dayAt(endDay), 'pill', locale)}</span>}
+                        </>
+                      );
+                    })()}
                     {/* A bar is a quiet surface with a fine edge, as a card is:
                         the status speaks through its mark and the wash of
                         its progress, not by painting the whole bar. */}
@@ -962,7 +981,7 @@ export function GanttView({
                       className={`absolute rounded-md cursor-pointer group border ${objectRows ? 'bg-[color-mix(in_oklab,var(--foreground)_7%,transparent)]' : 'bg-[var(--surface-strong)]'} transition-[border-color,box-shadow] overflow-hidden ${
                         selectedElement === element.id ? 'border-[var(--accent-default)] ring-1 ring-[var(--accent-default)]/40'
                           : isBlocked ? 'border-[var(--status-danger)]/50' : 'border-border/70 hover:border-[var(--border-strong)]'
-                      } ${isDraggingThis ? 'opacity-80 shadow-lg' : ''}`}
+                      } ${isDraggingThis ? 'border-[var(--accent-default)] shadow-lg' : ''}`}
                       style={{
                         left: barPos.left,
                         width: barWidth,
