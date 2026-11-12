@@ -12,12 +12,16 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { Button } from '@/ui/button';
+import { Plus } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetPicker } from './WidgetPicker';
 import { BoardPresence } from './BoardPresence';
 import { useWidgetActionSlot } from './WidgetActionSlot';
 import type { Board } from './useBoard';
 import { ZONES, type WidgetHost, type Zone } from './types';
+
+/** The widget a canvas is: an app AI writes, run in isolation. */
+const CANVAS_TYPE = 'generated-app';
 
 /** The droppable id a zone registers, so an empty zone is still a target. */
 export function zoneDroppableId(zone: Zone): string {
@@ -130,7 +134,16 @@ export function WidgetSurface({
     board.moveWidget(id, toZone, overIndex);
   }, [board]);
 
-  const picker = (
+  // An Object's page takes canvases, not a catalogue of widgets: one part
+  // that AI draws into whatever is asked for — a dashboard, a whiteboard, a
+  // calculator.
+  const canvasOnly = host.subject.kind === 'object' && zones.includes('main');
+  const picker = canvasOnly ? (
+    <Button variant="ghost" size="sm" disabled={board.loading || !!board.error}
+      onClick={() => board.addWidget('main', CANVAS_TYPE)}>
+      <Plus size={14} />{t('Add canvas')}
+    </Button>
+  ) : (
     <WidgetPicker
       disabled={board.loading || !!board.error}
       subjectKind={host.subject.kind}

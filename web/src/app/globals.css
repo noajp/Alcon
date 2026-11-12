@@ -661,6 +661,9 @@ button, a, input, select, textarea {
 }
 
 /* ---- Utility ---- */
+/* A widget surface that takes no room while none of its widgets shows (an
+   empty widget hides itself; its surface would still hold a gap). */
+.board-collapses:not(:has([data-widget]:not(.hidden))) { display: none; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ============================================

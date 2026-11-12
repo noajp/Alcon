@@ -419,7 +419,8 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
     <div className="ml-auto flex items-center gap-2 pr-2"><ViewOnlyBadge /></div>
   ) : selectedObject ? (
     <div className="ml-auto flex items-center gap-2">
-      {!isEmptyObjectElements && (
+      {/* The overview is for reading the Object; Elements are added on its lists. */}
+      {!isEmptyObjectElements && effectiveActiveType !== 'overview' && (
         <Button variant="ghost" size="sm" type="button" className="text-muted-foreground"
           onClick={() => window.dispatchEvent(new CustomEvent('alcon:quick-add-element'))}>
           <Plus size={14} />{t('Add Element')}
