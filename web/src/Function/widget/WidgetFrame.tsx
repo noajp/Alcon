@@ -7,7 +7,6 @@ import { FONT } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { RailCard } from '@/Function/shared/RailCard';
 import { ErrorBoundary } from '@/Function/shared/ErrorBoundary';
-import { ActionsButton, type ActionItem } from '@/Function/shared/ActionMenus';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { FrameVariant } from './types';
 
@@ -114,10 +113,6 @@ export interface WidgetFrameProps {
   onLongPress: () => void;
   /** Absent when this viewer may not take the widget off the board. */
   onRemove?: () => void;
-  /** What the widget's own "…" menu offers — move it, resize it, remove it.
-   *  The same things arrange mode does, reachable without knowing about the
-   *  long press. */
-  actions?: ActionItem[];
   /** A change here clears a caught render error (the widget's params, its subject). */
   resetKey?: unknown;
   /** Runs before a failed body is mounted again, e.g. to rebuild a lazy component whose load failed. */
@@ -164,12 +159,10 @@ export function WidgetFrame({
   padded = true,
   onLongPress,
   onRemove,
-  actions = [],
   resetKey,
   onRetry,
   children,
 }: WidgetFrameProps) {
-  const { t } = useI18n();
   const [empty, setEmpty] = useState(false);
   const reportEmpty = useCallback((next: boolean) => setEmpty(next), []);
   const [meta, setMeta] = useState<string | null>(null);
@@ -260,13 +253,6 @@ export function WidgetFrame({
         <span className="min-w-0 truncate text-[11px] text-muted-foreground tabular-nums">{meta}</span>
       )}
       <span ref={setHeaderSlot} className="flex shrink-0 items-center gap-2" />
-      {/* Shown while the widget is hovered or its menu is in use; always on a
-          screen without hover, where nothing would ever reveal it. */}
-      {actions.length > 0 && !arranging && (
-        <span className="flex opacity-0 transition-opacity group-hover/widget:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100">
-          <ActionsButton items={actions} label={t('Widget options')} align="end" />
-        </span>
-      )}
     </span>
   );
 

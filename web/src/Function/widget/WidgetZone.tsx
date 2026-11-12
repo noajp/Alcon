@@ -14,8 +14,6 @@ import { ConfirmDialog } from '@/Function/shared/ConfirmDialog';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_COMPONENTS, WIDGET_REGISTRY, reloadWidgetComponent } from './registry';
-import { ArrowDown, ArrowUp, Columns3, LayoutGrid, Maximize2, Minus } from '@/ui/icons';
-import type { ActionItem } from '@/Function/shared/ActionMenus';
 import { ZONE_VARIANT, type WidgetComponent, type WidgetInstance, type WidgetParams, type Zone } from './types';
 
 /** Shared so a widget without configuration gets one stable object. */
@@ -162,19 +160,7 @@ function SortableWidget({
   const size = instance.size ?? def.defaultSize ?? 'half';
   const spanClass = columns === 2 && size === 'full' ? 'lg:col-span-2' : '';
 
-  const siblings = board.layout[zone];
-  const index = siblings.findIndex((w) => w.id === instance.id);
   const remove = () => (def.holdsContents ? setConfirmingRemove(true) : board.removeWidget(instance.id));
-  const actions: ActionItem[] = [
-    ...(index > 0 ? [{ key: 'up', label: t('Move up'), icon: <ArrowUp size={14} />, onSelect: () => board.moveWidget(instance.id, zone, index - 1) }] : []),
-    ...(index >= 0 && index < siblings.length - 1 ? [{ key: 'down', label: t('Move down'), icon: <ArrowDown size={14} />, onSelect: () => board.moveWidget(instance.id, zone, index + 1) }] : []),
-    // Width only means something where widgets sit two to a row.
-    ...(columns === 2 ? [size === 'full'
-      ? { key: 'half', label: t('Half width'), icon: <Columns3 size={14} />, onSelect: () => board.setSize(instance.id, 'half') }
-      : { key: 'full', label: t('Full width'), icon: <Maximize2 size={14} />, onSelect: () => board.setSize(instance.id, 'full') }] : []),
-    { key: 'arrange', label: t('Arrange widgets'), icon: <LayoutGrid size={14} />, onSelect: () => setArranging(true) },
-    { key: 'remove', label: t('Remove from this page'), icon: <Minus size={14} />, onSelect: remove, destructive: true, separatorBefore: true },
-  ];
 
   return (
     <div
@@ -193,7 +179,6 @@ function SortableWidget({
         isDragging={isDragging}
         onLongPress={() => setArranging(true)}
         onRemove={remove}
-        actions={actions}
         // New params or a new subject are a new attempt: a caught error clears on its own.
         resetKey={`${bodyKey}|${JSON.stringify(params)}`}
         onRetry={() => setRetriedBody(() => reloadWidgetComponent(instance.type))}
