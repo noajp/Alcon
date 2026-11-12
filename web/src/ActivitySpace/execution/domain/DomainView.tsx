@@ -596,6 +596,8 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
         <GanttView
           elements={objectsAsBars}
           leftHeaderLabel="Objects"
+          rowScale="object"
+          defaultZoom="month"
           onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
           onRefresh={onRefresh}
           phases={domainPhases}
