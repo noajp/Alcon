@@ -201,7 +201,6 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
             /* No notebook chosen yet: Note opens on the list of them. */
             <NotebookList
               onOpenBook={(folderId) => onNavigate({ noteFolderId: folderId, noteSectionId: null, noteId: null })}
-              onOpenPage={(page) => onNavigate({ noteId: page.id })}
             />
             ) : (
             <div className="relative flex-1 flex flex-col overflow-hidden bg-card">

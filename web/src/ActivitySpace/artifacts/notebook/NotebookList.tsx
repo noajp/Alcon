@@ -16,15 +16,10 @@ import { filesInFolder, sectionsInFolder } from './noteTree';
 
 // Note opens on its notebooks, as a list: each with how many sections and
 // pages it holds and when it last changed. A notebook opens into its
-// sections (the panel on the left) and their pages. Under the notebooks,
-// the pages changed most recently, so the last thing written is one click
-// away without knowing which notebook it is in.
+// sections (the panel on the left) and their pages.
 
-const RECENT = 8;
-
-export function NotebookList({ onOpenBook, onOpenPage }: {
+export function NotebookList({ onOpenBook }: {
   onOpenBook: (folderId: string) => void;
-  onOpenPage: (page: NoteNode) => void;
 }) {
   const { t } = useI18n();
   const { nodes, createNode, renameNode, deleteNode } = useNotes();
@@ -36,8 +31,6 @@ export function NotebookList({ onOpenBook, onOpenPage }: {
     const changed = [book.updatedAt, ...pages.map((p) => p.updatedAt)].filter((x): x is string => !!x).sort().at(-1) ?? null;
     return { book, sections: sections.length, pages: pages.length, changed };
   }).sort((a, b) => a.book.name.localeCompare(b.book.name)), [nodes]);
-  const recent = useMemo(() => nodes.filter((n) => n.type === 'file')
-    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')).slice(0, RECENT), [nodes]);
 
   const addBook = async () => {
     try {
@@ -101,23 +94,6 @@ export function NotebookList({ onOpenBook, onOpenPage }: {
           </tbody>
         </table>
         {books.length === 0 && <p className="px-[30px] py-3 text-[13px] text-muted-foreground">{t('No notebooks yet.')}</p>}
-
-        {recent.length > 0 && (
-          <section className="mt-8 px-[30px] pb-8">
-            <h2 className="mb-1.5 text-[12px] text-muted-foreground">{t('Recent')}</h2>
-            <ul className="flex flex-col">
-              {recent.map((page) => (
-                <li key={page.id}>
-                  <button type="button" onClick={() => onOpenPage(page)}
-                    className="-mx-2 flex w-[calc(100%+16px)] min-w-0 items-center gap-3 rounded-md px-2 py-1.5 text-left text-[13.5px] text-foreground transition-colors hover:bg-foreground/[0.04]">
-                    <span className="min-w-0 flex-1 truncate">{page.name || t('Untitled')}</span>
-                    <span className="shrink-0 text-[12px] text-muted-foreground">{when(page.updatedAt)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </div>
     </div>
   );
