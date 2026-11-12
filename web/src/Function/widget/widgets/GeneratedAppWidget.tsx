@@ -52,7 +52,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
     </WidgetHeaderAction>
     {showEditor && <div className="space-y-3">
       <form className="space-y-2" onSubmit={e => { e.preventDefault(); void run(() => store.generate(prompt)); }}>
-        <TextComposer aria-label={t('Describe your canvas')} placeholder={t('Example: A dashboard of this Object’s progress by status and assignee. Or: a whiteboard where we can place and drag sticky notes.')} rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
+        <TextComposer aria-label={t('Describe your canvas')} placeholder={t('Example: Compare social security spending across countries as a chart. Or: a dashboard of this Object’s progress.')} rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
           action={<Button type="submit" variant="primary" size="xs" className="rounded-md px-2" title={t('Send')} aria-label={t('Send')} disabled={locked || !prompt.trim()}><SendIcon size={13} /></Button>}
           secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />{t('Previous version')}</Button>}
         />
