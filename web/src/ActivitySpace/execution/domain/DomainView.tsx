@@ -445,9 +445,12 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
         <HierarchyHeader
           domainName={activeDomain?.name ?? 'Objects'}
           objectName={selectedObject?.name ?? null}
-          // One step back: from an Object to the Domain's Objects; from the
-          // list, on to the Domain's own page.
-          onDomainClick={() => { onNavigate({ objectId: null }); if (!selectedObject) onViewChange?.('domain-overview'); }}
+          // The path names where this is: the Domain, then — on the Objects
+          // screen — "Objects", then the Object. The Domain opens its own
+          // page; "Objects" steps back from an Object to the list.
+          onDomainClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-overview'); }}
+          objectsCrumb={surface === 'objects'}
+          onObjectsClick={selectedObject ? () => onNavigate({ objectId: null }) : undefined}
           objectSlot={selectedObject ? (<>
             <ObjectActionsMenu
               object={selectedObject}
@@ -536,21 +539,29 @@ function HierarchyHeader({
   domainName,
   objectName,
   onDomainClick,
+  objectsCrumb,
+  onObjectsClick,
   objectSlot,
   actions,
 }: {
   domainName: string;
   objectName?: string | null;
   onDomainClick: () => void;
+  /** Show "Objects" between the Domain and the Object. */
+  objectsCrumb?: boolean;
+  /** Present when "Objects" leads somewhere (an Object is open). */
+  onObjectsClick?: () => void;
   /** Rendered immediately after the Object name (the lowest breadcrumb item) —
    *  e.g. the Object "⋯" actions menu. */
   objectSlot?: ReactNode;
   actions?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <IslandHeader
       crumbs={[
         { id: 'domain', label: domainName, onClick: onDomainClick },
+        ...(objectsCrumb ? [{ id: 'objects', label: t('Objects'), onClick: onObjectsClick }] : []),
         ...(objectName ? [{ id: 'object', label: objectName, icon: <ObjectIcon size={12} /> }] : []),
       ]}
       after={objectName ? objectSlot : undefined}
