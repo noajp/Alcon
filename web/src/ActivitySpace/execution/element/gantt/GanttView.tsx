@@ -50,6 +50,9 @@ interface GanttViewProps {
   onElementOpen?: (element: ElementWithDetails) => void;
   /** The zoom it opens at. A Strategy's Gantt opens by quarter. */
   defaultZoom?: ZoomLevel;
+  /** What a row stands for. 'object' rows are roomier with a thicker bar
+   *  and carry no Status mark (an Object has no Status of its own). */
+  rowScale?: keyof typeof ROW_SCALE;
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -183,7 +186,10 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, local
   return units;
 }
 
-const ROW_H = 36;
+// Row and bar heights by what a row stands for: an Element's row is
+// compact; an Object is a bigger unit of work, so its rows stand further
+// apart and its bar is thicker.
+const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 60, bar: 36 } } as const;
 const SECTION_HEADER_H = 32;
 const SECTION_GAP = 8;
 const HEADER_TIER1_H = 20;
@@ -206,7 +212,11 @@ export function GanttView({
   phases = EMPTY_PHASES,
   milestones = EMPTY_MILESTONES,
   defaultZoom = 'day',
+  rowScale = 'element',
 }: GanttViewProps) {
+  const ROW_H = ROW_SCALE[rowScale].row;
+  const BAR_H = ROW_SCALE[rowScale].bar;
+  const objectRows = rowScale === 'object';
   // Bars persist their dates through this callback. Defaults to updateElement
   // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
   // updateObject so dragging an Object bar writes objects.start_date /
@@ -310,7 +320,7 @@ export function GanttView({
       y += SECTION_GAP;
     });
     return { tops, sectionTops, totalHeight: y };
-  }, [elementsBySection, collapsedSections]);
+  }, [elementsBySection, collapsedSections, ROW_H]);
 
   // Calculate position for an Element bar (with drag offset applied)
   const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
@@ -631,10 +641,12 @@ export function GanttView({
                       >
                         {/* The same status mark as the list row, so a change
                             in either reads the same here. */}
-                        <span className="shrink-0 flex items-center">
-                          <ElementProgressMark status={element.status} progress={getElementProgress(element)} size={14} />
-                        </span>
-                        <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {!objectRows && (
+                          <span className="shrink-0 flex items-center">
+                            <ElementProgressMark status={element.status} progress={getElementProgress(element)} size={14} />
+                          </span>
+                        )}
+                        <span className={`${objectRows ? 'text-[13px] font-medium' : 'text-xs'} truncate flex-1 ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
                           {element.title}
                         </span>
                         <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">
@@ -862,11 +874,12 @@ export function GanttView({
                         />
                         {isCreatingThis && (
                           <div
-                            className="absolute h-6 rounded-md border-2 border-dashed pointer-events-none z-10"
+                            className="absolute rounded-md border-2 border-dashed pointer-events-none z-10"
                             style={{
+                              height: BAR_H,
                               left: previewFrom * pxPerDay,
                               width: Math.max((previewTo - previewFrom + 1) * pxPerDay, 8),
-                              top: top + (ROW_H - 24) / 2,
+                              top: top + (ROW_H - BAR_H) / 2,
                               borderColor: statusColor(element.status),
                               backgroundColor: statusTint(element.status),
                             }}
@@ -894,14 +907,15 @@ export function GanttView({
                         the status speaks through its mark and the wash of
                         its progress, not by painting the whole bar. */}
                     <div
-                      className={`absolute h-6 rounded-md cursor-pointer group border bg-[var(--surface-strong)] transition-[border-color,box-shadow] overflow-hidden ${
+                      className={`absolute ${objectRows ? 'rounded-lg' : 'rounded-md'} cursor-pointer group border bg-[var(--surface-strong)] transition-[border-color,box-shadow] overflow-hidden ${
                         selectedElement === element.id ? 'border-[var(--accent-default)] ring-1 ring-[var(--accent-default)]/40'
                           : isBlocked ? 'border-[var(--status-danger)]/50' : 'border-border/70 hover:border-[var(--border-strong)]'
                       } ${isDraggingThis ? 'opacity-80 shadow-lg' : ''}`}
                       style={{
                         left: barPos.left,
                         width: barWidth,
-                        top: top + (ROW_H - 24) / 2,
+                        height: BAR_H,
+                        top: top + (ROW_H - BAR_H) / 2,
                         boxShadow: isDraggingThis ? undefined : '0 1px 2px var(--gantt-bar-shadow)',
                       }}
                       onClick={() => { if (!draggedRef.current) activateElement(element); }}
@@ -947,8 +961,8 @@ export function GanttView({
                       {showLabel && (
                         <div className="absolute inset-0 flex items-center justify-between px-2 overflow-hidden gap-2 pointer-events-none">
                           <span className="flex min-w-0 items-center gap-1.5">
-                            <ElementProgressMark status={element.status} progress={progress} size={12} />
-                            <span className={`text-[11.5px] font-medium truncate ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
+                            {!objectRows && <ElementProgressMark status={element.status} progress={progress} size={12} />}
+                            <span className={`${objectRows ? 'text-[13px]' : 'text-[11.5px]'} font-medium truncate ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
                               {element.title}
                             </span>
                           </span>
