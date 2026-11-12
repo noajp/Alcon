@@ -59,13 +59,9 @@ export function FilesPane({
 
   return (
     <aside className="w-full sm:w-60 shrink-0 flex flex-col border-r border-border/40 bg-card/30">
-      {/* Header — h-[50px] + bottom divider lines this header up with the
-          editor's toolbar header so the two panes share one header band. */}
-      <div className="flex items-center gap-2 h-[50px] px-3 border-b border-border/30">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{title ?? ''}</span>
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-2">
+      {/* No heading: the Section is named (and highlighted) in the panel
+          beside this list. */}
+      <div className="flex-1 overflow-y-auto pb-2 pt-2">
         {!title && (
           <div className="px-3 py-6 text-center text-[11px] leading-relaxed text-muted-foreground/60">{t('Select a notebook to see its pages')}</div>
         )}
