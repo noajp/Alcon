@@ -41,7 +41,7 @@ export function SiteCredentialsSection({ spaceId, integrations, isOwner, ownerKn
     <section className="space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className={FONT.label}>{t('Site logins')}</h3>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Site logins')}</h2>
           <p className="mt-1 max-w-xl text-[12px] text-muted-foreground">
             {t('Sign-ins for websites that have no connection. The saved username and password are used only on that site, and the password is never shown back.')}
           </p>

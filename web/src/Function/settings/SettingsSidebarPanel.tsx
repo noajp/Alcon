@@ -12,35 +12,24 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 
 
-/** A page listed in the nav — opened on `tab` when the search matched one of its tabs. */
-interface NavHit { item: SettingsNavItem; tab?: string }
-
 // The Settings navigation rendered INSIDE the AppSidebar (it replaces the
-// Activity Space tree while Settings mode is active). Settings is one page:
-// selecting an item reveals its area (SettingsView scrolls it into view),
-// and the highlighted row follows SettingsView's scroll-spy as the reader
-// moves down the page.
+// Activity Space tree while Settings mode is active). One row is one page.
 export function SettingsSidebarPanel() {
   const { t } = useI18n();
-  const stored = useActiveSettingsSection();
-  const active = stored;
+  const active = useActiveSettingsSection();
   const [query, setQuery] = useState('');
 
-  // Search matches a page by its own label or by one of its tabs, so
-  // "Labels" still finds Objects and Elements; picking such a hit opens
-  // the page on that tab.
-  const filtered = useMemo((): { title: string; items: NavHit[] }[] => {
+  // Search matches a page by its row label, its page heading or its
+  // section, so "Element" finds the three Element pages.
+  const filtered = useMemo((): { title: string; items: SettingsNavItem[] }[] => {
     const q = query.trim().toLowerCase();
-    const nav = SETTINGS_NAV;
-    if (!q) return nav.map((s) => ({ title: s.title, items: s.items.map((item) => ({ item })) }));
-    return nav
+    if (!q) return SETTINGS_NAV;
+    return SETTINGS_NAV
       .map((s) => ({
         title: s.title,
-        items: s.items.flatMap((item): NavHit[] => {
-          if (t(item.label).toLowerCase().includes(q)) return [{ item }];
-          const tab = item.tabs?.find((x) => t(x.label).toLowerCase().includes(q));
-          return tab ? [{ item, tab: tab.id }] : [];
-        }),
+        items: t(s.title).toLowerCase().includes(q)
+          ? s.items
+          : s.items.filter((item) => [item.label, item.title ?? ''].some((x) => t(x).toLowerCase().includes(q))),
       }))
       .filter((s) => s.items.length > 0);
   }, [query, t]);
@@ -63,7 +52,7 @@ export function SettingsSidebarPanel() {
         <div key={section.title} className="mb-3">
           <SidebarSectionLabel className="mb-1">{t(section.title)}</SidebarSectionLabel>
           <div className="space-y-0.5">
-            {section.items.map(({ item, tab }) => {
+            {section.items.map((item) => {
               const Icon = item.icon;
               return (
                 <SidebarRow
@@ -71,8 +60,7 @@ export function SettingsSidebarPanel() {
                   active={active === item.id}
                   icon={<Icon size={16} />}
                   label={t(item.label)}
-                  meta={tab ? t(item.tabs!.find((x) => x.id === tab)!.label) : undefined}
-                  onClick={() => setActiveSettingsSection(item.id, tab)}
+                  onClick={() => setActiveSettingsSection(item.id)}
                 />
               );
             })}

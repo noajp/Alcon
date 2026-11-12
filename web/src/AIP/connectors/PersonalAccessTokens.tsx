@@ -8,7 +8,7 @@ import { Input } from '@/ui/input';
 import { ChoiceCard } from '@/ui/choice-card';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { FONT } from '@/shared/designTokens';
+import { FONT, SETTINGS_ISLAND } from '@/shared/designTokens';
 import type { PersonalAccessToken, PersonalAccessTokenAccess } from '@/types/database';
 import { CopyButton, CopyField } from './CopyField';
 import { claudeMcpAddCommand, usePersonalAccessTokenActions, usePersonalAccessTokens, type TokenExpiryDays } from './patData';
@@ -65,41 +65,39 @@ export function PersonalAccessTokens() {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className={`${FONT.lg} text-foreground`}>{t('Personal access tokens')}</h3>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            {t('A token lets an MCP client or script act as you. It sees and changes only what you can. Revoke it to cut it off at once.')}
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => setGenerating(true)}>
-          <Plus size={14} aria-hidden="true" />
-          <span>{t('Generate token')}</span>
-        </Button>
+      <div>
+        <h2 className={`${FONT.lg} text-foreground`}>{t('Personal access tokens')}</h2>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {t('For Claude Code, scripts and any client that sends an Authorization header. A token acts as you and sees and changes only what you can; a new one comes with the command that connects Claude Code.')}
+        </p>
       </div>
 
-      {error ? (
-        <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load tokens: {error}", { error: error.message })}</p>
-      ) : loading ? (
-        <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
-      ) : tokens.length === 0 ? (
-        <p className="text-[12px] text-muted-foreground">{t('No tokens yet.')}</p>
-      ) : (
-        <div>
-          {tokens.map((token) => (
-            <div key={token.id} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/40">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-[13px] font-medium text-foreground">{token.name}</span>
-                  <code className="shrink-0 font-mono text-[11px] text-muted-foreground">{token.token_prefix}…</code>
-                </div>
-                <div className="truncate text-[12px] text-muted-foreground">{describe(token)}</div>
-              </div>
-              <Button variant="danger" size="xs" onClick={() => confirmRevoke(token)} disabled={revoke.isPending}>{t('Revoke')}</Button>
-            </div>
-          ))}
+      <div className={`${SETTINGS_ISLAND} divide-y divide-[var(--border-subtle)]`}>
+        <div className="flex items-center justify-between gap-4 px-5 py-2.5">
+          <span className="min-w-0 text-[13px] text-muted-foreground">
+            {error ? <span className="text-[var(--status-danger)]">{t("Couldn't load tokens: {error}", { error: error.message })}</span>
+              : loading ? t('Loading…')
+              : tokens.length === 0 ? t('No tokens yet.')
+              : t('{n} token(s)', { n: tokens.length })}
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setGenerating(true)}>
+            <Plus size={14} aria-hidden="true" />
+            <span>{t('Generate token')}</span>
+          </Button>
         </div>
-      )}
+        {tokens.map((token) => (
+          <div key={token.id} className="flex items-center gap-3 px-5 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-[13px] font-medium text-foreground">{token.name}</span>
+                <code className="shrink-0 font-mono text-[11px] text-muted-foreground">{token.token_prefix}…</code>
+              </div>
+              <div className="truncate text-[12px] text-muted-foreground">{describe(token)}</div>
+            </div>
+            <Button variant="danger" size="xs" onClick={() => confirmRevoke(token)} disabled={revoke.isPending}>{t('Revoke')}</Button>
+          </div>
+        ))}
+      </div>
       {revokeError && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{revokeError}</p>}
 
       {generating && <GenerateTokenDialog onClose={() => setGenerating(false)} />}

@@ -45,20 +45,20 @@ export function stripOAuthReturn(href: string): string {
   return `${u.pathname}${u.search}${u.hash}`;
 }
 
-/** sessionStorage: the Settings › AI tab a sign-in was started from, when it is not Connectors (a harness install returns to Harnesses). */
-const OAUTH_RETURN_SETTINGS_TAB_KEY = 'alcon.integrationOAuth.returnTab';
-const RETURN_TABS = new Set(['definitions', 'external']);
+/** sessionStorage: the Settings page a sign-in was started from, when it is not Connectors (a harness install returns to Harnesses). */
+const OAUTH_RETURN_SETTINGS_PAGE_KEY = 'alcon.integrationOAuth.returnPage';
+const RETURN_PAGES = new Set(['harnesses', 'connectors']);
 
-export function saveOAuthReturnSettingsTab(tab: string): void {
-  try { sessionStorage.setItem(OAUTH_RETURN_SETTINGS_TAB_KEY, tab); } catch { /* storage unavailable */ }
+export function saveOAuthReturnSettingsPage(page: string): void {
+  try { sessionStorage.setItem(OAUTH_RETURN_SETTINGS_PAGE_KEY, page); } catch { /* storage unavailable */ }
 }
 
-/** The Settings › AI tab to come back to, read once; null means Connectors, as before. */
-export function takeOAuthReturnSettingsTab(): string | null {
+/** The Settings page to come back to, read once; null means Connectors. */
+export function takeOAuthReturnSettingsPage(): string | null {
   try {
-    const tab = sessionStorage.getItem(OAUTH_RETURN_SETTINGS_TAB_KEY);
-    sessionStorage.removeItem(OAUTH_RETURN_SETTINGS_TAB_KEY);
-    return tab && RETURN_TABS.has(tab) ? tab : null;
+    const page = sessionStorage.getItem(OAUTH_RETURN_SETTINGS_PAGE_KEY);
+    sessionStorage.removeItem(OAUTH_RETURN_SETTINGS_PAGE_KEY);
+    return page && RETURN_PAGES.has(page) ? page : null;
   } catch {
     return null;
   }

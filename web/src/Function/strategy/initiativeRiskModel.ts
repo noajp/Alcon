@@ -38,7 +38,7 @@ export interface RiskObject {
   name: string;
   /** Carried so a finding can be opened; the computation never reads it. */
   domainId?: string | null;
-  /** This Object's Domain's own thresholds (Settings > Elements > SLAs),
+  /** This Object's Domain's own thresholds (Settings > Strategy > Risk thresholds),
    *  already parsed by the caller. Only stallMinutes / idleHours /
    *  dueSoonDays are honoured here — they are judgements about one Object's
    *  work. concentrationThreshold measures one Worker's share of the whole
@@ -293,7 +293,7 @@ export function computeInitiativeRisk(
   //
   // Stalled / due-soon / idle are judged with the thresholds of the Object
   // being assessed — its Domain's own idea of "too quiet" and "too close"
-  // (Settings > Elements > SLAs) — falling back to the Strategy-level
+  // (Settings > Strategy > Risk thresholds) — falling back to the Strategy-level
   // options, then the defaults. The Strategy totals are the union across
   // Objects: a multi-homed Element counts once, and counts if any home flags
   // it. With no per-Object thresholds this is the same arithmetic as one

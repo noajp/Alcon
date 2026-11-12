@@ -11,8 +11,8 @@ export interface OpenScreen {
   navigation: NavigationState;
   /** Where Settings' Back goes, when Settings is open. */
   settingsReturn: string | null;
-  /** The Settings page and its tab. */
-  settings: { section: string; tab: string | null } | null;
+  /** The Settings page. */
+  settings: { section: string } | null;
 }
 
 const KEY = 'alcon.open-screen.v1';
@@ -38,7 +38,7 @@ export function openScreenFrom(raw: unknown, isView: (view: string) => boolean):
     view,
     navigation: { ...(navigation as Partial<NavigationState>), objectId: str(navigation.objectId) } as NavigationState,
     settingsReturn: settingsReturn && isView(settingsReturn) ? settingsReturn : null,
-    settings: section ? { section, tab: str(s?.tab) } : null,
+    settings: section ? { section } : null,
   };
 }
 
