@@ -500,7 +500,6 @@ export function GanttView({
     setCollapsedSections(next);
   };
 
-  const todayStr = formatDate(new Date(), 'pill', locale);
 
   /** Compact "Jun 8 – Jun 19" range text for the left row (— when undated). */
   const rowDateLabel = (el: ElementWithDetails): string | null => {
@@ -802,20 +801,12 @@ export function GanttView({
                 const leftPos = daysFromStart * pxPerDay + (pxPerDay / 2);
                 if (leftPos > 0 && leftPos < timelineWidth) {
                   return (
-                    <>
-                      <div
-                        className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                        style={{ left: leftPos - 0.5, width: 1, backgroundColor: 'color-mix(in oklab, var(--accent-default) 70%, transparent)' }}
-                      />
-                      <div
-                        className="absolute z-20 pointer-events-none"
-                        style={{ left: leftPos, top: 4, transform: 'translateX(-50%)' }}
-                      >
-                        <span className="inline-block text-[10px] font-semibold text-white bg-[var(--accent-default)] px-1.5 py-0.5 rounded-md shadow-sm whitespace-nowrap">
-                          Today · {todayStr}
-                        </span>
-                      </div>
-                    </>
+                    // The line alone marks today: a label on it sat over the
+                    // dates in the header above. The header already tints today.
+                    <div
+                      className="absolute top-0 bottom-0 z-10 pointer-events-none"
+                      style={{ left: leftPos - 0.5, width: 1, backgroundColor: 'color-mix(in oklab, var(--accent-default) 70%, transparent)' }}
+                    />
                   );
                 }
                 return null;
@@ -967,7 +958,8 @@ export function GanttView({
                             </span>
                           </span>
                           {showDueDate && element.due_date && (
-                            <span className="text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">
+                            <span className="flex flex-shrink-0 items-center gap-1 text-[10px] tabular-nums text-muted-foreground">
+                              <CalendarDays size={10} className="shrink-0" />
                               {formatDate(parseDateOnly(element.due_date, null)!, 'pill', locale)}
                             </span>
                           )}
