@@ -660,6 +660,13 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
 // Objects render as a flat list (matching "one bar per Object"). Status is
 // pinned to 'todo' for a neutral bar colour — Objects don't carry a status of
 // their own, and showing them all the same colour is the honest read.
+/** Pure. The share of an Object's Elements that are done, 0–100; null with none. */
+function objectProgress(o: AlconObjectWithChildren): number | null {
+  const open = (o.elements ?? []).filter((e) => e.status !== 'cancelled');
+  if (open.length === 0) return null;
+  return Math.round((open.filter((e) => e.status === 'done').length / open.length) * 100);
+}
+
 export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
   return {
     id: o.id,
@@ -680,7 +687,7 @@ export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails
     color: o.color ?? null,
     estimated_hours: null,
     actual_hours: null,
-    progress: null,
+    progress: objectProgress(o),
     direction: null,
     order_index: o.order_index ?? null,
     is_approval: false,

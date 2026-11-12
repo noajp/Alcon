@@ -189,7 +189,12 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, local
 // Row and bar heights by what a row stands for: an Element's row is
 // compact; an Object is a bigger unit of work, so its rows stand further
 // apart and its bar is thicker.
-const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 60, bar: 36 } } as const;
+// An Object row is laid out as Linear lays out a project: its name on a
+// line of its own, a quiet bar under it, and its milestones' names under
+// the bar — so the row is tall and the bar is slim.
+const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 78, bar: 20 } } as const;
+const OBJECT_TITLE_TOP = 8;   // px from the row's top to the name line
+const OBJECT_BAR_TOP = 32;    // px from the row's top to the bar
 const SECTION_HEADER_H = 32;
 const SECTION_GAP = 8;
 const HEADER_TIER1_H = 20;
@@ -217,6 +222,8 @@ export function GanttView({
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
   const objectRows = rowScale === 'object';
+  /** Where a row's bar starts, from the row's top. */
+  const barTopOf = (rowTop: number) => rowTop + (objectRows ? OBJECT_BAR_TOP : (ROW_H - BAR_H) / 2);
   // Bars persist their dates through this callback. Defaults to updateElement
   // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
   // updateObject so dragging an Object bar writes objects.start_date /
@@ -500,7 +507,6 @@ export function GanttView({
     setCollapsedSections(next);
   };
 
-  const todayStr = formatDate(new Date(), 'pill', locale);
 
   /** Compact "Jun 8 – Jun 19" range text for the left row (— when undated). */
   const rowDateLabel = (el: ElementWithDetails): string | null => {
@@ -579,8 +585,9 @@ export function GanttView({
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden" ref={containerRef}>
-        {/* Left panel — Element list */}
-        <div className="w-64 min-w-64 border-r border-border/60 flex flex-col bg-card">
+        {/* Left panel — Element list. Object rows carry their names on the
+            timeline itself, so they have no list beside it. */}
+        <div className={`w-64 min-w-64 border-r border-border/60 flex-col bg-card ${objectRows ? 'hidden' : 'flex'}`}>
           {/* Header */}
           <div className="flex items-center px-3 border-b border-border/60" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
             <span className="text-[11px] font-semibold text-muted-foreground">{t(leftHeaderLabel)}</span>
@@ -672,7 +679,18 @@ export function GanttView({
             ref={timelineRef}
             style={{ scrollbarWidth: 'none', height: HEADER_TIER1_H + HEADER_TIER2_H }}
           >
-            <div style={{ width: timelineWidth }}>
+            <div className="relative" style={{ width: timelineWidth }}>
+              {zoom !== 'day' && (() => {
+                const left = daysBetween(dateRange.start, startOfDay(new Date())) * pxPerDay + pxPerDay / 2;
+                if (left <= 0 || left >= timelineWidth) return null;
+                // Today, named in the date row itself — where the line below points.
+                return (
+                  <span className="absolute z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold leading-[18px] text-white"
+                    style={{ left, top: HEADER_TIER1_H + (HEADER_TIER2_H - 18) / 2 }}>
+                    {formatDate(new Date(), 'pill', locale)}
+                  </span>
+                );
+              })()}
               <div className="flex" style={{ height: HEADER_TIER1_H }}>
                 {headerSpans.map((span, idx) => (
                   <div
@@ -802,20 +820,12 @@ export function GanttView({
                 const leftPos = daysFromStart * pxPerDay + (pxPerDay / 2);
                 if (leftPos > 0 && leftPos < timelineWidth) {
                   return (
-                    <>
-                      <div
-                        className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                        style={{ left: leftPos - 0.5, width: 1, backgroundColor: 'color-mix(in oklab, var(--accent-default) 70%, transparent)' }}
-                      />
-                      <div
-                        className="absolute z-20 pointer-events-none"
-                        style={{ left: leftPos, top: 4, transform: 'translateX(-50%)' }}
-                      >
-                        <span className="inline-block text-[10px] font-semibold text-white bg-[var(--accent-default)] px-1.5 py-0.5 rounded-md shadow-sm whitespace-nowrap">
-                          Today · {todayStr}
-                        </span>
-                      </div>
-                    </>
+                    // The line alone marks today: a label on it sat over the
+                    // dates in the header above. The header already tints today.
+                    <div
+                      className="absolute top-0 bottom-0 z-10 pointer-events-none"
+                      style={{ left: leftPos - 0.5, width: 1, backgroundColor: 'color-mix(in oklab, var(--accent-default) 70%, transparent)' }}
+                    />
                   );
                 }
                 return null;
@@ -826,7 +836,7 @@ export function GanttView({
                   regardless of the current grouping. Same MilestoneDiamond
                   atom the Strategy Timeline uses; read-only here (no onClick),
                   so add/delete stays that view's job. */}
-              {milestones.map((m) => {
+              {!objectRows && milestones.map((m) => {
                 const date = parseDateOnly(m.date, null);
                 if (!date) return null;
                 const left = daysBetween(dateRange.start, date) * pxPerDay + pxPerDay / 2;
@@ -872,6 +882,15 @@ export function GanttView({
                             setCreating({ elementId: element.id, anchorDay: day, currentDay: day, laneLeft: rect.left });
                           }}
                         />
+                        {objectRows && (
+                          <div className="pointer-events-none absolute" style={{ left: 0, width: timelineWidth, top: top + OBJECT_TITLE_TOP }}>
+                            <span className="sticky left-3 inline-flex max-w-[320px] items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+                              <ObjectIcon size={13} className="shrink-0" />
+                              <span className="truncate">{element.title}</span>
+                              <span className="shrink-0 text-[11px] font-normal text-muted-foreground/70">{t('No dates')}</span>
+                            </span>
+                          </div>
+                        )}
                         {isCreatingThis && (
                           <div
                             className="absolute rounded-md border-2 border-dashed pointer-events-none z-10"
@@ -879,7 +898,7 @@ export function GanttView({
                               height: BAR_H,
                               left: previewFrom * pxPerDay,
                               width: Math.max((previewTo - previewFrom + 1) * pxPerDay, 8),
-                              top: top + (ROW_H - BAR_H) / 2,
+                              top: barTopOf(top),
                               borderColor: statusColor(element.status),
                               backgroundColor: statusTint(element.status),
                             }}
@@ -903,11 +922,44 @@ export function GanttView({
 
                   return (
                     <React.Fragment key={element.id}>
+                    {objectRows && (
+                      // The name rides above its bar and stays in view while
+                      // any of the bar is: the wrapper spans the bar, the
+                      // name sticks to the pane's left edge inside it.
+                      <div className="pointer-events-none absolute" style={{ left: barPos.left, width: Math.max(barWidth, 260), top: top + OBJECT_TITLE_TOP }}>
+                        <span className="sticky left-3 inline-flex max-w-full items-center gap-1.5 text-[13px] font-medium text-foreground">
+                          <ObjectIcon size={13} className="shrink-0 text-muted-foreground" />
+                          <span className="truncate">{element.title}</span>
+                          {assignedWorkers.length > 0 && <WorkerAvatarStack workers={assignedWorkers} max={2} size={16} itemClassName="border-card" />}
+                          {progress > 0 && <span className="shrink-0 text-[11px] font-normal tabular-nums text-muted-foreground">{Math.round(progress)}%</span>}
+                          {element.due_date && (
+                            <span className="flex shrink-0 items-center gap-1 text-[11px] font-normal tabular-nums text-muted-foreground">
+                              <CalendarDays size={10} />
+                              {formatDate(parseDateOnly(element.due_date, null)!, 'pill', locale)}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {objectRows && milestones.filter((m) => m.object_id === element.id).map((m) => {
+                      const date = parseDateOnly(m.date, null);
+                      if (!date) return null;
+                      const left = daysBetween(dateRange.start, date) * pxPerDay + pxPerDay / 2;
+                      if (left < 0 || left > timelineWidth) return null;
+                      return (
+                        // A milestone is a diamond on its Object's bar, named under it.
+                        <div key={m.id} className="pointer-events-none absolute z-20 flex -translate-x-1/2 flex-col items-center" style={{ left, top: barTopOf(top) + (BAR_H - 8) / 2 }}
+                          title={m.label ?? undefined}>
+                          <span className="size-2 rotate-45 rounded-[1px] bg-[var(--text-secondary)]" />
+                          {m.label && <span className="mt-[9px] max-w-[120px] truncate text-[10px] text-muted-foreground">{m.label}</span>}
+                        </div>
+                      );
+                    })}
                     {/* A bar is a quiet surface with a fine edge, as a card is:
                         the status speaks through its mark and the wash of
                         its progress, not by painting the whole bar. */}
                     <div
-                      className={`absolute ${objectRows ? 'rounded-lg' : 'rounded-md'} cursor-pointer group border bg-[var(--surface-strong)] transition-[border-color,box-shadow] overflow-hidden ${
+                      className={`absolute rounded-md cursor-pointer group border ${objectRows ? 'bg-[color-mix(in_oklab,var(--foreground)_7%,transparent)]' : 'bg-[var(--surface-strong)]'} transition-[border-color,box-shadow] overflow-hidden ${
                         selectedElement === element.id ? 'border-[var(--accent-default)] ring-1 ring-[var(--accent-default)]/40'
                           : isBlocked ? 'border-[var(--status-danger)]/50' : 'border-border/70 hover:border-[var(--border-strong)]'
                       } ${isDraggingThis ? 'opacity-80 shadow-lg' : ''}`}
@@ -915,7 +967,7 @@ export function GanttView({
                         left: barPos.left,
                         width: barWidth,
                         height: BAR_H,
-                        top: top + (ROW_H - BAR_H) / 2,
+                        top: barTopOf(top),
                         boxShadow: isDraggingThis ? undefined : '0 1px 2px var(--gantt-bar-shadow)',
                       }}
                       onClick={() => { if (!draggedRef.current) activateElement(element); }}
@@ -958,16 +1010,17 @@ export function GanttView({
                       />
 
                       {/* Inner label + optional due date */}
-                      {showLabel && (
+                      {showLabel && !objectRows && (
                         <div className="absolute inset-0 flex items-center justify-between px-2 overflow-hidden gap-2 pointer-events-none">
                           <span className="flex min-w-0 items-center gap-1.5">
-                            {!objectRows && <ElementProgressMark status={element.status} progress={progress} size={12} />}
-                            <span className={`${objectRows ? 'text-[13px]' : 'text-[11.5px]'} font-medium truncate ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
+                            <ElementProgressMark status={element.status} progress={progress} size={12} />
+                            <span className={`text-[11.5px] font-medium truncate ${isDone ? 'text-muted-foreground' : 'text-foreground'}`}>
                               {element.title}
                             </span>
                           </span>
                           {showDueDate && element.due_date && (
-                            <span className="text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">
+                            <span className="flex flex-shrink-0 items-center gap-1 text-[10px] tabular-nums text-muted-foreground">
+                              <CalendarDays size={10} className="shrink-0" />
                               {formatDate(parseDateOnly(element.due_date, null)!, 'pill', locale)}
                             </span>
                           )}
@@ -979,7 +1032,7 @@ export function GanttView({
                         the bar has overflow-hidden (for the progress fill's
                         clip) and this deliberately overlaps its right edge,
                         so it has to sit outside that boundary. */}
-                    {assignedWorkers.length > 0 && (
+                    {assignedWorkers.length > 0 && !objectRows && (
                       <div
                         className="absolute flex items-center pointer-events-none"
                         style={{ left: barPos.left + barWidth - 4, top: top + (ROW_H - 18) / 2 }}
