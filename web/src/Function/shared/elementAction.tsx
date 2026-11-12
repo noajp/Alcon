@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  Activity, Check, FileText, Forward, ListTree, MessageCircleQuestion, PenLine, Play, Scale, Search, Send, ShieldCheck,
-  Stamp, UserCheck,
+  Activity, Check, FileText, Forward, ListTree, MessageCircleQuestion, PenLine, Play, Scale, Search, SearchCheck, Send, ShieldCheck,
+  Stamp,
 } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -18,13 +18,13 @@ import { ELEMENT_ACTIONS, isHumanAction, type ElementAction } from './elementAct
 const ICON: Record<ElementAction, typeof Scale> = {
   judge: Scale,            // weighing options
   decide: Stamp,           // the seal on a settled call
-  approve: UserCheck,      // a person said yes
+  approve: ShieldCheck,    // a person's yes, as a shield: nothing passes without it
   answer: MessageCircleQuestion, // only someone who knows can answer
   plan: ListTree,          // breaking it down
   research: Search,
   create: PenLine,
   execute: Play,
-  verify: ShieldCheck,
+  verify: SearchCheck,     // looked into, and found right
   report: FileText,
   send: Send,
   delegate: Forward,

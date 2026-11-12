@@ -7,9 +7,9 @@ import { useNow } from '@/Function/shared/useNow';
 import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/Function/shared/dateUtils';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
-import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { Plus, Check, Tag, X } from '@/ui/icons';
+import { Plus, Check, ChevronLeft, ChevronRight, Tag, X } from '@/ui/icons';
 import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
@@ -69,6 +69,55 @@ function CellClearFooter({
   );
 }
 
+// Industry starter vocabularies for the Type picker — each tab offers ~10
+// type names that read naturally in that field. Terms intentionally overlap
+// across industries (Task, Customer, Order…); picking one adds it to this
+// Domain's list and assigns it.
+const TYPE_PRESETS: { label: string; types: string[] }[] = [
+  // design-lint-ignore — preserve existing user-selectable type presets during extraction.
+  { label: 'General',        types: ['Task', 'Issue', 'Customer', 'Bug', 'Feature', 'Story', 'Epic', 'Goal', 'Risk', 'Note'] },
+  { label: 'Project Office', types: ['Project', 'Deliverable', 'Milestone', 'Risk', 'Issue', 'Change Request', 'Action Item', 'Decision', 'Stakeholder', 'Resource'] },
+  { label: 'CRM',            types: ['Lead', 'Contact', 'Account', 'Opportunity', 'Deal', 'Customer', 'Ticket', 'Strategy', 'Activity', 'Quote'] },
+  { label: 'SCM',            types: ['Order', 'Shipment', 'Supplier', 'Inventory', 'SKU', 'Purchase Order', 'Warehouse', 'Lot', 'Delivery', 'Forecast'] },
+  // design-lint-ignore — preserve existing user-selectable type presets during extraction.
+  { label: 'Software',       types: ['Epic', 'Story', 'Task', 'Bug', 'Feature', 'Spike', 'Incident', 'Release', 'Sprint', 'Subtask'] },
+  { label: 'Healthcare',     types: ['Patient', 'Encounter', 'Appointment', 'Order', 'Medication', 'Lab', 'Diagnosis', 'Procedure', 'Referral', 'Claim'] },
+  { label: 'Finance',        types: ['Account', 'Transaction', 'Invoice', 'Payment', 'Journal', 'Budget', 'Expense', 'Asset', 'Ledger', 'Reconciliation'] },
+  { label: 'Sales',          types: ['Lead', 'Prospect', 'Opportunity', 'Quote', 'Order', 'Contract', 'Account', 'Activity', 'Target', 'Renewal'] },
+];
+
+/** A row of tabs wider than its box: no scrollbar — the row fades out toward
+ *  a round arrow at the edge it can still move to, and the arrow moves it. */
+function TabStrip({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [edge, setEdge] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setEdge({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+  }, []);
+  useEffect(() => { measure(); }, [measure]);
+  const move = (by: number) => ref.current?.scrollBy({ left: by, behavior: 'smooth' });
+  const fade = `linear-gradient(to right, ${edge.left ? 'transparent, black 44px' : 'black, black'}, ${edge.right ? 'black calc(100% - 44px), transparent' : 'black'})`;
+  const ARROW = 'absolute top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-popover text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:text-foreground';
+  return (
+    <div className="relative">
+      <div ref={ref} onScroll={measure}
+        className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ maskImage: fade, WebkitMaskImage: fade }}>
+        {children}
+      </div>
+      {edge.left && (
+        <button type="button" aria-label={t('Previous')} className={`${ARROW} left-0`} onClick={() => move(-160)}><ChevronLeft size={13} /></button>
+      )}
+      {edge.right && (
+        <button type="button" aria-label={t('Next')} className={`${ARROW} right-0`} onClick={() => move(160)}><ChevronRight size={13} /></button>
+      )}
+    </div>
+  );
+}
+
 /** The Type cell and its picker: a list of the Domain's types, each with its
  *  icon and a check on the current one; the first row is the plain kind
  *  itself (no type). "Create type" adds a name to the Domain and assigns it;
@@ -92,7 +141,15 @@ export function TypeCell({
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [presetTab, setPresetTab] = useState(0);
   const canEdit = !!onChange;
+  // A suggested name is registered on the Domain (if new) and assigned, both
+  // at once: the menu closing is the click's receipt, not the write's.
+  const pickPreset = (name: string) => {
+    if (onAddType && !types.some((x) => x.toLowerCase() === name.toLowerCase())) void onAddType(name);
+    void onChange?.(name);
+    setOpen(false);
+  };
 
   const trigger = (
     <button
@@ -118,12 +175,12 @@ export function TypeCell({
   };
   const pick = (next: string | null) => { void onChange?.(next); setOpen(false); };
   const canManage = !!onRemoveType && types.length > 0;
-  const ROW = 'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-muted/60';
+  const ROW = 'flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-2 text-left text-[14px] text-foreground transition-colors hover:bg-muted/60';
 
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setAdding(false); setDraft(''); setEditing(false); } }}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align="start" className={`${CELL_POPOVER_RADIUS} w-[240px] p-1.5`} onClick={(e) => e.stopPropagation()}>
+      <PopoverContent align="start" className={`${CELL_POPOVER_RADIUS} w-[320px] p-2`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
           <span className="text-[12px] text-muted-foreground">{tr('Types')}</span>
           {canManage && (
@@ -133,7 +190,7 @@ export function TypeCell({
             </button>
           )}
         </div>
-        <div className="max-h-[280px] overflow-y-auto">
+        <div className="max-h-[240px] overflow-y-auto">
           <button type="button" className={ROW} onClick={() => pick(null)}>
             <TypeMark type={null} icons={icons} kind={kind} />
             <span className="min-w-0 truncate">{kind === 'object' ? 'Object' : 'Element'}</span>
@@ -181,6 +238,31 @@ export function TypeCell({
                 <span>{tr('Create type')}</span>
               </button>
             )}
+            {/* Suggestions by field: tabs that scroll under a round arrow, and
+                the field's names in two aligned columns. */}
+            <div className="my-1 border-t border-border/60" />
+            <div className="px-2 pb-1.5 pt-1 text-[12px] text-muted-foreground">{tr('Recommended')}</div>
+            <TabStrip>
+              {TYPE_PRESETS.map((p, i) => (
+                <button key={p.label} type="button" onClick={() => setPresetTab(i)}
+                  className={`shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-[12px] transition-colors ${
+                    presetTab === i
+                      ? 'border-border bg-muted text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}>
+                  {tr(p.label)}
+                </button>
+              ))}
+            </TabStrip>
+            <div className="mt-1 grid grid-cols-2 gap-x-1">
+              {TYPE_PRESETS[presetTab].types.map((name) => (
+                <button key={name} type="button" className={`${ROW} !py-1.5 !text-[13px]`} onClick={() => pickPreset(name)}>
+                  <TypeMark type={name} icons={icons} kind={kind} size={13} />
+                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  {name === current && <Check size={12} className="shrink-0 text-muted-foreground" />}
+                </button>
+              ))}
+            </div>
           </>
         )}
       </PopoverContent>

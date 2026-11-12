@@ -1,9 +1,9 @@
 'use client';
 
-// Element Type icon — three hexagons clustered like a honeycomb (one on
-// top, two below). Custom glyph (lucide has no "3 hexagons"); represents the
-// `type` facet of an Element. Accepts `size` (group-by chips) or `className`
-// (rail / dropdown, where size-* + text-* set dimensions and colour).
+// The Type icon — a circle, a triangle and a square: "what kind of thing".
+// Stands for the `type` facet of an Element or Object. Accepts `size`
+// (group-by chips) or `className` (rail / dropdown, where size-* + text-*
+// set dimensions and colour).
 export const ElementTypeIcon = ({ size = 16, className }: { size?: number; className?: string }) => (
   <svg
     width={size}
@@ -17,9 +17,9 @@ export const ElementTypeIcon = ({ size = 16, className }: { size?: number; class
     className={className}
     aria-hidden="true"
   >
-    <path d="M12 13.43 17.07 10.51 17.07 4.66 12 1.73 6.93 4.66 6.93 10.51Z" />
-    <path d="M6.93 22.21 12 19.28 12 13.43 6.93 10.51 1.86 13.43 1.86 19.28Z" />
-    <path d="M17.07 22.21 22.14 19.28 22.14 13.43 17.07 10.51 12 13.43 12 19.28Z" />
+    <path d="M8.3 10a.7.7 0 0 1-.63-1.08l3.74-6a.7.7 0 0 1 1.2 0l3.7 6A.7.7 0 0 1 15.7 10z" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <circle cx="17.5" cy="17.5" r="3.5" />
   </svg>
 );
 
