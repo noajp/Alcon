@@ -88,7 +88,7 @@ export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged }
       views: [
         { id: 'progress', label: t('Progress'), hint: t('How far its Elements have come'), icon: <ElementProgressMark size={14} status="in_progress" progress={50} /> },
         { id: 'elements', label: t('Elements'), hint: t('Every Element under its Objects'), icon: <ElementIcon size={14} /> },
-        { id: 'gantt', label: t('Gantt'), hint: t('Its Objects on a timeline'), icon: <GanttChart size={14} /> },
+        { id: 'gantt', label: t('Timeline'), hint: t('Its Objects on a timeline'), icon: <GanttChart size={14} /> },
       ],
       render,
     };

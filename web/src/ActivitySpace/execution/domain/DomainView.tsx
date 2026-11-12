@@ -9,8 +9,8 @@ import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ObjectSidePanel } from '@/ActivitySpace/execution/object/ObjectSidePanel';
-import { useObjectDependencies } from '@/hooks/objectDependencyData';
-import { linkConflicts } from '@/Function/shared/objectDependencyModel';
+import { addObjectDependency, removeObjectDependency, useObjectDependencies } from '@/hooks/objectDependencyData';
+import { linkConflicts, linkWouldLoop } from '@/Function/shared/objectDependencyModel';
 import { Plus } from '@/ui/icons';
 import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
@@ -76,7 +76,7 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
   elements: { domainTitle: 'Objects', objectTitle: 'Elements' },
   overview: { domainTitle: 'Overview', objectTitle: 'Overview' },
-  gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
+  gantt: { domainTitle: 'Timeline', objectTitle: 'Timeline' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
   // Resource and Workers are one view: Team.
   workers: { domainTitle: 'Team', objectTitle: 'Team' },
@@ -599,7 +599,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     const objectsAsBars: ElementWithDetails[] = explorerData.objects.map((o) => objectToGanttBar(o));
     const dueOf = new Map(explorerData.objects.map((o) => [o.id, o]));
     const ganttLinks = objectLinks.map((l) => ({
-      from: l.blocker_object_id, to: l.blocked_object_id,
+      id: l.id, from: l.blocker_object_id, to: l.blocked_object_id,
       conflict: linkConflicts(dueOf.get(l.blocker_object_id)?.due_date, dueOf.get(l.blocked_object_id)?.start_date),
     }));
     const picked = ganttObjectId ? explorerData.objects.find((o) => o.id === ganttObjectId) ?? null : null;
@@ -616,6 +616,14 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
             phases={domainPhases}
             milestones={objectMilestones}
             links={ganttLinks}
+            // Dragged from one bar's end onto another: the second waits for
+            // the first — unless that would close a loop.
+            onLinkCreate={(from, to) => {
+              const pairs = objectLinks.map((l) => ({ blocker: l.blocker_object_id, blocked: l.blocked_object_id }));
+              if (pairs.some((p) => p.blocker === from && p.blocked === to) || linkWouldLoop(pairs, from, to)) return;
+              void addObjectDependency(from, to).catch((e) => console.error('Failed to add dependency', e));
+            }}
+            onLinkRemove={(link) => { if (link.id) void removeObjectDependency(link.id).catch((e) => console.error('Failed to remove dependency', e)); }}
             // A click on a bar opens the Object beside the timeline; again closes it.
             onElementOpen={(bar) => setGanttObjectId((cur) => (cur === bar.id ? null : bar.id))}
           />
