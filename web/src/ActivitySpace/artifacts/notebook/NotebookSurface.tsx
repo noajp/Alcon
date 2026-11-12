@@ -9,7 +9,6 @@ import {
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent } from '@/hooks/useNotesDb';
 import { FilesPane } from '@/ActivitySpace/artifacts/notebook/FilesPane';
-import { NotebookBreadcrumb } from '@/ActivitySpace/artifacts/notebook/NotebookBreadcrumb';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { NoteContentStatus } from '@/ActivitySpace/artifacts/notebook/NoteContentStatus';
 import {
@@ -19,6 +18,11 @@ import {
   filesInFolder,
   folderDisplayName,
 } from '@/ActivitySpace/artifacts/notebook/noteTree';
+import { NotebookList } from './NotebookList';
+import { SectionsPane } from './SectionsPane';
+import { IslandHeader } from '@/Function/shared/MainIsland';
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
+import { NavNoteIcon } from '@/Frame/sidebar/NavIcons';
 
 import { PageView } from '@/ActivitySpace/artifacts/notebook/PageView';
 import { ObjectDraftDialog } from '@/ActivitySpace/artifacts/notebook/ObjectDraftDialog';
@@ -197,27 +201,33 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
 
   return (
             noteGridMode ? (
-            /* No notebook chosen yet — the list lives in the sidebar now, so
-               this pane just waits for a pick. */
-            <div className="flex-1 flex items-center justify-center bg-card px-6">
-              <p className="text-[13px] text-muted-foreground">
-                {t('Select a notebook from the sidebar.')}
-              </p>
-            </div>
+            /* No notebook chosen yet: Note opens on the list of them. */
+            <NotebookList
+              onOpenBook={(folderId) => onNavigate({ noteFolderId: folderId, noteSectionId: null, noteId: null })}
+            />
             ) : (
             <div className="relative flex-1 flex flex-col overflow-hidden bg-card">
-            {/* Breadcrumb — the open Notebook's name. Books and Sections are
-                the sidebar's tree; pages are added from the list's "New page". */}
-            {resolvedFolderId && (
-              <NotebookBreadcrumb
-                folderName={folderDisplayName(nodes, resolvedFolderId)}
-                onBack={() => onNavigate({ noteFolderId: null, noteSectionId: null, noteId: null })}
-              />
-            )}
+            {/* One header across the notebook, like every other page: the
+                path Note > notebook > Section. Note leads back to the list. */}
+            <IslandHeader crumbs={[
+              { id: 'note', label: t('Note'), onClick: () => onNavigate({ noteFolderId: null, noteSectionId: null, noteId: null }) },
+              ...(resolvedFolderId ? [{
+                id: 'book', label: folderDisplayName(nodes, resolvedFolderId),
+                icon: <ItemIcon icon={nodes.find((n) => n.id === resolvedFolderId)?.icon ?? null} color={null} size={13} fallback={<NavNoteIcon size={13} />} />,
+                onClick: activeSectionName ? () => onNavigate({ noteFolderId: resolvedFolderId, noteSectionId: null, noteId: null }) : undefined,
+              }] : []),
+              ...(activeSectionName ? [{ id: 'section', label: activeSectionName }] : []),
+            ]} />
             <div className="flex-1 flex overflow-hidden bg-card">
-              {/* Middle pane: the active Section's file list. The Folder tree
-                  itself lives in AppSidebar (left rail); the editor is the wide
-                  pane on the right. */}
+              {/* Left to right: the notebook's Sections, the active Section's
+                  pages, the editor. */}
+              <SectionsPane
+                activeFolderId={resolvedFolderId}
+                activeSectionId={navigation.noteSectionId ?? null}
+                activeFileId={selectedFileId}
+                onNavigate={onNavigate}
+                onViewChange={(view) => onViewChange?.(view)}
+              />
               {filesPaneOpen && (
                 <FilesPane
                   title={activeSectionName ?? folderDisplayName(nodes, resolvedFolderId)}

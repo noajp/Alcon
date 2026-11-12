@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import { Pencil, X } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { EMBED_LANG, parseEmbed, useEmbedHost } from './embedBlocks';
+import { FILE_VIEW, FileBlock } from './fileBlocks';
 
 // ```alcon blocks drawn live over their source, as MermaidLayer draws
 // diagrams: the block (<pre data-lang="alcon">) stays in the editable text as
@@ -99,6 +100,7 @@ export function EmbedLayer({ root, frame, editable }: { root: RefObject<HTMLDivE
           className="group/embed absolute z-10 rounded-md bg-card"
           style={{ top: b.top, left: b.left, width: b.width }}>
           {!spec ? <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">{t('This block cannot be read. Edit its source.')}</p>
+            : spec.view === FILE_VIEW ? (typeof spec.id === 'string' ? <FileBlock id={spec.id} /> : null)
             : host ? host.render(spec)
             : <p className="px-3 py-2 text-[12px] text-muted-foreground">{t('This block shows on its own page.')}</p>}
           {editable && (

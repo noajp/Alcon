@@ -16,6 +16,11 @@ export const LABEL_PALETTE: { key: string; label: string; hex: string }[] = [
 ];
 const PALETTE_HEX: Record<string, string> = Object.fromEntries(LABEL_PALETTE.map((p) => [p.key, p.hex]));
 
+/** A palette key's color; an unknown key reads as grey. */
+export function paletteHex(key: string): string {
+  return PALETTE_HEX[key] ?? PALETTE_HEX.grey;
+}
+
 // Stable auto-colour from the name, used until a colour is picked.
 const FALLBACK = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899'];
 function deterministic(name: string): string {

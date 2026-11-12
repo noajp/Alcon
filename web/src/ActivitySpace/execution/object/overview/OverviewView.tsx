@@ -16,8 +16,6 @@ import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControl
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { PageSection } from '@/Function/shared/PageHead';
-import { ProgressPanel } from '@/Function/shared/ProgressPanel';
-import { CARD } from '@/shared/designTokens';
 import { MilestoneList } from '@/Function/widget/widgets/MilestonesWidget';
 import { ObjectCommentsPanel } from '../ObjectCommentsPanel';
 import { ObjectIcon } from '@/Frame/icons';
@@ -35,7 +33,7 @@ import {
 
 /** The band above (how it is going) and the rail beside; the document
  *  column between them is fixed, as on an Element's page. */
-const SURFACE_ZONES: Zone[] = ['band', 'rail'];
+const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
 
 // =============================================================
 // Object Overview — read like an Element's page.
@@ -231,6 +229,9 @@ export function OverviewView({
                 <AttachmentList owner={{ kind: 'object', id: object.id }} />
               </div>
 
+              {/* Canvases: what was asked to be drawn for this Object. */}
+              {board.layout.main.length > 0 && <WidgetZone zone="main" />}
+
               <PageSection title={t('Milestones')} action={
                 <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAddingMilestone(true)}>
                   <Plus size={14} />
@@ -247,13 +248,6 @@ export function OverviewView({
 
             {/* ───────────── Side column ───────────── */}
             <aside className="min-w-0 space-y-3">
-              {/* How the Object is moving, always first on the rail. */}
-              {elements.length > 0 && (
-                <section className={`${CARD} p-4`}>
-                  <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">{t('Progress')}</h3>
-                  <ProgressPanel elements={elements} end={object.due_date} />
-                </section>
-              )}
               <WidgetZone zone="rail" />
             </aside>
           </div>

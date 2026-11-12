@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { RotateCcw } from '@/ui/icons';
+import { SendIcon } from '@/Function/shared/SendIcon';
 import { Button } from '@/ui/button';
 import { TextComposer } from '@/ui/text-composer';
 import { useGeneratedApp } from '@/hooks/useGeneratedApp';
@@ -22,7 +23,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
   const loaded = useRef(false);
   const latestPrompt = useRef('');
   const app = store.app;
-  useWidgetMeta(app?.draft_app?.title ?? app?.current_app?.title ?? t('Create your own tool'));
+  useWidgetMeta(app?.draft_app?.title ?? app?.current_app?.title ?? null);
   useEffect(() => {
     if (!store.loading && !loaded.current) { loaded.current = true; setPrompt(app?.prompt ?? ''); latestPrompt.current = app?.prompt ?? ''; }
   }, [store.loading, app?.prompt]);
@@ -50,11 +51,9 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}>{showEditor ? t('Close editor') : t('Edit with AI')}</Button>}
     </WidgetHeaderAction>
     {showEditor && <div className="space-y-3">
-      {!app?.current_app && !app?.draft_app && <p className="text-xs text-muted-foreground">{t('Describe a calculator, checklist or summary for this Object. Everyone who can see it uses the same app and its saved inputs.')}</p>}
       <form className="space-y-2" onSubmit={e => { e.preventDefault(); void run(() => store.generate(prompt)); }}>
-        <TextComposer aria-label={t('Describe your app')} placeholder={t('Example: Calculate an estimate from headcount, unit price and discount, then save the chosen plan.')} rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
-          hint={t('Uses AI when you generate')}
-          action={<Button type="submit" variant="primary" size="sm" disabled={locked || !prompt.trim()}>{busy ? t('Working…') : source ? t('Generate revision') : t('Generate app')}</Button>}
+        <TextComposer aria-label={t('Describe your canvas')} placeholder={t('Example: A dashboard of this Object’s progress by status and assignee. Or: a whiteboard where we can place and drag sticky notes.')} rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
+          action={<Button type="submit" variant="primary" size="xs" className="rounded-md px-2" title={t('Send')} aria-label={t('Send')} disabled={locked || !prompt.trim()}><SendIcon size={13} /></Button>}
           secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />{t('Previous version')}</Button>}
         />
       </form>

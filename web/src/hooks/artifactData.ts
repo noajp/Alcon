@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { attachFile, type Attachment } from './attachmentData';
 
 // What Artifacts lists besides files and folders: this person's notebooks
 // (top-level notes) and the Space's slide decks, with the Artifacts folder
@@ -98,4 +99,12 @@ export async function createArtifactFolder(spaceId: string, parentId: string, na
     .select(FOLDER_COLUMNS).single();
   if (error || !data) throw error ?? new Error('Could not create the folder.');
   return data as { id: string };
+}
+
+/** Puts a file at the top of the Space's Artifacts (a file inserted into a
+ *  note or a description lives there, so everyone who reads the text can
+ *  open it). */
+export async function uploadToArtifacts(spaceId: string, file: File): Promise<Attachment> {
+  const root = await ensureArtifactRoot(spaceId, { scope: 'space' });
+  return attachFile({ kind: 'folder', id: root }, file);
 }

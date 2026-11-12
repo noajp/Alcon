@@ -3,7 +3,7 @@
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FileDown, PanelLeftClose, PanelLeftOpen } from '@/ui/icons';
+import { FileDown, PanelLeft } from '@/ui/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import {
   NoteEditor,
@@ -77,7 +77,6 @@ export function PageView({
   );
   const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
   const editorRef = useRef<NoteEditorHandle | null>(null);
-  const toolbarPortalRef = useRef<HTMLDivElement | null>(null);
 
   // Elements created from a Note land in the linked Object's Domain (when
   // a link is set) and otherwise fall back to the active Domain. The
@@ -121,25 +120,21 @@ export function PageView({
   }, []);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      <div className="relative flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
+    <div className="relative flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
+      {/* No bar over the page: its few controls sit in the corners. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-11 [&>*]:pointer-events-auto">
         {onToggleFilesPane && (
-          <div className="absolute left-2">
-            <ButtonAppearanceProvider appearance="navigation">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={onToggleFilesPane}
-                title={filesPaneOpen ? t('Hide page list') : t('Show page list')}
-                aria-label={filesPaneOpen ? t('Hide page list') : t('Show page list')}
-              >
-                {filesPaneOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-              </Button>
-            </ButtonAppearanceProvider>
+          <div className="absolute left-2 top-2">
+            {/* The same mark and weight as the title row's sidebar button. */}
+            <button type="button" onClick={onToggleFilesPane} aria-pressed={filesPaneOpen}
+              title={filesPaneOpen ? t('Hide page list') : t('Show page list')}
+              aria-label={filesPaneOpen ? t('Hide page list') : t('Show page list')}
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <PanelLeft size={15} />
+            </button>
           </div>
         )}
-        <div ref={toolbarPortalRef} className="flex items-center justify-center" />
-        <div className="absolute right-2 flex items-center gap-2">
+        <div className="absolute right-2 top-2 flex items-center gap-2">
           <PresenceStack viewers={viewers} />
           <ButtonAppearanceProvider appearance="navigation">
             <Button variant="ghost" size="icon-sm" title={t('Export to Word')} aria-label={t('Export to Word')}
@@ -187,7 +182,6 @@ export function PageView({
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}
             elementStatusById={elementStatusById}
-            toolbarPortalRef={toolbarPortalRef}
           />
         </div>
       </div>

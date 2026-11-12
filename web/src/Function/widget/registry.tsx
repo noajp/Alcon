@@ -36,8 +36,8 @@ function artifactParams(raw: Record<string, unknown> | undefined) {
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'generated-app': {
-    type: 'generated-app', label: 'AI app',
-    description: 'Create a persistent calculator, checklist or mini app with AI',
+    type: 'generated-app', label: 'Canvas',
+    description: 'A blank part AI draws into: a dashboard, a whiteboard, a calculator, a tracker',
     group: 'content', accepts: ['object'], zones: ['main'], defaultSize: 'full', holdsContents: true,
     load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
   },

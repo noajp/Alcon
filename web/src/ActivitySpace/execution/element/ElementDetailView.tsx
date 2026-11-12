@@ -980,7 +980,9 @@ function ElementDetailBody({
                 assumptions the Strategy bound to it. Above Properties for the
                 same reason Strategy intent sits above them on an Object: why
                 it exists comes before who owns it. */}
-            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES} addable={false}>
+            {/* With nothing on the rail it takes no room, so Properties starts
+                level with the title. */}
+            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES} addable={false} className="board-collapses">
               <WidgetZone zone="rail" />
             </WidgetSurface>
 
