@@ -34,6 +34,7 @@ import {
 } from '@/Function/shared/listControls';
 import { DomainOverview } from './DomainOverview';
 import { DomainNote } from './DomainNote';
+import { DomainMembers } from './DomainMembers';
 import { HomeView } from '@/ActivitySpace/home/HomeView';
 import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/Function/widget';
 import { ObjectBoard, type BoardObject } from '@/ActivitySpace/execution/chain/ObjectBoard';
@@ -683,7 +684,12 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   }
 
   // Team: everyone working in the Domain, with their load.
-  if (activeType === 'resource' || activeType === 'workers') {
+  // The Domain's Member tab lists who is in it; an Object's keeps its load.
+  if (activeType === 'workers') {
+    return <DomainMembers key={domainId} domainId={domainId ?? null} onViewChange={onViewChange} />;
+  }
+
+  if (activeType === 'resource') {
     return (
       <div className="flex-1 overflow-hidden">
         <ElementDrilldown key={domainId} label="Team" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName} onDetailChange={onElementDetailChange}>

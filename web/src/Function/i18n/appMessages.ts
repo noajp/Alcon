@@ -56,6 +56,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Types say what kind of Object something is. Each Domain keeps its own list, and an icon for each.': ['種類は、その Object が何であるかを表します。Domain ごとに一覧とアイコンを持ちます。', '유형은 Object가 무엇인지 나타냅니다. Domain마다 목록과 아이콘을 가집니다.', 'Les types disent ce qu’est un Object. Chaque Domain garde sa liste et une icône pour chacun.', 'Los tipos dicen qué es un Object. Cada Domain guarda su lista y un icono para cada uno.'],
   'Write the Domain’s note…': ['Domain のノートを書く…', 'Domain 노트를 작성…', 'Écrire la note du Domain…', 'Escribe la nota del Domain…'],
   'No note yet.': ['ノートはまだありません。', '아직 노트가 없습니다.', 'Pas encore de note.', 'Aún no hay nota.'],
+  'Manage members': ['メンバーを管理', '멤버 관리', 'Gérer les membres', 'Gestionar miembros'],
+  'No members to show.': ['表示できるメンバーがいません。', '표시할 멤버가 없습니다.', 'Aucun membre à afficher.', 'No hay miembros que mostrar.'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],
