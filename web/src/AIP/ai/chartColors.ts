@@ -1,14 +1,13 @@
 import type { ChartSpec } from './chartSpec';
+import { chartPaletteColors, DEFAULT_CHART_PALETTE } from '@/Function/shared/chartPalette';
 
 // A person's color choices on a chat chart. The chart spec (chartSpec.ts)
 // is the model's data and carries no colors; what a person picks is an
 // annotation on the message (CopilotMessage.chartColors), resolved here.
 //
-// The default colors are the theme's chart hues — the accent first,
-// then the chart tokens, each a different hue — so series and slices
-// read apart at a glance. The values are CSS expressions, not concrete
-// colors; the PNG export resolves them against the live document
-// before drawing.
+// The default colors are the palette chosen in Settings (chartPalette.ts).
+// The values are CSS expressions, not concrete colors; the PNG export
+// resolves them against the live document before drawing.
 
 /** The floating card a chat chart sits on — the Execution Chain
  *  cards' surface, verbatim (the ElementCard of PR 803). Shared here
@@ -17,9 +16,6 @@ import type { ChartSpec } from './chartSpec';
 export const CHART_CARD_CLASS =
   'rounded-lg border border-border bg-card shadow-[var(--shadow-card)] dark:bg-[var(--surface-rail)]';
 
-const CHART_THEME_COLORS = [
-  'var(--accent-default)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-1)',
-];
 
 /** One thing on a chart a person can recolor: a series, or — on a pie,
  *  where the single series is drawn per category — one row. `key` is
@@ -48,9 +44,10 @@ export function effectiveColor(
   overrides: Record<string, string> | undefined,
   key: string,
   index: number,
+  palette: readonly string[] = chartPaletteColors(DEFAULT_CHART_PALETTE),
 ): string {
   const picked = overrides?.[key];
-  return picked ? picked : CHART_THEME_COLORS[index % CHART_THEME_COLORS.length];
+  return picked ? picked : palette[index % palette.length];
 }
 
 /** Pure. A chart's override record with one slot set (a hex) or cleared

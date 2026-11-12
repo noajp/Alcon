@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -12,6 +12,8 @@ import { LABEL_PALETTE } from '@/Function/shared/labelColor';
 import { MENU_ROW } from '@/Function/shared/menu';
 import { downloadBytes } from '@/Function/office/downloadFile';
 import type { ChartSpec } from './chartSpec';
+import { chartPaletteColors } from '@/Function/shared/chartPalette';
+import { getCachedChartPalette, usePreference } from '@/Function/settings/preferencesStore';
 import { CHART_CARD_CLASS, chartFileName, chartSlots, effectiveColor, withSlotColor, type ChartColorSlot } from './chartColors';
 
 // A chart the AI drew inside its answer, on a floating card (the
@@ -21,50 +23,19 @@ import { CHART_CARD_CLASS, chartFileName, chartSlots, effectiveColor, withSlotCo
 // on the message, never part of the spec. A settled chart can be
 // recolored from its card and downloaded as it looks.
 
-const AXIS = { stroke: 'var(--text-secondary)', fontSize: 11, tickLine: false, axisLine: false } as const;
-const GRID = { stroke: 'color-mix(in oklab, var(--border-subtle), transparent 40%)', strokeDasharray: '2 5', vertical: false } as const;
+// Linear-like restraint: quiet axes, a faint solid grid, thin marks.
+const AXIS = { stroke: 'var(--text-tertiary)', fontSize: 10.5, tickLine: false, axisLine: false, tickMargin: 6 } as const;
+const GRID = { stroke: 'color-mix(in oklab, var(--border-subtle), transparent 45%)', vertical: false } as const;
 // The legend's words stay in the text color: the dot carries the hue,
 // so a row of labels never turns into a row of competing colors.
 const LEGEND = {
-  wrapperStyle: { fontSize: 11, paddingTop: 6 }, iconType: 'circle', iconSize: 8,
-  formatter: (value: string) => <span style={{ color: 'var(--text-secondary)' }}>{value}</span>,
+  wrapperStyle: { fontSize: 11, paddingTop: 6 }, iconType: 'circle', iconSize: 7,
+  formatter: (value: string) => <span style={{ color: 'var(--text-tertiary)' }}>{value}</span>,
 } as const;
 const TOOLTIP = {
   contentStyle: { background: 'var(--surface-overlay)', borderColor: 'var(--border-subtle)', borderRadius: 10, fontSize: 12, boxShadow: 'var(--shadow-overlay)' },
   labelStyle: { color: 'var(--text-secondary)' },
 } as const;
-
-// A slot's fill: lit at the top and fading to a translucent foot, so a
-// bar or slice glows against the dark card instead of sitting on it
-// like flat paint. No darkening anywhere — nothing reads as a shadow.
-function Gloss({ id, color }: { id: string; color: string }) {
-  return (
-    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" style={{ stopColor: `color-mix(in oklab, ${color}, white 18%)`, stopOpacity: 1 }} />
-      <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.45 }} />
-    </linearGradient>
-  );
-}
-
-// An area's wash: the color strong at its line, fading to nothing.
-function Wash({ id, color }: { id: string; color: string }) {
-  return (
-    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.6 }} />
-      <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.02 }} />
-    </linearGradient>
-  );
-}
-
-// A soft glow around a line or a slice: the shape blurred under itself.
-function Glow({ id }: { id: string }) {
-  return (
-    <filter id={id} x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="2.5" result="blur" />
-      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-    </filter>
-  );
-}
 
 const TOOLBAR_BUTTON =
   'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
@@ -84,19 +55,11 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
   const figureRef = useRef<HTMLElement | null>(null);
   const { type, data, series } = spec;
   const many = series.length > 1;
-  const colorAt = (key: string, index: number) => effectiveColor(colors, key, index);
-  const gid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const fillOf = (index: number) => `url(#${gid}-${index})`;
-  const glow = `url(#${gid}-glow)`;
-  const slots = type === 'pie' ? data.map((row, i) => ({ key: row.name, i })) : series.map((key, i) => ({ key, i }));
-  const defs = (wash: boolean) => (
-    <defs>
-      {slots.map(({ key, i }) => wash
-        ? <Wash key={key} id={`${gid}-${i}`} color={colorAt(key, i)} />
-        : <Gloss key={key} id={`${gid}-${i}`} color={colorAt(key, i)} />)}
-      <Glow id={`${gid}-glow`} />
-    </defs>
-  );
+  // Matte: every shape is one flat color from the Settings palette — no
+  // gradients, no glow.
+  const palette = chartPaletteColors(usePreference(getCachedChartPalette));
+  const colorAt = (key: string, index: number) => effectiveColor(colors, key, index, palette);
+
   return (
     <figure ref={figureRef} className={`${CHART_CARD_CLASS} group/chart p-3 animate-fade-in`}>
       {(spec.title || interactive) && (
@@ -106,10 +69,10 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
             : <span />}
           {interactive && (
             <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/chart:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100">
-              {onColorsChange && <ChartColorMenu spec={spec} colors={colors} onColorsChange={onColorsChange} />}
+              {onColorsChange && <ChartColorMenu spec={spec} colors={colors} palette={palette} onColorsChange={onColorsChange} />}
               <button type="button" title={t('Download chart')} aria-label={t('Download chart')}
                 className={TOOLBAR_BUTTON}
-                onClick={() => { if (figureRef.current) void exportChartPng(figureRef.current, spec, colors); }}>
+                onClick={() => { if (figureRef.current) void exportChartPng(figureRef.current, spec, colors, palette); }}>
                 <Download size={13} />
               </button>
             </div>
@@ -120,51 +83,47 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
         <ResponsiveContainer width="100%" height="100%">
           {type === 'pie' ? (
             <PieChart>
-              {defs(false)}
-              <Tooltip {...TOOLTIP} />
+                            <Tooltip {...TOOLTIP} />
               <Legend {...LEGEND} />
-              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="66%" outerRadius="86%" paddingAngle={3} cornerRadius={3} stroke="none" style={{ filter: glow }}>
-                {data.map((row, i) => <Cell key={i} fill={fillOf(i)} />)}
+              <Pie data={data} dataKey={series[0]} nameKey="name" innerRadius="72%" outerRadius="88%" paddingAngle={2} cornerRadius={2} stroke="none">
+                {data.map((row, i) => <Cell key={i} fill={colorAt(row.name, i)} />)}
               </Pie>
             </PieChart>
           ) : type === 'line' ? (
             <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-              {defs(true)}
-              <CartesianGrid {...GRID} />
+                            <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} style={{ filter: glow }}
-                dot={{ r: 2.5, strokeWidth: 0, fill: colorAt(key, i) }} activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
+              {series.map((key, i) => <Line key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={1.75}
+                dot={false} activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </LineChart>
           ) : type === 'area' ? (
             <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-              {defs(true)}
-              <CartesianGrid {...GRID} />
+                            <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
               <Tooltip {...TOOLTIP} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={2} style={{ filter: glow }}
-                // Only the first series is washed; the others ride over it as
+              {series.map((key, i) => <Area key={key} type="monotone" dataKey={key} stroke={colorAt(key, i)} strokeWidth={1.75}
+                // Only the first series is filled; the others ride over it as
                 // lines, so overlapping fills never mix into a muddy grey.
-                fill={i === 0 ? fillOf(i) : 'transparent'}
-                activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
+                fill={i === 0 ? colorAt(key, i) : 'transparent'} fillOpacity={0.1}
+                activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--card)' }} />)}
             </AreaChart>
           ) : (
             <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }} barCategoryGap="22%">
-              {defs(false)}
-              <CartesianGrid {...GRID} />
+                            <CartesianGrid {...GRID} />
               <XAxis dataKey="name" {...AXIS} />
               <YAxis {...AXIS} />
-              <Tooltip {...TOOLTIP} cursor={{ fill: 'var(--surface-strong)' }} />
+              <Tooltip {...TOOLTIP} cursor={{ fill: 'color-mix(in oklab, var(--foreground), transparent 94%)' }} />
               {many && <Legend {...LEGEND} />}
-              {series.map((key, i) => <Bar key={key} dataKey={key} fill={fillOf(i)} maxBarSize={30}
+              {series.map((key, i) => <Bar key={key} dataKey={key} fill={colorAt(key, i)} maxBarSize={22}
                 // Stacked segments part by a hairline of the card, so each reads as its own block.
-                stroke={spec.stacked ? 'var(--card)' : undefined} strokeWidth={spec.stacked ? 1.5 : 0}
+                stroke={spec.stacked ? 'var(--card)' : undefined} strokeWidth={spec.stacked ? 1 : 0}
                 // Stacked, only the top segment is rounded; side by side, every bar is.
-                radius={!spec.stacked || i === series.length - 1 ? [4, 4, 0, 0] : 0}
+                radius={!spec.stacked || i === series.length - 1 ? [3, 3, 0, 0] : 0}
                 stackId={spec.stacked ? 's' : undefined} />)}
             </BarChart>
           )}
@@ -182,9 +141,10 @@ export default function ChatChart({ spec, colors, onColorsChange, interactive }:
  * store hex directly (labels store palette keys), so this is a small
  * sibling of LabelPaletteRows reading the same LABEL_PALETTE data.
  */
-function ChartColorMenu({ spec, colors, onColorsChange }: {
+function ChartColorMenu({ spec, colors, palette, onColorsChange }: {
   spec: ChartSpec;
   colors?: Record<string, string>;
+  palette: readonly string[];
   onColorsChange: (next: Record<string, string>) => void;
 }) {
   const { t } = useI18n();
@@ -212,7 +172,7 @@ function ChartColorMenu({ spec, colors, onColorsChange }: {
                 aria-label={t('Color for {name}', { name: s.label })}
                 className={`${MENU_ROW} justify-between`}>
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: effectiveColor(colors, s.key, s.index) }} />
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: effectiveColor(colors, s.key, s.index, palette) }} />
                   <span className="truncate">{s.label}</span>
                 </span>
                 <span className="text-[11px] text-muted-foreground">{colors?.[s.key] ? t('Custom') : ''}</span>
@@ -296,7 +256,7 @@ function SlotPalette({ slot, override, onBack, onPick }: {
  * tree and each element's computed paint is baked onto it as inline
  * style (which outranks any presentation attribute it also carries).
  */
-async function exportChartPng(figure: HTMLElement, spec: ChartSpec, colors?: Record<string, string>): Promise<void> {
+async function exportChartPng(figure: HTMLElement, spec: ChartSpec, colors: Record<string, string> | undefined, palette: readonly string[]): Promise<void> {
   const svg = figure.querySelector<SVGSVGElement>('svg.recharts-surface');
   if (!svg) return;
   const SCALE = 2;
@@ -347,7 +307,7 @@ async function exportChartPng(figure: HTMLElement, spec: ChartSpec, colors?: Rec
     for (const s of slots) {
       const w = 10 + 4 + ctx.measureText(s.label).width;
       if (row.length > 0 && x + w > frameW - PAD) { legendRows.push(row); row = []; x = PAD; }
-      row.push({ label: s.label, color: resolveColor(effectiveColor(colors, s.key, s.index)), x });
+      row.push({ label: s.label, color: resolveColor(effectiveColor(colors, s.key, s.index, palette)), x });
       x += w + 12;
     }
     if (row.length > 0) legendRows.push(row);

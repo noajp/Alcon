@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { chartFileName, chartSlots, effectiveColor, withSlotColor } from '@/AIP/ai/chartColors';
 import type { ChartSpec } from '@/AIP/ai/chartSpec';
+import { chartPaletteColors, DEFAULT_CHART_PALETTE } from '@/Function/shared/chartPalette';
 
-// The default colors, pinned literally: the accent, then the chart hues.
-const THEME = [
-  'var(--accent-default)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-1)',
-];
+// The default colors: the Settings palette's default (key color and red),
+// read from the one place palettes are defined.
+const THEME = [...chartPaletteColors(DEFAULT_CHART_PALETTE)];
 
 // A person's chart colors: resolution is the theme family unless a
 // slot carries their hex. Pie slots are keyed by row name; the rest by
@@ -79,5 +79,20 @@ describe('chartFileName', () => {
   it('names the PNG after the chart title, else "chart"', () => {
     expect(chartFileName(bar)).toBe('売上.png');
     expect(chartFileName(pie)).toBe('chart.png');
+  });
+});
+
+describe('chart palettes', () => {
+  it('draws with the chosen palette when one is passed', () => {
+    const vivid = chartPaletteColors('vivid');
+    expect(effectiveColor(undefined, 'x', 1, vivid)).toBe(vivid[1]);
+  });
+  it('reads an unknown palette as the default', () => {
+    expect(chartPaletteColors('nope')).toEqual(chartPaletteColors(DEFAULT_CHART_PALETTE));
+  });
+  it('leads the default with the pale key color, then red', () => {
+    const [first, second] = chartPaletteColors(DEFAULT_CHART_PALETTE);
+    expect(first).toContain('var(--accent-default)');
+    expect(second).toBe('var(--status-danger)');
   });
 });
