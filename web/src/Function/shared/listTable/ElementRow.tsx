@@ -186,9 +186,9 @@ export const ElementRow = memo(function ElementRow({
           signals in their own cell, then the data columns — scrolls and
           slides under it at one edge. */}
       <td className="sticky left-13 z-10 bg-card pl-3.5 pr-0 py-2 min-w-0 max-w-0">
-        <div className="flex items-center min-w-0 min-h-[1.875rem]">
+        <div className="list-row-inner flex items-center min-w-0 min-h-[1.875rem]">
           {el.icon && <ItemIcon icon={el.icon} color={el.color} size={15} className="mr-2" />}
-          <span className="text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
+          <span className="list-row-title text-[15px] font-medium truncate flex-1 min-w-0 text-foreground">{el.title}</span>
         </div>
       </td>
       {/* Signals: who holds it, comments, what it waits on, labels. One

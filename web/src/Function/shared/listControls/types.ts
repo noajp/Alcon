@@ -63,7 +63,12 @@ export interface ListDisplay {
   /** Which closed Elements show — all, those closed in the past day / week /
    *  month, or none. Unset reads as 'all'. */
   closed?: ListClosedWindow;
+  /** How tall a row is. Unset reads as 'comfortable'; 'compact' packs the
+   *  list tight — more rows on a screen, smaller titles. */
+  density?: ListDensity;
 }
+
+export type ListDensity = 'comfortable' | 'compact';
 
 export interface ListControlsState {
   filter: ListFilter;

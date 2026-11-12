@@ -555,6 +555,12 @@ function DisplayPanel({
         {showClosedWindow && (
           <ClosedWindowSelect value={display.closed ?? 'all'} onSelect={(closed) => setDisplay({ closed })} />
         )}
+        <LabeledSelect
+          label="Row height"
+          value={display.density ?? 'comfortable'}
+          options={[{ id: 'comfortable' as const, label: t('Comfortable') }, { id: 'compact' as const, label: t('Compact') }]}
+          onSelect={(density) => setDisplay({ density })}
+        />
       </div>
 
       {/* Which properties show — the same store the list header's "+"
