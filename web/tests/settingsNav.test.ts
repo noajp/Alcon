@@ -65,8 +65,8 @@ describe('nav model', () => {
     expect(SETTINGS_ITEMS.objects.tabs).toBeUndefined();
   });
 
-  it('Elements keeps Labels/Templates; the SLAs tab is gone (one home: Strategy)', () => {
-    expect(SETTINGS_ITEMS.elements.tabs?.map((x) => x.id)).toEqual(['labels', 'templates']);
+  it('Elements keeps Types/Labels/Templates; the SLAs tab is gone (one home: Strategy)', () => {
+    expect(SETTINGS_ITEMS.elements.tabs?.map((x) => x.id)).toEqual(['types', 'labels', 'templates']);
   });
 
   it('AI and API & access keep their in-area tabs', () => {

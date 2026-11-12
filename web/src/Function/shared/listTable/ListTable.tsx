@@ -79,6 +79,8 @@ function makeRowAwareCollision(onPointer: (x: number, y: number) => void): Colli
 }
 
 interface ListTableProps {
+  /** Row height, from the list's Display settings. */
+  density?: 'comfortable' | 'compact';
   sections: ListSection[];
   onSelectObject: (id: string) => void;
   onSelectElement?: (id: string) => void;
@@ -196,6 +198,7 @@ export function ListTable({
   onElementRowSelect,
   selectedObjectIds,
   onObjectRowSelect,
+  density = 'comfortable',
 }: ListTableProps) {
   const { t } = useI18n();
   const dndId = useId();
@@ -570,7 +573,12 @@ export function ListTable({
         // NOT absorb the surplus in fixed-table layout — the browser instead
         // spreads it proportionally across the sized columns.)
         style={{ width: '100%', minWidth: packedWidth }}
-        className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[14px] [--cell-text:14px]"
+        // Compact packs the rows tight (Display > Row height): no cell
+        // padding, a shorter row box, a smaller and lighter title.
+        className={`group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[14px] [--cell-text:14px] ${density === 'compact'
+          ? '[--cell-text:12.5px] [&_tbody_td]:!py-0 [&_.list-row-inner]:!min-h-[1.625rem] [&_.list-row-title]:!text-[13px] [&_.list-row-title]:!font-normal'
+          : ''}`}
+        data-density={density}
         data-has-selection={hasSelection ? '' : undefined}
       >
         {/* Fixed tracks retain their saved widths; the trailing percentage

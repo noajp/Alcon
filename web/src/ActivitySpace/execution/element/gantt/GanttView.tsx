@@ -13,6 +13,7 @@ import { ElementProgressMark, getElementProgress } from '@/Function/shared/Eleme
 import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
+import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { dragRange } from './ganttRange';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -53,6 +54,10 @@ interface GanttViewProps {
   /** What a row stands for. 'object' rows are roomier with a thicker bar
    *  and carry no Status mark (an Object has no Status of its own). */
   rowScale?: keyof typeof ROW_SCALE;
+  /** Dependencies between rows, by row id: `to` waits for `from`. Drawn as a
+   *  curve from the end of one bar to the start of the other, in the danger
+   *  color when `conflict` (the dates break the order). */
+  links?: { from: string; to: string; conflict?: boolean }[];
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -192,7 +197,8 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, local
 // An Object row is laid out as Linear lays out a project: its name on a
 // line of its own, a quiet bar under it, and its milestones' names under
 // the bar — so the row is tall and the bar is slim.
-const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 78, bar: 20 } } as const;
+const EMPTY_LINKS: { from: string; to: string; conflict?: boolean }[] = [];
+const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 88, bar: 30 } } as const;
 const OBJECT_TITLE_TOP = 8;   // px from the row's top to the name line
 const OBJECT_BAR_TOP = 32;    // px from the row's top to the bar
 const SECTION_HEADER_H = 32;
@@ -218,6 +224,7 @@ export function GanttView({
   milestones = EMPTY_MILESTONES,
   defaultZoom = 'day',
   rowScale = 'element',
+  links = EMPTY_LINKS,
 }: GanttViewProps) {
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
@@ -814,6 +821,37 @@ export function GanttView({
                 );
               })}
 
+              {/* A group's whole span: from its first start to its last due,
+                  drawn as a bracket on the group's own row, with the dates
+                  beside it — the Object's schedule read off its Elements. */}
+              {elementsBySection.map(({ key, name, elements: sectionElements }) => {
+                if (!name) return null;
+                const top = layout.sectionTops.get(key);
+                if (top === undefined) return null;
+                let first: Date | null = null;
+                let last: Date | null = null;
+                for (const el of sectionElements) {
+                  const a = parseDateOnly(el.start_date, null) ?? parseDateOnly(el.due_date, null);
+                  const b = parseDateOnly(el.due_date, null) ?? parseDateOnly(el.start_date, null);
+                  if (a && (!first || a < first)) first = a;
+                  if (b && (!last || b > last)) last = b;
+                }
+                if (!first || !last) return null;
+                const left = daysBetween(dateRange.start, first) * pxPerDay;
+                const width = Math.max((daysBetween(first, last) + 1) * pxPerDay, 12);
+                const color = 'color-mix(in oklab, var(--accent-default) 75%, transparent)';
+                return (
+                  <div key={`span-${key}`} className="pointer-events-none absolute z-[5]" style={{ left, width, top: top + 7 }}>
+                    <div className="h-[5px] rounded-[1px]" style={{ backgroundColor: color }} />
+                    <span className="absolute left-0 top-[5px] h-[6px] w-[6px]" style={{ backgroundColor: color, clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
+                    <span className="absolute right-0 top-[5px] h-[6px] w-[6px]" style={{ backgroundColor: color, clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+                    <span className="absolute left-1/2 top-[8px] -translate-x-1/2 whitespace-nowrap text-[10px] tabular-nums text-muted-foreground">
+                      {formatDate(first, 'pill', locale)} – {formatDate(last, 'pill', locale)}
+                    </span>
+                  </div>
+                );
+              })}
+
               {/* Today line with pill label */}
               {(() => {
                 const daysFromStart = daysBetween(dateRange.start, startOfDay(new Date()));
@@ -866,6 +904,19 @@ export function GanttView({
                   // Undated row — full-width invisible lane; sweeping it
                   // schedules the element (preview bar while dragging).
                   if (!barPos) {
+                    // An undated Object only names itself: its dates are set on
+                    // the Object, not swept onto the timeline.
+                    if (objectRows) {
+                      return (
+                        <div key={element.id} className="pointer-events-none absolute" style={{ left: 0, width: timelineWidth, top: top + OBJECT_TITLE_TOP }}>
+                          <span className="sticky left-3 inline-flex max-w-[320px] items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+                            <span className="flex shrink-0"><ItemIcon icon={element.icon ?? null} color={element.color ?? null} size={13} fallback={<ObjectIcon size={13} />} /></span>
+                            <span className="truncate">{element.title}</span>
+                            <span className="shrink-0 text-[11px] font-normal text-muted-foreground/70">{t('No dates')}</span>
+                          </span>
+                        </div>
+                      );
+                    }
                     const isCreatingThis = creating?.elementId === element.id;
                     const previewFrom = isCreatingThis ? Math.min(creating.anchorDay, creating.currentDay) : 0;
                     const previewTo = isCreatingThis ? Math.max(creating.anchorDay, creating.currentDay) : 0;
@@ -882,15 +933,6 @@ export function GanttView({
                             setCreating({ elementId: element.id, anchorDay: day, currentDay: day, laneLeft: rect.left });
                           }}
                         />
-                        {objectRows && (
-                          <div className="pointer-events-none absolute" style={{ left: 0, width: timelineWidth, top: top + OBJECT_TITLE_TOP }}>
-                            <span className="sticky left-3 inline-flex max-w-[320px] items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
-                              <ObjectIcon size={13} className="shrink-0" />
-                              <span className="truncate">{element.title}</span>
-                              <span className="shrink-0 text-[11px] font-normal text-muted-foreground/70">{t('No dates')}</span>
-                            </span>
-                          </div>
-                        )}
                         {isCreatingThis && (
                           <div
                             className="absolute rounded-md border-2 border-dashed pointer-events-none z-10"
@@ -928,7 +970,7 @@ export function GanttView({
                       // name sticks to the pane's left edge inside it.
                       <div className="pointer-events-none absolute" style={{ left: barPos.left, width: Math.max(barWidth, 260), top: top + OBJECT_TITLE_TOP }}>
                         <span className="sticky left-3 inline-flex max-w-full items-center gap-1.5 text-[13px] font-medium text-foreground">
-                          <ObjectIcon size={13} className="shrink-0 text-muted-foreground" />
+                          <span className="flex shrink-0 text-muted-foreground"><ItemIcon icon={element.icon ?? null} color={element.color ?? null} size={13} fallback={<ObjectIcon size={13} />} /></span>
                           <span className="truncate">{element.title}</span>
                           {assignedWorkers.length > 0 && <WorkerAvatarStack workers={assignedWorkers} max={2} size={16} itemClassName="border-card" />}
                           {progress > 0 && <span className="shrink-0 text-[11px] font-normal tabular-nums text-muted-foreground">{Math.round(progress)}%</span>}
@@ -955,6 +997,21 @@ export function GanttView({
                         </div>
                       );
                     })}
+                    {isDraggingThis && (() => {
+                      // While a bar is dragged or stretched, the date each moving
+                      // edge lands on is named above it.
+                      const dayAt = (offset: number) => { const d = new Date(dateRange.start); d.setDate(d.getDate() + offset); return d; };
+                      const startDay = Math.round(barPos.left / pxPerDay);
+                      const endDay = startDay + Math.max(1, Math.round(barPos.width / pxPerDay)) - 1;
+                      const pill = 'pointer-events-none absolute z-30 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--accent-default)] px-1.5 text-[10px] font-semibold leading-[18px] text-white';
+                      const pillTop = barTopOf(top) - 22;
+                      return (
+                        <>
+                          {dragging.type !== 'resize-end' && <span className={pill} style={{ left: barPos.left, top: pillTop }}>{formatDate(dayAt(startDay), 'pill', locale)}</span>}
+                          {dragging.type !== 'resize-start' && <span className={pill} style={{ left: barPos.left + barWidth, top: pillTop }}>{formatDate(dayAt(endDay), 'pill', locale)}</span>}
+                        </>
+                      );
+                    })()}
                     {/* A bar is a quiet surface with a fine edge, as a card is:
                         the status speaks through its mark and the wash of
                         its progress, not by painting the whole bar. */}
@@ -962,7 +1019,7 @@ export function GanttView({
                       className={`absolute rounded-md cursor-pointer group border ${objectRows ? 'bg-[color-mix(in_oklab,var(--foreground)_7%,transparent)]' : 'bg-[var(--surface-strong)]'} transition-[border-color,box-shadow] overflow-hidden ${
                         selectedElement === element.id ? 'border-[var(--accent-default)] ring-1 ring-[var(--accent-default)]/40'
                           : isBlocked ? 'border-[var(--status-danger)]/50' : 'border-border/70 hover:border-[var(--border-strong)]'
-                      } ${isDraggingThis ? 'opacity-80 shadow-lg' : ''}`}
+                      } ${isDraggingThis ? 'border-[var(--accent-default)] shadow-lg' : ''}`}
                       style={{
                         left: barPos.left,
                         width: barWidth,
@@ -1065,6 +1122,30 @@ export function GanttView({
                       className="text-muted-foreground/60" />
                   </marker>
                 </defs>
+                {links.map((link) => {
+                  const source = elements.find((el) => el.id === link.from);
+                  const target = elements.find((el) => el.id === link.to);
+                  const sourcePos = source && getBarPosition(source);
+                  const targetPos = target && getBarPosition(target);
+                  const sourceTop = layout.tops.get(link.from);
+                  const targetTop = layout.tops.get(link.to);
+                  if (!sourcePos || !targetPos || sourceTop === undefined || targetTop === undefined) return null;
+                  const sx = sourcePos.left + Math.max(sourcePos.width, 20);
+                  const sy = barTopOf(sourceTop) + BAR_H / 2;
+                  const tx = targetPos.left;
+                  const ty = barTopOf(targetTop) + BAR_H / 2;
+                  // An S-curve out of the blocker's end and into the waiting
+                  // bar's start; it loops back when the waiting bar starts early.
+                  const reach = Math.max(36, Math.abs(tx - sx) / 2);
+                  const stroke = link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 70%, transparent)';
+                  return (
+                    <g key={`link-${link.from}-${link.to}`}>
+                      <path d={`M ${sx} ${sy} C ${sx + reach} ${sy}, ${tx - reach} ${ty}, ${tx} ${ty}`} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />
+                      <circle cx={sx} cy={sy} r="2.5" fill={stroke} />
+                      <circle cx={tx} cy={ty} r="2.5" fill={stroke} />
+                    </g>
+                  );
+                })}
                 {elements.map(element => {
                   const deps = getDependencies(element);
                   const targetPos = getBarPosition(element);

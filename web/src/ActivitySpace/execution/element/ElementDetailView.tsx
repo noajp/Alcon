@@ -82,9 +82,8 @@ import {
 const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/Function/shared/RailRow';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { ElementTypeIcon, ObjectIcon } from '@/Frame/icons';
-import { PageIcon, PageSection, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
-import { ItemIconButton, useItemLook } from '@/Function/shared/itemIcon/IconPicker';
+import { ObjectIcon } from '@/Frame/icons';
+import { PageSection, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { StatusPicker } from '@/Function/shared/StatusPicker';
@@ -112,7 +111,8 @@ import { logActivity, useElementActivityLog, invalidateElementActivity, mergeAct
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { formatElementDate, parseDateOnly, toDateOnlyString, formatAge } from '@/Function/shared/dateUtils';
-import { ElementIcon, MessageIcon } from '@/Function/shared/conceptIcons';
+import { MessageIcon } from '@/Function/shared/conceptIcons';
+import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
 
 interface ElementDetailViewProps {
   /** A notification reader stacks supplementary properties below the activity. */
@@ -231,8 +231,6 @@ function ElementDetailBody({
     [element, onRefresh, onOpenStrategy],
   );
   const [title, setTitle] = useState(element.title);
-  const [look, changeLook] = useItemLook({ icon: element.icon ?? null, color: element.color },
-    async (next) => { await updateElement(element.id, next); onRefresh?.(); });
   const [description, setDescription] = useState(element.description || '');
   // Auto-grow the title textarea so long titles wrap into multiple
   // visible rows. We re-measure on value change.
@@ -751,11 +749,8 @@ function ElementDetailBody({
         <div className={layout === 'reader' ? "mx-auto w-full max-w-4xl px-5 py-7 flex flex-col gap-8" : `${PAGE_FRAME} flex gap-8`}>
           <div className="flex-1 min-w-0 flex flex-col gap-8">
 
-          {/* Title & description — under the concept's icon, like every concept page */}
+          {/* Title & description. An Element's page opens on its title: no icon above it. */}
           <div>
-            <PageIcon>
-              <ItemIconButton value={look} onChange={changeLook} defaultIcon={<ElementIcon size={18} />} />
-            </PageIcon>
             <div className="flex items-start gap-2 mb-3">
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter and Escape both
@@ -1304,6 +1299,7 @@ function TypePicker({
   onCreate: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const typeIcons = useTypeIcons('element');
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1337,7 +1333,7 @@ function TypePicker({
         <button className="w-full">
           <RailRow
             name={t('Type')}
-            icon={<ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />}
+            icon={<TypeMark type={value} icons={typeIcons} size={14} />}
             label={value ?? t('Set type')}
             placeholder={!value}
             dense
@@ -1361,7 +1357,7 @@ function TypePicker({
               onClick={() => pick(opt)}
               className="w-full flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground/90 rounded-md hover:bg-muted/60 text-left transition-colors"
             >
-              <ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <TypeMark type={opt} icons={typeIcons} size={14} />
               <span className="flex-1 truncate">{opt}</span>
               {value === opt && <Check size={12} className="text-muted-foreground shrink-0" />}
             </button>

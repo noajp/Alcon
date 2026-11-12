@@ -146,6 +146,46 @@ export async function addDomainElementType(domainId: string, name: string): Prom
   return next;
 }
 
+// Set (or, with null, clear) the icon a Domain shows for one Element or
+// Object type. Reads fresh so a concurrent edit to another type's icon is kept.
+export async function setDomainTypeIcon(domainId: string, kind: 'element' | 'object', name: string, icon: string | null): Promise<void> {
+  const column = kind === 'object' ? 'object_type_icons' : 'element_type_icons';
+  const { data: domain, error: readErr } = await supabase.from('domains').select(column).eq('id', domainId).single();
+  if (readErr) throw readErr;
+  const stored = (domain as Record<string, unknown> | null)?.[column];
+  const next = { ...(stored && typeof stored === 'object' && !Array.isArray(stored) ? stored as Record<string, string> : {}) };
+  if (icon) next[name] = icon; else delete next[name];
+  const { data, error } = await supabase
+    .from('domains')
+    .update(kind === 'object'
+      ? { object_type_icons: next, updated_at: new Date().toISOString() }
+      : { element_type_icons: next, updated_at: new Date().toISOString() })
+    .eq('id', domainId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('You are not a member of this Domain.');
+  void invalidateDomains();
+}
+
+// Remove an Object type from a Domain's `object_types` list. Catalog-only:
+// Objects that already carry the type keep their value.
+export async function removeDomainObjectType(domainId: string, name: string): Promise<string[]> {
+  const { data: domain, error: readErr } = await supabase.from('domains').select('object_types').eq('id', domainId).single();
+  if (readErr) throw readErr;
+  const current: string[] = Array.isArray(domain?.object_types) ? domain.object_types : [];
+  const next = current.filter((t) => t.toLowerCase() !== name.toLowerCase());
+  if (next.length === current.length) return current;
+  const { data, error } = await supabase
+    .from('domains')
+    .update({ object_types: next, updated_at: new Date().toISOString() })
+    .eq('id', domainId)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('You are not a member of this Domain.');
+  void invalidateDomains();
+  return next;
+}
+
 // Remove an Element type from a Domain's shared `element_types` list.
 // Catalog-only: rows that already carry the type keep their value.
 export async function removeDomainElementType(domainId: string, name: string): Promise<string[]> {

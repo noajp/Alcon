@@ -142,6 +142,7 @@ export function ElementsList({
 
   return (
     <ListTable
+      density={controls.display.density}
       sections={sections}
       onSelectObject={(id) => onSelectObject?.(id)}
       onSelectElement={(id) => onSelectElement?.(id)}

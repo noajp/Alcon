@@ -112,6 +112,7 @@ export function ObjListView({
     <div className="h-full flex flex-col overflow-hidden bg-card">
       <div className="flex-1 overflow-auto">
         <ListTable
+          density={effectiveControls.display.density}
           sections={sections}
           entity="object"
           onSelectObject={onSelect}

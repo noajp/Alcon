@@ -7,9 +7,10 @@ import { useNow } from '@/Function/shared/useNow';
 import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/Function/shared/dateUtils';
 import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
-import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { Menu, Plus, Check, Tag, X } from '@/ui/icons';
+import { Plus, Check, ChevronLeft, ChevronRight, Tag, X } from '@/ui/icons';
+import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
 import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
@@ -38,10 +39,6 @@ import { PRIORITY, statusLabel } from '@/shared/designTokens';
 
 const PRIORITY_LABELS: Record<string, string> = Object.fromEntries(Object.entries(PRIORITY).map(([key, value]) => [key, value.label]));
 
-// Type cell — Domain-shared `type` for either an Element or an Object, shown
-// as an always-on column. Opens a chip-grid picker: every type as a pill, the
-// current one highlighted, plus a dashed "+" that adds a brand-new type to the
-// Domain (when onAddType is wired) and applies it to this row.
 // Shared bottom strip for cell-editor popovers (Type / Due date): full-bleed
 // divider, optional status label on the left, an 11px Clear on the right.
 // One component so the line position and Clear sizing never drift apart.
@@ -73,9 +70,9 @@ function CellClearFooter({
 }
 
 // Industry starter vocabularies for the Type picker — each tab offers ~10
-// Element type names that read naturally in that domain. Terms intentionally
-// overlap across industries (Task, Customer, Order…); picking one adds it to
-// this Domain's catalogue and assigns it.
+// type names that read naturally in that field. Terms intentionally overlap
+// across industries (Task, Customer, Order…); picking one adds it to this
+// Domain's list and assigns it.
 const TYPE_PRESETS: { label: string; types: string[] }[] = [
   // design-lint-ignore — preserve existing user-selectable type presets during extraction.
   { label: 'General',        types: ['Task', 'Issue', 'Customer', 'Bug', 'Feature', 'Story', 'Epic', 'Goal', 'Risk', 'Note'] },
@@ -89,16 +86,56 @@ const TYPE_PRESETS: { label: string; types: string[] }[] = [
   { label: 'Sales',          types: ['Lead', 'Prospect', 'Opportunity', 'Quote', 'Order', 'Contract', 'Account', 'Activity', 'Target', 'Renewal'] },
 ];
 
+/** A row of tabs wider than its box: no scrollbar — the row fades out toward
+ *  a round arrow at the edge it can still move to, and the arrow moves it. */
+function TabStrip({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [edge, setEdge] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setEdge({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+  }, []);
+  useEffect(() => { measure(); }, [measure]);
+  const move = (by: number) => ref.current?.scrollBy({ left: by, behavior: 'smooth' });
+  const fade = `linear-gradient(to right, ${edge.left ? 'transparent, black 44px' : 'black, black'}, ${edge.right ? 'black calc(100% - 44px), transparent' : 'black'})`;
+  const ARROW = 'absolute top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-popover text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:text-foreground';
+  return (
+    <div className="relative">
+      <div ref={ref} onScroll={measure}
+        className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ maskImage: fade, WebkitMaskImage: fade }}>
+        {children}
+      </div>
+      {edge.left && (
+        <button type="button" aria-label={t('Previous')} className={`${ARROW} left-0`} onClick={() => move(-160)}><ChevronLeft size={13} /></button>
+      )}
+      {edge.right && (
+        <button type="button" aria-label={t('Next')} className={`${ARROW} right-0`} onClick={() => move(160)}><ChevronRight size={13} /></button>
+      )}
+    </div>
+  );
+}
+
+/** The Type cell and its picker: a list of the Domain's types, each with its
+ *  icon and a check on the current one; the first row is the plain kind
+ *  itself (no type). "Create type" adds a name to the Domain and assigns it;
+ *  Edit turns the checks into removes. Each type wears the icon the Domain
+ *  gave it in Settings. */
 export function TypeCell({
-  value, types, onChange, onAddType, onRemoveType,
+  value, types, onChange, onAddType, onRemoveType, kind = 'element',
 }: {
   value: string | null;
   types: string[];
   onChange?: (next: string | null) => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
   onRemoveType?: (name: string) => void | Promise<void>;
+  /** Whose types these are. */
+  kind?: 'element' | 'object';
 }) {
   const { t: tr } = useI18n();
+  const icons = useTypeIcons(kind);
   const current = value ?? null;
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -106,16 +143,10 @@ export function TypeCell({
   const [draft, setDraft] = useState('');
   const [presetTab, setPresetTab] = useState(0);
   const canEdit = !!onChange;
-
-  // Pick an industry preset: register it on the Domain (if new) and assign it.
-  // Fire both without waiting on the round trip — matches the plain
-  // catalogue-chip click below, which never awaited onChange either. The
-  // popover closing is a receipt for the click, not for the write; awaiting
-  // both writes in sequence here (register the type, then assign it) meant
-  // the popover sat open through two full write+refetch round trips before
-  // the cell ever moved.
+  // A suggested name is registered on the Domain (if new) and assigned, both
+  // at once: the menu closing is the click's receipt, not the write's.
   const pickPreset = (name: string) => {
-    if (onAddType && !types.includes(name)) void onAddType(name);
+    if (onAddType && !types.some((x) => x.toLowerCase() === name.toLowerCase())) void onAddType(name);
     void onChange?.(name);
     setOpen(false);
   };
@@ -126,7 +157,7 @@ export function TypeCell({
       disabled={!canEdit}
       className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
     >
-      {current ? <CellText>{current}</CellText> : <EmptyCellMark />}
+      {current ? <><TypeMark type={current} icons={icons} size={13} kind={kind} /><CellText>{current}</CellText></> : <EmptyCellMark />}
     </button>
   );
   // Read-only (no editor) when there's nothing to pick and no way to add.
@@ -142,142 +173,97 @@ export function TypeCell({
     void onChange?.(normalized);
     setOpen(false);
   };
-
+  const pick = (next: string | null) => { void onChange?.(next); setOpen(false); };
   const canManage = !!onRemoveType && types.length > 0;
-  const showFooter = !!current || canManage;
+  const ROW = 'flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-2 text-left text-[14px] text-foreground transition-colors hover:bg-muted/60';
 
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setAdding(false); setDraft(''); setEditing(false); } }}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent
-        align="start"
-        // With a footer, match the due-date Calendar popover's height so both
-        // row editors put their divider + footer strip at the same spot.
-        className={`${CELL_POPOVER_RADIUS} w-[230px] p-2 flex flex-col ${showFooter ? 'min-h-[370px]' : ''}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Industry presets — rectangular tabs over a chip list of starter
-            Element type names. Picking one registers it on the Domain (if new)
-            and assigns it. Hidden in delete/edit mode to keep that focused. */}
-        {!editing && (
-          <div className="mb-2 pb-2 border-b border-border/60">
-            <div className="flex gap-1 overflow-x-auto pb-1.5">
-              {TYPE_PRESETS.map((p, i) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => setPresetTab(i)}
-                  className={`shrink-0 px-2 py-1 text-[11px] rounded-md border whitespace-nowrap transition-colors ${
-                    presetTab === i
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'bg-transparent text-muted-foreground border-border/50 hover:text-foreground hover:border-border'
-                  }`}
-                >
-                  {tr(p.label)}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {TYPE_PRESETS[presetTab].types.map((name) => {
-                // Highlight the *selected* type only — not every term already in
-                // the catalogue — so the fill tracks the actual selection.
-                const isCurrent = name === current;
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => void pickPreset(name)}
-                    className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
-                      isCurrent
-                        ? 'bg-muted text-foreground border-border'
-                        : 'bg-transparent text-muted-foreground border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:text-foreground'
-                    }`}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-1.5">
-          {types.map((t) => {
-            const on = t === current;
-            return (
-              <span key={t} className="relative">
-                <button
-                  type="button"
-                  onClick={() => { if (editing) return; onChange?.(on ? null : t); setOpen(false); }}
-                  className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
-                    on
-                      ? 'bg-muted text-foreground border-border'
-                      : 'bg-transparent text-muted-foreground border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:text-foreground'
-                  }`}
-                >
-                  {t}
-                </button>
-                {editing && (
-                  <button
-                    type="button"
-                    onClick={() => void onRemoveType?.(t)}
-                    title={tr('Delete “{name}”', { name: t })}
-                    aria-label={tr('Delete “{name}”', { name: t })}
-                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground border border-border/60 flex items-center justify-center hover:text-foreground hover:border-border transition-colors"
-                  >
-                    <X size={9} strokeWidth={2.5} />
-                  </button>
-                )}
-              </span>
-            );
-          })}
-          {onAddType && !adding && !editing && (
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              title={tr('Add type')}
-              aria-label={tr('Add type')}
-              className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-            >
-              <Plus size={13} />
+      <PopoverContent align="start" className={`${CELL_POPOVER_RADIUS} w-[320px] p-2`} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
+          <span className="text-[12px] text-muted-foreground">{tr('Types')}</span>
+          {canManage && (
+            <button type="button" onClick={() => setEditing((v) => !v)}
+              className="rounded-md px-1.5 py-0.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+              {editing ? tr('Done') : tr('Edit')}
             </button>
           )}
         </div>
-        {adding && (
-          <input
-            autoFocus
-            value={draft}
-            placeholder={tr('New type…')}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); void submitNew(); }
-              else if (e.key === 'Escape') { e.preventDefault(); setAdding(false); setDraft(''); }
-            }}
-            onBlur={() => void submitNew()}
-            className="mt-2 w-full px-2 py-1 text-[12px] bg-muted/50 rounded-md text-foreground placeholder:text-muted-foreground/60 border-none"
-          />
-        )}
-        {showFooter && (
-          // Pinned to the bottom edge (mt-auto); -mx/-mb cancel the p-2 so
-          // the strip's geometry matches the due-date popover exactly.
-          <CellClearFooter
-            className="mt-auto -mx-2 -mb-2"
-            label={canManage && (
-              <button
-                type="button"
-                onClick={() => setEditing((v) => !v)}
-                title={tr('Edit types')}
-                aria-label={tr('Edit types')}
-                className={`p-1 rounded-md transition-colors ${
-                  editing
-                    ? 'text-foreground bg-muted/60'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                }`}
-              >
-                <Menu size={13} />
+        <div className="max-h-[240px] overflow-y-auto">
+          <button type="button" className={ROW} onClick={() => pick(null)}>
+            <TypeMark type={null} icons={icons} kind={kind} />
+            <span className="min-w-0 truncate">{kind === 'object' ? 'Object' : 'Element'}</span>
+            <span className="shrink-0 text-[12px] text-muted-foreground">{tr('(default)')}</span>
+            <span className="flex-1" />
+            {!current && <Check size={13} className="shrink-0 text-muted-foreground" />}
+          </button>
+          {types.map((name) => (
+            <div key={name} className="flex min-w-0 items-center">
+              <button type="button" className={ROW} onClick={() => { if (!editing) pick(name); }}>
+                <TypeMark type={name} icons={icons} kind={kind} />
+                <span className="min-w-0 flex-1 truncate">{name}</span>
+                {!editing && name === current && <Check size={13} className="shrink-0 text-muted-foreground" />}
+              </button>
+              {editing && (
+                <button type="button" onClick={() => void onRemoveType?.(name)}
+                  title={tr('Delete “{name}”', { name })} aria-label={tr('Delete “{name}”', { name })}
+                  className="mr-1 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        {onAddType && !editing && (
+          <>
+            <div className="my-1 border-t border-border/60" />
+            {adding ? (
+              <input
+                autoFocus
+                value={draft}
+                placeholder={tr('New type…')}
+                aria-label={tr('New type…')}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); submitNew(); }
+                  else if (e.key === 'Escape') { e.preventDefault(); setAdding(false); setDraft(''); }
+                }}
+                onBlur={submitNew}
+                className="w-full rounded-md bg-muted/50 px-2 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground/60"
+              />
+            ) : (
+              <button type="button" className={ROW} onClick={() => setAdding(true)}>
+                <Plus size={14} className="shrink-0 text-muted-foreground" />
+                <span>{tr('Create type')}</span>
               </button>
             )}
-            onClear={current ? () => { onChange?.(null); setOpen(false); } : undefined}
-          />
+            {/* Suggestions by field: tabs that scroll under a round arrow, and
+                the field's names in two aligned columns. */}
+            <div className="my-1 border-t border-border/60" />
+            <div className="px-2 pb-1.5 pt-1 text-[12px] text-muted-foreground">{tr('Recommended')}</div>
+            <TabStrip>
+              {TYPE_PRESETS.map((p, i) => (
+                <button key={p.label} type="button" onClick={() => setPresetTab(i)}
+                  className={`shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-[12px] transition-colors ${
+                    presetTab === i
+                      ? 'border-border bg-muted text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}>
+                  {tr(p.label)}
+                </button>
+              ))}
+            </TabStrip>
+            <div className="mt-1 grid grid-cols-2 gap-x-1">
+              {TYPE_PRESETS[presetTab].types.map((name) => (
+                <button key={name} type="button" className={`${ROW} !py-1.5 !text-[13px]`} onClick={() => pickPreset(name)}>
+                  <TypeMark type={name} icons={icons} kind={kind} size={13} />
+                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  {name === current && <Check size={12} className="shrink-0 text-muted-foreground" />}
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </PopoverContent>
     </Popover>
@@ -689,6 +675,7 @@ export function ObjectCell({
         onClick={(e) => e.stopPropagation()}
       >
         <TypeCell
+          kind="object"
           value={obj.type ?? null}
           types={elementTypes}
           onChange={onObjectUpdate ? (t) => onObjectUpdate(obj.id, { type: t }) : undefined}

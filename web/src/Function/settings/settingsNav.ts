@@ -82,6 +82,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
         // SLAs are not a tab here any more: the risk thresholds have ONE
         // home under Strategy (redesign §2.4); this area points there.
         tabs: [
+          { id: 'types', label: 'Types' },
           { id: 'labels', label: 'Labels' },
           { id: 'templates', label: 'Templates' },
         ],

@@ -8,6 +8,9 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { ObjectSidePanel } from '@/ActivitySpace/execution/object/ObjectSidePanel';
+import { useObjectDependencies } from '@/hooks/objectDependencyData';
+import { linkConflicts } from '@/Function/shared/objectDependencyModel';
 import { Plus } from '@/ui/icons';
 import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
@@ -565,6 +568,9 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
+  const { data: objectLinks } = useObjectDependencies(explorerData.objects.map((o) => o.id));
+  // The Object picked on the Gantt, read in the panel beside it.
+  const [ganttObjectId, setGanttObjectId] = useState<string | null>(null);
 
   if (activeType === 'elements') {
     // List = Linear-style Domain table (top-level Objects). Drilling into
@@ -591,18 +597,34 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     // object_id = null so they render as a flat list (no sub-grouping), and
     // route persistence through updateObject.
     const objectsAsBars: ElementWithDetails[] = explorerData.objects.map((o) => objectToGanttBar(o));
+    const dueOf = new Map(explorerData.objects.map((o) => [o.id, o]));
+    const ganttLinks = objectLinks.map((l) => ({
+      from: l.blocker_object_id, to: l.blocked_object_id,
+      conflict: linkConflicts(dueOf.get(l.blocker_object_id)?.due_date, dueOf.get(l.blocked_object_id)?.start_date),
+    }));
+    const picked = ganttObjectId ? explorerData.objects.find((o) => o.id === ganttObjectId) ?? null : null;
     return (
-      <div className="flex-1 overflow-hidden">
-        <GanttView
-          elements={objectsAsBars}
-          leftHeaderLabel="Objects"
-          rowScale="object"
-          defaultZoom="month"
-          onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
-          onRefresh={onRefresh}
-          phases={domainPhases}
-          milestones={objectMilestones}
-        />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <GanttView
+            elements={objectsAsBars}
+            leftHeaderLabel="Objects"
+            rowScale="object"
+            defaultZoom="month"
+            onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
+            onRefresh={onRefresh}
+            phases={domainPhases}
+            milestones={objectMilestones}
+            links={ganttLinks}
+            // A click on a bar opens the Object beside the timeline; again closes it.
+            onElementOpen={(bar) => setGanttObjectId((cur) => (cur === bar.id ? null : bar.id))}
+          />
+        </div>
+        {picked && (
+          <ObjectSidePanel key={picked.id} object={picked} onRefresh={onRefresh}
+            objects={explorerData.objects} links={objectLinks}
+            onOpen={() => onSelectObject(picked.id)} onClose={() => setGanttObjectId(null)} />
+        )}
       </div>
     );
   }
@@ -685,6 +707,7 @@ export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails
     due_date: o.due_date,
     due_time: null,
     color: o.color ?? null,
+    icon: o.icon ?? null,
     estimated_hours: null,
     actual_hours: null,
     progress: objectProgress(o),

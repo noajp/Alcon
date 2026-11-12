@@ -2718,12 +2718,14 @@ export type Database = {
           color: string | null
           created_at: string
           description: string | null
+          element_type_icons: Json
           element_types: Json
           icon: string | null
           id: string
           identifier: string | null
           label_colors: Json
           name: string
+          object_type_icons: Json
           object_types: string[]
           order_index: number | null
           phase_defaults: Json
@@ -2738,12 +2740,14 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          element_type_icons?: Json
           element_types?: Json
           icon?: string | null
           id?: string
           identifier?: string | null
           label_colors?: Json
           name: string
+          object_type_icons?: Json
           object_types?: string[]
           order_index?: number | null
           phase_defaults?: Json
@@ -2758,12 +2762,14 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
+          element_type_icons?: Json
           element_types?: Json
           icon?: string | null
           id?: string
           identifier?: string | null
           label_colors?: Json
           name?: string
+          object_type_icons?: Json
           object_types?: string[]
           order_index?: number | null
           phase_defaults?: Json
@@ -4906,6 +4912,45 @@ export type Database = {
           {
             foreignKeyName: "object_members_object_id_fkey"
             columns: ["object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      object_dependencies: {
+        Row: {
+          blocked_object_id: string
+          blocker_object_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+        }
+        Insert: {
+          blocked_object_id: string
+          blocker_object_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+        }
+        Update: {
+          blocked_object_id?: string
+          blocker_object_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_dependencies_blocked_object_id_fkey"
+            columns: ["blocked_object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "object_dependencies_blocker_object_id_fkey"
+            columns: ["blocker_object_id"]
             isOneToOne: false
             referencedRelation: "objects"
             referencedColumns: ["id"]
