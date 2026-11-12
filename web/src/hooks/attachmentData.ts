@@ -157,6 +157,13 @@ async function insertFile(owner: AttachmentOwner, name: string, mime: string | n
   throw error ?? new Error('Could not save the file.');
 }
 
+/** Attaches one file to `owner` and returns it as listed. */
+export async function attachFile(owner: AttachmentOwner, file: File): Promise<Attachment> {
+  const saved = await insertFile(owner, file.name, file.type || null, file, null);
+  if (!saved) throw new Error(translate('Could not save the file.'));
+  return saved;
+}
+
 export interface SavedEdits {
   file: Attachment;
   /** Edits whose cell or paragraph someone else had changed meanwhile (theirs was overwritten). */

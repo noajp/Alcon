@@ -9,7 +9,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered,
-  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus,
+  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus, Minus, Paperclip, FileText,
 } from '@/ui/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Function/notebook/htmlSanitizer';
@@ -17,7 +17,11 @@ import { patchBlocks } from '@/Function/notebook/noteMerge';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MermaidLayer } from './MermaidLayer';
 import { EmbedLayer } from './EmbedLayer';
-import { EMBED_LANG, embedSource, useEmbedHost } from './embedBlocks';
+import { EMBED_LANG, embedSource, useEmbedHost, type EmbedSpec } from './embedBlocks';
+import { ArtifactPicker, FILE_VIEW } from './fileBlocks';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { uploadToArtifacts } from '@/hooks/artifactData';
+import { formatError } from '@/Function/shared/formatError';
 
 export interface NoteEditorProps {
   initialHtml?: string;
@@ -34,9 +38,6 @@ export interface NoteEditorProps {
   /** id → status for every Element. Bullets linked via data-element-id
    *  render a read-only ○ that mirrors the linked Element's status. */
   elementStatusById?: Record<string, string | null | undefined>;
-  /** When provided, the formatting toolbar is portaled into this element
-   *  as a centered island instead of floating near the selection. */
-  toolbarPortalRef?: React.RefObject<HTMLDivElement | null>;
   /** A short body inside another page (an Element's description): no
    *  page-tall minimum, the page's text size, smaller headings. Its text is
    *  kept as Markdown, so it offers no underline or alignment. */
@@ -72,6 +73,23 @@ export interface NoteEditorHandle {
 
 const TOOLBAR_GAP = 8;
 
+/** One thing "/" offers. `run` gets the empty line it was typed on and
+ *  where the menu stood. */
+interface SlashItem {
+  id: string; group: string; label: string; hint?: string; icon: React.ReactNode;
+  /** Words that also find it. */
+  keywords?: string;
+  /** Its label and hint are already in the reader's language (a page's own block). */
+  translated?: boolean;
+  search?: string;
+  run: (at: Element | null, pos: { x: number; y: number }) => void;
+}
+const SLASH_MENU_HEIGHT = 340;
+const filterSlash = (items: SlashItem[], query: string) => {
+  const q = query.trim().toLowerCase();
+  return q ? items.filter((item) => (item.search ?? '').includes(q)) : items;
+};
+
 // Blocks whose style must NOT carry onto the next line. Headings are
 // single-line: Enter always drops to a paragraph. Quote / code are
 // multi-line containers: Enter adds a line, and Enter on an *empty* line
@@ -87,7 +105,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   editable = true,
   onBulletContextMenu,
   elementStatusById,
-  toolbarPortalRef,
   compact = false,
   placeholder,
 }, handleRef) {
@@ -114,11 +131,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // doesn't re-render every frame (geometry is stable until the table changes).
   const handlesSigRef = useRef<string | null>(null);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
-  // Refs don't trigger a re-render, so the parent's toolbar-portal node isn't
-  // available on the first render. Flip this after mount to re-render once the
-  // node exists and the always-on header island can portal into it.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   const initRef = useRef(false);
   const lastEmittedRef = useRef<string>('');
   // True while an IME composition is in flight. emit() rewrites the DOM
@@ -146,18 +158,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     };
     document.addEventListener('selectionchange', save);
     return () => document.removeEventListener('selectionchange', save);
-  }, []);
-
-  // Snapshot the current in-editor selection. Called from the toolbar's
-  // mousedown (the last instant the user's selection is still intact, before
-  // the click can collapse it) and continuously via selectionchange below.
-  const captureSelection = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
-      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
-    }
   }, []);
 
   // Put the snapshot back before a command runs. Inline commands (bold,
@@ -218,10 +218,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     replaceBody(value ?? initialHtml);
   }, [initialHtml, value, replaceBody]);
 
-  // "/" on an empty line, where the page offers live blocks: a menu of them;
-  // the one picked replaces the line as an ```alcon block.
+  // "/" on an empty line opens the menu of everything a line can become: a
+  // style, a list, a table, a file, and the live blocks the page offers.
+  // What is typed after it narrows the menu.
   const embedHost = useEmbedHost();
-  const [slash, setSlash] = useState<{ x: number; y: number; index: number; block: Element | null } | null>(null);
+  const spaceId = useActiveSpaceId();
+  const [slash, setSlash] = useState<{ x: number; y: number; index: number; query: string; block: Element | null } | null>(null);
+  const slashItemsRef = useRef<SlashItem[]>([]);
+  const [picker, setPicker] = useState<{ x: number; y: number; block: Element | null } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileBlockRef = useRef<Element | null>(null);
   const emit = useCallback(() => {
     const el = ref.current;
     if (!el) return;
@@ -237,18 +243,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     onChange?.(html);
   }, [onChange]);
 
-  const insertEmbed = useCallback((view: string) => {
+  // Puts a block-level node where the line `at` is (at the end when that
+  // line is gone), with an empty line after it holding the caret.
+  const placeBlock = useCallback((node: HTMLElement, at: Element | null) => {
     const el = ref.current;
-    const at = slash?.block ?? null;
-    setSlash(null);
     if (!el) return;
-    const pre = document.createElement('pre');
-    pre.setAttribute('data-lang', EMBED_LANG);
-    pre.textContent = embedSource({ view });
     const after = document.createElement('p');
     after.appendChild(document.createElement('br'));
-    if (at && at.parentElement === el) { at.replaceWith(pre); pre.after(after); }
-    else { el.appendChild(pre); el.appendChild(after); }
+    if (at && at.parentElement === el) { at.replaceWith(node); node.after(after); }
+    else { el.appendChild(node); el.appendChild(after); }
+    el.focus();
     const range = document.createRange();
     range.selectNodeContents(after);
     range.collapse(true);
@@ -256,7 +260,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     sel?.removeAllRanges();
     sel?.addRange(range);
     emit();
-  }, [slash, emit]);
+  }, [emit]);
+
+  const insertEmbed = useCallback((spec: EmbedSpec, at: Element | null) => {
+    const pre = document.createElement('pre');
+    pre.setAttribute('data-lang', EMBED_LANG);
+    pre.textContent = embedSource(spec);
+    placeBlock(pre, at);
+  }, [placeBlock]);
+
+  const uploadFiles = useCallback(async (files: File[]) => {
+    const at = fileBlockRef.current;
+    fileBlockRef.current = null;
+    if (!spaceId || !files.length) return;
+    try {
+      let line = at;
+      for (const file of files) {
+        const saved = await uploadToArtifacts(spaceId, file);
+        insertEmbed({ view: FILE_VIEW, id: saved.id }, line);
+        line = null;
+      }
+    } catch (err) {
+      await appDialog.alert(formatError(err));
+    }
+  }, [spaceId, insertEmbed]);
 
   // Mirror each linked bullet's ○ to its Element's live status.
   // `data-element-status` is derived — applied here and re-applied
@@ -342,12 +369,36 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     };
   }, [updateToolbarPosition]);
 
+  // A "/" that arrived as text rather than as its key (an input method, a
+  // phone's keyboard): a line holding only that opens the menu the same way.
+  const openSlashFromText = useCallback(() => {
+    const el = ref.current;
+    const sel = document.getSelection();
+    if (!el || !editable || !sel?.anchorNode || !el.contains(sel.anchorNode)) return false;
+    let node: Node | null = sel.anchorNode;
+    while (node && node.parentNode !== el) node = node.parentNode;
+    const block = node instanceof HTMLElement ? node : null;
+    if (!block || block.tagName === 'PRE' || block.tagName === 'TABLE') return false;
+    const text = block.textContent ?? '';
+    if (text !== '/' && text !== '／') return false;
+    const box = block.getBoundingClientRect();
+    block.innerHTML = '<br>';
+    const range = document.createRange();
+    range.selectNodeContents(block);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    setSlash({ x: box.left, y: box.bottom + 4, index: 0, query: '', block });
+    return true;
+  }, [editable]);
+
   const handleInput = useCallback(() => {
     // Let the IME finish; compositionend re-runs this work once committed.
     if (composingRef.current) return;
+    openSlashFromText();
     normalizeAlignment(ref.current);
     emit();
-  }, [emit]);
+  }, [emit, openSlashFromText]);
 
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
@@ -365,11 +416,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     } else if (locallyChanged) {
       // A committed local composition is the latest edit. Its own controlled
       // echo will be recognized rather than replacing the composition's caret.
+      openSlashFromText();
       normalizeAlignment(ref.current);
       emit();
     }
     applyElementStatuses();
-  }, [applyElementStatuses, emit, replaceBody]);
+  }, [applyElementStatuses, emit, replaceBody, openSlashFromText]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
@@ -474,25 +526,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, [emit]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (slash && embedHost) {
-      const n = embedHost.views.length;
+    if (slash) {
+      const items = filterSlash(slashItemsRef.current, slash.query);
+      const n = items.length || 1;
       if (e.key === 'ArrowDown') { e.preventDefault(); setSlash({ ...slash, index: (slash.index + 1) % n }); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setSlash({ ...slash, index: (slash.index + n - 1) % n }); return; }
-      if (e.key === 'Enter') { e.preventDefault(); const v = embedHost.views[slash.index]; if (v) insertEmbed(v.id); return; }
+      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+        e.preventDefault();
+        const item = items[slash.index];
+        setSlash(null);
+        item?.run(slash.block, slash);
+        return;
+      }
+      if (e.key === 'Backspace' && slash.query) { e.preventDefault(); setSlash({ ...slash, query: slash.query.slice(0, -1), index: 0 }); return; }
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.nativeEvent.isComposing) {
+        e.preventDefault();
+        setSlash({ ...slash, query: slash.query + e.key, index: 0 });
+        return;
+      }
       setSlash(null);
-      if (e.key === 'Escape') { e.preventDefault(); return; }
+      if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); return; }
     }
-    if (e.key === '/' && embedHost && embedHost.views.length && editable && !e.nativeEvent.isComposing && ref.current) {
+    if (e.key === '/' && editable && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing && ref.current) {
       const sel = document.getSelection();
       let node: Node | null = sel?.anchorNode ?? null;
       while (node && node.parentNode !== ref.current) node = node.parentNode;
       const block = node instanceof Element ? node : null;
-      const empty = block ? !(block.textContent ?? '').trim() && block.tagName !== 'PRE' : !(ref.current.textContent ?? '').trim();
+      const empty = block ? !(block.textContent ?? '').trim() && block.tagName !== 'PRE' && block.tagName !== 'TABLE' : !(ref.current.textContent ?? '').trim();
       if (empty) {
         e.preventDefault();
         const r = sel && sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
         const box = (block ?? ref.current).getBoundingClientRect();
-        setSlash({ x: r && r.left ? r.left : box.left, y: (r && r.bottom ? r.bottom : box.bottom) + 4, index: 0, block });
+        setSlash({ x: r && r.left ? r.left : box.left, y: (r && r.bottom ? r.bottom : box.bottom) + 4, index: 0, query: '', block });
         return;
       }
     }
@@ -509,7 +574,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     if (key === 'b') { e.preventDefault(); exec('bold'); }
     else if (key === 'i') { e.preventDefault(); exec('italic'); }
     else if (key === 'u') { e.preventDefault(); if (!compact) exec('underline'); }
-  }, [exec, breakOutOfStickyBlock, handleTableTab, compact, slash, embedHost, insertEmbed, editable]);
+  }, [exec, breakOutOfStickyBlock, handleTableTab, compact, slash, editable]);
 
   // Restore caret into the editor when triggering commands from the
   // header toolbar — execCommand only runs against the focused
@@ -931,6 +996,27 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     exec('createLink', url);
   }, [exec, restoreSelection, t]);
 
+  // A link on a line of its own ("/" has no text selected to wrap): asks
+  // for the address and writes it as the link's text.
+  const insertUrl = useCallback(async () => {
+    const editor = ref.current;
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+    const url = await appDialog.prompt(t('Link URL'), 'https://');
+    if (!url) return;
+    if (!/^(https?:\/\/|mailto:)/i.test(url)) {
+      await appDialog.alert(t('Enter a URL that starts with http(s):// or mailto:.'));
+      return;
+    }
+    if (!editor || ref.current !== editor || !range || !editor.contains(range.commonAncestorContainer)) return;
+    editor.focus();
+    selection?.removeAllRanges(); selection?.addRange(range);
+    const a = document.createElement('a');
+    a.href = url;
+    a.textContent = url;
+    exec('insertHTML', a.outerHTML);
+  }, [exec, t]);
+
   // Block-level toggle: applies `tag` if the current block isn't
   // already that tag, otherwise reverts to <p>. Used by the floating
   // toolbar's quote button and the style dropdown so a second click
@@ -944,6 +1030,47 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     },
     [exec, focusEditor],
   );
+
+  // Everything "/" offers, in the order shown. A description keeps its text
+  // as Markdown, so it has no underline or alignment.
+  const heading = (n: number) => <span className="text-[11px] font-semibold leading-none">H{n}</span>;
+  const rawSlash: SlashItem[] = [
+    { id: 'p', group: 'Style', label: 'Text', icon: <FileText size={15} />, keywords: 'paragraph body', run: () => applyBlock('P') },
+    { id: 'h1', group: 'Style', label: 'Heading 1', icon: heading(1), keywords: 'title h1', run: () => applyBlock('H1') },
+    { id: 'h2', group: 'Style', label: 'Heading 2', icon: heading(2), keywords: 'h2', run: () => applyBlock('H2') },
+    { id: 'h3', group: 'Style', label: 'Heading 3', icon: heading(3), keywords: 'h3', run: () => applyBlock('H3') },
+    { id: 'quote', group: 'Style', label: 'Quote', icon: <Quote size={15} />, keywords: 'blockquote', run: () => applyBlock('BLOCKQUOTE') },
+    { id: 'code', group: 'Style', label: 'Code block', icon: <span className="font-mono text-[11px] leading-none">{'</>'}</span>, keywords: 'pre mermaid', run: () => applyBlock('PRE') },
+    { id: 'bullet', group: 'List', label: 'Bulleted list', icon: <List size={15} />, keywords: 'ul', run: () => applyList('bullet') },
+    { id: 'numbered', group: 'List', label: 'Numbered list', icon: <ListOrdered size={15} />, keywords: 'ol', run: () => applyList('numbered') },
+    { id: 'check', group: 'List', label: 'Checklist', icon: <ElementIcon size={15} />, keywords: 'todo task', run: () => applyList('check') },
+    { id: 'table', group: 'Insert', label: 'Insert table', icon: <TableIcon size={15} />, keywords: 'grid', run: () => insertTable() },
+    { id: 'hr', group: 'Insert', label: 'Divider', icon: <Minus size={15} />, keywords: 'hr line rule', run: (at) => placeBlock(document.createElement('hr'), at) },
+    { id: 'link', group: 'Insert', label: 'Link', icon: <LinkIcon size={15} />, keywords: 'url', run: () => { void insertUrl(); } },
+    ...(spaceId ? ([
+      { id: 'file', group: 'Insert', label: 'File', icon: <Paperclip size={15} />, keywords: 'upload image attach artifact',
+        run: (at, pos) => setPicker({ x: pos.x, y: pos.y, block: at }) },
+    ] satisfies SlashItem[]) : []),
+    ...(embedHost?.views ?? []).map((v) => ({
+      id: `embed:${v.id}`, group: 'Insert', label: v.label, hint: v.hint, icon: v.icon ?? null, translated: true,
+      run: (at) => insertEmbed({ view: v.id }, at),
+    } satisfies SlashItem)),
+    { id: 'bold', group: 'Formatting', label: 'Bold', icon: <Bold size={15} />, run: () => exec('bold') },
+    { id: 'italic', group: 'Formatting', label: 'Italic', icon: <Italic size={15} />, run: () => exec('italic') },
+    ...(compact ? [] : [{ id: 'underline', group: 'Formatting', label: 'Underline', icon: <UnderlineIcon size={15} />, run: () => exec('underline') }]),
+    { id: 'strike', group: 'Formatting', label: 'Strikethrough', icon: <Strikethrough size={15} />, run: () => exec('strikeThrough') },
+    ...(compact ? [] : [
+      { id: 'left', group: 'Formatting', label: 'Align left', icon: <AlignLeft size={15} />, run: () => exec('justifyLeft') },
+      { id: 'center', group: 'Formatting', label: 'Align center', icon: <AlignCenter size={15} />, run: () => exec('justifyCenter') },
+      { id: 'right', group: 'Formatting', label: 'Align right', icon: <AlignRight size={15} />, run: () => exec('justifyRight') },
+    ]),
+  ];
+  const slashItems = rawSlash.map((item) => ({ ...item, search: `${item.translated ? item.label : t(item.label)} ${item.label} ${item.keywords ?? ''}`.toLowerCase() }));
+  slashItemsRef.current = slashItems;
+  const shownSlash = slash ? filterSlash(slashItems, slash.query) : [];
+  // Opens upward when the line is low on the screen.
+  const slashTop = slash && typeof window !== 'undefined' && slash.y + SLASH_MENU_HEIGHT > window.innerHeight
+    ? Math.max(8, slash.y - SLASH_MENU_HEIGHT - 28) : slash?.y ?? 0;
 
   return (
     <>
@@ -977,25 +1104,47 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         <MermaidLayer root={ref} frame={frameRef} />
         {/* ```alcon blocks drawn live over their source. */}
         <EmbedLayer root={ref} frame={frameRef} editable={editable} />
-        {slash && embedHost && createPortal(
-          <div role="listbox" aria-label={t('Insert a block')}
-            className="fixed z-50 w-64 overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-xl"
-            style={{ left: slash.x, top: slash.y }}
-            onMouseDown={(e) => e.preventDefault()}>
-            {embedHost.views.map((v, i) => (
-              <button key={v.id} type="button" role="option" aria-selected={i === slash.index}
-                onMouseEnter={() => setSlash({ ...slash, index: i })}
-                onClick={() => insertEmbed(v.id)}
-                className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left ${i === slash.index ? 'bg-muted' : ''}`}>
-                <span className="flex shrink-0 text-muted-foreground">{v.icon}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] text-foreground">{v.label}</span>
-                  {v.hint && <span className="block truncate text-[11px] text-muted-foreground">{v.hint}</span>}
-                </span>
-              </button>
-            ))}
-          </div>,
+        {slash && createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onMouseDown={(e) => { e.preventDefault(); setSlash(null); }} />
+            <div role="listbox" aria-label={t('Insert a block')}
+              className="fixed z-50 w-64 overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-xl"
+              style={{ left: Math.min(slash.x, window.innerWidth - 272), top: slashTop, maxHeight: SLASH_MENU_HEIGHT }}
+              onMouseDown={(e) => e.preventDefault()}>
+              {slash.query && <p className="px-3 pb-1 pt-0.5 text-[11.5px] text-muted-foreground">/{slash.query}</p>}
+              {shownSlash.map((item, i) => (
+                <div key={item.id}>
+                  {!slash.query && item.group !== shownSlash[i - 1]?.group && (
+                    <p className={`px-3 pb-1 text-[11px] font-medium text-muted-foreground ${i ? 'mt-1 border-t border-border/50 pt-2' : 'pt-1'}`}>{t(item.group)}</p>
+                  )}
+                  <button type="button" role="option" aria-selected={i === slash.index}
+                    ref={i === slash.index ? (node) => node?.scrollIntoView({ block: 'nearest' }) : undefined}
+                    onMouseEnter={() => { if (i !== slash.index) setSlash({ ...slash, index: i }); }}
+                    onClick={() => { setSlash(null); item.run(slash.block, slash); }}
+                    className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left ${i === slash.index ? 'bg-muted' : ''}`}>
+                    <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">{item.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] text-foreground">{item.translated ? item.label : t(item.label)}</span>
+                      {item.hint && <span className="block truncate text-[11px] text-muted-foreground">{item.translated ? item.hint : t(item.hint)}</span>}
+                    </span>
+                  </button>
+                </div>
+              ))}
+              {!shownSlash.length && <p className="px-3 py-2 text-[12px] text-muted-foreground">{t('Nothing matches.')}</p>}
+            </div>
+          </>,
           document.body,
+        )}
+        {picker && createPortal(
+          <ArtifactPicker spaceId={spaceId} x={Math.min(picker.x, window.innerWidth - 336)} y={Math.min(picker.y, window.innerHeight - 320)}
+            onClose={() => setPicker(null)}
+            onUpload={() => { fileBlockRef.current = picker.block; setPicker(null); fileInputRef.current?.click(); }}
+            onPick={(file) => { const at = picker.block; setPicker(null); insertEmbed({ view: FILE_VIEW, id: file.id }, at); }} />,
+          document.body,
+        )}
+        {editable && (
+          <input ref={fileInputRef} type="file" multiple hidden
+            onChange={(e) => { const files = Array.from(e.target.files ?? []); e.target.value = ''; void uploadFiles(files); }} />
         )}
         {editable && tableHandles && (
           <TableInsertHandles
@@ -1007,25 +1156,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         )}
       </div>
 
-      {/* Header-island toolbar — always visible, portaled into PageView's
-          header bar (independent of the text selection). */}
-      {editable && mounted && toolbarPortalRef?.current &&
-        createPortal(
-          <HeaderToolbar
-            markdownOnly={compact}
-            onCommand={exec}
-            onChecklist={toggleChecklist}
-            onLink={insertLink}
-            onToggleBlock={toggleBlock}
-            onInsertTable={() => insertTable()}
-            onCaptureSelection={captureSelection}
-          />,
-          toolbarPortalRef.current,
-        )}
-
-      {/* Floating selection toolbar — fallback when no header portal target
-          is provided (the toolbar follows the selection instead). */}
-      {toolbar && editable && !toolbarPortalRef && (
+      {/* The toolbar follows the selection. */}
+      {toolbar && editable && (
         <FloatingToolbar
           x={toolbar.x}
           y={toolbar.y}
@@ -1807,55 +1939,6 @@ function FloatingToolbar({
       <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
       <TbDivider />
       <TbBtn icon={Quote} title="Quote" onClick={() => onToggleBlock('BLOCKQUOTE')} />
-      <TbBtn icon={LinkIcon} title="Link" onClick={onLink} />
-    </div>
-  );
-}
-
-function HeaderToolbar({
-  markdownOnly,
-  onCommand,
-  onChecklist,
-  onLink,
-  onToggleBlock,
-  onInsertTable,
-  onCaptureSelection,
-}: {
-  markdownOnly?: boolean;
-  onCommand: (cmd: string, value?: string) => void;
-  onChecklist: () => void;
-  onLink: () => void;
-  onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
-  onInsertTable: () => void;
-  /** Snapshot the editor selection at pointer-down, before the click can
-   *  collapse it. Runs in the capture phase so it fires before preventDefault. */
-  onCaptureSelection: () => void;
-}) {
-  return (
-    <div
-      className="flex items-center gap-0.5 px-1 py-0.5"
-      onMouseDownCapture={onCaptureSelection}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      <TbStyleDropdown onToggleBlock={onToggleBlock} />
-      <TbDivider />
-      <TbBtn icon={Bold} title="Bold (⌘B)" onClick={() => onCommand('bold')} />
-      <TbBtn icon={Italic} title="Italic (⌘I)" onClick={() => onCommand('italic')} />
-      {!markdownOnly && <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />}
-      <TbBtn icon={Strikethrough} title="Strikethrough" onClick={() => onCommand('strikeThrough')} />
-      <TbDivider />
-      {!markdownOnly && <>
-        <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
-        <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
-        <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
-        <TbDivider />
-      </>}
-      <TbBtn icon={List} title="Bulleted list" onClick={() => onCommand('insertUnorderedList')} />
-      <TbBtn icon={ListOrdered} title="Numbered list" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
-      <TbDivider />
-      <TbBtn icon={Quote} title="Quote" onClick={() => onToggleBlock('BLOCKQUOTE')} />
-      <TbBtn icon={TableIcon} title="Insert table" onClick={onInsertTable} />
       <TbBtn icon={LinkIcon} title="Link" onClick={onLink} />
     </div>
   );

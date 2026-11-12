@@ -253,7 +253,7 @@ export function CommentComposer({
     <div className="pt-1 relative">
       {/* The same box as the AI's composer: a soft border that firms up while
           typing, one row that grows, the primary send button at its end. */}
-      <div className="flex items-end gap-1 rounded-lg border border-border/30 bg-[var(--surface-rail)] px-1.5 py-1.5 shadow-[var(--shadow-island)] transition-colors focus-within:border-border">
+      <div className="flex items-end gap-1 gloss-island rounded-lg bg-[var(--surface-rail)] px-1.5 py-1.5 !shadow-[var(--shadow-card)] transition-colors focus-within:border-border">
         <textarea
           ref={taRef}
           value={value}
