@@ -18,6 +18,10 @@ import {
 import type { NavigationState } from '@/types/navigation';
 import { SidebarRow } from '@/Function/shared/SidebarRow';
 import { PanelBody } from '@/Function/shared/PanelLayout';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Button } from '@/ui/button';
+import { LABEL_PALETTE, paletteHex } from '@/Function/shared/labelColor';
+import { FIELD } from '@/shared/designTokens';
 
 // An open notebook's Sections, as the column left of its pages: picking
 // one decides which pages the list beside it shows, and the highlighted row
@@ -38,7 +42,7 @@ export function SectionsPane({
   onViewChange: (view: string) => void;
 }) {
   const { t } = useI18n();
-  const { nodes, createNode, renameNode, deleteNode } = useNotes();
+  const { nodes, createNode, renameNode, deleteNode, moveNodes } = useNotes();
   const [renaming, setRenaming] = useState<string | null>(null);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   // The notebook shown: the one picked, else the open page's (walk up to the
@@ -61,18 +65,25 @@ export function SectionsPane({
   const startRename = (id: string) => { window.setTimeout(() => setRenaming(id), 0); };
   const go = (nav: Partial<NavigationState>) => { onViewChange('note'); onNavigate(nav); };
 
-  const addSection = async () => {
+  const addSection = async (name: string, color: string | null) => {
     let section: { id: string } | undefined;
     try {
-      section = await createNode('section', t('New section'), book.id);
+      // The notebook's loose pages (written before it had Sections) move into
+      // its first Section: with Sections, only a Section's pages are listed.
+      const loose = sections.length === 0 ? filesInFolder(nodes, book.id) : [];
+      section = await createNode('section', name, book.id, { color });
+      if (loose.length > 0) {
+        await moveNodes(loose.map((p) => p.id), section.id);
+        go({ noteFolderId: book.id, noteSectionId: section.id, noteId: loose[0].id });
+        return;
+      }
       // Seed a page so the new Section opens straight into the editor.
       const page = await createNode('file', t('Untitled'), section.id);
       go({ noteFolderId: book.id, noteSectionId: section.id, noteId: page.id });
-      startRename(section.id);
     } catch (e) {
       console.error('Failed to create note section', e);
       // Don't leave a page-less Section behind if the page insert failed.
-      if (section) { try { await deleteNode(section.id); } catch { /* best-effort */ } }
+      if (section && filesInFolder(nodes, section.id).length === 0) { try { await deleteNode(section.id); } catch { /* best-effort */ } }
     }
   };
   const addPage = async (sectionId: string) => {
@@ -103,8 +114,11 @@ export function SectionsPane({
             return (
               <ContextMenu key={section.id}>
                 <ContextMenuTrigger asChild>
-                  <SidebarRow active={active}
-                    icon={<span className={`h-3.5 w-[3px] rounded-full ${active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`} />}>
+                  <SidebarRow active={active}>
+                    {/* The Section's color band, hard against the row's left
+                        edge, with the name close beside it. */}
+                    <span className={`-ml-1.5 -mr-1 h-4 w-[3px] shrink-0 rounded-full ${section.color ? '' : active ? 'bg-[var(--accent-default)]' : 'bg-[var(--text-tertiary)]'}`}
+                      style={section.color ? { backgroundColor: paletteHex(section.color) } : undefined} />
                     {renaming === section.id ? (
                       <RenameInput initial={section.name}
                         onCommit={(v) => { if (v && v !== section.name) void renameNode(section.id, v).catch((e) => console.error('Failed to rename note', e)); setRenaming(null); }}
@@ -127,9 +141,51 @@ export function SectionsPane({
               </ContextMenu>
             );
           })}
-          <SidebarRow icon={<Plus size={15} />} label={t('New section')} onClick={() => void addSection()} />
+          <NewSection onCreate={addSection} />
         </div>
       </PanelBody>
     </aside>
+  );
+}
+
+/** "New section": asks for the Section's name — it cannot be made without
+ *  one — and its color, then makes it. */
+function NewSection({ onCreate }: { onCreate: (name: string, color: string | null) => Promise<void> }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const ready = name.trim().length > 0 && !busy;
+  const create = async () => {
+    if (!ready) return;
+    setBusy(true);
+    try { await onCreate(name.trim(), color); setOpen(false); setName(''); setColor(null); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setName(''); setColor(null); } }}>
+      <PopoverTrigger asChild>
+        <SidebarRow icon={<Plus size={15} />} label={t('New section')} active={open} onClick={() => setOpen(true)} />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[260px] space-y-3 p-3">
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
+          placeholder={t('Section name')} aria-label={t('Section name')} aria-required="true"
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void create(); } }}
+          className={`${FIELD.base} h-8 w-full bg-transparent px-2.5 text-[13px] text-foreground`} />
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('Color')}>
+          {LABEL_PALETTE.map((p) => (
+            <button key={p.key} type="button" role="radio" aria-checked={color === p.key} aria-label={t(p.label)} title={t(p.label)}
+              onClick={() => setColor(color === p.key ? null : p.key)}
+              className={`flex size-6 items-center justify-center rounded-full transition-shadow ${color === p.key ? 'ring-2 ring-[var(--accent-default)] ring-offset-2 ring-offset-popover' : ''}`}>
+              <span className="size-4 rounded-full" style={{ backgroundColor: p.hex }} />
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-end">
+          <Button variant="primary" size="sm" disabled={!ready} onClick={() => void create()}>{t('Create')}</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

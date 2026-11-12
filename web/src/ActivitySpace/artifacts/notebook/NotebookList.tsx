@@ -36,6 +36,9 @@ export function NotebookList({ onOpenBook }: {
   const addBook = async () => {
     try {
       const book = await createNode('folder', t('New notebook'), null);
+      // A notebook always has a Section: pages live in Sections, never loose.
+      const section = await createNode('section', t('Section 1'), book.id);
+      await createNode('file', t('Untitled'), section.id);
       setRenaming(book.id);
     } catch (e) { console.error('Failed to create notebook', e); }
   };

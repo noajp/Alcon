@@ -4564,6 +4564,7 @@ export type Database = {
       }
       notes: {
         Row: {
+          color: string | null
           created_at: string
           created_by: string
           folder_id: string | null
@@ -4577,6 +4578,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
           created_by?: string
           folder_id?: string | null
@@ -4590,6 +4592,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          color?: string | null
           created_at?: string
           created_by?: string
           folder_id?: string | null

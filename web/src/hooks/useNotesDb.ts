@@ -20,6 +20,7 @@ interface NoteRow {
   type: NoteNodeType;
   name: string;
   icon: string | null;
+  color?: string | null;
   parent_id: string | null;
   order_index: number;
   linked_object_id: string | null;
@@ -40,6 +41,7 @@ function rowToNode(r: NoteRow): NoteNode {
     type: r.type,
     name: r.name,
     icon: r.icon ?? undefined,
+    color: r.color ?? undefined,
     parentId: r.parent_id,
     linkedObjectId: r.linked_object_id ?? null,
     createdBy: r.created_by,
@@ -296,7 +298,7 @@ export function useNotes() {
 
   // --- mutations ---
   const createNode = useCallback(
-    async (type: NoteNodeType, name: string, parentId: string | null): Promise<NoteNode> => {
+    async (type: NoteNodeType, name: string, parentId: string | null, extra?: { color?: string | null }): Promise<NoteNode> => {
       // DB CHECK: folders sit at the root (parent_id null); sections and
       // files both require a non-null parent. When a caller passes null:
       // - a Section falls back to the first existing root Folder (creating
@@ -335,7 +337,7 @@ export function useNotes() {
 
       const { data, error } = await supabase
         .from('notes')
-        .insert({ type, name, parent_id: resolvedParentId })
+        .insert({ type, name, parent_id: resolvedParentId, ...(extra?.color ? { color: extra.color } : {}) })
         .select('*')
         .single();
       if (error) throw error;
@@ -358,6 +360,15 @@ export function useNotes() {
     if (error) { void reload(); throw error; }
     void getQueryClient().invalidateQueries({ queryKey: ['note-header', id] });
   }, [reload]);
+
+  /** Moves nodes under another parent — a notebook's loose pages into its
+   *  first Section, so they stay listed once it has Sections. */
+  const moveNodes = useCallback(async (ids: string[], parentId: string) => {
+    if (ids.length === 0) return;
+    updateNodes((prev) => prev.map((n) => (ids.includes(n.id) ? { ...n, parentId } : n)));
+    const { error } = await supabase.from('notes').update({ parent_id: parentId }).in('id', ids);
+    if (error) { void reload(); throw error; }
+  }, [reload, updateNodes]);
 
   /** Sets (or, with null, clears) a node's icon — a notebook's mark. */
   const setNodeIcon = useCallback(async (id: string, icon: string | null) => {
@@ -407,6 +418,7 @@ export function useNotes() {
     createNode,
     renameNode,
     setNodeIcon,
+    moveNodes,
     deleteNode,
     setLinkedObject,
   };

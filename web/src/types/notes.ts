@@ -9,6 +9,8 @@ export interface NoteNode {
   type: NoteNodeType;
   name: string;
   icon?: string;
+  /** A Section's color, as a palette key ('teal'); unset shows the default mark. */
+  color?: string;
   parentId: string | null;
   /** Optional Object link. When set on a file/folder, bullet →
    *  Element conversion pre-selects the linked Object (and its
