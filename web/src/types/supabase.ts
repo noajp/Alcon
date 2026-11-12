@@ -4924,6 +4924,39 @@ export type Database = {
           },
         ]
       }
+      canvas_skills: {
+        Row: {
+          activity_space_id: string
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          name: string
+          url: string | null
+        }
+        Insert: {
+          activity_space_id: string
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          name: string
+          url?: string | null
+        }
+        Update: {
+          activity_space_id?: string
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       object_dependencies: {
         Row: {
           blocked_object_id: string

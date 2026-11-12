@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { readGeneratedAppContext } from './generatedAppContext';
+import { readGeneratedAppContext, readSpaceContext } from './generatedAppContext';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { useSessionUserId, useWidgetDocument, useWidgetViewerState } from './useWidgetDocument';
 import { supabase } from '@/lib/supabase';
 import { parseAppSource, parseAppState, sourceDigest, stableJson, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
@@ -97,6 +98,11 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
       if (!userId) throw new Error('Sign in before reading Object data.');
       return readGeneratedAppContext(objectId, userId);
     },
+    readSpace: async () => {
+      const spaceId = getActiveSpaceId();
+      if (!userId || !spaceId) throw new Error('Sign in before reading Space data.');
+      return readSpaceContext(spaceId, userId);
+    },
     /** A built-in template is known code: it becomes the shared app at once, no preview. */
     useTemplate: (source: AppSource) => serial(async () => {
       await setShared({ current: parseAppSource(source), previous: latest.current.shared?.current ?? null });
@@ -105,7 +111,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     savePrompt: (prompt: string) => serial(() => saveOwn({ prompt })),
     generate: (prompt: string) => serial(async () => {
       await saveOwn({ prompt });
-      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3 } });
+      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3, spaceId: getActiveSpaceId() } });
       if (error) {
         let message = error.message;
         if ('context' in error && error.context instanceof Response) { try { message = (await error.context.json()).error ?? message; } catch { /* Keep transport error. */ } }

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { RotateCcw } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
 import { Button } from '@/ui/button';
@@ -7,6 +8,8 @@ import { TextComposer } from '@/ui/text-composer';
 import { useGeneratedApp } from '@/hooks/useGeneratedApp';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import { CANVAS_TEMPLATES } from '../generated/templates';
+import { CanvasSkillsDialog } from '../generated/CanvasSkills';
+import { libraryCode } from '../generated/skills';
 import { AppRuntime } from '../generated/AppRuntime';
 import type { WidgetProps } from '../types';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -23,6 +26,7 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
   const loaded = useRef(false);
   const latestPrompt = useRef('');
   const app = store.app;
+  const [skillsOpen, setSkillsOpen] = useState(false);
   useWidgetMeta(app?.draft_app?.title ?? app?.current_app?.title ?? null);
   useEffect(() => {
     if (!store.loading && !loaded.current) { loaded.current = true; setPrompt(app?.prompt ?? ''); latestPrompt.current = app?.prompt ?? ''; }
@@ -42,12 +46,21 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
     try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : t('Could not save the app.')); }
     finally { setBusy(false); }
   }
+  // A canvas's libraries are fetched here: its frame has no network.
+  const libraryList = (app?.draft_app ?? app?.current_app)?.libraries;
+  const libraryKey = (libraryList ?? []).join('\n');
+  const libsQuery = useQuery({
+    queryKey: ['canvas-libraries', libraryKey], enabled: !!libraryKey, staleTime: Infinity, retry: 1,
+    queryFn: () => Promise.all(libraryKey.split('\n').map(libraryCode)),
+  });
+  const libs = { code: libraryKey ? libsQuery.data ?? null : [], error: libraryKey && libsQuery.error ? (libsQuery.error instanceof Error ? libsQuery.error.message : 'Could not load a library.') : null };
   const showEditor = editing || !app?.current_app || !!app?.draft_app;
   const source = app?.draft_app ?? app?.current_app;
   const locked = busy || !!host.readOnly || !!store.error || store.loading;
   if (store.loading) return <p className="text-sm text-muted-foreground">{t('Loading your app…')}</p>;
   return <div className="space-y-3">
     <WidgetHeaderAction>
+      {!host.readOnly && <Button variant="ghost" size="sm" onClick={() => setSkillsOpen(true)}>{t('Skills')}</Button>}
       {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}>{showEditor ? t('Close editor') : t('Edit with AI')}</Button>}
     </WidgetHeaderAction>
     {showEditor && <div className="space-y-3">
@@ -70,13 +83,15 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
       <Button variant="primary" size="sm" disabled={locked || !ready || store.saving} onClick={() => void run(async () => { await store.adopt(); setEditing(false); setPrompt(''); latestPrompt.current = ''; setEpoch(n => n + 1); })}>{t('Use this app')}</Button>
       <Button variant="ghost" size="sm" disabled={locked} onClick={() => void run(() => store.discard())}>{t('Discard preview')}</Button>
     </div>}
-    {source?.usesObjectData && (app?.draft_app || store.dataConnected
+    {(source?.usesObjectData || source?.usesSpaceData) && (app?.draft_app || store.dataConnected
       ? store.knownTemplate ? null : <p className="text-xs text-muted-foreground">{t('Object data connected · Reads this Object’s Elements, related Strategies and Intents with your access permissions. Data reflects the time it was fetched.')}</p>
       : <div className="flex flex-wrap items-center gap-2">
-        <p className="mr-auto text-xs text-muted-foreground">{t('Object data not connected · Once connected, this version reads this Object’s Elements, related Strategies and Intents with your access, and can save what it reads where everyone on this widget sees it.')}</p>
-        <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.connectData())}>{t('Connect Object data')}</Button>
+        <p className="mr-auto text-xs text-muted-foreground">{source?.usesSpaceData ? t('Space data not connected · Once connected, this version reads everything you can see in this Space — Domains, Objects, Elements, Strategies and people — with your access, and can save what it reads where everyone on this canvas sees it.') : t('Object data not connected · Once connected, this version reads this Object’s Elements, related Strategies and Intents with your access, and can save what it reads where everyone on this widget sees it.')}</p>
+        <Button variant="secondary" size="sm" disabled={locked} onClick={() => void run(() => store.connectData())}>{source?.usesSpaceData ? t('Connect Space data') : t('Connect Object data')}</Button>
       </div>)}
-    {source && <AppRuntime key={`${epoch}:${app?.draft_app ? 'draft' : store.dataConnected ? 'live' : 'unconnected'}:${JSON.stringify(source)}`} source={source} state={store.state} objectId={host.subject.id ?? ''} objectName={host.object?.name ?? ''} preview={!!app?.draft_app} readOnly={!!host.readOnly || !!store.error} onSave={async (value, base) => { try { return await store.saveState(value, base); } catch (e) { setError(e instanceof Error ? e.message : t('Could not save app data.')); throw e; } }} onReadContext={source.usesObjectData && (app?.draft_app || store.dataConnected) ? store.readContext : undefined} onReady={setReady} />}
+    <CanvasSkillsDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
+    {source && libs.error && <p role="alert" className="text-sm text-destructive">{libs.error}</p>}
+    {source && libs.code && <AppRuntime key={`${epoch}:${app?.draft_app ? 'draft' : store.dataConnected ? 'live' : 'unconnected'}:${JSON.stringify(source)}`} libraryCode={libs.code} onReadSpace={source.usesSpaceData && (app?.draft_app || store.dataConnected) ? store.readSpace : undefined} source={source} state={store.state} objectId={host.subject.id ?? ''} objectName={host.object?.name ?? ''} preview={!!app?.draft_app} readOnly={!!host.readOnly || !!store.error} onSave={async (value, base) => { try { return await store.saveState(value, base); } catch (e) { setError(e instanceof Error ? e.message : t('Could not save app data.')); throw e; } }} onReadContext={source.usesObjectData && (app?.draft_app || store.dataConnected) ? store.readContext : undefined} onReady={setReady} />}
     {(error || store.error) && <div role="alert" className="space-y-1 text-sm text-destructive"><p>{error ?? store.error}</p><Button variant="ghost" size="sm" disabled={busy || store.saving} onClick={() => void run(async () => { const result = await store.reload(); if (result.error) throw result.error; setEpoch(n => n + 1); })}>{t('Reload saved app')}</Button></div>}
     {host.readOnly && <p className="text-xs text-muted-foreground">{t('Reconnect to edit or save this app.')}</p>}
   </div>;
