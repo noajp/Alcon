@@ -23,7 +23,6 @@
     "src/AIP/harness/promotionModel.ts#promotionBindingHashWeb": "サーバ側 promotionBindingHash の twin。tests/promotionModel.test.ts がサーバとの一致を検証するために export（画面は構造ハッシュと drift を使う）",
     "src/AIP/harness/promotionModel.ts#readPromotionBindingWeb": "同一ファイルの draftPackageWeb が使う読み取り。tests/promotionModel.test.ts がサーバとの一致を検証するために export している",
     "src/Frame/sidebarOrder.ts#normalizeSidebarOrder": "loadSidebarOrder が使う純粋な読み取り（保存値の検証と新しい行の補完）。localStorage のない node のテストから直接確かめるために export している",
-    "src/Frame/sidebarOrder.ts#SIDEBAR_ITEMS": "サイドバー固定行の既定の並び。同一ファイルの読み取りが使い、tests/sidebarOrder.test.ts が既定順を確かめるために export している",
-    "src/Function/shared/progressModel.ts#itemTimes": "buildProgressSeries が使う純粋な判定（Element が範囲に入った・着手した・完了した時刻）。呼び出し元が同一ファイルのため走査からは未配線に見える。tests/progressModel.test.ts が記録の有無ごとの時刻を直接確かめるために export している"
+    "src/Frame/sidebarOrder.ts#SIDEBAR_ITEMS": "サイドバー固定行の既定の並び。同一ファイルの読み取りが使い、tests/sidebarOrder.test.ts が既定順を確かめるために export している"
   }
 }

@@ -16,8 +16,6 @@ import { supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type { ElementActivity } from '@/types/database';
 import { latestClosedAt, latestDoneAt } from '@/Function/shared/completion';
-import { selectIn } from '@/hooks/chunkedIn';
-import type { MoveTimes } from '@/Function/shared/progressModel';
 
 export type ActivityKind =
   | 'created'
@@ -230,44 +228,4 @@ export function mergeActivity(
     });
   }
   return rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-}
-
-// ── When work was started and finished, for a set of Elements ──
-//
-// The Progress panel's series. Reads the Status rows of the given Elements
-// (in chunks, so the ids do not overflow the URL) and keeps, per Element,
-// its first move into a started Status and its latest move into done.
-
-const STARTED_STATUSES = ['in_progress', 'review', 'blocked', 'done'];
-
-async function fetchMoveTimes(elementIds: string[]): Promise<Map<string, MoveTimes>> {
-  const rows = await selectIn(elementIds, (chunk) => supabase
-    .from('element_activity')
-    .select('element_id, detail, created_at')
-    .eq('kind', 'status')
-    .in('element_id', chunk)
-    .order('created_at', { ascending: true })) as { element_id: string; detail: string; created_at: string }[];
-  const out = new Map<string, MoveTimes>();
-  for (const row of rows) {
-    const to = row.detail.split('→').pop()?.trim() ?? '';
-    const cur = out.get(row.element_id) ?? {};
-    if (STARTED_STATUSES.includes(to) && !cur.startedAt) cur.startedAt = row.created_at;
-    if (to === 'done') cur.doneAt = row.created_at;
-    out.set(row.element_id, cur);
-  }
-  return out;
-}
-
-const NO_MOVES: ReadonlyMap<string, MoveTimes> = new Map();
-
-/** Started / done times for these Elements, from the Status record. */
-export function useElementMoveTimes(elementIds: string[]) {
-  const key = [...elementIds].sort().join(',');
-  const query = useQuery({
-    queryKey: ['elementMoveTimes', key],
-    queryFn: () => fetchMoveTimes(elementIds),
-    enabled: elementIds.length > 0,
-    staleTime: 60_000,
-  });
-  return query.data ?? NO_MOVES;
 }

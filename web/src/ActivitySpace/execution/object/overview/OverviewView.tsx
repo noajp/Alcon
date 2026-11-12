@@ -16,8 +16,6 @@ import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControl
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { PageSection } from '@/Function/shared/PageHead';
-import { ProgressPanel } from '@/Function/shared/ProgressPanel';
-import { CARD } from '@/shared/designTokens';
 import { MilestoneList } from '@/Function/widget/widgets/MilestonesWidget';
 import { ObjectCommentsPanel } from '../ObjectCommentsPanel';
 import { ObjectIcon } from '@/Frame/icons';
@@ -247,13 +245,6 @@ export function OverviewView({
 
             {/* ───────────── Side column ───────────── */}
             <aside className="min-w-0 space-y-3">
-              {/* How the Object is moving, always first on the rail. */}
-              {elements.length > 0 && (
-                <section className={`${CARD} p-4`}>
-                  <h3 className="mb-3 text-[13px] font-medium text-muted-foreground">{t('Progress')}</h3>
-                  <ProgressPanel elements={elements} end={object.due_date} />
-                </section>
-              )}
               <WidgetZone zone="rail" />
             </aside>
           </div>
