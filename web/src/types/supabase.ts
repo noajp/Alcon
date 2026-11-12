@@ -4912,6 +4912,45 @@ export type Database = {
           },
         ]
       }
+      object_dependencies: {
+        Row: {
+          blocked_object_id: string
+          blocker_object_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+        }
+        Insert: {
+          blocked_object_id: string
+          blocker_object_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+        }
+        Update: {
+          blocked_object_id?: string
+          blocker_object_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_dependencies_blocked_object_id_fkey"
+            columns: ["blocked_object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "object_dependencies_blocker_object_id_fkey"
+            columns: ["blocker_object_id"]
+            isOneToOne: false
+            referencedRelation: "objects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       object_milestones: {
         Row: {
           created_at: string

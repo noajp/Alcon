@@ -9,6 +9,8 @@ import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ObjectSidePanel } from '@/ActivitySpace/execution/object/ObjectSidePanel';
+import { useObjectDependencies } from '@/hooks/objectDependencyData';
+import { linkConflicts } from '@/Function/shared/objectDependencyModel';
 import { Plus } from '@/ui/icons';
 import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
@@ -566,6 +568,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
+  const { data: objectLinks } = useObjectDependencies(explorerData.objects.map((o) => o.id));
   // The Object picked on the Gantt, read in the panel beside it.
   const [ganttObjectId, setGanttObjectId] = useState<string | null>(null);
 
@@ -594,6 +597,11 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     // object_id = null so they render as a flat list (no sub-grouping), and
     // route persistence through updateObject.
     const objectsAsBars: ElementWithDetails[] = explorerData.objects.map((o) => objectToGanttBar(o));
+    const dueOf = new Map(explorerData.objects.map((o) => [o.id, o]));
+    const ganttLinks = objectLinks.map((l) => ({
+      from: l.blocker_object_id, to: l.blocked_object_id,
+      conflict: linkConflicts(dueOf.get(l.blocker_object_id)?.due_date, dueOf.get(l.blocked_object_id)?.start_date),
+    }));
     const picked = ganttObjectId ? explorerData.objects.find((o) => o.id === ganttObjectId) ?? null : null;
     return (
       <div className="flex flex-1 overflow-hidden">
@@ -607,12 +615,14 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
             onRefresh={onRefresh}
             phases={domainPhases}
             milestones={objectMilestones}
+            links={ganttLinks}
             // A click on a bar opens the Object beside the timeline; again closes it.
             onElementOpen={(bar) => setGanttObjectId((cur) => (cur === bar.id ? null : bar.id))}
           />
         </div>
         {picked && (
           <ObjectSidePanel key={picked.id} object={picked} onRefresh={onRefresh}
+            objects={explorerData.objects} links={objectLinks}
             onOpen={() => onSelectObject(picked.id)} onClose={() => setGanttObjectId(null)} />
         )}
       </div>

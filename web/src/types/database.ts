@@ -2541,6 +2541,15 @@ export interface IntentNextAction {
 // Object milestone — single-date ◇ marker on the Timeline
 // =====================================================
 
+/** One Object dependency: `blocked_object_id` waits for `blocker_object_id`. */
+export interface ObjectDependency {
+  id: string
+  blocker_object_id: string
+  blocked_object_id: string
+  created_by: string | null
+  created_at: string
+}
+
 export interface ObjectMilestone {
   id: string
   object_id: string

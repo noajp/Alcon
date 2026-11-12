@@ -54,6 +54,10 @@ interface GanttViewProps {
   /** What a row stands for. 'object' rows are roomier with a thicker bar
    *  and carry no Status mark (an Object has no Status of its own). */
   rowScale?: keyof typeof ROW_SCALE;
+  /** Dependencies between rows, by row id: `to` waits for `from`. Drawn as a
+   *  curve from the end of one bar to the start of the other, in the danger
+   *  color when `conflict` (the dates break the order). */
+  links?: { from: string; to: string; conflict?: boolean }[];
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -193,6 +197,7 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel, local
 // An Object row is laid out as Linear lays out a project: its name on a
 // line of its own, a quiet bar under it, and its milestones' names under
 // the bar — so the row is tall and the bar is slim.
+const EMPTY_LINKS: { from: string; to: string; conflict?: boolean }[] = [];
 const ROW_SCALE = { element: { row: 36, bar: 24 }, object: { row: 88, bar: 30 } } as const;
 const OBJECT_TITLE_TOP = 8;   // px from the row's top to the name line
 const OBJECT_BAR_TOP = 32;    // px from the row's top to the bar
@@ -219,6 +224,7 @@ export function GanttView({
   milestones = EMPTY_MILESTONES,
   defaultZoom = 'day',
   rowScale = 'element',
+  links = EMPTY_LINKS,
 }: GanttViewProps) {
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
@@ -1116,6 +1122,30 @@ export function GanttView({
                       className="text-muted-foreground/60" />
                   </marker>
                 </defs>
+                {links.map((link) => {
+                  const source = elements.find((el) => el.id === link.from);
+                  const target = elements.find((el) => el.id === link.to);
+                  const sourcePos = source && getBarPosition(source);
+                  const targetPos = target && getBarPosition(target);
+                  const sourceTop = layout.tops.get(link.from);
+                  const targetTop = layout.tops.get(link.to);
+                  if (!sourcePos || !targetPos || sourceTop === undefined || targetTop === undefined) return null;
+                  const sx = sourcePos.left + Math.max(sourcePos.width, 20);
+                  const sy = barTopOf(sourceTop) + BAR_H / 2;
+                  const tx = targetPos.left;
+                  const ty = barTopOf(targetTop) + BAR_H / 2;
+                  // An S-curve out of the blocker's end and into the waiting
+                  // bar's start; it loops back when the waiting bar starts early.
+                  const reach = Math.max(36, Math.abs(tx - sx) / 2);
+                  const stroke = link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 70%, transparent)';
+                  return (
+                    <g key={`link-${link.from}-${link.to}`}>
+                      <path d={`M ${sx} ${sy} C ${sx + reach} ${sy}, ${tx - reach} ${ty}, ${tx} ${ty}`} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />
+                      <circle cx={sx} cy={sy} r="2.5" fill={stroke} />
+                      <circle cx={tx} cy={ty} r="2.5" fill={stroke} />
+                    </g>
+                  );
+                })}
                 {elements.map(element => {
                   const deps = getDependencies(element);
                   const targetPos = getBarPosition(element);
