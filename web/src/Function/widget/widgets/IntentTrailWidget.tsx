@@ -102,7 +102,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   // that nothing is bound here, which is a different and worse claim than
   // saying the read failed.
   // The fallback is read from the Strategies, so their read counts too.
-  const failed = error ?? (rows.length === 0 ? strategiesError : null);
+  const failed = error ?? (rows.length === 0 && objectIds.length > 0 ? strategiesError : null);
   useWidgetEmpty(!failed && (loading || (rows.length === 0 && (strategiesLoading || served.length === 0))));
   useWidgetMeta(rows.length > 0 ? String(rows.length) : null);
 
