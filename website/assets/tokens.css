@@ -13,9 +13,9 @@
   --color-rule: oklch(89.5% 0.01 255); --color-rule-strong: oklch(80% 0.014 255);
   --color-accent: oklch(50% 0.13 255); --color-accent-hover: oklch(44% 0.13 255); --color-accent-ink: oklch(98.6% 0.004 255); --color-focus: oklch(52% 0.19 255);
   --color-seal: oklch(70% 0.125 82); --color-seal-ink: oklch(42% 0.09 82); --color-porcelain: oklch(97% 0.006 85); --color-capture: oklch(18% 0.006 260);
-  --font-display: "Zen Kaku Gothic New", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif; --font-body: "Noto Sans JP", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif; --font-outlier: var(--font-body);
-  --radius-card: 8px; --radius-input: 8px; --display-weight: 700; --radius-pill: 999px; --rule-hair: 1px; --shadow-card: none;
-  --tracking-display: -0.02em; --nav-h: 64px;
+  --font-display: "Inter", "Noto Sans JP", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif; --font-body: "Noto Sans JP", "Hiragino Sans", ui-sans-serif, system-ui, sans-serif; --font-outlier: var(--font-body);
+  --radius-card: 8px; --radius-input: 8px; --display-weight: 600; --radius-pill: 999px; --rule-hair: 1px; --shadow-card: none;
+  --tracking-display: -0.03em; --nav-h: 64px;
   color-scheme: light;
 }
 

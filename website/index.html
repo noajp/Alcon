@@ -14,7 +14,7 @@ try{var m=localStorage.getItem('cw-theme');if(m==='dark'||m==='light')document.d
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&family=Zen+Kaku+Gothic+New:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -42,7 +42,7 @@ try{var m=localStorage.getItem('cw-theme');if(m==='dark'||m==='light')document.d
             <a href="#integrations">連携できるサービス</a>
             <a href="#new">更新情報</a>
             <a href="#pricing">料金</a>
-            <a href="#story">Claywareについて</a>
+            <a href="#contact">お問い合わせ</a>
           </div>
         </div>
       </div>
@@ -67,23 +67,20 @@ try{var m=localStorage.getItem('cw-theme');if(m==='dark'||m==='light')document.d
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="container">
-    <figure class="hero__field">
-      <img src="assets/elements.jpg" alt="Claywareの画面。届いた問い合わせやクレームから作られた作業が、担当と状態つきで並ぶ" width="1600" height="1000">
-    </figure>
-    <div class="seam" aria-hidden="true">
-      <svg viewBox="0 0 1000 40" preserveAspectRatio="none"><path class="main" d="M0 20 L210 22 L262 16 L330 23 L470 19 L520 25 L610 18 L760 21 L820 15 L1000 20"/><path class="branch" d="M520 25 L536 36"/><path class="branch" d="M820 15 L846 6"/></svg>
-    </div>
-    <div class="grid hero__ledge">
-      <h1 id="hero-title">AIに任せられる会社を、つくる。</h1>
-      <div class="hero__side">
+    <div class="hero__top">
+      <h1 id="hero-title">AIに任せられる会社を、<br>つくる。</h1>
+      <div class="hero__row">
         <p class="lead">プロダクト、チェンジマネジメント、教育の3つで、人とAIが一緒に働く会社へ。</p>
         <div class="actions">
           <a href="#contact" class="btn">導入の相談をする</a>
-          <a href="#service" class="textlink">サービスを見る</a>
+          <a href="#service" class="btn btn--quiet">サービスを見る</a>
         </div>
-        <p class="news"><a href="#new" class="textlink">Clayware v4 を公開しました</a></p>
       </div>
+      <p class="news"><a href="#new" class="textlink">Clayware v4 を公開しました</a></p>
     </div>
+    <figure class="hero__shot">
+      <img src="assets/elements.jpg" alt="Claywareの画面。届いた問い合わせやクレームから作られた作業が、担当と状態つきで並ぶ" width="1600" height="1000">
+    </figure>
   </div>
 </section>
 
@@ -250,28 +247,22 @@ try{var m=localStorage.getItem('cw-theme');if(m==='dark'||m==='light')document.d
 
 </main>
 
-<footer class="letter" id="story">
-  <div class="container">
-    <div class="letter__body">
-      <svg viewBox="0 0 220 130" aria-hidden="true"><path class="bowl__body" d="M14 30h192c0 52-40 90-96 90S14 82 14 30z"/><path class="bowl__band" d="M22 44h176"/><path class="bowl__band" d="M40 98c40 10 100 10 140 0"/><path class="bowl__seam" d="M96 30l14 26-16 18 18 22-6 22"/><path class="bowl__seam" d="M110 56l30 6 12 18"/></svg>
-      <div class="letter__text">
-        <h2>ひびを隠さず、金で継ぐ。</h2>
-        <p>割れた器を漆と金で継ぎ、前よりも美しくする。Claywareは仕事のひびを見つけ、人とAIのあいだを継ぎ直します。継ぎ目こそが、その会社だけの強さになると考えています。</p>
-        <p class="signoff">Clayware<time datetime="2026-11">2026年11月</time></p>
-      </div>
-      <div class="contact" id="contact">
-        <p>まずは、仕事のひびを一緒に探しましょう。</p>
-        <a href="mailto:hello@clayware.app?subject=%E5%B0%8E%E5%85%A5%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87" class="textlink mail">メールで相談する</a>
-        <a href="mailto:hello@clayware.app?subject=%E8%B3%87%E6%96%99%E3%81%AE%E3%81%94%E8%AB%8B%E6%B1%82" class="textlink">資料をもらう</a>
-      </div>
-    </div>
-    <div class="foot">
-      <nav aria-label="フッター">
-        <a href="#product">Product</a><a href="#change">Change management</a><a href="#education">Education</a><a href="#resource">Resource</a><a href="#case">Case</a><a href="#pricing">Pricing</a>
-      </nav>
-      <span>© 2026 Clayware、clayware.app</span>
+<footer class="footer">
+  <div class="container footer__close" id="contact">
+    <h2>まずは、1つの業務から。</h2>
+    <div class="actions">
+      <a href="mailto:hello@clayware.app?subject=%E5%B0%8E%E5%85%A5%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87" class="btn btn--quiet">メールで相談する</a>
+      <a href="mailto:hello@clayware.app?subject=%E8%B3%87%E6%96%99%E3%81%AE%E3%81%94%E8%AB%8B%E6%B1%82" class="textlink">資料をもらう</a>
     </div>
   </div>
+  <div class="container footer__grid">
+    <a href="/homepage" class="wordmark" aria-label="Clayware ホーム"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="bowl__body" d="M8 22h48c0 18-10 30-24 30S8 40 8 22z"/><path class="bowl__band" d="M11 29h42"/><path class="bowl__seam" d="M30 22l4 9-5 7 4 14"/></svg>Clayware</a>
+    <nav aria-label="Service"><h2>Service</h2><a href="#product">Product</a><a href="#change">Change management</a><a href="#education">Education</a><a href="#integrations">連携</a></nav>
+    <nav aria-label="Resource"><h2>Resource</h2><a href="#resource">資料</a><a href="#new">更新情報</a></nav>
+    <nav aria-label="Company"><h2>Company</h2><a href="#case">Case</a><a href="#pricing">Pricing</a></nav>
+    <nav aria-label="Contact"><h2>Contact</h2><a href="mailto:hello@clayware.app">hello@clayware.app</a><a href="/login">ログイン</a></nav>
+  </div>
+  <div class="container footer__legal"><span>© 2026 Clayware</span><span>clayware.app</span></div>
 </footer>
 
 <script>
