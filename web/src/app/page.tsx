@@ -27,16 +27,15 @@ import { QuickAddNotebookPopup } from '@/ActivitySpace/artifacts/notebook/QuickA
 import { placeNewNotebook, seedNotebook, setNextNotebookFolder } from '@/ActivitySpace/artifacts/notebook/notebookActions';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
 import { MyInvitations } from '@/Function/membership/MyInvitations';
 import { getCachedHomeViewId } from '@/Function/settings/preferencesStore';
-import { setActiveSettingsSection, useActiveSettingsSection, useActiveSettingsTab } from '@/Function/settings/settingsNav';
+import { setActiveSettingsSection, useActiveSettingsSection } from '@/Function/settings/settingsNav';
 import { readOpenScreen, writeOpenScreen, type OpenScreen } from '@/Frame/openScreen';
 import { VIEW_REGISTRY } from '@/Frame/viewRegistry';
-import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn, takeOAuthReturnSettingsTab } from '@/AIP/connectors/oauthReturn';
+import { completeOAuthReturn, readOAuthReturn, stripOAuthReturn, takeOAuthReturnSettingsPage } from '@/AIP/connectors/oauthReturn';
 import { finishIntegrationOAuth } from '@/AIP/connectors/data';
 import { useWorkspaceDeltaStream } from '@/Function/sync/deltaStream';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
@@ -49,7 +48,12 @@ import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNa
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
 
-  if (!authLoading && !isAuthenticated) return <AuthPage />;
+  // Signed out: / is the homepage, like linear.app. Sign-in is at /login.
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) window.location.replace('/homepage');
+  }, [authLoading, isAuthenticated]);
+
+  if (!authLoading && !isAuthenticated) return null;
   // Assume the happy path during the (usually instant) session check and
   // paint the app shell — if it turns out logged-out, the line above flips
   // to AuthPage on the next render.
@@ -323,7 +327,7 @@ function WorkspaceContent({
   // otherwise Settings > Preferences > "Default home view" — honoured at launch.
   const [restored] = useState<OpenScreen | null>(() => {
     const screen = typeof window === 'undefined' ? null : readOpenScreen(activeSpaceId, isShellView);
-    if (screen?.settings) setActiveSettingsSection(screen.settings.section, screen.settings.tab ?? undefined);
+    if (screen?.settings) setActiveSettingsSection(screen.settings.section);
     return screen;
   });
   const [initialTab] = useState<AppTab>(() => (restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
@@ -523,15 +527,14 @@ function WorkspaceContent({
   const [settingsReturnView, setSettingsReturnView] = useState<string | null>(() => restored?.settingsReturn ?? null);
   // Remember the open screen for a reload of this browser tab.
   const settingsSection = useActiveSettingsSection();
-  const settingsTab = useActiveSettingsTab();
   useEffect(() => {
     writeOpenScreen(activeSpaceId, {
       view: storedTab.activeView,
       navigation: storedTab.navigation,
       settingsReturn: storedTab.activeView === 'settings' ? settingsReturnView : null,
-      settings: { section: settingsSection, tab: settingsTab },
+      settings: { section: settingsSection },
     });
-  }, [activeSpaceId, storedTab.activeView, storedTab.navigation, settingsReturnView, settingsSection, settingsTab]);
+  }, [activeSpaceId, storedTab.activeView, storedTab.navigation, settingsReturnView, settingsSection]);
   const handleOpenSettings = () => {
     if (activeTab.activeView === 'settings') return;
     setSettingsReturnView(activeTab.activeView);
@@ -539,14 +542,15 @@ function WorkspaceContent({
   };
   // Back from an integration sign-in (integration-oauth): drop the parameters
   // from the URL, confirm the sign-in as this person (POST /finish — nothing
-  // is stored before that) and open Settings › AI to show the outcome.
+  // is stored before that) and open the Settings page it started from to
+  // show the outcome.
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
     window.history.replaceState(window.history.state, '', stripOAuthReturn(window.location.href));
     // Settings' Back then returns to the view the app launched on. A sign-in
-    // started from another Settings › AI tab (a harness install) returns there.
-    setActiveSettingsSection('integrations', takeOAuthReturnSettingsTab() ?? 'external');
+    // started from Harnesses (a harness install) returns there.
+    setActiveSettingsSection(takeOAuthReturnSettingsPage() ?? 'connectors');
     // The reload usually restored that screen already; a fresh tab opens it
     // once the sign-in is confirmed.
     void completeOAuthReturn(result, finishIntegrationOAuth).finally(() => {

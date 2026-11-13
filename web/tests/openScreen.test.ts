@@ -7,11 +7,11 @@ describe('the open screen a reload comes back to', () => {
   it('reads back the view, where it was, and the Settings page', () => {
     const s = openScreenFrom({
       view: 'settings', navigation: { objectId: null, strategyId: 's1' },
-      settingsReturn: 'strategy', settings: { section: 'integrations', tab: 'external' },
+      settingsReturn: 'strategy', settings: { section: 'connectors', tab: 'gone' },
     }, isView);
     expect(s).toEqual({
       view: 'settings', navigation: { objectId: null, strategyId: 's1' },
-      settingsReturn: 'strategy', settings: { section: 'integrations', tab: 'external' },
+      settingsReturn: 'strategy', settings: { section: 'connectors' },
     });
   });
 

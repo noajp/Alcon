@@ -174,8 +174,8 @@ const TIMELINE_AHEAD_KEY = 'clayware:pref:timeline-months-ahead';
 const TIMELINE_TODAY_KEY = 'clayware:pref:timeline-today-marker';
 const TIMELINE_FILL_KEY = 'clayware:pref:timeline-progress-fill';
 
-const TIMELINE_MONTHS_BACK_RANGE = { min: 0, max: 12, fallback: 2 } as const;
-const TIMELINE_MONTHS_AHEAD_RANGE = { min: 3, max: 36, fallback: 10 } as const;
+export const TIMELINE_MONTHS_BACK_RANGE = { min: 0, max: 12, fallback: 2 } as const;
+export const TIMELINE_MONTHS_AHEAD_RANGE = { min: 3, max: 36, fallback: 10 } as const;
 
 function readInt(key: string, range: { min: number; max: number; fallback: number }): number {
   if (typeof window === 'undefined') return range.fallback;

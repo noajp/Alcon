@@ -1,14 +1,14 @@
 import type { DomainPhaseDefaults } from '@/types/database';
 import { shiftDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
 
-// How Settings > Strategy > Phase seeds a new Phase's dates. Pure, so the
+// How a Domain's phase_defaults seed a new Phase's dates. Pure, so the
 // rule is testable: `length_days` spans the Phase with its end_date
 // inclusive — the same reading of end_date as Function/shared/phaseWindow.ts
 // (a 14-day Phase starting on the 1st ends on the 14th); `start` is today or
 // the day after the Domain's last dated Phase. Without length_days nothing
 // is seeded and the dialog starts empty, as before.
 
-export const PHASE_DEFAULTS_MAX = { length_days: 3650 } as const;
+const PHASE_DEFAULTS_MAX = { length_days: 3650 } as const;
 
 export function seedPhaseDates(
   defaults: DomainPhaseDefaults | null | undefined,

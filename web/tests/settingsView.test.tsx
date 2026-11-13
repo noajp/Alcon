@@ -1,15 +1,13 @@
 /** @vitest-environment jsdom */
 //
-// Settings, one area per page: the page shows only the area the store
-// names, headed by its name; a reveal switches the page and lands the
-// named tab; stub areas are a compact placeholder island; in-area
-// segmented controls swap the area's body. Panels are stubbed — this
-// suite pins the page's composition, not the panels.
+// Settings, one page per nav row: the page shows only what the store
+// names, headed by its name, with nothing to switch inside it. Panels are
+// stubbed — this suite pins the page's composition, not the panels.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { I18nProvider } from '@/Function/i18n/I18nProvider';
-import { SETTINGS_NAV, setActiveSettingsSection, useActiveSettingsSection } from '@/Function/settings/settingsNav';
+import { SETTINGS_NAV, setActiveSettingsSection } from '@/Function/settings/settingsNav';
 import { SettingsView } from '@/Function/settings/SettingsView';
 
 vi.mock('@/Function/settings/ProfileSettings', () => ({ ProfileSettings: () => 'Profile panel' }));
@@ -22,13 +20,12 @@ vi.mock('@/Function/settings/LabelSettings', () => ({ LabelSettings: () => 'Labe
 vi.mock('@/Function/settings/TypeSettings', () => ({ TypeSettings: ({ kind }: { kind: string }) => `Types panel: ${kind}` }));
 vi.mock('@/Function/automation/AutomationSettings', () => ({ AutomationSettings: () => 'Automation panel' }));
 vi.mock('@/Function/settings/ElementTemplateSettings', () => ({ ElementTemplateSettings: () => 'Templates panel' }));
-vi.mock('@/Function/settings/StrategySettingsPanels', () => ({
-  InitiativeJudgementSettings: () => 'SLA panel',
-  PhaseDefaultsSettings: () => 'Phase panel',
-}));
-vi.mock('@/AIP/connectors/IntegrationsSettings', () => ({
-  IntegrationsSettings: ({ tab }: { tab: string | null }) => `Integrations panel: ${tab}`,
-}));
+vi.mock('@/Function/settings/SlaSettings', () => ({ SlaSettings: () => 'SLA panel' }));
+vi.mock('@/Function/settings/TimelineSettings', () => ({ TimelineSettings: () => 'Timeline panel' }));
+vi.mock('@/AIP/connectors/IntegrationsSettings', () => ({ ConnectorsSettings: () => 'Connectors panel' }));
+vi.mock('@/AIP/harness/HarnessesPanel', () => ({ HarnessesPanel: () => 'Harnesses panel' }));
+vi.mock('@/AIP/connectors/ClaywareConnectPanel', () => ({ ClaywareConnectPanel: () => 'API panel' }));
+vi.mock('@/AIP/connectors/AssetRelayPanel', () => ({ AssetRelayPanel: () => 'Assets panel' }));
 vi.mock('@/Function/settings/useUserPreferences', () => ({
   useUserPreferences: () => ({
     preferences: {
@@ -52,8 +49,8 @@ const renderPage = () => render(
 
 const shown = (c: HTMLElement) => [...c.querySelectorAll('[data-settings-area]')].map((s) => s.getAttribute('data-settings-area'));
 
-describe('one area per page', () => {
-  it('shows only the area the store names, headed by its name', () => {
+describe('one page per nav row', () => {
+  it('shows only the page the store names, headed by its name', () => {
     act(() => setActiveSettingsSection('workspace'));
     const view = renderPage();
     expect(shown(view.container)).toEqual(['workspace']);
@@ -62,29 +59,40 @@ describe('one area per page', () => {
     expect(screen.queryByText('Member panel')).toBeNull();
   });
 
-  it('a reveal switches the page, landing the named tab', () => {
+  it('a reveal switches the page', () => {
     const view = renderPage();
-    act(() => setActiveSettingsSection('integrations', 'external'));
-    expect(shown(view.container)).toEqual(['integrations']);
-    expect(screen.getByText('Integrations panel: external')).toBeTruthy();
+    act(() => setActiveSettingsSection('connectors'));
+    expect(shown(view.container)).toEqual(['connectors']);
+    expect(screen.getByText('Connectors panel')).toBeTruthy();
     act(() => setActiveSettingsSection('members'));
     expect(shown(view.container)).toEqual(['members']);
     expect(screen.getByText('Member panel')).toBeTruthy();
   });
 
-  it('every area in the nav has a page', () => {
+  it('every page in the nav has a body and nothing to switch inside it', () => {
     const view = renderPage();
     for (const item of SETTINGS_NAV.flatMap((g) => g.items)) {
       act(() => setActiveSettingsSection(item.id));
       expect(shown(view.container)).toEqual([item.id]);
+      const body = view.container.querySelector('[data-settings-area]')!;
+      expect(body.textContent!.length).toBeGreaterThan((item.title ?? item.label).length);
     }
+    expect(view.container.querySelector('[role="tablist"]')).toBeNull();
   });
 
-  it('a stub area is one compact placeholder island', () => {
-    act(() => setActiveSettingsSection('calendar'));
-    const view = renderPage();
-    const island = [...view.container.querySelectorAll('div')].find((d) => d.className.includes('gloss-island'));
-    expect(island?.textContent).toContain('settings are coming soon.');
+  it('a short nav row is headed by its full name', () => {
+    act(() => setActiveSettingsSection('element-labels'));
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Element labels' })).toBeTruthy();
+    expect(screen.getByText('Labels panel')).toBeTruthy();
+  });
+
+  it('Elements and Objects each open their own types', () => {
+    act(() => setActiveSettingsSection('element-types'));
+    renderPage();
+    expect(screen.getByText('Types panel: element')).toBeTruthy();
+    act(() => setActiveSettingsSection('objects'));
+    expect(screen.getByText('Types panel: object')).toBeTruthy();
   });
 
   it('Preferences is headed once', () => {
@@ -92,42 +100,5 @@ describe('one area per page', () => {
     renderPage();
     expect(screen.getAllByRole('heading', { name: 'Preferences' })).toHaveLength(1);
     expect(screen.getByText('General')).toBeTruthy();
-  });
-});
-
-describe('in-area segmented controls', () => {
-  it('Objects is its types', () => {
-    act(() => setActiveSettingsSection('objects'));
-    renderPage();
-    expect(screen.getByText('Types panel: object')).toBeTruthy();
-  });
-
-  it('swaps the Elements body between Types, Labels and Templates', () => {
-    act(() => setActiveSettingsSection('elements'));
-    renderPage();
-    expect(screen.getByText('Types panel: element')).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'Labels' }));
-    expect(screen.getByText('Labels panel')).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'Templates' }));
-    expect(screen.getByText('Templates panel')).toBeTruthy();
-    expect(screen.queryByText('Labels panel')).toBeNull();
-  });
-
-  it('swaps the AI body between Harnesses and Connectors', () => {
-    act(() => setActiveSettingsSection('integrations'));
-    renderPage();
-    fireEvent.click(screen.getByRole('radio', { name: 'Connectors' }));
-    expect(screen.getByText('Integrations panel: external')).toBeTruthy();
-  });
-
-  it('the SLA pointer row opens the Strategy page (the thresholds’ one home)', () => {
-    act(() => setActiveSettingsSection('elements'));
-    const view = renderPage();
-    const section = renderHook(() => useActiveSettingsSection());
-    expect(screen.getByText('Risk thresholds')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Go to Strategy settings' }));
-    expect(section.result.current).toBe('initiative');
-    expect(shown(view.container)).toEqual(['initiative']);
-    section.unmount();
   });
 });

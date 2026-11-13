@@ -61,9 +61,9 @@ cd web && npm run dispatch   # Element を Claude Code に渡す常駐（claywar
 - `AIP/` AI の部品（`harness` `connectors` `ai`）
 - `Function/` 画面を支える仕組みと、画面をまたぐモデル（`widget` `property` `settings` `space` `shared` など）
 - `hooks/` Supabase の読み書きはすべてここ
-- `lib/` `providers/` `auth/` `types/` `ui/`、`app/` は layout / page / globals.css だけ
+- `lib/` `providers/` `auth/` `types/` `ui/`、`app/` は layout / page / globals.css と、ログイン画面の `login/` だけ
 
-root 直下は `supabase/`（migrations と functions。ここにだけ置く）、`sdk/`、`docs/`（外部向けの API・MCP の説明）、`website/`（LP）。開発にだけ使うものは `.claude/`。
+root 直下は `supabase/`（migrations と functions。ここにだけ置く）、`sdk/`、`docs/`（外部向けの API・MCP の説明）、`website/`（紹介ページ。ビルド時に `web/public/homepage/` へ写し、`/homepage` で出す。ログインしていない人が `/` を開くとここへ送る）。開発にだけ使うものは `.claude/`。
 
 ## 実装ルール
 

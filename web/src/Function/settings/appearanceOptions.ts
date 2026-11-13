@@ -43,9 +43,3 @@ export const FONT_SIZES: { key: string; label: string; scale: number }[] = [
 export function applyFontSize(scale: number) {
   document.documentElement.style.setProperty('--fs', String(scale));
 }
-
-// ---- Pointer cursors -------------------------------------------------------
-// A device-local display choice like the font size: persisted in
-// localStorage ('1' = on). Settings redesign D4 — the Preferences toggle
-// used to keep this in component state only, so it never survived a reload.
-export const POINTER_CURSOR_KEY = 'clayware.pointercursors';

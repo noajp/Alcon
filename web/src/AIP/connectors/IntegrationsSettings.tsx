@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ExternalLink } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { CARD_FLAT, CARD_HOVER, FONT } from '@/shared/designTokens';
+import { CARD_FLAT, CARD_HOVER, FONT, SETTINGS_ISLAND } from '@/shared/designTokens';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -30,39 +30,21 @@ import { Textarea } from '@/ui/textarea';
 import type { IntegrationDraft } from '@/types/database';
 import { IntegrationIcon } from './IntegrationDetailDialog';
 import { ConnectDialogHost, openedForIntegration, openedForPreset, openedForRegistryEntry, type OpenedConnection } from './ConnectDialogHost';
-import { ClaywareConnectPanel } from './ClaywareConnectPanel';
-import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
-import { HarnessesPanel } from '@/AIP/harness/HarnessesPanel';
 import { RegistrySection } from '@/AIP/harness/RegistrySection';
 import type { DirectoryEntry } from '@/hooks/customizeData';
 
-// Settings › AI: how the Space's AI works.
-//   definitions  harnesses — how a kind of work is carried out, the connectors
-//                it uses and where it stops (HarnessesPanel)
-//   external     connectors: one page — what the Space has (Connected,
-//                site logins, drafts), then what it can add, grouped by
-//                how a connection is made, and the public MCP Registry
-//                (RegistrySection)
-// Settings › API & access: the other direction.
-//   clayware        point an MCP client or script at Clayware
-//                with an OAuth sign-in or a personal access token
-//                (ClaywareConnectPanel, ADR 0032 / 0034).
-//   assets       the apps and AIs that joined the Space by adding one line to
-//                their backend (AssetRelayPanel, ADR 0036).
-// Members see everything read-only; only owners can connect or change.
+// Settings › AI › Connectors: the outside services the Space's AI can use.
+// One page, top to bottom — what the Space has (Connected, site logins,
+// drafts), then what it can add, grouped by how a connection is made, the
+// public MCP Registry (RegistrySection) and a draft the AI writes for a
+// service neither has. Members see everything read-only; only owners can
+// connect or change.
 
 const DOCS_URL = 'https://github.com/noajp/clayware/blob/main/docs/mcp.md';
 
-export function IntegrationsSettings({ tab }: { tab: string | null }) {
-  return tab === 'clayware' ? <ClaywareConnectPanel />
-    : tab === 'assets' ? <AssetRelayPanel />
-    : tab === 'definitions' ? <HarnessesPanel />
-    : tab === 'external' ? <ExternalServicesPanel />
-    : <HarnessesPanel />;
-}
+export function ConnectorsSettings() {
 
-function ExternalServicesPanel() {
   const { t } = useI18n();
   const spaceId = useActiveSpaceId();
   const { data: integrations, loading, error, refetch: refetchIntegrations } = useIntegrations(spaceId);
@@ -107,18 +89,6 @@ function ExternalServicesPanel() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className={`${FONT.lg} text-foreground`}>{t('Connectors')}</h2>
-        </div>
-        <Button asChild variant="ghost" size="sm">
-          <a href={DOCS_URL} target="_blank" rel="noreferrer">
-            <ExternalLink size={14} aria-hidden="true" />
-            <span>{t('Docs')}</span>
-          </a>
-        </Button>
-      </div>
-
       {oauthOutcome && (
         <div role="status" className={cn('flex items-start justify-between gap-3 rounded-md px-3 py-2 text-[12px] text-foreground',
           oauthOutcome.status === 'ok' ? 'bg-[var(--status-success-subtle)]' : oauthOutcome.status === 'error' ? 'bg-[var(--status-danger-subtle)]' : 'bg-[var(--surface-strong)]')}>
@@ -142,18 +112,31 @@ function ExternalServicesPanel() {
       )}
 
       <section className="space-y-3">
-        <h3 className={FONT.label}>{t('Connected')}</h3>
-        {error ? (
-          <p className="text-[12px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
-        ) : loading ? (
-          <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
-        ) : connectedRows.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('Nothing is connected to this Space yet.')}</p>
-        ) : (
-          <div>
-            {connectedRows.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className={`${FONT.lg} text-foreground`}>{t('Connected')}</h2>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Services this Space is connected to. Open one to see what AI may do with it.')}</p>
           </div>
-        )}
+          <Button asChild variant="ghost" size="sm">
+            <a href={DOCS_URL} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} aria-hidden="true" />
+              <span>{t('Docs')}</span>
+            </a>
+          </Button>
+        </div>
+        <div className={`${SETTINGS_ISLAND} px-5 py-1.5`}>
+          {error ? (
+            <p className="py-2.5 text-[13px] text-[var(--status-danger)]">{t("Couldn't load integrations: {error}", { error: error.message })}</p>
+          ) : loading ? (
+            <p className="py-2.5 text-[13px] text-muted-foreground">{t('Loading…')}</p>
+          ) : connectedRows.length === 0 ? (
+            <p className="py-2.5 text-[13px] text-muted-foreground">{t('Nothing is connected to this Space yet.')}</p>
+          ) : (
+            <div>
+              {connectedRows.map((i) => <ConnectedRow key={i.id} integration={i} onOpen={() => openIntegration(i)} />)}
+            </div>
+          )}
+        </div>
       </section>
 
       {spaceId && (
@@ -163,7 +146,7 @@ function ExternalServicesPanel() {
 
       {drafts.length > 0 && (
         <section className="space-y-3">
-          <h3 className={FONT.label}>{t('Drafted connections')}</h3>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Drafted connections')}</h2>
           <div>
             {drafts.map((d) => (
               <button key={d.id} type="button" onClick={() => setOpenedDraftId(d.id)}
@@ -183,7 +166,7 @@ function ExternalServicesPanel() {
       )}
 
       {(groups.length > 0 || isOwner) && <section className="space-y-3">
-        <h3 className={FONT.label}>{t('Add a connection')}</h3>
+        <h2 className={`${FONT.lg} text-foreground`}>{t('Add a connection')}</h2>
         <div className="space-y-6">
           {CONNECTION_METHOD_ORDER.map((method) => {
             const group = groups.find((g) => g.method === method);
@@ -191,7 +174,7 @@ function ExternalServicesPanel() {
             if (!group && !showSiteCard) return null;
             return (
               <div key={method} className="space-y-3">
-                <h4 className={FONT.label}>{t(CONNECTION_METHOD_HEADINGS[method])}</h4>
+                <h3 className={FONT.label}>{t(CONNECTION_METHOD_HEADINGS[method])}</h3>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {group?.cards.map(({ preset, state }) => (
                     <PresetCard key={preset.id} preset={preset} state={state} onOpen={() => openPreset(preset)} />
@@ -336,7 +319,7 @@ function DraftCreateSection({ spaceId, integrations, drafts, onCreated, onOpenDr
   return (
     <section className="space-y-3">
       <div>
-        <h3 className={FONT.label}>{t('Have the AI draft it')}</h3>
+        <h2 className={`${FONT.lg} text-foreground`}>{t('Have the AI draft it')}</h2>
         <p className="mt-1 max-w-xl text-[12px] text-muted-foreground">
           {t('For a service with a public API that is not in the catalog: the AI reads the official documentation, drafts the connection definition and tests it. An owner reviews and activates it — nothing connects on its own.')}
         </p>

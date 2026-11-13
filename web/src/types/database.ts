@@ -28,7 +28,7 @@ export interface DomainAIConfig {
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
 // in Function/strategy/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
-/** Settings > Strategy > Phase: how a new Phase's dates are seeded. Every
+/** How a new Phase's dates are seeded. Every
  *  key optional; absent = the create dialog starts with empty dates. */
 export interface DomainPhaseDefaults {
   length_days?: number            // a new Phase spans this many days (end_date inclusive)
@@ -69,8 +69,8 @@ export interface Domain {
   note?: string | null
   object_types: string[]        // Object (Project層) の型カタログ (Project / Strategy ...) — element_types とは別レイヤー
   label_colors: Record<string, string>  // Label 名 → パレットキー (e.g. {"Bug":"red"})。色は Domain 共通
-  risk_thresholds: DomainRiskThresholds // Settings > Elements > SLAs。未設定は {}（DB 既定）
-  phase_defaults: DomainPhaseDefaults   // Settings > Strategy > Phase。未設定は {}（DB 既定）
+  risk_thresholds: DomainRiskThresholds // Settings > Strategy > Risk thresholds。未設定は {}（DB 既定）
+  phase_defaults: DomainPhaseDefaults   // 新しい Phase の日付の初期値。未設定は {}（DB 既定）
 }
 
 export interface DomainInsert {

@@ -194,7 +194,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
 
   const draft = () => ({ name, endpoint, auth, authHeader, delegation, enabled });
 
-  /** Leaves the app for the provider's sign-in; it comes back to Settings › AI. */
+  /** Leaves the app for the provider's sign-in; it comes back to the Settings page it left. */
   const signIn = async (id: string) => {
     const url = await actions.signIn.mutateAsync(id);
     window.location.assign(url);

@@ -1,24 +1,21 @@
 /** @vitest-environment jsdom */
 //
-// The settingsNav store:
-// setActiveSettingsSection is a REVEAL — same tab validation as the old
-// page store, plus a nonce that increments on every reveal, including
-// re-revealing the area already shown.
+// The settingsNav store: setActiveSettingsSection is a REVEAL — it names
+// the page and bumps a nonce on every call, including re-revealing the
+// page already shown. One nav row is one page; nothing switches inside.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import {
-  SETTINGS_ITEMS,
+  SETTINGS_ITEMS, SETTINGS_NAV,
   setActiveSettingsSection,
   useActiveSettingsSection,
-  useActiveSettingsTab,
   useSettingsRevealNonce,
 } from '@/Function/settings/settingsNav';
 
 function probe() {
   return renderHook(() => ({
     section: useActiveSettingsSection(),
-    tab: useActiveSettingsTab(),
     nonce: useSettingsRevealNonce(),
   }));
 }
@@ -27,50 +24,41 @@ let current: ReturnType<typeof probe> | null = null;
 afterEach(() => { current?.unmount(); current = null; });
 
 describe('settingsNav store', () => {
-  it('opens on the first area of the nav, no reveal yet', () => {
+  it('opens on the first page of the nav, no reveal yet', () => {
     current = probe();
-    expect(current.result.current).toEqual({ section: 'workspace', tab: null, nonce: 0 });
+    expect(current.result.current).toEqual({ section: 'preferences', nonce: 0 });
   });
 
-  it('a reveal sets section and tab and bumps the nonce', () => {
+  it('a reveal sets the page and bumps the nonce', () => {
     current = probe();
     const before = current.result.current.nonce;
-    act(() => setActiveSettingsSection('integrations', 'external'));
-    expect(current.result.current).toEqual({ section: 'integrations', tab: 'external', nonce: before + 1 });
+    act(() => setActiveSettingsSection('connectors'));
+    expect(current.result.current).toEqual({ section: 'connectors', nonce: before + 1 });
   });
 
-  it('re-revealing the same area and tab still bumps the nonce (it re-scrolls)', () => {
+  it('re-revealing the same page still bumps the nonce (it starts at the top again)', () => {
     current = probe();
-    act(() => setActiveSettingsSection('integrations', 'external'));
+    act(() => setActiveSettingsSection('connectors'));
     const before = current.result.current.nonce;
-    act(() => setActiveSettingsSection('integrations', 'external'));
-    expect(current.result.current.nonce).toBe(before + 1);
-    expect(current.result.current.section).toBe('integrations');
-    expect(current.result.current.tab).toBe('external');
+    act(() => setActiveSettingsSection('connectors'));
+    expect(current.result.current).toEqual({ section: 'connectors', nonce: before + 1 });
   });
 
-  it('tab validation is unchanged: omitted or unknown tab → first tab; tab-less area → null', () => {
+  it('a page the nav does not have opens the first page', () => {
     current = probe();
     act(() => setActiveSettingsSection('integrations'));
-    expect(current.result.current.tab).toBe('definitions');
-    act(() => setActiveSettingsSection('access', 'bogus'));
-    expect(current.result.current).toMatchObject({ section: 'access', tab: 'clayware' });
-    act(() => setActiveSettingsSection('workspace'));
-    expect(current.result.current).toMatchObject({ section: 'workspace', tab: null });
+    expect(current.result.current.section).toBe('preferences');
   });
 });
 
 describe('nav model', () => {
-  it('Objects has no tab strip (its surfaces are all still to come)', () => {
-    expect(SETTINGS_ITEMS.objects.tabs).toBeUndefined();
+  it('every page id is listed once', () => {
+    const ids = SETTINGS_NAV.flatMap((g) => g.items.map((i) => i.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(Object.keys(SETTINGS_ITEMS).sort()).toEqual([...ids].sort());
   });
 
-  it('Elements keeps Types/Labels/Templates; the SLAs tab is gone (one home: Strategy)', () => {
-    expect(SETTINGS_ITEMS.elements.tabs?.map((x) => x.id)).toEqual(['types', 'labels', 'templates']);
-  });
-
-  it('AI and API & access keep their in-area tabs', () => {
-    expect(SETTINGS_ITEMS.integrations.tabs?.map((x) => x.id)).toEqual(['definitions', 'external']);
-    expect(SETTINGS_ITEMS.access.tabs?.map((x) => x.id)).toEqual(['clayware', 'assets']);
+  it('lists no page without something to set', () => {
+    for (const gone of ['phase', 'workload', 'calendar', 'connected']) expect(SETTINGS_ITEMS[gone]).toBeUndefined();
   });
 });

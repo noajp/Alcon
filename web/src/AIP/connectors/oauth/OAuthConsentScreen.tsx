@@ -103,7 +103,7 @@ export function OAuthConsentScreen() {
 
             <div className="space-y-1.5 text-[13px] text-foreground">
               <p>{t('It acts as {email}: it sees and changes only what you can, in every Space you belong to.', { email: state.details.user.email || user?.email || '' })}</p>
-              <p className="text-muted-foreground">{t('It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › API & access.')}</p>
+              <p className="text-muted-foreground">{t('It cannot delete, bulk-edit, move Elements between Objects, or edit Objects. Disconnect it any time in Settings › API.')}</p>
             </div>
 
             <div className="grid gap-2">

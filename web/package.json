@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/design-fonts.mjs",
+    "predev": "node scripts/design-fonts.mjs && node scripts/homepage.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/design-fonts.mjs",
+    "prebuild": "node scripts/design-fonts.mjs && node scripts/homepage.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
