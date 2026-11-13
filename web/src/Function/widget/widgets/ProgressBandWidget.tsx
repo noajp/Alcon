@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ProgressBelt } from '@/Function/shared/ProgressBelt';
 import type { WidgetHost } from '../types';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -26,7 +26,7 @@ export function ProgressBandWidget({ host }: { host: WidgetHost }) {
 
   return (
     <div className="flex items-center gap-3">
-      <SegmentedProgress value={stats.pct} className="w-40 min-w-12 shrink" />
+      <ProgressBelt value={stats.pct} className="w-40 min-w-12 shrink" />
       <span className="shrink-0 text-[12px] font-medium tabular-nums text-foreground">{stats.pct}%</span>
       <span className="min-w-0 truncate text-[12px] tabular-nums text-muted-foreground">
         {t('{done}/{total} done', { done: stats.done, total: stats.total })}

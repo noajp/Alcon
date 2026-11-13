@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { outlook, warmthGradient, warnsAboutTime } from '@/ActivitySpace/execution/element/gantt/ganttUrgency';
+import { warmthGradient, warnsAboutTime } from '@/ActivitySpace/execution/element/gantt/ganttUrgency';
+import { beltGradient, outlook } from '@/Function/shared/pace';
 
 const alphas = (g: string) => [...g.matchAll(/ ([\d.]+)%, transparent\)/g)].map((m) => Number(m[1]));
 
@@ -66,5 +67,16 @@ describe('Gantt colour', () => {
     expect(gone).toContain('var(--accent-default)');
     const ahead = warmthGradient(400, 300, 1, 350)!;
     expect(ahead).not.toContain('var(--status-danger)');
+  });
+
+  it('draws a progress belt clear at its start and deepest at its edge, blue or red by outlook', () => {
+    const blue = beltGradient(0.4);
+    expect(blue.startsWith('linear-gradient(in oklab to right, color-mix(in oklab, oklch(from var(--accent-default)')).toBe(true);
+    expect(blue).toContain('100.0%');
+    expect(blue).not.toContain('var(--status-danger)');
+    expect(beltGradient(-0.4)).toContain('var(--status-danger)');
+    expect(beltGradient(0)).toContain('var(--accent-default)');
+    const a = alphas(blue);
+    expect(a.every((v, i) => i === 0 || v >= a[i - 1])).toBe(true);
   });
 });

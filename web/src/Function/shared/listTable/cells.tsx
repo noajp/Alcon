@@ -19,7 +19,8 @@ import { ObjectIcon } from '@/Frame/icons';
 import { QuickDates } from '@/Function/shared/date/QuickDates';
 import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ProgressBelt } from '@/Function/shared/ProgressBelt';
+import { outlook } from '@/Function/shared/pace';
 import { labelColor, useLabelColors } from '@/Function/shared/labelColor';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
@@ -712,7 +713,7 @@ export function ObjectCell({
     return (
       <td className="table-cell pl-3 pr-1.5 py-2 max-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
-          <SegmentedProgress value={pct} className="flex-1" />
+          <ProgressBelt value={pct} outlook={outlook(pct, obj.start_date, obj.due_date, formatDateOnly(new Date()))} className="flex-1" />
           <span className="text-[12px] text-muted-foreground w-9 text-right tabular-nums shrink-0">{pct}%</span>
         </div>
       </td>

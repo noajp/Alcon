@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { completionOf } from '@/Function/shared/completion';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ProgressBelt } from '@/Function/shared/ProgressBelt';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { requestElementDetail } from '@/Function/shared/element/elementDetailRequest';
@@ -25,7 +25,7 @@ function Progress({ elements }: { elements: ElementWithDetails[] }) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2.5">
       <ElementProgressMark size={16} status={c.total > 0 && c.done === c.total ? 'done' : c.done > 0 ? 'in_progress' : 'todo'} progress={c.pct} />
-      <SegmentedProgress value={c.pct} className="flex-1" />
+      <ProgressBelt value={c.pct} className="flex-1" />
       <span className="shrink-0 text-[13px] tabular-nums text-foreground">{c.done}/{c.total}</span>
       <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{t('{pct}% done', { pct: c.pct })}</span>
     </div>

@@ -20,7 +20,8 @@ import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
 import { CustomColumnCell } from '@/Function/property/CustomColumnCell';
 import { RailRow } from '@/Function/shared/RailRow';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ProgressBelt } from '@/Function/shared/ProgressBelt';
+import { outlook } from '@/Function/shared/pace';
 import { ReachHint, WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import {
@@ -202,7 +203,7 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
         name={t('Progress')}
         label={
           <span className="flex items-center gap-2 w-full">
-            <SegmentedProgress value={stats.progress} className="flex-1" />
+            <ProgressBelt value={stats.progress} outlook={outlook(stats.progress, object.start_date, object.due_date, toDateOnlyString(new Date()))} className="flex-1" />
             <span className="text-[12px] tabular-nums text-muted-foreground shrink-0">
               {stats.progress}%
             </span>
