@@ -39,7 +39,7 @@ export const CONTENT_KINDS: Record<ContentKind, { media: string; target: string 
 
 export type DriveToolName = "drive_search" | "drive_read" | "drive_create" | "drive_update" | "drive_create_folder";
 
-const SCOPE_NOTE = "Alcon は drive.file 権限で接続しているので、見えるのは Alcon が作ったファイルと、利用者が Alcon に渡したファイルだけです。";
+const SCOPE_NOTE = "Clayware は drive.file 権限で接続しているので、見えるのは Clayware が作ったファイルと、利用者が Clayware に渡したファイルだけです。";
 
 export const DRIVE_TOOLS: { name: DriveToolName; description: string; readOnly: boolean; input_schema: Record<string, unknown> }[] = [
   {
@@ -199,7 +199,7 @@ export function buildContentRequest(fileId: unknown, mimeType: string): DriveReq
 export function newBoundary(): string {
   const buf = new Uint8Array(16);
   crypto.getRandomValues(buf);
-  return `alcon_${Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  return `clayware_${Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /** A multipart/related body: JSON metadata, then the media part. */

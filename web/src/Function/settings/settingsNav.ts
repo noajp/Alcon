@@ -55,7 +55,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
       {
         id: 'access', label: 'API & access', icon: Link2,
         tabs: [
-          { id: 'alcon', label: 'Connect to Alcon' },
+          { id: 'clayware', label: 'Connect to Clayware' },
           { id: 'assets', label: 'Connected assets' },
         ],
       },

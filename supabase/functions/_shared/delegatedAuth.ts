@@ -70,7 +70,7 @@ export interface UserClaims {
   alcon_chain?: ChainClaim;
 }
 
-/** Pure. True for a bearer value that claims to be an Alcon personal access token. */
+/** Pure. True for a bearer value that claims to be an Clayware personal access token. */
 export function isPersonalAccessToken(token: string): boolean {
   return token.startsWith(PAT_PREFIX);
 }
@@ -186,7 +186,7 @@ export type SigningKey =
   | { alg: "ES256"; jwk: Record<string, unknown>; kid: string | undefined };
 
 /**
- * Pure. ALCON_JWT_SIGNING_KEY → how to sign. Today it is the project's legacy
+ * Pure. CLAYWARE_JWT_SIGNING_KEY → how to sign. Today it is the project's legacy
  * HS256 JWT secret. If it holds an EC private JWK instead, sign ES256 with its
  * kid, so moving the project to asymmetric signing keys is a config change.
  */
@@ -214,7 +214,9 @@ export class DelegatedAuthNotConfigured extends Error {
 
 /** A short-lived JWT for the person a delegated caller stands for. Fails closed without a key. */
 export async function mintUserJwt(subject: DelegatedSubject, rawKey?: string | null): Promise<string> {
-  const key = parseSigningKey(rawKey ?? (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("ALCON_JWT_SIGNING_KEY"));
+  const env = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env;
+  // A deployment that has not renamed the secret yet still holds it as ALCON_JWT_SIGNING_KEY.
+  const key = parseSigningKey(rawKey ?? env?.get("CLAYWARE_JWT_SIGNING_KEY") ?? env?.get("ALCON_JWT_SIGNING_KEY"));
   if (!key) throw new DelegatedAuthNotConfigured();
   const claims = buildUserClaims(subject);
   const jose = await import("npm:jose@5.9.6");

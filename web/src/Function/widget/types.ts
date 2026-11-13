@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import type {
   ExplorerData,
   ElementWithDetails,
-  AlconObjectWithChildren,
+  ClaywareObjectWithChildren,
 } from '@/hooks/useSupabase';
 
 // =============================================================
@@ -74,7 +74,7 @@ export interface WidgetHost {
   /** Elements in the subject's scope. Empty for subjects that have none. */
   elements: ElementWithDetails[];
   /** Present when the subject is an Object. */
-  object?: AlconObjectWithChildren;
+  object?: ClaywareObjectWithChildren;
   /** Present on space-wide boards (Home). */
   explorerData?: ExplorerData;
   onRefresh?: () => void;

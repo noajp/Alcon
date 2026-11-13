@@ -278,7 +278,7 @@ function useAssignmentReadings(
   }, [dated, workers, availability, commitments]);
 }
 
-/** The AI agents Alcon knows that the Space has not made yet — Claude,
+/** The AI agents Clayware knows that the Space has not made yet — Claude,
  *  ChatGPT, Gemini, DeepSeek… — offered under the Workers; picking one makes
  *  it a Worker of the Space (with its mark) and assigns it. */
 function AiPresetItems({ workers, onAdd }: { workers: AssignableWorker[]; onAdd: (workerId: string) => void }) {

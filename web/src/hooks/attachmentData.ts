@@ -17,7 +17,7 @@ import { fileText } from '@/Function/office/fileText';
 // under "<owner kind>/<owner id>/…", opened through a short-lived signed
 // link, never a public URL.
 //
-// A file edited in Alcon is saved as a new version: new bytes and a new row
+// A file edited in Clayware is saved as a new version: new bytes and a new row
 // naming the row it replaces (previous_id). A replaced row is never listed;
 // the listing, the trash and anything pinned to a file follow the latest.
 // Edits are applied to the newest version when they are saved, not to the

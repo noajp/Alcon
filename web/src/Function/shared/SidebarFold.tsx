@@ -9,7 +9,7 @@ const read = (key: string) => { try { return window.localStorage.getItem(key) !=
  *  Domain ▾"): the heading names it and folds it; open by default, and each
  *  section remembers whether it was folded. */
 export function SidebarFold({ id, label, children }: { id: string; label: string; children: ReactNode }) {
-  const key = `alcon:sidebar-fold:${id}`;
+  const key = `clayware:sidebar-fold:${id}`;
   const [open, setOpen] = useState(() => typeof window === 'undefined' ? true : read(key));
   const toggle = () => setOpen((o) => {
     try { window.localStorage.setItem(key, o ? '0' : '1'); } catch { /* the choice lasts this visit */ }

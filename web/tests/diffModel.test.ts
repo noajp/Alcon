@@ -204,7 +204,7 @@ describe('readGuide', () => {
 });
 
 describe('iteratePrompt', () => {
-  const base = { repo: 'o/r', number: 7, url: 'https://github.com/o/r/pull/7', headRef: 'alcon/el-1' };
+  const base = { repo: 'o/r', number: 7, url: 'https://github.com/o/r/pull/7', headRef: 'clayware/el-1' };
   it('asks for the open points on the same branch', () => {
     const p = iteratePrompt({
       ...base,
@@ -218,7 +218,7 @@ describe('iteratePrompt', () => {
         { verdict: 'matches', body: 'lgtm', reviewer: 'Cy', stale: false },
       ],
     })!;
-    expect(p).toContain('alcon/el-1');
+    expect(p).toContain('clayware/el-1');
     expect(p).toContain('`a.ts:3`');
     expect(p).toContain('missing the empty state');
     expect(p).not.toContain('done already');

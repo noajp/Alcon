@@ -54,8 +54,8 @@ import {
   useDomains,
   useObjects,
   useStrategies,
-  type AlconObject,
-  type AlconObjectWithChildren,
+  type ClaywareObject,
+  type ClaywareObjectWithChildren,
   type StrategyWithObjects,
   type Worker,
 } from '@/hooks/useSupabase';
@@ -427,7 +427,7 @@ function useAutoGrowTextarea(ref: { current: HTMLTextAreaElement | null }, value
   }, [ref, value]);
 }
 
-function useAllObjects(): { objects: AlconObjectWithChildren[]; refetch: () => Promise<void> } {
+function useAllObjects(): { objects: ClaywareObjectWithChildren[]; refetch: () => Promise<void> } {
   const { data: explorer, refetch } = useObjects(null);
 
   const objects = explorer.objects;
@@ -449,7 +449,7 @@ function useObjectPicker(query: string) {
   }, [allObjects, query]);
 
   const grouped = useMemo(() => {
-    const m = new Map<string, { domainName: string; objects: AlconObject[] }>();
+    const m = new Map<string, { domainName: string; objects: ClaywareObject[] }>();
     for (const o of filtered) {
       const did = o.domain_id ?? '__none__';
       const dname = domains.find((d) => d.id === did)?.name ?? t('No Domain');
@@ -467,7 +467,7 @@ function ObjectPickerList({
   selectedIds,
   onToggle,
 }: {
-  grouped: Array<[string, { domainName: string; objects: AlconObject[] }]>;
+  grouped: Array<[string, { domainName: string; objects: ClaywareObject[] }]>;
   selectedIds: Set<string>;
   onToggle: (id: string) => void;
 }) {

@@ -1,5 +1,5 @@
 // Capability attenuation for chained runs (back-half program B10,
-// design: ~/workspace/dev/alcon-b10-design.md).
+// design: ~/workspace/dev/clayware-b10-design.md).
 //
 // When a run starts another run — advanceFrom unblocking the Elements
 // downstream of a finished one — the child does not inherit the
@@ -353,7 +353,7 @@ export function chainKeyForCall(it: IntegrationTool | undefined, call: ToolCall)
  *     so a scoped run never makes one — the fence's outside, by
  *     construction.
  *   - anything that is not an integration call at all (catalog /
- *     board / runner / machine tools, Alcon's own record tools):
+ *     board / runner / machine tools, Clayware's own record tools):
  *     null — no fact; those surfaces keep their own entry policies
  *     (design §5.5 / §9 limits).
  */

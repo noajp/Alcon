@@ -59,7 +59,7 @@ export function AssetRelayPanel() {
 
       <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-medium text-foreground">{t('The one line')}</h3>
-        <p className="text-[12px] text-muted-foreground">{t("Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
+        <p className="text-[12px] text-muted-foreground">{t("Add Clayware's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
         {spaceId && <CopyButton value={relayEnvLines(ASSET_RELAY_URL, spaceId)} label={t('Copy settings')} />}
         <p className="text-[12px] text-muted-foreground">
           {t('No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.')}

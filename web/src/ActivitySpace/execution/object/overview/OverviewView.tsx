@@ -8,7 +8,7 @@ import { setActiveDomainId } from '@/Function/space/domainsStore';
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
+import type { ElementWithDetails, ClaywareObjectWithChildren } from '@/hooks/useSupabase';
 import { toggleReaction, updateObject, useWorkers } from '@/hooks/useSupabase';
 import { useObjectReactions } from '@/hooks/commentData';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -56,7 +56,7 @@ const CANVAS_ONLY = ['generated-app'];
 
 interface OverviewViewProps {
   elements: ElementWithDetails[];
-  object: AlconObjectWithChildren;
+  object: ClaywareObjectWithChildren;
   onRefresh?: () => void;
   onNavigate?: (nav: { objectId?: string | null; strategyId?: string }) => void;
   /** Switch the active top-level activity — the Strategy rows use this to

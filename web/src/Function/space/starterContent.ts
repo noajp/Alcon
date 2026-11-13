@@ -42,13 +42,13 @@ const ja: StarterContent = {
   domain: {
     name: '初期設定',
     identifier: 'SETUP',
-    description: 'Alcon の設定と使い方を、実際の Object と Element で確かめるための Domain です。終わったら削除してかまいません。',
+    description: 'Clayware の設定と使い方を、実際の Object と Element で確かめるための Domain です。終わったら削除してかまいません。',
   },
   objects: [
     {
       key: 'concepts',
-      name: 'はじめに — Alcon の考え方',
-      description: 'Alcon が組織の活動をどう捉えるかを知る。',
+      name: 'はじめに — Clayware の考え方',
+      description: 'Clayware が組織の活動をどう捉えるかを知る。',
       elements: [
         { title: 'Strategy・Execution・Sustainment の 3 分類を知る', description: 'Strategy は「何を達成し、どう勝つか」、Execution は「実際の行動」、Sustainment は「仕事道具」です。左端のレールで切り替えます。' },
         { title: 'Domain → Object → Element の階層を理解する', description: 'Domain は活動の場、Object は Element をまとめる持ち場（プロジェクトに近い）、Element は行動の最小単位です。いま見ているこの行が Element です。' },
@@ -104,20 +104,20 @@ const ja: StarterContent = {
   ],
   strategy: {
     name: 'アプリの使い方をマスターする',
-    description: 'チームの全員が、意図（Strategy）と行動（Execution）を Alcon の上で行き来できる。',
+    description: 'チームの全員が、意図（Strategy）と行動（Execution）を Clayware の上で行き来できる。',
   },
   strategies: [
     {
       name: '基本を身につける',
       description: '考え方を理解し、Space を使える状態にする。',
       children: [
-        { name: 'Alcon の考え方を理解する', description: '3 つの分類と Domain → Object → Element の階層を、自分の言葉で説明できるようになる。', objectKeys: ['concepts'] },
+        { name: 'Clayware の考え方を理解する', description: '3 つの分類と Domain → Object → Element の階層を、自分の言葉で説明できるようになる。', objectKeys: ['concepts'] },
         { name: 'Space を使える状態にする', description: 'メンバー・AI エージェント・通知・表示を整え、チームで使い始められるようにする。', objectKeys: ['space'] },
       ],
     },
     {
       name: '実務で使いこなす',
-      description: '実際の仕事を Alcon に乗せ、意図と結びつける。',
+      description: '実際の仕事を Clayware に乗せ、意図と結びつける。',
       children: [
         { name: '日々の実行を Element にする', description: '自分たちの Domain・Object・Element を作り、担当と期限を持たせる。', objectKeys: ['execution'] },
         { name: '意図と実行を結びつける', description: 'Strategy を書いて入れ子にし、Object を結びつけて、目的と実行状況を行き来できるようにする。', objectKeys: ['strategy'] },
@@ -131,13 +131,13 @@ const en: StarterContent = {
   domain: {
     name: 'Getting started',
     identifier: 'SETUP',
-    description: 'A Domain for trying out Alcon\'s setup and concepts with real Objects and Elements. Delete it once you are done.',
+    description: 'A Domain for trying out Clayware\'s setup and concepts with real Objects and Elements. Delete it once you are done.',
   },
   objects: [
     {
       key: 'concepts',
-      name: 'Start here — how Alcon thinks',
-      description: 'How Alcon models an organisation\'s activity.',
+      name: 'Start here — how Clayware thinks',
+      description: 'How Clayware models an organisation\'s activity.',
       elements: [
         { title: 'Learn the three areas: Strategy, Execution, Sustainment', description: 'Strategy is what to achieve and how to win, Execution is the actual work, and Sustainment is the tools for the job. Switch between them on the left rail.' },
         { title: 'Understand Domain → Object → Element', description: 'A Domain is where work happens, an Object holds the Elements of one project, and an Element is the smallest unit of action. This row is an Element.' },
@@ -193,20 +193,20 @@ const en: StarterContent = {
   ],
   strategy: {
     name: 'Master the app',
-    description: 'Everyone on the team moves between intent (Strategy) and action (Execution) in Alcon.',
+    description: 'Everyone on the team moves between intent (Strategy) and action (Execution) in Clayware.',
   },
   strategies: [
     {
       name: 'Learn the basics',
       description: 'Understand the model and get the Space ready.',
       children: [
-        { name: 'Understand how Alcon thinks', description: 'Be able to explain the three areas and Domain → Object → Element in your own words.', objectKeys: ['concepts'] },
+        { name: 'Understand how Clayware thinks', description: 'Be able to explain the three areas and Domain → Object → Element in your own words.', objectKeys: ['concepts'] },
         { name: 'Get the Space ready', description: 'Set up members, AI agents, notifications and appearance so the team can start.', objectKeys: ['space'] },
       ],
     },
     {
       name: 'Use it for real work',
-      description: 'Put actual work into Alcon and tie it to intent.',
+      description: 'Put actual work into Clayware and tie it to intent.',
       children: [
         { name: 'Put daily execution on the board', description: 'Create your own Domains, Objects and Elements with assignees and due dates.', objectKeys: ['execution'] },
         { name: 'Connect intent and execution', description: 'Write and nest Strategies and link Objects, so purpose and progress are one click apart.', objectKeys: ['strategy'] },
@@ -220,13 +220,13 @@ const ko: StarterContent = {
   "domain": {
     "name": "시작하기",
     "identifier": "SETUP",
-    "description": "Alcon의 설정과 사용법을 실제 Object와 Element로 확인하는 Domain입니다. 끝나면 삭제해도 됩니다."
+    "description": "Clayware의 설정과 사용법을 실제 Object와 Element로 확인하는 Domain입니다. 끝나면 삭제해도 됩니다."
   },
   "objects": [
     {
       "key": "concepts",
-      "name": "먼저 읽기 — Alcon의 사고방식",
-      "description": "Alcon이 조직의 활동을 어떻게 다루는지 알아봅니다.",
+      "name": "먼저 읽기 — Clayware의 사고방식",
+      "description": "Clayware이 조직의 활동을 어떻게 다루는지 알아봅니다.",
       "elements": [
         {
           "title": "Strategy·Execution·Sustainment 세 영역 알기",
@@ -345,7 +345,7 @@ const ko: StarterContent = {
   ],
   "strategy": {
     "name": "앱 사용법 마스터하기",
-    "description": "팀 전원이 Alcon에서 의도(Strategy)와 행동(Execution)을 오갈 수 있다."
+    "description": "팀 전원이 Clayware에서 의도(Strategy)와 행동(Execution)을 오갈 수 있다."
   },
   "strategies": [
     {
@@ -353,7 +353,7 @@ const ko: StarterContent = {
       "description": "사고방식을 이해하고 Space를 쓸 수 있는 상태로 만듭니다.",
       "children": [
         {
-          "name": "Alcon의 사고방식 이해하기",
+          "name": "Clayware의 사고방식 이해하기",
           "description": "세 영역과 Domain → Object → Element 계층을 자신의 말로 설명할 수 있게 됩니다.",
           "objectKeys": [
             "concepts"
@@ -370,7 +370,7 @@ const ko: StarterContent = {
     },
     {
       "name": "실무에서 활용하기",
-      "description": "실제 업무를 Alcon에 올리고 의도와 연결합니다.",
+      "description": "실제 업무를 Clayware에 올리고 의도와 연결합니다.",
       "children": [
         {
           "name": "일상의 실행을 보드에 올리기",
@@ -402,13 +402,13 @@ const fr: StarterContent = {
   "domain": {
     "name": "Prise en main",
     "identifier": "SETUP",
-    "description": "Un Domain pour découvrir la configuration et les concepts d’Alcon avec de vrais Objects et Elements. Supprimez-le une fois terminé."
+    "description": "Un Domain pour découvrir la configuration et les concepts d’Clayware avec de vrais Objects et Elements. Supprimez-le une fois terminé."
   },
   "objects": [
     {
       "key": "concepts",
-      "name": "Commencer ici — la logique d’Alcon",
-      "description": "Comment Alcon modélise l’activité d’une organisation.",
+      "name": "Commencer ici — la logique d’Clayware",
+      "description": "Comment Clayware modélise l’activité d’une organisation.",
       "elements": [
         {
           "title": "Découvrir les trois domaines : Strategy, Execution, Sustainment",
@@ -527,7 +527,7 @@ const fr: StarterContent = {
   ],
   "strategy": {
     "name": "Maîtriser l’application",
-    "description": "Toute l’équipe passe de l’intention (Strategy) à l’action (Execution) dans Alcon."
+    "description": "Toute l’équipe passe de l’intention (Strategy) à l’action (Execution) dans Clayware."
   },
   "strategies": [
     {
@@ -535,7 +535,7 @@ const fr: StarterContent = {
       "description": "Comprendre le modèle et préparer le Space.",
       "children": [
         {
-          "name": "Comprendre la logique d’Alcon",
+          "name": "Comprendre la logique d’Clayware",
           "description": "Savoir expliquer avec ses propres mots les trois domaines et Domain → Object → Element.",
           "objectKeys": [
             "concepts"
@@ -552,7 +552,7 @@ const fr: StarterContent = {
     },
     {
       "name": "L’utiliser pour le vrai travail",
-      "description": "Mettre le travail réel dans Alcon et le relier à l’intention.",
+      "description": "Mettre le travail réel dans Clayware et le relier à l’intention.",
       "children": [
         {
           "name": "Mettre l’exécution quotidienne sur le tableau",
@@ -584,13 +584,13 @@ const es: StarterContent = {
   "domain": {
     "name": "Primeros pasos",
     "identifier": "SETUP",
-    "description": "Un Domain para probar la configuración y los conceptos de Alcon con Objects y Elements reales. Elimínalo cuando termines."
+    "description": "Un Domain para probar la configuración y los conceptos de Clayware con Objects y Elements reales. Elimínalo cuando termines."
   },
   "objects": [
     {
       "key": "concepts",
-      "name": "Empieza aquí — cómo piensa Alcon",
-      "description": "Cómo modela Alcon la actividad de una organización.",
+      "name": "Empieza aquí — cómo piensa Clayware",
+      "description": "Cómo modela Clayware la actividad de una organización.",
       "elements": [
         {
           "title": "Conocer las tres áreas: Strategy, Execution, Sustainment",
@@ -709,7 +709,7 @@ const es: StarterContent = {
   ],
   "strategy": {
     "name": "Dominar la aplicación",
-    "description": "Todo el equipo se mueve entre la intención (Strategy) y la acción (Execution) en Alcon."
+    "description": "Todo el equipo se mueve entre la intención (Strategy) y la acción (Execution) en Clayware."
   },
   "strategies": [
     {
@@ -717,7 +717,7 @@ const es: StarterContent = {
       "description": "Entender el modelo y dejar listo el Space.",
       "children": [
         {
-          "name": "Entender cómo piensa Alcon",
+          "name": "Entender cómo piensa Clayware",
           "description": "Poder explicar con tus palabras las tres áreas y Domain → Object → Element.",
           "objectKeys": [
             "concepts"
@@ -734,7 +734,7 @@ const es: StarterContent = {
     },
     {
       "name": "Usarla en el trabajo real",
-      "description": "Llevar el trabajo real a Alcon y unirlo a la intención.",
+      "description": "Llevar el trabajo real a Clayware y unirlo a la intención.",
       "children": [
         {
           "name": "Llevar la ejecución diaria al tablero",

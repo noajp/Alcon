@@ -19,13 +19,13 @@ import { parseDateOnly } from '@/Function/shared/dateUtils';
 
 // Last Object an Element was quick-added to — pressing C on a screen with no
 // Object context (Home, Notes, …) targets this Object again.
-const LAST_OBJECT_KEY = 'alcon.quickAddElement.lastObjectId';
+const LAST_OBJECT_KEY = 'clayware.quickAddElement.lastObjectId';
 
-// Mirrors the alcon:create-object / alcon:create-domain / alcon:create-space
+// Mirrors the clayware:create-object / clayware:create-domain / clayware:create-space
 // convention (ObjectsView.tsx, domainsStore.ts, activeSpaceStore.ts) — lets
 // an external caller (⌘K's Create group) raise this popup without a prop or
 // a real keypress.
-export const CREATE_ELEMENT_EVENT = 'alcon:create-element';
+export const CREATE_ELEMENT_EVENT = 'clayware:create-element';
 /** Optional detail on CREATE_ELEMENT_EVENT — the Calendar's "+" presets the
  *  day the grid is on; a Board column's "+" presets its Object and Status. */
 export interface CreateElementDetail { dueDate?: string | null; objectId?: string | null; status?: ElementStatus | null }

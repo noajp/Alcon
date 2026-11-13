@@ -55,8 +55,8 @@ function rowToNode(r: NoteRow): NoteNode {
 
 /** App overview written into the seeded readme. Sanitiser-safe HTML
  *  (h1/h2/p/ul/li/strong — see brief/editor/htmlSanitizer). */
-const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
-<p>Alcon は世界最高の組織活動支援ツールを目指しています。企業・軍事作戦・病院など業界を問わず、あらゆる組織活動を業界非依存の少数概念で扱います。</p>
+const APP_GUIDE_README_HTML = `<h1>Clayware へようこそ</h1>
+<p>Clayware は世界最高の組織活動支援ツールを目指しています。企業・軍事作戦・病院など業界を問わず、あらゆる組織活動を業界非依存の少数概念で扱います。</p>
 <h2>三分類</h2>
 <p>機能は Strategy / Execution / Sustainment の三つに分類されます。全体の体系はクラウゼヴィッツ『戦争論』の 戦略・戦闘・兵站 に着想を得ています。</p>
 <ul>

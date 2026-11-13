@@ -1,11 +1,11 @@
-// alcon-api — the board over plain HTTP, for scripts, no-code tools and
+// clayware-api — the board over plain HTTP, for scripts, no-code tools and
 // other services (ELE_PLT-006).
 //
 // Each route runs one tool from the outside-caller allowlist that MCP also
 // offers (_shared/externalTools.ts, routes.ts), with the caller's own JWT,
 // so RLS decides what it sees and changes — the same boundary as the app and
 // MCP. Writes are recorded on the Element's Activity as "API · token: <name>"
-// (with the X-Alcon-Client name in front when the caller sends one).
+// (with the X-Clayware-Client name in front when the caller sends one).
 //
 // Auth (ADR 0032, 0034): Authorization: Bearer <personal access token>, an
 // OAuth access token or a Supabase session JWT, resolved by
@@ -27,7 +27,7 @@ import { apiActorLabel, apiPath, openApiDocument, planRequest, ROUTES, toRespons
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, x-alcon-client",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-clayware-client",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, OPTIONS",
   "Access-Control-Expose-Headers": "www-authenticate",
 };
@@ -45,7 +45,7 @@ function fail(e: ApiError): Response {
 
 function serverUrl(): string {
   const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
-  return `${base}/functions/v1/alcon-api`;
+  return `${base}/functions/v1/clayware-api`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -57,18 +57,18 @@ Deno.serve(async (req: Request) => {
   if (req.method === "GET" && path === "/openapi.json") return json(200, openApiDocument(serverUrl()));
   if (req.method === "GET" && path === "/") {
     return json(200, {
-      name: "Alcon API",
+      name: "Clayware API",
       openapi: `${serverUrl()}/openapi.json`,
       routes: ROUTES.map((r) => `${r.method} ${r.path}`),
     });
   }
 
-  const client = req.headers.get("x-alcon-client");
+  const client = req.headers.get("x-clayware-client");
   const auth = await authenticateCaller(req, { client: sanitizeName(client) || "API" });
   if (!auth.ok) {
     if (auth.status === 401) {
       return json(401, { error: { code: "unauthorized", message: auth.detail } }, {
-        "www-authenticate": `Bearer realm="alcon", error="invalid_token", error_description="${auth.detail}"`,
+        "www-authenticate": `Bearer realm="clayware", error="invalid_token", error_description="${auth.detail}"`,
       });
     }
     return json(auth.status, { error: { code: "server_error", message: auth.error } });

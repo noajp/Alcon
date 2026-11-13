@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-const protocol = await import(new URL('../../supabase/functions/alcon-mcp/protocol.ts', import.meta.url).pathname);
-const { mcpTools, mcpHost, MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/alcon-mcp/tools.ts', import.meta.url).pathname);
+const protocol = await import(new URL('../../supabase/functions/clayware-mcp/protocol.ts', import.meta.url).pathname);
+const { mcpTools, mcpHost, MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
 const board = await import(new URL('../../supabase/functions/_shared/boardTools.ts', import.meta.url).pathname);
 
 const { handleBody, clientLabel, negotiateVersion, SUPPORTED_PROTOCOL_VERSIONS, RPC } = protocol;
@@ -141,7 +141,7 @@ describe('MCP tool surface', () => {
 });
 
 describe('clientLabel', () => {
-  const url = (q = '') => new URL(`https://x.supabase.co/functions/v1/alcon-mcp${q}`);
+  const url = (q = '') => new URL(`https://x.supabase.co/functions/v1/clayware-mcp${q}`);
   it('recognises clients from the User-Agent', () => {
     expect(clientLabel(url(), 'claude-code/2.1.0')).toBe('Claude Code (MCP)');
     expect(clientLabel(url(), 'Claude-User')).toBe('Claude (MCP)');
@@ -209,9 +209,9 @@ describe('board tools', () => {
 
 describe('mcpHost', () => {
   it('sends strategy tools to the strategy runner and board tools to the board runner', async () => {
-    const { db } = fakeDb({ strategies: [{ id: UUID, name: 'Alcon GTM', status: 'active' }], intents: [], strategy_objects: [], strategy_children: [] });
+    const { db } = fakeDb({ strategies: [{ id: UUID, name: 'Clayware GTM', status: 'active' }], intents: [], strategy_objects: [], strategy_children: [] });
     const h = mcpHost(db, { agent: 'AI (MCP)', userId: 'u' });
     const res = await h.call('getInitiative', { id: UUID });
-    expect(res).toMatchObject({ ok: true, data: { name: 'Alcon GTM', intents: [], objects: [] } });
+    expect(res).toMatchObject({ ok: true, data: { name: 'Clayware GTM', intents: [], objects: [] } });
   });
 });

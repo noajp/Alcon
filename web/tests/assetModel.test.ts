@@ -53,7 +53,7 @@ describe('isLive', () => {
 describe('relayEnvLines', () => {
   it('gives the two variables the one line needs', () => {
     expect(relayEnvLines('https://x.supabase.co/functions/v1/asset-relay', 'sp')).toBe(
-      'ALCON_RELAY=https://x.supabase.co/functions/v1/asset-relay\nALCON_SPACE=sp',
+      'CLAYWARE_RELAY=https://x.supabase.co/functions/v1/asset-relay\nCLAYWARE_SPACE=sp',
     );
   });
 });

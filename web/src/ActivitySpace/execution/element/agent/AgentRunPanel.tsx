@@ -12,7 +12,7 @@ import { TraceCompletion, TraceHeadline, TraceStepList } from '@/Function/shared
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import { CredentialRequestCard } from '@/AIP/connectors/CredentialRequestCard';
 import { CreatedEntityCard } from '@/AIP/ai/CreatedEntityCard';
-import type { CreatedEntity } from '@/AIP/ai/useAlconCopilot';
+import type { CreatedEntity } from '@/AIP/ai/useClaywareCopilot';
 import type { AgentOutput } from '@/types/database';
 import type { ProposedReading } from '@/Function/audit/auditModel';
 import { useMeasureLabels } from '@/AIP/ai/agentData';
@@ -25,7 +25,7 @@ import { useNow } from '@/Function/shared/useNow';
 // (Function/shared/workTraceView) — its headline, its steps as compact rows,
 // its completion — the approval card when it waits on a person, and the
 // deliverables it saved. Shapes follow the Task Rows / Tool Chips /
-// Approval Card patterns, drawn with Alcon's own tokens.
+// Approval Card patterns, drawn with Clayware's own tokens.
 
 type Agent = ReturnType<typeof useAgentRun>;
 

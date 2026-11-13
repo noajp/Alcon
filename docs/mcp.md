@@ -1,8 +1,8 @@
-# Alcon MCP サーバー
+# Clayware MCP サーバー
 
-外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で Alcon のデータを読み書きする入口。
+外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で Clayware のデータを読み書きする入口。
 
-- エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-mcp`
+- エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-mcp`
 - 方式: Streamable HTTP（状態を持たない。POST で JSON-RPC を 1 件送り、JSON で応答を受け取る）
 - 認証: claude.ai・ChatGPT などのコネクタは OAuth でサインイン、Claude Code やスクリプトは `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`）
 
@@ -33,7 +33,7 @@ lease は `claim_element()` / `release_element()` だけを通して書く。担
 
 ## 認証
 
-個人用アクセストークン（PAT）を使う。アプリの Settings › Customize の「Alcon へ接続する」で発行する。
+個人用アクセストークン（PAT）を使う。アプリの Settings › Customize の「Clayware へ接続する」で発行する。
 
 - 名前、有効期限（30 日・90 日・無期限）、権限（読み取りと書き込み／読み取りのみ）を選ぶ。平文が表示されるのは発行したときの 1 回だけで、DB にはハッシュだけが残る
 - 一覧には、権限・有効期限・最終使用日時と接続元が出る。取り消すと、次の要求から 401 になる
@@ -49,19 +49,19 @@ Supabase のセッションの JWT（1 時間で切れる）も受け付ける�
 コネクタの設定にエンドポイントの URL を貼るだけでよい。トークンは要らない。
 
 1. claude.ai の Settings › Connectors › Add custom connector（ChatGPT は Developer mode のコネクタ）に、エンドポイントの URL を入れる
-2. Alcon のサインイン画面が開く。サインインすると同意画面（`/oauth/consent`）に、クライアント名・戻り先・できること・できないことが出る
+2. Clayware のサインイン画面が開く。サインインすると同意画面（`/oauth/consent`）に、クライアント名・戻り先・できること・できないことが出る
 3. 「読み取りと書き込み」か「読み取りのみ」を選んで承認する
 
-接続したアプリは、Settings › Customize の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンでデータに届くのは、Alcon の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでもデータは読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
+接続したアプリは、Settings › Customize の「接続中のアプリ」に並ぶ。権限を替えたり、切断したりでき、切断すると次の呼び出しから 401 になる。OAuth で発行されたトークンでデータに届くのは、Clayware の MCP（と REST API）を通したときだけで、PostgREST などに直接持ち込んでもデータは読み書きできない。書き込みは「Claude (MCP · OAuth)」の形で記録される。
 
-仕組み：401 の `WWW-Authenticate` が `resource_metadata` で `…/alcon-mcp/.well-known/oauth-protected-resource` を指し、そこに認可サーバー（Supabase Auth の OAuth サーバー、`https://<ref>.supabase.co/auth/v1`）が書いてある。クライアントの登録・PKCE・トークンの発行と更新は Supabase が行う。
+仕組み：401 の `WWW-Authenticate` が `resource_metadata` で `…/clayware-mcp/.well-known/oauth-protected-resource` を指し、そこに認可サーバー（Supabase Auth の OAuth サーバー、`https://<ref>.supabase.co/auth/v1`）が書いてある。クライアントの登録・PKCE・トークンの発行と更新は Supabase が行う。
 
 ## Claude Code から接続する
 
 トークンを発行すると、それを埋め込んだコマンドがコピーボタン付きで表示される。
 
 ```bash
-claude mcp add --transport http alcon "https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-mcp?client=Claude%20Code" --header "Authorization: Bearer alc_pat_…"
+claude mcp add --transport http clayware "https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-mcp?client=Claude%20Code" --header "Authorization: Bearer alc_pat_…"
 ```
 
 `?client=` に書いた名前が記録に使われる。省略した場合は、User-Agent から判別する。Authorization ヘッダーを送れる MCP クライアントやスクリプトなら、同じ方法で接続できる。
@@ -69,12 +69,12 @@ claude mcp add --transport http alcon "https://rkugtcqztkkacvoylupw.supabase.co/
 ## デプロイ
 
 ```bash
-env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-mcp --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy clayware-mcp --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（保護リソースのメタデータを指す `WWW-Authenticate` 付き）を返し、メタデータをトークンなしで配るため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-api` も、`_shared/boardTools.ts` を変更したら `alcon-api` も再デプロイする。
+`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（保護リソースのメタデータを指す `WWW-Authenticate` 付き）を返し、メタデータをトークンなしで配るため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `clayware-api` も、`_shared/boardTools.ts` を変更したら `clayware-api` も再デプロイする。
 
-PAT と OAuth を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT と OAuth のトークンは 500「server not configured」で断られ、セッションの JWT だけが通る。OAuth にはさらに次を行う。
+PAT と OAuth を受け付けるには、Edge Function のシークレット `CLAYWARE_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT と OAuth のトークンは 500「server not configured」で断られ、セッションの JWT だけが通る。OAuth にはさらに次を行う。
 
 - Authentication › OAuth Server を有効にする（Authorization path は `/oauth/consent`、Dynamic client registration は ON）
 - Site URL を本番のアプリにし、Redirect URLs に `<本番のアプリ>/oauth/consent**` を足す（同意画面で登録した人の確認メールが同意に戻るため）
@@ -84,19 +84,19 @@ PAT と OAuth を受け付けるには、Edge Function のシークレット `AL
 
 非対称の署名鍵に移ったら、EC の秘密鍵の JWK を入れれば ES256 で署名する。
 
-## 逆向き：Alcon のエージェントが外部サービスを使う
+## 逆向き：Clayware のエージェントが外部サービスを使う
 
-この文書は外部の AI が Alcon を操作する入口を扱う。Alcon のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Customize の「コネクタ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。エージェントは Alcon 自身を指す連携を使わず、Alcon の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
+この文書は外部の AI が Clayware を操作する入口を扱う。Clayware のエージェント（run-agent）が Linear・Asana・任意の MCP / API を道具として使う接続は、Settings › Customize の「コネクタ」で Space の owner が設定する。資格情報は Vault に置かれ、外部への書き込みは既定で毎回承認を待つ。エージェントは Clayware 自身を指す連携を使わず、Clayware の PAT は連携の資格情報として保存できない（エージェントは開始した人の権限で、盤面の道具をすでに持っている）。
 
 ### Google Drive（OAuth）
 
-Google Drive は資格情報を貼り付けず、owner が Google にサインインしてつなぐ。スコープは `drive.file` だけなので、エージェントが扱えるのは Alcon が作ったファイルと利用者が選んだファイルに限られ、作ったファイルは接続した Google アカウントの名義になる。エージェントには `drive_search`・`drive_read`（読み取り）と `drive_create`・`drive_update`・`drive_create_folder`（書き込み、承認を通る）が出る。
+Google Drive は資格情報を貼り付けず、owner が Google にサインインしてつなぐ。スコープは `drive.file` だけなので、エージェントが扱えるのは Clayware が作ったファイルと利用者が選んだファイルに限られ、作ったファイルは接続した Google アカウントの名義になる。エージェントには `drive_search`・`drive_read`（読み取り）と `drive_create`・`drive_update`・`drive_create_folder`（書き込み、承認を通る）が出る。
 
-アクセスは Google アカウントに付き、Space ごとには分かれない。同じ Google アカウントを 2 つの Space でつなぐと、どちらの Space のエージェントも、もう一方で Alcon が作ったファイルを見られる。また切断は Google で Alcon の許可全体を取り消すので、一方の Space で切断すると、同じアカウントをつないだ他の Space も次のリフレッシュで `oauth_expired`（再接続が必要）になる。
+アクセスは Google アカウントに付き、Space ごとには分かれない。同じ Google アカウントを 2 つの Space でつなぐと、どちらの Space のエージェントも、もう一方で Clayware が作ったファイルを見られる。また切断は Google で Clayware の許可全体を取り消すので、一方の Space で切断すると、同じアカウントをつないだ他の Space も次のリフレッシュで `oauth_expired`（再接続が必要）になる。
 
 ### GitHub（OAuth）
 
-GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Customize から）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Element のコード変更（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Alcon を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
+GitHub も資格情報を貼り付けず、owner が GitHub にサインインしてつなぐ（Settings › Customize から）。スコープは `repo` で、サインインした人が触れるリポジトリを読み書きできる。この接続を、Element のコード変更（差分の取得、判定・行コメントの投稿、マージ）とエージェント（GitHub の MCP サーバー）の両方が使い、投稿・マージ・push はサインインした GitHub アカウントの名義になる。トークンは期限切れにならず、切断（GitHub の grant の取り消し）か、本人が GitHub の Settings › Applications で Clayware を外すまで使える。アクセスが GitHub アカウントに付き、一方の Space で切断すると同じアカウントの他の Space も切れるのは Google と同じ。
 
 ### サインインの流れ（共通）
 
@@ -119,6 +119,6 @@ Edge Function のシークレットに次を入れる。相手ごとのクライ
 | `GOOGLE_OAUTH_CLIENT_SECRET` | 同じクライアントのシークレット |
 | `GITHUB_OAUTH_CLIENT_ID` | GitHub の OAuth App の Client ID |
 | `GITHUB_OAUTH_CLIENT_SECRET` | 同じ OAuth App の Client secret |
-| `APP_ORIGIN` | サインイン後に戻るアプリの origin（例 `https://alcon.example.com`）。パスは付けない。保存を確定する `/finish` はこのアプリから呼ばれるので、ない間はサインインを完了できない（コールバックは何も保存せず「APP_ORIGIN を設定してください」と返す） |
+| `APP_ORIGIN` | サインイン後に戻るアプリの origin（例 `https://clayware.example.com`）。パスは付けない。保存を確定する `/finish` はこのアプリから呼ばれるので、ない間はサインインを完了できない（コールバックは何も保存せず「APP_ORIGIN を設定してください」と返す） |
 
 Google の OAuth クライアントには、承認済みのリダイレクト URI として `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/integration-oauth/callback` を登録し、同意画面に `https://www.googleapis.com/auth/drive.file` を加える。GitHub の OAuth App（GitHub › Settings › Developer settings › OAuth Apps）は、Authorization callback URL に同じ URL を、Homepage URL に `APP_ORIGIN` を入れる。

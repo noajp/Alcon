@@ -4,7 +4,7 @@ import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { Plus } from '@/ui/icons';
-import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { reorderElements, reorderObjects, useElementCommentActivity, useElementBlockers, withCommentActivity } from '@/hooks/useSupabase';
 import { type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
 import { displayIdOf } from '@/Function/shared/element/displayId';
@@ -851,7 +851,7 @@ export function ListTable({
 function DragCard({
   data,
 }: {
-  data: { kind: 'element'; el: ElementWithDetails } | { kind: 'object'; obj: AlconObjectWithChildren };
+  data: { kind: 'element'; el: ElementWithDetails } | { kind: 'object'; obj: ClaywareObjectWithChildren };
 }) {
   const elementId = data.kind === 'element' ? displayIdOf(data.el) : null;
   return (

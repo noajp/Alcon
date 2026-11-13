@@ -12,7 +12,7 @@ describe('holderToken', () => {
   });
 
   it('gives the primary checkout its own token', () => {
-    expect(holderToken({}, '/Users/x/Dev/Alcon')).toBe('Claude@Alcon');
+    expect(holderToken({}, '/Users/x/Dev/Clayware')).toBe('Claude@Clayware');
   });
 
   it('two worktrees never share a token', () => {

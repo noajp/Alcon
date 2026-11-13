@@ -1,23 +1,23 @@
-// Alcon asset relay — the one line a local app adds to join its Space.
+// Clayware asset relay — the one line a local app adds to join its Space.
 //
-//   import './alcon.mjs';                         // that is the line
+//   import './clayware.mjs';                         // that is the line
 //
 // On import it announces this process to the relay (name, version, runtime,
 // host, which AI providers it has keys for, nothing secret), keeps the asset
-// token it gets back in .alcon/asset.json so a restart is the same asset,
+// token it gets back in .clayware/asset.json so a restart is the same asset,
 // and from then on reports what the app does:
 //
 //   - every outbound HTTP host the app talks to (hostnames only, batched)
 //   - process start and stop
-//   - whatever the app chooses to say: alcon.event('closed-books', 'Q3 closed', { fy: 2026 })
+//   - whatever the app chooses to say: clayware.event('closed-books', 'Q3 closed', { fy: 2026 })
 //
 // Configuration (environment):
-//   ALCON_RELAY   the relay URL (…/functions/v1/asset-relay)   required
-//   ALCON_SPACE   the Space id to announce to                  required on first contact
-//   ALCON_NAME    the asset's name (default: package.json name, else the folder)
-//   ALCON_KIND    app | ai_agent | script | service | other (default app)
-//   ALCON_STATE   where to keep the token (default ./.alcon/asset.json)
-//   ALCON_SILENT  set to 1 to suppress the one-line console notes
+//   CLAYWARE_RELAY   the relay URL (…/functions/v1/asset-relay)   required
+//   CLAYWARE_SPACE   the Space id to announce to                  required on first contact
+//   CLAYWARE_NAME    the asset's name (default: package.json name, else the folder)
+//   CLAYWARE_KIND    app | ai_agent | script | service | other (default app)
+//   CLAYWARE_STATE   where to keep the token (default ./.clayware/asset.json)
+//   CLAYWARE_SILENT  set to 1 to suppress the one-line console notes
 //
 // Never throws, never blocks the app: a relay that is down or a token that
 // was revoked is logged once and the app carries on as if the line were not
@@ -27,10 +27,10 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { hostname, platform, release } from 'node:os';
 
-const RELAY = (process.env.ALCON_RELAY ?? '').replace(/\/+$/, '');
-const SPACE = process.env.ALCON_SPACE ?? '';
-const STATE_PATH = process.env.ALCON_STATE ?? join(process.cwd(), '.alcon', 'asset.json');
-const SILENT = process.env.ALCON_SILENT === '1';
+const RELAY = (process.env.CLAYWARE_RELAY ?? '').replace(/\/+$/, '');
+const SPACE = process.env.CLAYWARE_SPACE ?? '';
+const STATE_PATH = process.env.CLAYWARE_STATE ?? join(process.cwd(), '.clayware', 'asset.json');
+const SILENT = process.env.CLAYWARE_SILENT === '1';
 const FLUSH_MS = 5000;
 
 const AI_PROVIDER_KEYS = {
@@ -43,7 +43,7 @@ const AI_PROVIDER_KEYS = {
   aws_bedrock: ['AWS_BEARER_TOKEN_BEDROCK'],
 };
 
-const note = (msg) => { if (!SILENT) console.error(`[alcon] ${msg}`); };
+const note = (msg) => { if (!SILENT) console.error(`[clayware] ${msg}`); };
 
 function readPackage() {
   let dir = process.cwd();
@@ -87,7 +87,7 @@ function manifest(pkg) {
     entry: process.argv[1] ? basename(process.argv[1]) : null,
     ai_providers: providers,
     dependencies: Object.keys(pkg?.dependencies ?? {}).slice(0, 100),
-    sdk: 'alcon-node/0.1',
+    sdk: 'clayware-node/0.1',
   };
 }
 
@@ -107,15 +107,15 @@ async function post(path, body, withToken) {
 }
 
 async function announce() {
-  if (!RELAY) { note('ALCON_RELAY is not set; not connected'); state.down = true; return; }
+  if (!RELAY) { note('CLAYWARE_RELAY is not set; not connected'); state.down = true; return; }
   const pkg = readPackage();
-  const name = process.env.ALCON_NAME ?? pkg?.name ?? basename(process.cwd());
-  const kind = process.env.ALCON_KIND ?? 'app';
+  const name = process.env.CLAYWARE_NAME ?? pkg?.name ?? basename(process.cwd());
+  const kind = process.env.CLAYWARE_KIND ?? 'app';
   const saved = readState();
   const body = { name, kind, manifest: manifest(pkg) };
   if (saved?.token) body.token = saved.token;
   else if (SPACE) body.space = SPACE;
-  else { note('ALCON_SPACE is not set and no asset token is kept; not connected'); state.down = true; return; }
+  else { note('CLAYWARE_SPACE is not set and no asset token is kept; not connected'); state.down = true; return; }
 
   let r;
   try { r = await post('/hello', body, false); } catch (e) { note(`relay unreachable (${e.message}); carrying on without it`); state.down = true; return; }
@@ -123,10 +123,10 @@ async function announce() {
   if (r.status === 401 && saved?.token) {
     // The kept token is unknown to this relay (another project, a reset):
     // start over as a new asset if a Space is configured.
-    if (!SPACE) { note('the kept asset token is unknown and ALCON_SPACE is not set; not connected'); state.down = true; return; }
+    if (!SPACE) { note('the kept asset token is unknown and CLAYWARE_SPACE is not set; not connected'); state.down = true; return; }
     try { r = await post('/hello', { name, kind, manifest: body.manifest, space: SPACE }, false); } catch (e) { note(`relay unreachable (${e.message})`); state.down = true; return; }
   }
-  if (r.status === 403) { note('this asset was revoked in Alcon; not reporting'); state.down = true; return; }
+  if (r.status === 403) { note('this asset was revoked in Clayware; not reporting'); state.down = true; return; }
   if (!r.ok || !r.data?.asset_id) { note(`relay refused the hello (${r.status} ${r.data?.error?.code ?? ''}); carrying on without it`); state.down = true; return; }
 
   state.assetId = r.data.asset_id;
@@ -134,8 +134,8 @@ async function announce() {
   if (r.data.token) { state.token = r.data.token; writeState({ token: r.data.token, asset_id: r.data.asset_id, relay: RELAY }); }
   else state.token = saved.token;
   note(r.data.token
-    ? `announced to Alcon as "${name}" — waiting for a Space owner to accept it (Settings › Customize › Connected assets)`
-    : `connected to Alcon as "${name}" (${state.status})`);
+    ? `announced to Clayware as "${name}" — waiting for a Space owner to accept it (Settings › Customize › Connected assets)`
+    : `connected to Clayware as "${name}" (${state.status})`);
   event('started', `${name} started`, { pid: process.pid, entry: body.manifest.entry });
 }
 
@@ -151,7 +151,7 @@ async function flush() {
   const batch = queue.splice(0, 50);
   try {
     const r = await post('/events', { events: batch }, true);
-    if (r.status === 403) { note('this asset was revoked in Alcon; not reporting'); state.down = true; return; }
+    if (r.status === 403) { note('this asset was revoked in Clayware; not reporting'); state.down = true; return; }
     if (!r.ok) note(`relay refused ${batch.length} event(s) (${r.status} ${r.data?.error?.code ?? ''})`);
   } catch (e) {
     note(`relay unreachable (${e.message}); ${batch.length} event(s) dropped`);
@@ -177,7 +177,7 @@ export function event(kind, summary, payload) {
 // Outbound hosts, hostnames only: which services and AI providers the app
 // actually talks to, as opposed to what it says in its manifest.
 if (typeof nativeFetch === 'function') {
-  globalThis.fetch = function alconFetch(input, init) {
+  globalThis.fetch = function claywareFetch(input, init) {
     try {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;
       if (url && !url.startsWith(RELAY)) {
@@ -207,5 +207,5 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 
 state.ready = announce();
 
-export const alcon = { event, ready: state.ready, get status() { return state.status; }, get assetId() { return state.assetId; } };
-export default alcon;
+export const clayware = { event, ready: state.ready, get status() { return state.status; }, get assetId() { return state.assetId; } };
+export default clayware;

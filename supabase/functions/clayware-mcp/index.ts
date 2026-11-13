@@ -1,4 +1,4 @@
-// alcon-mcp — Alcon as an MCP server.
+// clayware-mcp — Clayware as an MCP server.
 //
 // External AI clients (Claude Code, Claude, ChatGPT, …) connect over MCP
 // Streamable HTTP and read / write the board as the person who connected

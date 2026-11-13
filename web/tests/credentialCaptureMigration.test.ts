@@ -32,7 +32,7 @@ describe('20261202090000 credential capture migration', () => {
     expect(sql).toContain('revoke all on table public.credential_once_stash from public, anon, authenticated');
   });
 
-  it('stash is owner-only, TTL-bound at ten minutes, and refuses an Alcon PAT', () => {
+  it('stash is owner-only, TTL-bound at ten minutes, and refuses an Clayware PAT', () => {
     expect(sql).toContain('public.stash_credential_once(');
     expect(sql).toContain('p_value text');
     expect(sql).toContain('is_activity_space_owner(v_req.activity_space_id)');

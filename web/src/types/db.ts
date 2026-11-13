@@ -334,7 +334,7 @@ interface RowChecks {
   domains: Compatible<TableRow<'domains'>, H.Domain>
   membership_invitations: Compatible<TableRow<'membership_invitations'>, H.MembershipInvitation>
   object_domains: Compatible<TableRow<'object_domains'>, H.ObjectDomain>
-  objects: Compatible<TableRow<'objects'>, H.AlconObject>
+  objects: Compatible<TableRow<'objects'>, H.ClaywareObject>
   elements: Compatible<TableRow<'elements'>, H.Element>
   workers: Compatible<TableRow<'workers'>, H.Worker>
   element_assignees: Compatible<TableRow<'element_assignees'>, H.ElementAssignee>

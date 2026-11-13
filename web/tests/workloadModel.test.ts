@@ -34,12 +34,12 @@ vi.mock('@/lib/supabase', () => ({
 import { summarizeWorkload, workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, workloadOverDays, workloadUtilization, selectWorkloadElements, resolveWorkloadScope } from '@/Function/workload/workloadModel';
 import { fetchWorkloadObject } from '@/hooks/useWorkloadData';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
-import type { AlconObjectWithChildren, ElementWithDetails } from '@/types/database';
+import type { ClaywareObjectWithChildren, ElementWithDetails } from '@/types/database';
 
 const element = (id: string, changes: Partial<ElementWithDetails> = {}): ElementWithDetails => ({
   id, title: id, start_date: null, due_date: null, estimated_hours: 6, priority: 'medium', status: 'todo', ...changes,
 } as ElementWithDetails);
-const object = (id: string, elements: ElementWithDetails[]) => ({ id, elements } as AlconObjectWithChildren);
+const object = (id: string, elements: ElementWithDetails[]) => ({ id, elements } as ClaywareObjectWithChildren);
 
 describe('Workload scope', () => {
   it('resets a previous Space selection and preserves an explicit empty filter', () => {

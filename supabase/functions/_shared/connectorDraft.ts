@@ -7,7 +7,7 @@
 // failure vocabulary a test round speaks, and the hashes a tested draft
 // is bound by. The database half lives in integrationDrafts.ts; the
 // command-test executor in draftTest.ts. Design:
-// ~/workspace/dev/alcon-g4-design.md (with its 2026-11-08 addendum).
+// ~/workspace/dev/clayware-g4-design.md (with its 2026-11-08 addendum).
 
 import { parseManifest, type Manifest } from "./connectorManifest.ts";
 import { foldConnectorName } from "./connectorNeeds.ts";

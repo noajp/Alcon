@@ -52,7 +52,7 @@ async function fetchElementTemplates(domainId: string): Promise<ElementTemplate[
 // edit would otherwise leave an already-mounted QuickAdd popup's own
 // `useElementTemplates(domainId)` (a different tab, or one that just hasn't
 // remounted) showing stale template contents indefinitely.
-const ELEMENT_TEMPLATES_CHANGED_EVENT = 'alcon:element-templates-changed';
+const ELEMENT_TEMPLATES_CHANGED_EVENT = 'clayware:element-templates-changed';
 function notifyElementTemplatesChanged() {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(ELEMENT_TEMPLATES_CHANGED_EVENT));

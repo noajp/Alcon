@@ -97,7 +97,7 @@ const SIDEBAR_CLOSE_PULL = 72;
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
-const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
+const SIDEBAR_WIDTH_KEY = 'clayware:sidebarWidth';
 
 
 

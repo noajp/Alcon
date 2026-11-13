@@ -102,8 +102,8 @@ describe('approval card rows', () => {
     const batch = (flags: [boolean, boolean], critical: string | null = null) => ({
       input: {
         calls: [
-          { id: 'a', name: 'gh__create_issue', input: { repo: 'Alcon', title: 'one' } },
-          { id: 'b', name: 'gh__create_issue', input: { repo: 'Alcon', title: 'two' } },
+          { id: 'a', name: 'gh__create_issue', input: { repo: 'Clayware', title: 'one' } },
+          { id: 'b', name: 'gh__create_issue', input: { repo: 'Clayware', title: 'two' } },
         ],
         display: [
           { id: 'a', integration: 'GitHub', operation: 'issues.create', rememberable: flags[0], critical },
@@ -111,7 +111,7 @@ describe('approval card rows', () => {
         ],
       },
     });
-    expect(rememberChoices(batch([true, true]) as never)).toEqual([{ field: 'repo', value: 'Alcon' }]);
+    expect(rememberChoices(batch([true, true]) as never)).toEqual([{ field: 'repo', value: 'Clayware' }]);
     // A critical batch, a manifest-less (raw HTTP) batch, and a mixed batch offer nothing.
     expect(rememberChoices(batch([false, false], 'send') as never)).toEqual([]);
     expect(rememberChoices(batch([false, false]) as never)).toEqual([]);
@@ -122,13 +122,13 @@ describe('approval card rows', () => {
 describe('approval card model — display v2', () => {
   const v2 = {
     input: {
-      calls: [{ id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.', draft: false } }],
+      calls: [{ id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.', draft: false } }],
       display: [{
         id: 'a', integration: 'GitHub', operation: 'create_pull_request', destination: 'https://api.github.com',
         detail: null, effect: 'write', critical: null, rememberable: true,
         title: 'Create a pull request',
         fields: [
-          { label: 'Repository owner', value: 'noajp' }, { label: 'Repository', value: 'Alcon' },
+          { label: 'Repository owner', value: 'noajp' }, { label: 'Repository', value: 'Clayware' },
           { label: 'Title', value: 'Add the card' }, { label: 'Base', value: 'main' }, { label: 'Head', value: 'claude/card' },
         ],
         preview: 'The body.', askReason: 'command',
@@ -141,7 +141,7 @@ describe('approval card model — display v2', () => {
     const row = approvalRows(v2 as never)[0];
     expect(row.title).toBe('Create a pull request');
     expect(row.fields).toEqual([
-      ['Repository owner', 'noajp'], ['Repository', 'Alcon'], ['Title', 'Add the card'], ['Base', 'main'], ['Head', 'claude/card'],
+      ['Repository owner', 'noajp'], ['Repository', 'Clayware'], ['Title', 'Add the card'], ['Base', 'main'], ['Head', 'claude/card'],
     ]);
     expect(row.preview).toBe('The body.');
     expect(row.askReason).toBe('command');

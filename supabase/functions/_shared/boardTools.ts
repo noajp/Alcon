@@ -4,8 +4,8 @@ import { basisErrorText, bindBasis } from "./elementBasis.ts";
 // Board tools — Domain / Object / Element / Sub-element reads and writes that
 // run with the caller's JWT, so RLS decides what each call can see and touch.
 //
-// Shared by the in-app Copilot (alcon-copilot) and the MCP server
-// (alcon-mcp). Each entry exposes the subset it wants by name; a write the
+// Shared by the in-app Copilot (clayware-copilot) and the MCP server
+// (clayware-mcp). Each entry exposes the subset it wants by name; a write the
 // entry does not list cannot be reached from it.
 
 export type ToolDef = {
@@ -19,7 +19,7 @@ export type ToolResult =
   | { ok: false; error: string };
 
 /**
- * Who is writing. `agent` is the AI's label ("Alcon Copilot",
+ * Who is writing. `agent` is the AI's label ("Clayware Copilot",
  * "Claude Code (MCP)"): the comment author, and named in each Activity line.
  * `userId` is the person whose JWT the call runs under, so a comment stays
  * traceable to who delegated it.

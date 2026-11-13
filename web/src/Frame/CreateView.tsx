@@ -94,7 +94,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
               autoFocus
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder={t('e.g. Alcon Dev, Marketing, Ward 1')}
+              placeholder={t('e.g. Clayware Dev, Marketing, Ward 1')}
               onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleCreate(); }}
             />
           </Field>

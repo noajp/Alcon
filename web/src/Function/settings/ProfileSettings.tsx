@@ -287,7 +287,7 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-10">
-      <SettingsIsland title={t('Profile')} description={t('How your name and avatar appear across Alcon.')}>
+      <SettingsIsland title={t('Profile')} description={t('How your name and avatar appear across Clayware.')}>
         <div className="px-5 py-4 flex items-center gap-4">
           <button
             type="button"

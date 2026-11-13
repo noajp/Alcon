@@ -1,6 +1,6 @@
 # 承認の依頼と証明（audit-approvals）
 
-ゲートウェイ（Metaxy の実行基盤）が、人の判断が要る操作の前に承認を求め、送る直前にその承認を1回だけ使うための口。鍵と署名は [audit-intake](audit-intake.md)、Alcon の公開鍵は [audit-grants](audit-grants.md) と同じ。
+ゲートウェイ（Metaxy の実行基盤）が、人の判断が要る操作の前に承認を求め、送る直前にその承認を1回だけ使うための口。鍵と署名は [audit-intake](audit-intake.md)、Clayware の公開鍵は [audit-grants](audit-grants.md) と同じ。
 
 ## 送り方
 
@@ -8,8 +8,8 @@
 
 ```
 POST https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/audit-approvals
-x-alcon-gateway-key: <鍵 id>
-x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
+x-clayware-gateway-key: <鍵 id>
+x-clayware-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 ```
 
 ### 1. 依頼する
@@ -34,7 +34,7 @@ x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 
 | 状態 | 意味 | ゲートウェイがすること |
 |---|---|---|
-| 200 | 承認を消費した。本文が証明、`x-alcon-signature` がその署名 | 証明を確かめてから送る |
+| 200 | 承認を消費した。本文が証明、`x-clayware-signature` がその署名 | 証明を確かめてから送る |
 | 202 `pending` | まだ判断されていない | 待って引き換え直す |
 | 409 `rejected` | 却下された（`note` に理由） | 送らない |
 | 409 `mismatch` | 送ろうとしている内容が承認された内容と違う。消費していない | 送らない。新しく依頼する |
@@ -46,15 +46,15 @@ x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 証明は消費した時に1回だけ発行される。応答を受け取れなかったときは、その承認はもう使えないので、新しい `request_id` で依頼し直す。引き換えられるのは依頼した鍵だけ。
 
 ```json
-{ "kind": "alcon.approval", "approval_id": "<uuid>", "space_id": "<uuid>", "deployment_id": "<uuid>",
+{ "kind": "clayware.approval", "approval_id": "<uuid>", "space_id": "<uuid>", "deployment_id": "<uuid>",
   "run_external_id": "PO-1042", "connector": "Gmail", "operation": "send", "input_hash": "<…>",
   "approved_by": "<判断した人の名前>", "approved_at": "…", "issued_at": "…", "expires_at": "<issued_at の10分後>",
-  "signing_key": "<Alcon の公開鍵>" }
+  "signing_key": "<Clayware の公開鍵>" }
 ```
 
 ## ゲートウェイが守ること
 
-- 証明の署名を、導入時に固定した Alcon の公開鍵で確かめる（権限表と同じ鍵。`kind` が `alcon.approval` でないものは証明ではない）
+- 証明の署名を、導入時に固定した Clayware の公開鍵で確かめる（権限表と同じ鍵。`kind` が `clayware.approval` でないものは証明ではない）
 - `approval_id`・`input_hash`・`deployment_id`・`connector`・`operation` が、引き換えたものとこれから行う操作と一致し、`expires_at` 前であることを確かめてから送る（参照実装は `supabase/functions/_shared/auditApprovals.ts` の `readApprovalProof`）
 - 承認の結果は、記録（[audit-intake](audit-intake.md)）の `kind: "approval"` の手順として残す
 

@@ -54,7 +54,7 @@ describe('settingsNav store', () => {
     act(() => setActiveSettingsSection('integrations'));
     expect(current.result.current.tab).toBe('definitions');
     act(() => setActiveSettingsSection('access', 'bogus'));
-    expect(current.result.current).toMatchObject({ section: 'access', tab: 'alcon' });
+    expect(current.result.current).toMatchObject({ section: 'access', tab: 'clayware' });
     act(() => setActiveSettingsSection('workspace'));
     expect(current.result.current).toMatchObject({ section: 'workspace', tab: null });
   });
@@ -71,6 +71,6 @@ describe('nav model', () => {
 
   it('AI and API & access keep their in-area tabs', () => {
     expect(SETTINGS_ITEMS.integrations.tabs?.map((x) => x.id)).toEqual(['definitions', 'external']);
-    expect(SETTINGS_ITEMS.access.tabs?.map((x) => x.id)).toEqual(['alcon', 'assets']);
+    expect(SETTINGS_ITEMS.access.tabs?.map((x) => x.id)).toEqual(['clayware', 'assets']);
   });
 });

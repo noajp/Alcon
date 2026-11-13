@@ -3,8 +3,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 // Live blocks in a description. A block is kept in the Markdown as a fenced
-// code block of the language `alcon` whose body is a small JSON spec —
-// ```alcon
+// code block of the language `clayware` whose body is a small JSON spec —
+// ```clayware
 // {"view":"gantt"}
 // ```
 // — so it is plain text to save, to diff and for an AI to read or write. The
@@ -12,7 +12,9 @@ import { createContext, useContext, type ReactNode } from 'react';
 // them (EmbedHost); the editor only places them and draws what it is given.
 // Outside such a page the block shows as a quiet note.
 
-export const EMBED_LANG = 'alcon';
+export const EMBED_LANG = 'clayware';
+/** Blocks saved under the earlier fence name are still drawn. */
+export const EMBED_LANGS = [EMBED_LANG, 'alcon'] as const;
 
 /** What a block shows: a view the host offers, and that view's settings. */
 export interface EmbedSpec { view: string; [setting: string]: unknown }

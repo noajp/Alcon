@@ -46,7 +46,7 @@ export function stripOAuthReturn(href: string): string {
 }
 
 /** sessionStorage: the Settings › AI tab a sign-in was started from, when it is not Connectors (a harness install returns to Harnesses). */
-const OAUTH_RETURN_SETTINGS_TAB_KEY = 'alcon.integrationOAuth.returnTab';
+const OAUTH_RETURN_SETTINGS_TAB_KEY = 'clayware.integrationOAuth.returnTab';
 const RETURN_TABS = new Set(['definitions', 'external']);
 
 export function saveOAuthReturnSettingsTab(tab: string): void {

@@ -81,7 +81,7 @@ export interface Redeemed {
 }
 
 export interface ApprovalProof {
-  kind: "alcon.approval";
+  kind: "clayware.approval";
   approval_id: string;
   space_id: string;
   deployment_id: string;
@@ -93,7 +93,7 @@ export interface ApprovalProof {
   approved_at: string;
   issued_at: string;
   expires_at: string;
-  /** Alcon's public key the proof is signed with (base64url, 43 chars). */
+  /** Clayware's public key the proof is signed with (base64url, 43 chars). */
   signing_key: string;
 }
 
@@ -101,7 +101,7 @@ export interface ApprovalProof {
 export function buildApprovalProof(redeemed: Redeemed, signingKey: string): ApprovalProof {
   const issued = new Date(redeemed.used_at);
   return {
-    kind: "alcon.approval",
+    kind: "clayware.approval",
     approval_id: redeemed.approval_id,
     space_id: redeemed.space_id,
     deployment_id: redeemed.deployment_id,
@@ -118,7 +118,7 @@ export function buildApprovalProof(redeemed: Redeemed, signingKey: string): Appr
 }
 
 /**
- * The proof a gateway received, if it is Alcon's signature under the pinned
+ * The proof a gateway received, if it is Clayware's signature under the pinned
  * key, for the approval the gateway redeemed, for exactly the content it is
  * about to send — and the deployment, connector and operation it is about to
  * use — and not expired. Anything else and the gateway does not send.
@@ -134,7 +134,7 @@ export async function readApprovalProof(
   } catch {
     return null;
   }
-  if (proof?.kind !== "alcon.approval" || proof.approval_id !== expect.approvalId || proof.input_hash !== expect.inputHash) return null;
+  if (proof?.kind !== "clayware.approval" || proof.approval_id !== expect.approvalId || proof.input_hash !== expect.inputHash) return null;
   if (proof.deployment_id !== expect.deploymentId || proof.connector !== expect.connector || proof.operation !== expect.operation) return null;
   if (!(Date.parse(proof.expires_at) > expect.nowMs)) return null;
   return proof;

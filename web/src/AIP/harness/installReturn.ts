@@ -11,7 +11,7 @@ export interface StoredInstallSession {
   catalogId: string;
 }
 
-const KEY = 'alcon.harnessInstall.session';
+const KEY = 'clayware.harnessInstall.session';
 
 /** Pure. A stored session as JSON. */
 export function serializeInstallSession(session: StoredInstallSession): string {

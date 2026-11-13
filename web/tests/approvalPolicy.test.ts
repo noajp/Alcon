@@ -4,7 +4,7 @@ const ap = await import(new URL('../../supabase/functions/_shared/approvalPolicy
 const needs = ap.needsApprovalFor as (facts: Record<string, unknown>) => boolean;
 
 describe('needsApprovalFor', () => {
-  it('Alcon-internal tools follow their entry policy', () => {
+  it('Clayware-internal tools follow their entry policy', () => {
     expect(needs({ catalogDecision: 'approve', isWrite: true, isRead: false })).toBe(true);
     expect(needs({ catalogDecision: 'allow', isWrite: true, isRead: false })).toBe(false);
     expect(needs({ catalogDecision: 'deny', isWrite: true, isRead: false })).toBe(false);

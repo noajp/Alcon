@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import { normalizeDirection } from '@/types/database';
 import type {
-  AlconObject, Element, ElementAssignee, ElementEdge, ElementObject,
+  ClaywareObject, Element, ElementAssignee, ElementEdge, ElementObject,
   ElementWithDetails, Strategy, StrategyChild, StrategyObject, Worker, WorkerAvailability,
 } from '@/types/database';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
@@ -20,7 +20,7 @@ export interface DecisionLabData {
   availability: WorkerAvailability[];
   edges: ElementEdge[];
   scopeElementIds: string[];
-  objects: AlconObject[];
+  objects: ClaywareObject[];
   initiativeName: string;
   initiativeOwnerId: string | null;
   readAt: string;
@@ -76,7 +76,7 @@ export async function fetchDecisionLabData(
       .from('object_domains').select('object_id, domain_id', { count: 'exact' }).in('domain_id', chunk)
       .order('object_id').order('domain_id').range(from, to).abortSignal(signal),
     (row) => `${row.object_id}:${row.domain_id}`),
-    readAllIn<AlconObject>('Space Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
+    readAllIn<ClaywareObject>('Space Objects', domainIds, (chunk, from, to) => onlyActiveObjects(supabase
       .from('objects').select('*', { count: 'exact' }).in('domain_id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId),
     readAllPages<{ user_id: string }>('Space members', (from, to) => supabase
@@ -89,7 +89,7 @@ export async function fetchDecisionLabData(
   ]);
 
   const directObjectIds = new Set(directObjects.map((row) => row.id));
-  const linkedObjects = await readAllIn<AlconObject>('Linked Space Objects',
+  const linkedObjects = await readAllIn<ClaywareObject>('Linked Space Objects',
     objectLinks.map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => onlyActiveObjects(supabase
       .from('objects').select('*', { count: 'exact' }).in('id', chunk))
       .order('id').range(from, to).abortSignal(signal), rowId);

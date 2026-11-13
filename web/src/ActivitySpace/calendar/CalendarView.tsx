@@ -10,7 +10,7 @@ import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import type { CalendarEvent } from '@/hooks/calendarEventData';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import type { ElementWithDetails, AlconObject, ElementStatus } from '@/types/database';
+import type { ElementWithDetails, ClaywareObject, ElementStatus } from '@/types/database';
 import { calendarEntries, occursOn, layoutTimedEntries, layoutWeekSpans, type CalendarEntry } from './schedule';
 import { COLOR_PALETTE } from './calendarColorPalette';
 import { updateElement } from '@/hooks/useSupabase';
@@ -21,8 +21,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
-  objects?: AlconObject[];
-  onObjectClick?: (object: AlconObject) => void;
+  objects?: ClaywareObject[];
+  onObjectClick?: (object: ClaywareObject) => void;
   onElementClick?: (element: ElementWithDetails) => void;
   onRefresh?: () => void;
   /** The day the grid is on, when a parent (the Calendar sidebar) owns it. */

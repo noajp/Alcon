@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { flattenCreated, liveTurnFromSteps, type CopilotStepRow } from '@/AIP/ai/copilotSteps';
-import { toKeptMessages, type CopilotMessage, type ToolEvent } from '@/AIP/ai/useAlconCopilot';
+import { toKeptMessages, type CopilotMessage, type ToolEvent } from '@/AIP/ai/useClaywareCopilot';
 
 // The panel's live turn, mapped from a chat run's steps while Athena
 // works (copilotSteps.ts), and the kept shape a cut-back writes
-// (useAlconCopilot.ts) — the client half of the unification's display
+// (useClaywareCopilot.ts) — the client half of the unification's display
 // contract.
 const step = (type: string, title: string, detail: string | null = null): CopilotStepRow => ({ type, title, detail });
 

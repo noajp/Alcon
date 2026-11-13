@@ -1,15 +1,15 @@
 ---
-name: alcon
-description: Alcon に登録された Element から仕事を取って Alcon 自体を開発するとき、架空の案件で Alcon を使ってみるとき、PR をレビューするときに読む。ユーザーがそう頼んだときだけ使う。
+name: clayware
+description: Clayware に登録された Element から仕事を取って Clayware 自体を開発するとき、架空の案件で Clayware を使ってみるとき、PR をレビューするときに読む。ユーザーがそう頼んだときだけ使う。
 ---
 
-Alcon を Alcon で開発するための規約。普段のセッションでは読まなくてよい。「Element から取って開発して」「架空の案件で使ってみて」「PR をレビューして」と頼まれたときに読む。
+Clayware を Clayware で開発するための規約。普段のセッションでは読まなくてよい。「Element から取って開発して」「架空の案件で使ってみて」「PR をレビューして」と頼まれたときに読む。
 
 ## 前提
 
 - 開発の仕事は、開発 Domain（`dev_control.domain_id`）の Object にある Element として管理する。外部の TODO リストを作らない
 - ユーザーの判断が要るものは、Object「Decisions — 判断」に Element として作る
-- アプリ内の AI（`alcon-copilot` / `run-agent` など）はこの開発では使わない。API の費用がかかるため
+- アプリ内の AI（`clayware-copilot` / `run-agent` など）はこの開発では使わない。API の費用がかかるため
 - ID（Worker・Domain・Object）はこのファイルに書かず、毎回 DB から引く
 
 ## 流れ
@@ -29,7 +29,7 @@ order by (e.phase_id is not null) desc,
 1. **取る** — `node .claude/ops/lease.mjs claim <display_id> --branch claude/<prefix>-<slug> --note "方針1行"`。`HELD` が返ったら他のセッションが作業中なので触らない。`start_date` / `due_date` が空なら入れる
 2. **作る** — 1 Element = 1 ブランチ = 1 PR。`origin/main` から切る。着手前に `git log --oneline HEAD..origin/main` で、もう入っていないかを見る
 3. **確かめる** — `npx tsc --noEmit` / `npm test` / eslint（変更ファイルの前後比較）/ `npm run unwired-lint`（新しいファイルはコミットしてから回す。未追跡のファイルは見えない）/ UI なら `npm run design-lint` とブラウザで描いたスクリーンショット
-4. **レビュー** — `alcon-reviewer` エージェント（`.claude/agents/`）に PR 番号を渡して読ませる。指摘を直して再レビュー、通るまで回す
+4. **レビュー** — `clayware-reviewer` エージェント（`.claude/agents/`）に PR 番号を渡して読ませる。指摘を直して再レビュー、通るまで回す
 5. **マージ** — ユーザーの承認を待たずにマージする。`main` に直接 push しない
 
    ```bash
@@ -42,7 +42,7 @@ order by (e.phase_id is not null) desc,
 
 途中経過は `node .claude/ops/lease.mjs comment <id> --text "…"` で Element にコメントする。このコメントが、その Element を作業中として押さえておく期限（`claim_expires_at`）を延ばす。書き出しは `▶ 着手` / `● 進捗` / `⬆ PR — URL` / `✔ 完了` / `■ Blocked — 原因と必要な判断`。
 
-## Alcon から渡された仕事（dispatcher）
+## Clayware から渡された仕事（dispatcher）
 
 人が Element を Claude Code に渡すと、その Element に `dispatch` ラベルが付く（Strategy のページで分解案を承認したとき、Execution の「Hand to Claude Code」）。primary checkout で `cd web && npm run dispatch` を動かしておくと、`.claude/ops/dispatch.mjs` が1分ごとに次の Element を探し、1件ずつ新しい worktree（`.claude/worktrees/agent-<display_id>`）で headless の Claude Code を起動する。
 
@@ -110,9 +110,9 @@ Strategy のコメントで `@Claude` を含むものだけが依頼。それ以
 
 ## 架空の案件で使ってみる
 
-着手できる Element がないときに行う（`alcon-scout` エージェントに任せてよい）。仕事を探すのではなく、架空の組織と案件を Alcon で実際に回し、使いにくかった所を次に作るものにする。案件は [PRODUCT.md](../../PRODUCT.md) の「仕事が回る形」に沿って選ぶ。問い合わせ対応・営業・採用・改善活動のように、ビジネスで毎日起きる仕事を上からと下からの両方で回し、「次に作るもの」の欠けが実際にどう効くかを確かめる。
+着手できる Element がないときに行う（`clayware-scout` エージェントに任せてよい）。仕事を探すのではなく、架空の組織と案件を Clayware で実際に回し、使いにくかった所を次に作るものにする。案件は [PRODUCT.md](../../PRODUCT.md) の「仕事が回る形」に沿って選ぶ。問い合わせ対応・営業・採用・改善活動のように、ビジネスで毎日起きる仕事を上からと下からの両方で回し、「次に作るもの」の欠けが実際にどう効くかを確かめる。
 
-- Alcon に実データで作る。Domain 1、Phase 数個、Object 4〜6、Element 8〜16、架空の Worker。description に `【架空】` と書く。このデータは消さない
+- Clayware に実データで作る。Domain 1、Phase 数個、Object 4〜6、Element 8〜16、架空の Worker。description に `【架空】` と書く。このデータは消さない
 - Strategy の description に「崩れたら困る前提」を書き、途中でそれを崩す。順調な計画からは何も見つからない
 - 1回の流れ：前回直した所をもう一度試す → 1日か1週分進める → 画面を実際に見て数える → 「なぜ〜なのか」の形で問う → 既存のコードを読んでから直し方を考える → Element を作る
 - 問いの基準は製品自身の説明（[CLAUDE.md](../../CLAUDE.md) の概念モデルと [PRODUCT.md](../../PRODUCT.md)）。説明と実装が食い違う所を探す
@@ -163,6 +163,6 @@ Strategy のコメントで `@Claude` を含むものだけが依頼。それ以
 
 ## セッションの外で動くもの
 
-- **dispatcher**：SessionStart hook が `dispatch.mjs` も起動し、マシンに1つだけ残す。`dispatch` ラベルの付いた Element を1件ずつ headless の Claude Code に渡す（上の「Alcon から渡された仕事」）
-- **毎日の見回り**：scheduled task が1日1回、`.claude/ops/prompts/daily.md` に沿って動く。マージ済みの掃除、dispatcher の空回りの確認、Decisions の滞留の確認、着手できる Element がなければ `alcon-scout` で次の Element の案を作る
+- **dispatcher**：SessionStart hook が `dispatch.mjs` も起動し、マシンに1つだけ残す。`dispatch` ラベルの付いた Element を1件ずつ headless の Claude Code に渡す（上の「Clayware から渡された仕事」）
+- **毎日の見回り**：scheduled task が1日1回、`.claude/ops/prompts/daily.md` に沿って動く。マージ済みの掃除、dispatcher の空回りの確認、Decisions の滞留の確認、着手できる Element がなければ `clayware-scout` で次の Element の案を作る
 - **hooks**（`.claude/settings.json`）：Stop で変更したファイルの型とテストを確かめ、落ちていたら止まらせない。PreToolUse で `git reset --hard`・main への push・force push を止める

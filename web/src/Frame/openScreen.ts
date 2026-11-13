@@ -15,7 +15,7 @@ export interface OpenScreen {
   settings: { section: string; tab: string | null } | null;
 }
 
-const KEY = 'alcon.open-screen.v1';
+const KEY = 'clayware.open-screen.v1';
 const keyFor = (spaceId: string) => `${KEY}:${spaceId}`;
 const obj = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null);
 const str = (v: unknown) => (typeof v === 'string' && v ? v : null);

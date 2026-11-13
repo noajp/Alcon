@@ -16,7 +16,7 @@ import { LineCounts, Pill } from './codeChangeLabels';
 
 // One changed file in the review screen: its header, its hunks in unified or
 // split layout, and the line comments under the lines they were left on —
-// those written in Alcon (with whether they reached GitHub) and those written
+// those written in Clayware (with whether they reached GitHub) and those written
 // on GitHub, which read here but are answered there.
 
 export type DiffLayout = 'unified' | 'split';

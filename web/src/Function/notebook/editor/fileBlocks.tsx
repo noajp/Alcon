@@ -7,7 +7,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import { attachmentSource, useAttachment, useSpaceAttachments, type SpaceFile } from '@/hooks/attachmentData';
 
-// A file placed in the text: an ```alcon block whose view is `file` and whose
+// A file placed in the text: an ```clayware block whose view is `file` and whose
 // id names a file in Artifacts. The editor draws it itself, on any page — an
 // image as the image, anything else as a row that opens it. Both have a fixed
 // height, so the block's place in the text does not move as the file loads.

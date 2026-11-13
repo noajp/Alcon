@@ -30,10 +30,10 @@ describe('queryCacheKeysToDrop', () => {
   });
 
   it('drops the unscoped cache written before caches were per user', () => {
-    expect(queryCacheKeysToDrop(['alcon-query-cache', A], 'user-a')).toEqual(['alcon-query-cache']);
+    expect(queryCacheKeysToDrop(['clayware-query-cache', A], 'user-a')).toEqual(['clayware-query-cache']);
   });
 
   it('leaves unrelated IndexedDB entries alone', () => {
-    expect(queryCacheKeysToDrop(['alcon-query-cache-x', 'kata', 42, ['alcon-query-cache']], null)).toEqual([]);
+    expect(queryCacheKeysToDrop(['clayware-query-cache-x', 'kata', 42, ['clayware-query-cache']], null)).toEqual([]);
   });
 });

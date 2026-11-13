@@ -13,12 +13,12 @@ describe('embed blocks', () => {
     expect(parseEmbed('')).toBeNull();
   });
 
-  it('survives the Markdown round trip as an ```alcon block', () => {
-    const md = `Before.\n\n\`\`\`alcon\n${embedSource({ view: 'progress' })}\n\`\`\`\n\nAfter.`;
+  it('survives the Markdown round trip as an ```clayware block', () => {
+    const md = `Before.\n\n\`\`\`clayware\n${embedSource({ view: 'progress' })}\n\`\`\`\n\nAfter.`;
     const html = markdownToHtml(md);
-    expect(html).toContain('<pre data-lang="alcon">');
+    expect(html).toContain('<pre data-lang="clayware">');
     const back = htmlToMarkdown(html);
-    expect(back).toContain('```alcon');
-    expect(parseEmbed(back.split('```alcon')[1].split('```')[0])).toEqual({ view: 'progress' });
+    expect(back).toContain('```clayware');
+    expect(parseEmbed(back.split('```clayware')[1].split('```')[0])).toEqual({ view: 'progress' });
   });
 });

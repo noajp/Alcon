@@ -11,7 +11,7 @@ import { approvalState, type ApprovalState, type GrantOperation } from './auditM
 
 // A gateway's request for a person's yes (ADR 0047), where the Space's owner
 // decides it: in the Inbox, and beside the workflow in Audit. The person
-// reads the gateway's summary — Alcon never holds the content itself — and
+// reads the gateway's summary — Clayware never holds the content itself — and
 // the approval is bound to the content's fingerprint, so the gateway can use
 // it once, for exactly that content.
 

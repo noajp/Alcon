@@ -1,4 +1,4 @@
-// What a Copilot turn created in Alcon, as a record the panel can draw
+// What a Copilot turn created in Clayware, as a record the panel can draw
 // as cards. The creation tools already answer with the rows they made;
 // until now the turn assembly reported only a row count to the driver,
 // so "what was created" survived nowhere but the model's prose. This
@@ -25,7 +25,7 @@ export interface CreatedEntity {
    *  do; a batch's rows do not — the card's live read resolves it). */
   objectId?: string;
   /** A pull request's own facts (coding capability PR3): its id is
-   *  the code_changes row's — the durable Alcon-side record whose
+   *  the code_changes row's — the durable Clayware-side record whose
    *  state the card re-reads live — and these are the snapshot the
    *  card falls back to, as with every kind here. */
   url?: string;
@@ -105,7 +105,7 @@ export function createdOf(toolName: string, data: unknown): CreatedEntity[] | un
  * Pure. A pull request the coding publish opened, as a card record:
  * the code_changes row the PR was linked into (coding capability
  * PR3, design §8) — the row is the card's identity because it is
- * what carries the PR's live state in Alcon; the snapshot fields
+ * what carries the PR's live state in Clayware; the snapshot fields
  * are the fallback while that read loads, as with every kind here.
  * Anything without the row's id, a title and the PR's URL is not a
  * card: a card without them would be a lie about what was made.

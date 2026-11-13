@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries, filterByWorkers, miniMonthDays, monthOf, shiftMonth, layoutWeekSpans } from '../src/ActivitySpace/calendar/schedule';
-import type { AlconObjectWithChildren, ElementWithDetails } from '../src/types/database';
+import type { ClaywareObjectWithChildren, ElementWithDetails } from '../src/types/database';
 
 const element = (id: string) => ({ id, title: id, start_date: '2026-09-06', due_date: '2026-09-08' } as ElementWithDetails);
-const object = (id: string, elements: ElementWithDetails[]) => ({ id, name: id, elements, start_date: '2026-09-01', due_date: '2026-09-30' } as AlconObjectWithChildren);
+const object = (id: string, elements: ElementWithDetails[]) => ({ id, name: id, elements, start_date: '2026-09-01', due_date: '2026-09-30' } as ClaywareObjectWithChildren);
 
 describe('calendar scope', () => {
   const shared = element('shared');

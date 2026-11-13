@@ -6,11 +6,11 @@ import { Button } from '@/ui/button';
 import { useEffect, useRef, useState } from 'react';
 import { X, Maximize2, Minimize2, Paperclip, Square } from '@/ui/icons';
 import { SendIcon } from '@/Function/shared/SendIcon';
-import { buildCopilotContext, type CopilotAttachment, type CopilotContext, type CopilotSubject } from './useAlconCopilot';
+import { buildCopilotContext, type CopilotAttachment, type CopilotContext, type CopilotSubject } from './useClaywareCopilot';
 import { useStrategies } from '@/hooks/strategyData';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
 import { ATTACH_ACCEPT, AttachError, MAX_FILES, MAX_PDF_BYTES, readAttachment } from './copilotFiles';
-import { AlconFilePicker } from './AlconFilePicker';
+import { ClaywareFilePicker } from './ClaywareFilePicker';
 import { useCopilotConversation } from './CopilotProvider';
 import { CredentialChatHint } from '@/AIP/connectors/CredentialChatHint';
 import { getActiveSpaceId, useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -21,7 +21,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 const SlidesAssistant = dynamic(() => import('@/ActivitySpace/artifacts/slides/SlidesAssistant').then((m) => m.SlidesAssistant), { ssr: false });
 
-const FLOAT_KEY = 'alcon.copilot.float';
+const FLOAT_KEY = 'clayware.copilot.float';
 const FLOAT_MIN_W = 320;
 const FLOAT_MIN_H = 280;
 
@@ -49,13 +49,13 @@ function readFloatRect(): FloatRect | null {
   return null;
 }
 
-export interface AlconCopilotPanelProps {
+export interface ClaywareCopilotPanelProps {
   /** Open state is owned by the page so the corner button, ⌘L and the
    *  panel's own close all flip the same boolean. Ignored on the AI screen. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** What the screen is about, when the panel should speak to it rather
-   *  than to Alcon at large: slides makes it the open deck's assistant; a
+   *  than to Clayware at large: slides makes it the open deck's assistant; a
    *  strategy is context for the next send only — the panel's entry and
    *  its bounds do not change with the subject. The copilot is one
    *  conversation by design: switching the open Strategy mid-conversation
@@ -77,7 +77,7 @@ export interface AlconCopilotPanelProps {
  * bounds what they may see and change, and deletes are confirmed in the
  * chat. A subject scopes the next send's context; it grants nothing.
  */
-export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant = 'floating', onExpand, onMinimize }: AlconCopilotPanelProps) {
+export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, variant = 'floating', onExpand, onMinimize }: ClaywareCopilotPanelProps) {
   const { t } = useI18n();
   const floating = variant === 'floating';
   const page = variant === 'page';
@@ -309,7 +309,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
       </div>
 
       {/* One AI panel across the app: on Slides it is the open deck's
-          assistant (its conversation and composer), elsewhere Alcon's. */}
+          assistant (its conversation and composer), elsewhere Clayware's. */}
       {subject?.kind === 'slides' ? <SlidesAssistant /> : <>
       {/* Conversation — empty state is intentionally blank; the placeholder
           in the composer is the only nudge. */}
@@ -355,7 +355,7 @@ export function AlconCopilotPanel({ open, onOpenChange, subject = null, variant 
               title={t('Attach a file (PDF, Markdown, text)')} aria-label={t('Attach a file (PDF, Markdown, text)')} className="text-muted-foreground">
               <Paperclip size={14} />
             </Button>
-            <AlconFilePicker disabled={streaming || files.length >= MAX_FILES} onPick={(f) => { setFileError(null); setFiles((prev) => [...prev, f]); }} />
+            <ClaywareFilePicker disabled={streaming || files.length >= MAX_FILES} onPick={(f) => { setFileError(null); setFiles((prev) => [...prev, f]); }} />
             <textarea
               ref={inputRef}
               value={input}

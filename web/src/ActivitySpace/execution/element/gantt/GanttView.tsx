@@ -4,7 +4,7 @@ import { parseDateOnly, toDateOnlyString as fmtDateOnly, addDays, daysBetween, s
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
+import type { ClaywareObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { CalendarDays, X, ZoomIn, ZoomOut } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
@@ -29,7 +29,7 @@ export interface GanttSection {
 
 interface GanttViewProps {
   elements: ElementWithDetails[];
-  object?: AlconObjectWithChildren;
+  object?: ClaywareObjectWithChildren;
   sections?: GanttSection[];
   onRefresh?: () => void;
   /** Left-pane header label. Defaults to "Elements" — caller passes

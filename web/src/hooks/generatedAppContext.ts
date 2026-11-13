@@ -1,11 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { readAllIn, readAllPages } from './readAllPages';
-import type { AlconObject, Element, Strategy, Intent, IntentBinding, Phase, Domain } from '@/types/database';
+import type { ClaywareObject, Element, Strategy, Intent, IntentBinding, Phase, Domain } from '@/types/database';
 
 export interface AppContextSnapshot {
   version: 1;
   fetchedAt: string;
-  object: Pick<AlconObject, 'id' | 'name' | 'description' | 'start_date' | 'due_date'>;
+  object: Pick<ClaywareObject, 'id' | 'name' | 'description' | 'start_date' | 'due_date'>;
   elements: Pick<Element, 'id' | 'display_id' | 'title' | 'description' | 'status' | 'priority' | 'progress' | 'start_date' | 'due_date' | 'phase_id' | 'is_approval' | 'approval_state'>[];
   initiatives: Pick<Strategy, 'id' | 'name' | 'description' | 'status'>[];
   intents: Pick<Intent, 'id' | 'strategy_id' | 'parent_intent_id' | 'kind' | 'title' | 'subtitle' | 'status' | 'target_value' | 'actual_value' | 'unit' | 'direction' | 'measured_at' | 'horizon' | 'superseded_by_intent_id'>[];

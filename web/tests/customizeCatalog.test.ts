@@ -25,7 +25,7 @@ describe('harness catalog', () => {
     }
   });
 
-  it('writes out how Alcon breaks a Strategy down, so a Space can change it', () => {
+  it('writes out how Clayware breaks a Strategy down, so a Space can change it', () => {
     const d = def.parseDefinition(bodies.get('def.strategy-default')!);
     expect(d.sections.breakdown).toContain('Object');
   });

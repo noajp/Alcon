@@ -1,6 +1,6 @@
 // The files attached to a Strategy, as the Planner reads them: every one,
 // whole. Text files are decoded from their bytes, a PDF goes to the model as
-// the document itself, and anything else is read from the text Alcon
+// the document itself, and anything else is read from the text Clayware
 // extracted from it. Nothing is cut short. When everything together is more
 // than the model can take in at once, it is read in parts — every part, in
 // parallel — and planned from what each reading drew out (index.ts).

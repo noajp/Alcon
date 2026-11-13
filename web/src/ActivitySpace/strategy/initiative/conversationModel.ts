@@ -60,7 +60,7 @@ export type ConversationItem =
 export interface ConversationStep { id: string; type: string; title: string; detail: string | null }
 
 const WRITES = new Set(['updateInitiative', 'createInitiative', 'addIntent', 'updateIntent', 'removeIntent', 'writeInitiativeDefinition']);
-const ALCON = 'Alcon: ';
+const CLAYWARE = 'Clayware: ';
 
 /** Pure. A proposal step's detail, read defensively: anything unreadable
  *  or incomplete reads as no proposal, never as an exception. */
@@ -105,8 +105,8 @@ function work(step: ConversationStep): WorkItem | null {
     };
   }
   const failed = step.type === 'error';
-  if (step.title.startsWith(ALCON)) {
-    const name = step.title.slice(ALCON.length);
+  if (step.title.startsWith(CLAYWARE)) {
+    const name = step.title.slice(CLAYWARE.length);
     return {
       id: step.id, name, kind: WRITES.has(name) ? 'write' : 'read', ok: !failed,
       detail: failed ? '' : step.detail ?? '', ...(failed ? { error: step.detail ?? '' } : {}),

@@ -8,7 +8,7 @@ import {
   fetchStrategyElements,
   useObjects,
   useStrategiesInSpace,
-  type AlconObject,
+  type ClaywareObject,
   type ElementWithDetails,
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
@@ -65,7 +65,7 @@ export function TimelineView({
   const { data: { objects: explorerObjects } } = useObjects(null);
 
   const objectsById = useMemo(() => {
-    return new Map<string, AlconObject>(explorerObjects.map((o) => [o.id, o]));
+    return new Map<string, ClaywareObject>(explorerObjects.map((o) => [o.id, o]));
   }, [explorerObjects]);
 
   // Top-level Strategies only — nested ones are part of
@@ -169,7 +169,7 @@ export function TimelineView({
     strategy: StrategyWithObjects;
     range: DateRange | null;
     progress: number; // 0-100
-    objects: { obj: AlconObject; range: DateRange | null }[];
+    objects: { obj: ClaywareObject; range: DateRange | null }[];
   };
 
   const groups = useMemo(() => {
@@ -185,7 +185,7 @@ export function TimelineView({
       }
       const objects = s.objectIds
         .map((oid) => objectsById.get(oid))
-        .filter((o): o is AlconObject => !!o)
+        .filter((o): o is ClaywareObject => !!o)
         .map((obj) => ({ obj, range: objectRange(obj, elsByObject.get(obj.id) ?? []) }));
       const range = unionRanges(objects.map((o) => o.range));
       const progress = completionOf(els).pct;
@@ -400,7 +400,7 @@ function InitiativeTimelineRow({
     strategy: StrategyWithObjects;
     range: DateRange | null;
     progress: number;
-    objects: { obj: AlconObject; range: DateRange | null }[];
+    objects: { obj: ClaywareObject; range: DateRange | null }[];
   };
   months: { x: number; w: number }[];
   totalW: number;
@@ -494,7 +494,7 @@ function ObjectTimelineRow({
   dayW,
   onOpen,
 }: {
-  obj: AlconObject;
+  obj: ClaywareObject;
   range: DateRange | null;
   months: { x: number; w: number }[];
   totalW: number;
@@ -612,7 +612,7 @@ function quarterLabel(d: Date): string {
 
 /** An Object's span: its own start/due dates, falling back to the union
  *  of its Elements' dates when it has none of its own. */
-function objectRange(obj: AlconObject, elements: ElementWithDetails[]): DateRange | null {
+function objectRange(obj: ClaywareObject, elements: ElementWithDetails[]): DateRange | null {
   const s = parseDateOnly(obj.start_date, null);
   const d = parseDateOnly(obj.due_date, null);
   if (s || d) return { start: s ?? d!, end: d ?? s! };

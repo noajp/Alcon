@@ -386,7 +386,7 @@ export async function notifyCredentialRequestOwners(
   for (const o of owners ?? []) {
     const { error } = await admin.from("notifications").insert({
       recipient_id: (o as { user_id: string }).user_id,
-      actor_name: "Alcon Agent",
+      actor_name: "Clayware Agent",
       kind: "status_change",
       title: credentialRequestTitle(args.label),
       body: `${args.waitingFor} — 資格情報の入力はオーナーが行います。会話や実行のカードから入力できます。`,

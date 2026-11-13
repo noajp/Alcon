@@ -19,7 +19,7 @@ import type { CriticalClass, Permission } from "./connectorManifest.ts";
 //      a deny. The fact is composed only for integration calls of a
 //      scoped run (chainScope's chainFactFor); every other call
 //      carries no fact and is judged exactly as before.
-//   1. Alcon's own tools follow their entry policy.
+//   1. Clayware's own tools follow their entry policy.
 //   2. A call that is not a write never asks.
 //   3. A manifest command: a denial is not asked about (it is refused);
 //      a critical command always asks — full delegation, an "allow"
@@ -57,7 +57,7 @@ import type { CriticalClass, Permission } from "./connectorManifest.ts";
 //     drafted connection's activation never read the mode.
 
 export interface ApprovalFacts {
-  catalogDecision?: "allow" | "approve" | "deny";       // Alcon-internal tools
+  catalogDecision?: "allow" | "approve" | "deny";       // Clayware-internal tools
   isWrite: boolean;
   isRead: boolean;                                       // per-call read determination (command effect / readOnly / httpIsRead)
   manifest?: { permission: Permission; rule: number | null; critical: CriticalClass | null };

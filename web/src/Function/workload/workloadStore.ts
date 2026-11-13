@@ -23,7 +23,7 @@ type State = {
   planOpen: boolean;
 };
 
-const RANGE_KEY = 'alcon:workload-range';
+const RANGE_KEY = 'clayware:workload-range';
 
 function readRange(): WorkloadRange {
   if (typeof window === 'undefined') return 'month';

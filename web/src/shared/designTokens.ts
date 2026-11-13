@@ -1,5 +1,5 @@
 /**
- * Alcon Design Tokens
+ * Clayware Design Tokens
  *
  * Accent: Matte blue (#426fac) — muted, single accent
  * Danger: Matte red (#d05249) — muted, warm red

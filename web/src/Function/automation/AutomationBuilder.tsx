@@ -255,7 +255,7 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
                   <TriggerEditor key={`${a.kind}|${a.cron ?? ''}|${a.timezone}`} a={a} busy={busy}
                     onSave={(input) => void act(() => updateAutomationBinding(a.id, input))}>
                     <div className="mt-2 space-y-1.5">
-                      <p className="text-[11px] text-muted-foreground">{t('POST JSON to this URL with the token in the x-alcon-token header. The body becomes the input of the Element it makes.')}</p>
+                      <p className="text-[11px] text-muted-foreground">{t('POST JSON to this URL with the token in the x-clayware-token header. The body becomes the input of the Element it makes.')}</p>
                       <CopyField value={webhookUrl(a.id)} label={t('URL')} />
                       {token ? (
                         <>

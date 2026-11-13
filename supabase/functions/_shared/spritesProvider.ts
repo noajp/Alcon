@@ -29,7 +29,7 @@ export interface SpritesConfig {
   token: string;
   baseUrl: string;
   /** Where the deployment publishes the runner build (a single
-   *  file — sdk/node/runner's alcon-runner.mjs). Without it a
+   *  file — sdk/node/runner's clayware-runner.mjs). Without it a
    *  sprite can be created but never booted: provisioning gates on
    *  it separately, so the two absences word differently. */
   runnerUrl: string | null;

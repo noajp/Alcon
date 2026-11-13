@@ -1,4 +1,4 @@
-// notificationKindMeta is shared between the Inbox feed (Alcon's original
+// notificationKindMeta is shared between the Inbox feed (Clayware's original
 // consumer) and Settings > Notifications (el_QLT-020). Both rely on the
 // fallback for a `kind` value newer than this build knows about — a newer
 // deploy can widen notifications.kind's CHECK constraint before this build

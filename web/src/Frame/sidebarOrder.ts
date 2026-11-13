@@ -6,7 +6,7 @@
 export const SIDEBAR_ITEMS = ['inbox', 'ai', 'strategy'] as const;
 export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
 
-const KEY = 'alcon:sidebar-order';
+const KEY = 'clayware:sidebar-order';
 
 /** Pure. A saved order made whole: known rows once each, missing ones at
  *  their default place. */

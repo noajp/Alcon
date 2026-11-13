@@ -15,7 +15,7 @@ import { extractStrategyIntent } from '@/ActivitySpace/execution/object/overview
 //   OP KESTREL RELIEF — `## Ends` / `## Ways` / `## Means` / `## 成功条件`,
 //     every section a bullet list. Opens with framing, so a leading-N-character
 //     excerpt yields a preamble that is neither intent nor success criteria.
-//   Alcon Self-Build — `## 勝ち筋` / `## 前提` / `## 成功条件と現在地`,
+//   Clayware Self-Build — `## 勝ち筋` / `## 前提` / `## 成功条件と現在地`,
 //     prose paragraphs, bold pseudo-sub-headings, bullets under a section that
 //     must NOT be shown.
 
@@ -42,7 +42,7 @@ const KESTREL = `【架空演習】ケストレル火山噴火（アルダニア
 // written before the Campaign→Strategy rename — kept as "Campaign" here on
 // purpose so this fixture stays true to what's really stored, not to what the
 // concept is called today.
-const SELF_BUILD = `Alcon 自身を Alcon 上で開発する Campaign。
+const SELF_BUILD = `Clayware 自身を Clayware 上で開発する Campaign。
 
 ## 勝ち筋
 Element の記述品質がそのままエージェントの実行品質になる構造を作り、自己改善ループを回す。
@@ -53,8 +53,8 @@ Element の記述品質がそのままエージェントの実行品質になる
 
 ## 成功条件と現在地（2026-08-30 時点）
 
-**(1) バックログが Alcon 内で完結する — 達成**
-Sprint 1・2 とも起票から完了報告まで全て Alcon DB 上。
+**(1) バックログが Clayware 内で完結する — 達成**
+Sprint 1・2 とも起票から完了報告まで全て Clayware DB 上。
 
 **(2) ループが 1 スプリント自走する — 未達成**`;
 
@@ -111,13 +111,13 @@ describe('extractStrategyIntent — OP KESTREL RELIEF (Ends / Ways / Means / 成
   });
 });
 
-describe('extractStrategyIntent — Alcon Self-Build (prose + bold sub-headings)', () => {
+describe('extractStrategyIntent — Clayware Self-Build (prose + bold sub-headings)', () => {
   const sections = extractStrategyIntent(SELF_BUILD);
 
   it('leads with the un-headed opening paragraph', () => {
     expect(sections[0]).toEqual({
       heading: null,
-      items: ['Alcon 自身を Alcon 上で開発する Campaign。'],
+      items: ['Clayware 自身を Clayware 上で開発する Campaign。'],
     });
   });
 
@@ -132,7 +132,7 @@ describe('extractStrategyIntent — Alcon Self-Build (prose + bold sub-headings)
 
   it('strips bold markers rather than showing literal asterisks', () => {
     const success = sections.find((s) => s.heading?.includes('成功条件'));
-    expect(success?.items).toEqual(['(1) バックログが Alcon 内で完結する — 達成']);
+    expect(success?.items).toEqual(['(1) バックログが Clayware 内で完結する — 達成']);
     for (const s of sections) {
       for (const item of s.items) expect(item).not.toContain('**');
     }

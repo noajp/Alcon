@@ -89,33 +89,33 @@ describe('cookie and return URL', () => {
   const HANDLE = 'h'.repeat(20) + '_-' + 'K'.repeat(21);
 
   it('returns to the app that started the sign-in only when it is allowed', () => {
-    const app = 'https://alcon.example.com';
-    expect(oauth.returnOrigin('https://alcon.example.com', app, null)).toBe(app);
+    const app = 'https://clayware.example.com';
+    expect(oauth.returnOrigin('https://clayware.example.com', app, null)).toBe(app);
     expect(oauth.returnOrigin('http://localhost:3000', app, null)).toBe('http://localhost:3000');
     expect(oauth.returnOrigin('http://127.0.0.1:3001', app, null)).toBe('http://127.0.0.1:3001');
     expect(oauth.returnOrigin('https://preview-1.example.app', app, 'https://preview-1.example.app, https://x.example')).toBe('https://preview-1.example.app');
     // Anything else, or nothing usable, goes back to the app.
     expect(oauth.returnOrigin('https://evil.example', app, 'https://preview-1.example.app')).toBe(app);
     expect(oauth.returnOrigin('http://evil.example', app, 'http://evil.example')).toBe(app);
-    expect(oauth.returnOrigin('https://alcon.example.com/next', app, null)).toBe(app);
+    expect(oauth.returnOrigin('https://clayware.example.com/next', app, null)).toBe(app);
     expect(oauth.returnOrigin(42, app, null)).toBe(app);
     expect(oauth.returnOrigin(undefined, null, null)).toBeNull();
   });
 
   it('returns only to a bare https app origin, with the completion handle on finish', () => {
-    expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION, HANDLE))
-      .toBe(`https://alcon.example.com/?integration_oauth=finish&integration=${INTEGRATION}&handle=${HANDLE}`);
-    expect(oauth.appReturnUrl('https://alcon.example.com/', 'error', 'not-a-uuid')).toBe('https://alcon.example.com/?integration_oauth=error');
+    expect(oauth.appReturnUrl('https://clayware.example.com', 'finish', INTEGRATION, HANDLE))
+      .toBe(`https://clayware.example.com/?integration_oauth=finish&integration=${INTEGRATION}&handle=${HANDLE}`);
+    expect(oauth.appReturnUrl('https://clayware.example.com/', 'error', 'not-a-uuid')).toBe('https://clayware.example.com/?integration_oauth=error');
     expect(oauth.appReturnUrl('http://localhost:3000', 'error', null)).toBe('http://localhost:3000/?integration_oauth=error');
     // finish without a well-formed handle is not a return URL at all.
-    expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION)).toBeNull();
-    expect(oauth.appReturnUrl('https://alcon.example.com', 'finish', INTEGRATION, 'short')).toBeNull();
-    expect(oauth.appReturnUrl('http://alcon.example.com', 'error', null)).toBeNull();
-    expect(oauth.appReturnUrl('https://alcon.example.com/next?x=1', 'error', null)).toBeNull();
+    expect(oauth.appReturnUrl('https://clayware.example.com', 'finish', INTEGRATION)).toBeNull();
+    expect(oauth.appReturnUrl('https://clayware.example.com', 'finish', INTEGRATION, 'short')).toBeNull();
+    expect(oauth.appReturnUrl('http://clayware.example.com', 'error', null)).toBeNull();
+    expect(oauth.appReturnUrl('https://clayware.example.com/next?x=1', 'error', null)).toBeNull();
     expect(oauth.appReturnUrl('', 'error', null)).toBeNull();
     expect(oauth.appReturnUrl(undefined, 'finish', null, HANDLE)).toBeNull();
-    expect(oauth.appOrigin('https://alcon.example.com/')).toBe('https://alcon.example.com');
-    expect(oauth.appOrigin('https://user:pw@alcon.example.com')).toBeNull();
+    expect(oauth.appOrigin('https://clayware.example.com/')).toBe('https://clayware.example.com');
+    expect(oauth.appOrigin('https://user:pw@clayware.example.com')).toBeNull();
   });
 
   it('reads and strips the result on the app side', () => {
@@ -374,7 +374,7 @@ describe('Drive request builders', () => {
 
   it('refuses content that contains the boundary', () => {
     expect(() => drive.buildCreateRequest({ name: 'x', kind: 'text', content: 'a --B b' }, 'B')).toThrow(/boundary/);
-    expect(drive.newBoundary()).toMatch(/^alcon_[0-9a-f]{32}$/);
+    expect(drive.newBoundary()).toMatch(/^clayware_[0-9a-f]{32}$/);
   });
 
   it('updates content with a multipart PATCH, or renames with JSON', () => {

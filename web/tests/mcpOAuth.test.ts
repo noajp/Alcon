@@ -5,10 +5,10 @@ import {
 
 // MCP over OAuth (ELE_PLT-004, ADR 0034): discovery, the token classifier,
 // the record's name, and the consent / connected-apps helpers.
-const oauth = await import(new URL('../../supabase/functions/alcon-mcp/oauth.ts', import.meta.url).pathname);
+const oauth = await import(new URL('../../supabase/functions/clayware-mcp/oauth.ts', import.meta.url).pathname);
 const auth = await import(new URL('../../supabase/functions/_shared/delegatedAuth.ts', import.meta.url).pathname);
-const protocol = await import(new URL('../../supabase/functions/alcon-mcp/protocol.ts', import.meta.url).pathname);
-const routes = await import(new URL('../../supabase/functions/alcon-api/routes.ts', import.meta.url).pathname);
+const protocol = await import(new URL('../../supabase/functions/clayware-mcp/protocol.ts', import.meta.url).pathname);
+const routes = await import(new URL('../../supabase/functions/clayware-api/routes.ts', import.meta.url).pathname);
 
 const SUPABASE = 'https://ref.supabase.co/';
 const CLIENT = '0b6a4f7e-3c51-4d5e-9a0b-6c7d8e9f0a1b';
@@ -19,26 +19,26 @@ function jwt(payload: Record<string, unknown>): string {
 }
 
 describe('protected resource metadata', () => {
-  it('names alcon-mcp as the resource and Supabase Auth as its authorization server', () => {
+  it('names clayware-mcp as the resource and Supabase Auth as its authorization server', () => {
     expect(oauth.protectedResourceMetadata(SUPABASE)).toMatchObject({
-      resource: 'https://ref.supabase.co/functions/v1/alcon-mcp',
+      resource: 'https://ref.supabase.co/functions/v1/clayware-mcp',
       authorization_servers: ['https://ref.supabase.co/auth/v1'],
       bearer_methods_supported: ['header'],
     });
   });
 
   it('is served under the function', () => {
-    expect(oauth.isProtectedResourcePath('/alcon-mcp/.well-known/oauth-protected-resource')).toBe(true);
-    expect(oauth.isProtectedResourcePath('/functions/v1/alcon-mcp/.well-known/oauth-protected-resource/')).toBe(true);
-    expect(oauth.isProtectedResourcePath('/alcon-mcp')).toBe(false);
-    expect(oauth.isProtectedResourcePath('/alcon-api/.well-known/oauth-protected-resource')).toBe(false);
+    expect(oauth.isProtectedResourcePath('/clayware-mcp/.well-known/oauth-protected-resource')).toBe(true);
+    expect(oauth.isProtectedResourcePath('/functions/v1/clayware-mcp/.well-known/oauth-protected-resource/')).toBe(true);
+    expect(oauth.isProtectedResourcePath('/clayware-mcp')).toBe(false);
+    expect(oauth.isProtectedResourcePath('/clayware-api/.well-known/oauth-protected-resource')).toBe(false);
   });
 
   it('is pointed at by every 401, with an error only when a token was sent', () => {
-    const meta = 'resource_metadata="https://ref.supabase.co/functions/v1/alcon-mcp/.well-known/oauth-protected-resource"';
-    expect(oauth.wwwAuthenticate(SUPABASE, null)).toBe(`Bearer realm="alcon", ${meta}`);
+    const meta = 'resource_metadata="https://ref.supabase.co/functions/v1/clayware-mcp/.well-known/oauth-protected-resource"';
+    expect(oauth.wwwAuthenticate(SUPABASE, null)).toBe(`Bearer realm="clayware", ${meta}`);
     expect(oauth.wwwAuthenticate(SUPABASE, 'token is invalid or expired'))
-      .toBe(`Bearer realm="alcon", ${meta}, error="invalid_token", error_description="token is invalid or expired"`);
+      .toBe(`Bearer realm="clayware", ${meta}, error="invalid_token", error_description="token is invalid or expired"`);
     expect(oauth.wwwAuthenticate(SUPABASE, 'a "b"\r\nc')).toContain('error_description="a b  c"');
   });
 });
@@ -64,7 +64,7 @@ describe('the OAuth token classifier', () => {
 });
 
 describe('the record names the OAuth client', () => {
-  const url = new URL('https://x.test/alcon-mcp');
+  const url = new URL('https://x.test/clayware-mcp');
   it('in MCP', () => {
     expect(protocol.clientLabel(url, 'claude-ai', { oauthClient: 'Claude' })).toBe('Claude (MCP · OAuth)');
     expect(protocol.clientLabel(url, 'openai-mcp', { oauthClient: '<>' })).toBe('ChatGPT (MCP · OAuth)');

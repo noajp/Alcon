@@ -428,7 +428,7 @@ export const useKata = create<KataState>()(
       };
     },
     {
-      name: "alcon-slides-prefs-v1",
+      name: "clayware-slides-prefs-v1",
       storage: createJSONStorage(() => safeStorage),
       // The language is the app's, never a saved preference: an old save's
       // `lang` is dropped so it cannot override the app.

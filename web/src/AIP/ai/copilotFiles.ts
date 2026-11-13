@@ -1,4 +1,4 @@
-import type { CopilotAttachment } from './useAlconCopilot';
+import type { CopilotAttachment } from './useClaywareCopilot';
 
 // Files the AI can read: PDF, Markdown and plain text. A PDF goes to the model
 // as itself (base64); Markdown and text go as their text. The limits match

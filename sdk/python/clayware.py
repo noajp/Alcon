@@ -1,23 +1,23 @@
-"""Alcon asset relay — the one line a local Python app adds to join its Space.
+"""Clayware asset relay — the one line a local Python app adds to join its Space.
 
-    import alcon          # that is the line
+    import clayware          # that is the line
 
 On import it announces this process to the relay (name, runtime, host, which
 AI providers it has keys for, nothing secret), keeps the asset token it gets
-back in .alcon/asset.json so a restart is the same asset, and from then on
+back in .clayware/asset.json so a restart is the same asset, and from then on
 reports what the app does:
 
-    alcon.event("closed-books", "Q3 closed", {"fy": 2026})
+    clayware.event("closed-books", "Q3 closed", {"fy": 2026})
 
 Process start and stop are reported on their own.
 
 Configuration (environment):
-    ALCON_RELAY   the relay URL (…/functions/v1/asset-relay)   required
-    ALCON_SPACE   the Space id to announce to                  required on first contact
-    ALCON_NAME    the asset's name (default: the folder name)
-    ALCON_KIND    app | ai_agent | script | service | other (default app)
-    ALCON_STATE   where to keep the token (default ./.alcon/asset.json)
-    ALCON_SILENT  set to 1 to suppress the one-line notes
+    CLAYWARE_RELAY   the relay URL (…/functions/v1/asset-relay)   required
+    CLAYWARE_SPACE   the Space id to announce to                  required on first contact
+    CLAYWARE_NAME    the asset's name (default: the folder name)
+    CLAYWARE_KIND    app | ai_agent | script | service | other (default app)
+    CLAYWARE_STATE   where to keep the token (default ./.clayware/asset.json)
+    CLAYWARE_SILENT  set to 1 to suppress the one-line notes
 
 Never raises, never blocks the app: a relay that is down or a token that was
 revoked is noted once and the app carries on as if the line were not there.
@@ -35,10 +35,10 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-_RELAY = (os.environ.get("ALCON_RELAY") or "").rstrip("/")
-_SPACE = os.environ.get("ALCON_SPACE") or ""
-_STATE_PATH = os.environ.get("ALCON_STATE") or os.path.join(os.getcwd(), ".alcon", "asset.json")
-_SILENT = os.environ.get("ALCON_SILENT") == "1"
+_RELAY = (os.environ.get("CLAYWARE_RELAY") or "").rstrip("/")
+_SPACE = os.environ.get("CLAYWARE_SPACE") or ""
+_STATE_PATH = os.environ.get("CLAYWARE_STATE") or os.path.join(os.getcwd(), ".clayware", "asset.json")
+_SILENT = os.environ.get("CLAYWARE_SILENT") == "1"
 _FLUSH_SECONDS = 5.0
 
 _AI_PROVIDER_KEYS = {
@@ -59,7 +59,7 @@ _timer = None
 
 def _note(msg):
     if not _SILENT:
-        print("[alcon] " + msg, file=sys.stderr)
+        print("[clayware] " + msg, file=sys.stderr)
 
 
 def _now():
@@ -97,7 +97,7 @@ def _manifest():
         "cwd": os.path.basename(os.getcwd()),
         "entry": entry,
         "ai_providers": providers,
-        "sdk": "alcon-python/0.1",
+        "sdk": "clayware-python/0.1",
     }
 
 
@@ -119,11 +119,11 @@ def _post(path, body, with_token):
 
 def _announce():
     if not _RELAY:
-        _note("ALCON_RELAY is not set; not connected")
+        _note("CLAYWARE_RELAY is not set; not connected")
         _state["down"] = True
         return
-    name = os.environ.get("ALCON_NAME") or os.path.basename(os.getcwd())
-    kind = os.environ.get("ALCON_KIND") or "app"
+    name = os.environ.get("CLAYWARE_NAME") or os.path.basename(os.getcwd())
+    kind = os.environ.get("CLAYWARE_KIND") or "app"
     saved = _read_state() or {}
     body = {"name": name, "kind": kind, "manifest": _manifest()}
     if saved.get("token"):
@@ -131,14 +131,14 @@ def _announce():
     elif _SPACE:
         body["space"] = _SPACE
     else:
-        _note("ALCON_SPACE is not set and no asset token is kept; not connected")
+        _note("CLAYWARE_SPACE is not set and no asset token is kept; not connected")
         _state["down"] = True
         return
     try:
         status, data = _post("/hello", body, False)
         if status == 401 and saved.get("token"):
             if not _SPACE:
-                _note("the kept asset token is unknown and ALCON_SPACE is not set; not connected")
+                _note("the kept asset token is unknown and CLAYWARE_SPACE is not set; not connected")
                 _state["down"] = True
                 return
             status, data = _post("/hello", {"name": name, "kind": kind, "manifest": body["manifest"], "space": _SPACE}, False)
@@ -147,7 +147,7 @@ def _announce():
         _state["down"] = True
         return
     if status == 403:
-        _note("this asset was revoked in Alcon; not reporting")
+        _note("this asset was revoked in Clayware; not reporting")
         _state["down"] = True
         return
     if status >= 300 or not data or not data.get("asset_id"):
@@ -160,10 +160,10 @@ def _announce():
     if data.get("token"):
         _state["token"] = data["token"]
         _write_state({"token": data["token"], "asset_id": data["asset_id"], "relay": _RELAY})
-        _note('announced to Alcon as "%s" — waiting for a Space owner to accept it (Settings › Customize › Connected assets)' % name)
+        _note('announced to Clayware as "%s" — waiting for a Space owner to accept it (Settings › Customize › Connected assets)' % name)
     else:
         _state["token"] = saved["token"]
-        _note('connected to Alcon as "%s" (%s)' % (name, _state["status"]))
+        _note('connected to Clayware as "%s" (%s)' % (name, _state["status"]))
     event("started", "%s started" % name, {"pid": os.getpid(), "entry": body["manifest"]["entry"]})
 
 
@@ -181,7 +181,7 @@ def _flush():
     try:
         status, data = _post("/events", {"events": batch}, True)
         if status == 403:
-            _note("this asset was revoked in Alcon; not reporting")
+            _note("this asset was revoked in Clayware; not reporting")
             _state["down"] = True
             return
         if status >= 300:

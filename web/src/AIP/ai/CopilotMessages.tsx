@@ -8,7 +8,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import type { AgentAction } from '@/types/database';
-import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotCredentialAsk, CopilotMessage, ToolEvent } from './useAlconCopilot';
+import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotCredentialAsk, CopilotMessage, ToolEvent } from './useClaywareCopilot';
 import { toolCardOf, type ToolCardKind } from './copilotToolCards';
 import { ToolCallCard, ToolCallGroup } from '@/Function/shared/ToolCallCard';
 import { splitAnswer } from './chartSpec';

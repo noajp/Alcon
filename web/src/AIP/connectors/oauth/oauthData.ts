@@ -6,7 +6,7 @@ import { useCurrentUserId } from '@/providers/authContext';
 import { mergeConnectedApps, type ConnectedApp, type OAuthAccess } from './connectedApps';
 
 // The signed-in person's OAuth connections (ADR 0034). Supabase Auth holds
-// the grants (listGrants / revokeGrant); Alcon holds what each client may do
+// the grants (listGrants / revokeGrant); Clayware holds what each client may do
 // (oauth_client_access, read or read & write). Both writes refuse a caller
 // that is itself a delegated client.
 

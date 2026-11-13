@@ -112,14 +112,14 @@ function renderTemplate(template: string, today: string): string {
   return template.replace(/\{\{\s*date\s*\}\}/gi, today);
 }
 
-/** The Space's AI Worker that runs in Alcon (the automations' own
+/** The Space's AI Worker that runs in Clayware (the automations' own
  *  choice, shared here rather than imported from an Edge Function). */
 async function aiWorkerOf(admin: SupabaseClient, spaceId: string): Promise<string | null> {
   const { data } = await admin.from("workers").select("id, name, ai_config")
     .eq("activity_space_id", spaceId).eq("type", "ai_agent").eq("status", "active");
-  const inAlcon = ((data ?? []) as { id: string; name: string; ai_config: unknown }[])
+  const inClayware = ((data ?? []) as { id: string; name: string; ai_config: unknown }[])
     .filter((w) => (w.ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
-  return (inAlcon.find((w) => w.name === "Claude") ?? inAlcon[0])?.id ?? null;
+  return (inClayware.find((w) => w.name === "Claude") ?? inClayware[0])?.id ?? null;
 }
 
 /**
@@ -145,7 +145,7 @@ export async function launchPromotionRehearsal(args: {
   const requesterId = draft.requester_id ?? draft.created_by;
   if (!requesterId) return { error: "起草した人が分かりません。" };
   const workerId = await aiWorkerOf(admin, draft.activity_space_id);
-  if (!workerId) return { error: "この Space に、Alcon で動く AI Worker がいません。" };
+  if (!workerId) return { error: "この Space に、Clayware で動く AI Worker がいません。" };
   const { data: obj } = await userDb.from("objects").select("id, domain_id").eq("id", pkg.binding.objectId).maybeSingle();
   if (!obj) return { error: "置き場の Object が見つからないか、起草した人からは見られません。" };
   const object = obj as { id: string; domain_id: string | null };
@@ -190,7 +190,7 @@ export async function notifyPromotionOwners(
     .select("user_id").eq("activity_space_id", draft.activity_space_id).eq("role", "owner");
   for (const owner of (owners ?? []) as { user_id: string }[]) {
     await admin.from("notifications").insert({
-      recipient_id: owner.user_id, actor_name: "Alcon Agent", kind: "promotion",
+      recipient_id: owner.user_id, actor_name: "Clayware Agent", kind: "promotion",
       promotion_draft_id: draft.id, title, body,
     }).then(() => {}, () => {});
   }
@@ -255,7 +255,7 @@ export async function settlePromotionRehearsal(
     const requesterId = draft.requester_id ?? draft.created_by;
     if (requesterId) {
       await admin.from("notifications").insert({
-        recipient_id: requesterId, actor_name: "Alcon Agent", kind: "promotion",
+        recipient_id: requesterId, actor_name: "Clayware Agent", kind: "promotion",
         promotion_draft_id: draft.id, title: "昇格の起草が失敗しました",
         body: `「${draft.name ?? "定義"}」の試走が ${MAX_PROMOTION_REVISIONS} 回失敗し、起草は失敗として記録されました（分類: ${outcome}）。`,
       }).then(() => {}, () => {});

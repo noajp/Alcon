@@ -6,7 +6,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { translate } from '@/Function/i18n/I18nProvider';
 import type {
-  AlconObject,
+  ClaywareObject,
   Element,
   ElementAssignee,
   ElementObject,
@@ -60,7 +60,7 @@ export function ascNullsLast(a: string | number | null, b: string | number | nul
 export async function fetchStrategyElements(opts: {
   domainIds: string[];
   objectIds: string[];   // explicitly selected Objects (in addition to whole-domain selection)
-}): Promise<{ elements: ElementWithDetails[]; objects: AlconObject[] }> {
+}): Promise<{ elements: ElementWithDetails[]; objects: ClaywareObject[] }> {
   const { domainIds, objectIds: explicitObjectIds } = opts;
   if (domainIds.length === 0 && explicitObjectIds.length === 0) {
     return { elements: [], objects: [] };
@@ -90,7 +90,7 @@ export async function fetchStrategyElements(opts: {
   // only in archived Objects.
   const objectsData = await selectIn(Array.from(objectScope), chunk =>
     onlyActiveObjects(supabase.from('objects').select('*').in('id', chunk)),
-  ) as AlconObject[];
+  ) as ClaywareObject[];
   if (objectsData.length === 0) return { elements: [], objects: [] };
   const objectIdsArr = objectsData.map(o => o.id);
 

@@ -40,7 +40,7 @@ import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySe
 // API & access, Elements) swap their body behind an in-area segmented
 // control; their per-area tab state lives here, seeded by reveals.
 //
-// Alcon's vocabulary replaces Linear's: Issues → Elements,
+// Clayware's vocabulary replaces Linear's: Issues → Elements,
 // Projects → Objects, Team(s) → Domain(s).
 // =============================================================
 
@@ -49,10 +49,10 @@ import { InitiativeJudgementSettings, PhaseDefaultsSettings } from './StrategySe
  *  convert in PR3/PR4a. */
 const AREA_DESCRIPTIONS: Record<string, string> = {
   integrations: 'The harnesses Athena works by, and the services connected to this Space.',
-  access: 'Tokens, endpoints and connected machines — the ways other tools work with Alcon.',
+  access: 'Tokens, endpoints and connected machines — the ways other tools work with Clayware.',
   automation: 'The work that runs by itself — open one to see and change its flow.',
   elements: 'Labels and templates for Elements, set per Domain.',
-  preferences: 'Language, appearance, and defaults for how Alcon works for you.',
+  preferences: 'Language, appearance, and defaults for how Clayware works for you.',
 };
 
 export function SettingsView() {
@@ -271,12 +271,12 @@ function PreferencesPanel() {
       )}
 
       <SettingsIsland title={t('General')}>
-        <SettingRow label={t('Language')} desc={t('Choose the language used across Alcon')}>
+        <SettingRow label={t('Language')} desc={t('Choose the language used across Clayware')}>
           <LanguageSelect />
         </SettingRow>
         <SegmentedRow
           label={t('Default home view')}
-          desc={t('Select which view to open when launching Alcon')}
+          desc={t('Select which view to open when launching Clayware')}
           value={preferences.home_view}
           options={['My Elements', 'Inbox', 'Calendar']}
           onChange={(v) => savePreference('home_view', v as UserPreferences['home_view'])}

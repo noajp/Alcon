@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildCopilotContext, copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
+import { buildCopilotContext, copilotSubjectFor } from '@/AIP/ai/useClaywareCopilot';
 
 const base = { domainId: 'd1', spaceId: 's1', today: '2026-11-07' };
 
 describe('buildCopilotContext', () => {
   it('a subject-less context is exactly what the panel has always sent', () => {
     expect(buildCopilotContext({ subject: null, ...base }))
-      .toEqual({ viewLabel: 'Alcon', domainId: 'd1', spaceId: 's1', today: '2026-11-07' });
+      .toEqual({ viewLabel: 'Clayware', domainId: 'd1', spaceId: 's1', today: '2026-11-07' });
   });
 
   it('a slides subject changes nothing — the deck swap is not context', () => {

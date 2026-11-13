@@ -15,10 +15,10 @@ describe("copilot turn assembly (Athena's chat driver)", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userDb: {} as any, admin: null,
       context: { viewLabel: 'ボード', today: '2026-11-08' },
-      supabaseUrl: null, actor: { agent: 'Alcon Copilot', userId: 'u1' },
+      supabaseUrl: null, actor: { agent: 'Clayware Copilot', userId: 'u1' },
     });
     expect(turn.toolset).toBeNull();
-    expect(turn.system[0].text).toContain('Alcon');
+    expect(turn.system[0].text).toContain('Clayware');
     expect(turn.system[1].text).toContain('現在のビュー: ボード');
     expect(turn.system[1].text).toContain('ユーザーの業務日付: 2026-11-08');
     expect(turn.toolParams.length).toBeGreaterThan(0);
@@ -29,7 +29,7 @@ describe("copilot turn assembly (Athena's chat driver)", () => {
   });
 
   it('names the Copilot as its steps and notifications sign', () => {
-    expect(anchorMod.COPILOT_AGENT_NAME).toBe('Alcon Copilot');
+    expect(anchorMod.COPILOT_AGENT_NAME).toBe('Clayware Copilot');
   });
 
   it('carries the approval mode it was built under, defaulting to auto', async () => {
@@ -37,7 +37,7 @@ describe("copilot turn assembly (Athena's chat driver)", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userDb: {} as any, admin: null,
       context: { viewLabel: 'ボード', today: '2026-11-08' },
-      supabaseUrl: null, actor: { agent: 'Alcon Copilot', userId: 'u1' },
+      supabaseUrl: null, actor: { agent: 'Clayware Copilot', userId: 'u1' },
     });
     expect(plain.approvalMode).toBe('auto');
     // Without an integration toolset there is no verdict to give: the
@@ -48,7 +48,7 @@ describe("copilot turn assembly (Athena's chat driver)", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userDb: {} as any, admin: null,
       context: { viewLabel: 'ボード', today: '2026-11-08' },
-      supabaseUrl: null, actor: { agent: 'Alcon Copilot', userId: 'u1' },
+      supabaseUrl: null, actor: { agent: 'Clayware Copilot', userId: 'u1' },
       approvalMode: 'free',
     });
     expect(freed.approvalMode).toBe('free');

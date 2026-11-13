@@ -24,7 +24,7 @@ import { useEffect, useState } from 'react';
 // outside this module needs the event name itself (unlike domainsStore.ts's
 // DOMAINS_CHANGED_EVENT, which useSupabase.ts's useDomains also listens for
 // directly). Export it if that changes.
-const PREFERENCES_CHANGED_EVENT = 'alcon:preferences-changed';
+const PREFERENCES_CHANGED_EVENT = 'clayware:preferences-changed';
 
 function notifyPreferencesChanged() {
   if (typeof window === 'undefined') return;
@@ -52,11 +52,11 @@ export type FirstDayOfWeek = 'Monday' | 'Sunday' | 'Saturday';
 export type DisplayNames = 'Full name' | 'Short name' | 'Username';
 export type TimelineScale = 'month' | 'quarter';
 
-const HOME_VIEW_KEY = 'alcon:pref:home-view';
-const SEND_SHORTCUT_KEY = 'alcon:pref:send-comment-shortcut';
-const FIRST_DAY_KEY = 'alcon:pref:first-day-of-week';
-const DISPLAY_NAMES_KEY = 'alcon:pref:display-names';
-const EMOTICONS_KEY = 'alcon:pref:convert-emoticons';
+const HOME_VIEW_KEY = 'clayware:pref:home-view';
+const SEND_SHORTCUT_KEY = 'clayware:pref:send-comment-shortcut';
+const FIRST_DAY_KEY = 'clayware:pref:first-day-of-week';
+const DISPLAY_NAMES_KEY = 'clayware:pref:display-names';
+const EMOTICONS_KEY = 'clayware:pref:convert-emoticons';
 
 // A stored value with no view behind it any more (the retired 'Now')
 // opens the Inbox.
@@ -168,11 +168,11 @@ export function convertEmoticons(text: string): string {
 }
 
 // ── Timeline display (Settings > Strategy > Timeline) ─────────────────
-const TIMELINE_SCALE_KEY = 'alcon:pref:timeline-scale';
-const TIMELINE_BACK_KEY = 'alcon:pref:timeline-months-back';
-const TIMELINE_AHEAD_KEY = 'alcon:pref:timeline-months-ahead';
-const TIMELINE_TODAY_KEY = 'alcon:pref:timeline-today-marker';
-const TIMELINE_FILL_KEY = 'alcon:pref:timeline-progress-fill';
+const TIMELINE_SCALE_KEY = 'clayware:pref:timeline-scale';
+const TIMELINE_BACK_KEY = 'clayware:pref:timeline-months-back';
+const TIMELINE_AHEAD_KEY = 'clayware:pref:timeline-months-ahead';
+const TIMELINE_TODAY_KEY = 'clayware:pref:timeline-today-marker';
+const TIMELINE_FILL_KEY = 'clayware:pref:timeline-progress-fill';
 
 const TIMELINE_MONTHS_BACK_RANGE = { min: 0, max: 12, fallback: 2 } as const;
 const TIMELINE_MONTHS_AHEAD_RANGE = { min: 3, max: 36, fallback: 10 } as const;
@@ -209,7 +209,7 @@ export function setCachedTimelineProgressFill(v: boolean) { write(TIMELINE_FILL_
 
 // Charts (Settings > Preferences > Chart colors): which palette every chart
 // draws in. Kept in this browser, like the font size.
-const CHART_PALETTE_KEY = 'alcon:pref:chart-palette';
+const CHART_PALETTE_KEY = 'clayware:pref:chart-palette';
 export function getCachedChartPalette(): string {
   if (typeof window === 'undefined') return 'key-red';
   return localStorage.getItem(CHART_PALETTE_KEY) ?? 'key-red';

@@ -10,15 +10,15 @@ import { FilesIcon } from '@/Function/shared/conceptIcons';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { attachmentText, useSpaceAttachments, type SpaceFile } from '@/hooks/attachmentData';
-import type { CopilotAttachment } from './useAlconCopilot';
+import type { CopilotAttachment } from './useClaywareCopilot';
 
 /**
- * Hands the AI a file that is already in Alcon — any file attached in this
+ * Hands the AI a file that is already in Clayware — any file attached in this
  * Space that the person can see — as its text, the way a file from the
  * computer is handed over. The person picks it; nothing is sent until they
  * send their message.
  */
-export function AlconFilePicker({ disabled, onPick }: { disabled?: boolean; onPick: (file: CopilotAttachment) => void }) {
+export function ClaywareFilePicker({ disabled, onPick }: { disabled?: boolean; onPick: (file: CopilotAttachment) => void }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -52,7 +52,7 @@ export function AlconFilePicker({ disabled, onPick }: { disabled?: boolean; onPi
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button size="icon-sm" type="button" variant="ghost" disabled={disabled} className="text-muted-foreground"
-          title={t('Add a file from Alcon')} aria-label={t('Add a file from Alcon')}>
+          title={t('Add a file from Clayware')} aria-label={t('Add a file from Clayware')}>
           <FilesIcon size={14} />
         </Button>
       </PopoverTrigger>

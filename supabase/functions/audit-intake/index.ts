@@ -7,8 +7,8 @@
 // and nothing else, and a revoked key nothing at all.
 //
 // Request:  POST <batch JSON> (shape: _shared/auditIntake.ts)
-//           x-alcon-gateway-key: <workflow_gateway_keys.id>
-//           x-alcon-signature:   <base64url Ed25519 signature of the raw body>
+//           x-clayware-gateway-key: <workflow_gateway_keys.id>
+//           x-clayware-signature:   <base64url Ed25519 signature of the raw body>
 // Response: 200 { status: accepted | duplicate, runs_added, steps_added }
 //           409 { status: rejected, reason }  — nothing from the batch was written,
 //               and the rejection is kept for the Space's owner
@@ -40,8 +40,8 @@ Deno.serve(async (req) => {
   if (!url || !serviceKey) return json({ error: "supabase env missing" }, 500);
   const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" };
 
-  const keyId = req.headers.get("x-alcon-gateway-key") ?? "";
-  const signature = req.headers.get("x-alcon-signature") ?? "";
+  const keyId = req.headers.get("x-clayware-gateway-key") ?? req.headers.get("x-alcon-gateway-key") ?? "";
+  const signature = req.headers.get("x-clayware-signature") ?? req.headers.get("x-alcon-signature") ?? "";
   if (!UUID.test(keyId) || !signature) return json({ error: "unauthorized" }, 401);
 
   const declared = Number(req.headers.get("content-length") ?? "0");

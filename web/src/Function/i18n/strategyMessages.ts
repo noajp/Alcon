@@ -375,7 +375,7 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Started “{name}”.': ['「{name}」を開始しました。', '“{name}”을(를) 시작했습니다.', '« {name} » a démarré.', 'Se inició «{name}».'],
   'Turn off': ['オフにする', '끄기', 'Désactiver', 'Desactivar'],
   'Turn on': ['オンにする', '켜기', 'Activer', 'Activar'],
-  'POST JSON to this URL with the token in the x-alcon-token header. The body becomes the input of the Element it makes.': ['この URL に JSON を POST し、トークンを x-alcon-token ヘッダーに入れてください。本文は作られる Element の入力になります。', '이 URL로 JSON을 POST하고 토큰을 x-alcon-token 헤더에 넣으세요. 본문은 만들어지는 Element의 입력이 됩니다.', 'Envoyez du JSON en POST à cette URL avec le jeton dans l’en-tête x-alcon-token. Le corps devient l’entrée de l’Element créé.', 'Envía JSON por POST a esta URL con el token en la cabecera x-alcon-token. El cuerpo será la entrada del Element que se crea.'],
+  'POST JSON to this URL with the token in the x-clayware-token header. The body becomes the input of the Element it makes.': ['この URL に JSON を POST し、トークンを x-clayware-token ヘッダーに入れてください。本文は作られる Element の入力になります。', '이 URL로 JSON을 POST하고 토큰을 x-clayware-token 헤더에 넣으세요. 본문은 만들어지는 Element의 입력이 됩니다.', 'Envoyez du JSON en POST à cette URL avec le jeton dans l’en-tête x-clayware-token. Le corps devient l’entrée de l’Element créé.', 'Envía JSON por POST a esta URL con el token en la cabecera x-clayware-token. El cuerpo será la entrada del Element que se crea.'],
   'Token': ['トークン', '토큰', 'Jeton', 'Token'],
   'Copy the token now. It is not shown again.': ['トークンは今コピーしてください。もう表示されません。', '지금 토큰을 복사하세요. 다시 표시되지 않습니다.', 'Copiez le jeton maintenant. Il ne sera plus affiché.', 'Copia el token ahora. No se volverá a mostrar.'],
   'Replace the token': ['トークンを作り直す', '토큰 다시 만들기', 'Remplacer le jeton', 'Reemplazar el token'],

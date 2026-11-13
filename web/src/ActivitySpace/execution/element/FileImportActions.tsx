@@ -21,7 +21,7 @@ import { importDataTable } from '@/hooks/tableData';
 import { attachmentSource, type Attachment } from '@/hooks/attachmentData';
 
 /**
- * What an attached file can become in Alcon, from its preview's toolbar: a
+ * What an attached file can become in Clayware, from its preview's toolbar: a
  * workbook's sheet becomes a Table (header row as columns, numbers kept as
  * numbers), a Word document becomes a Note (headings, lists, tables, text
  * styles), a PowerPoint deck becomes a Slides deck (each slide's shapes,

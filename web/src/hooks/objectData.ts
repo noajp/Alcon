@@ -6,7 +6,7 @@ import { reorderObjectsInExplorer } from '@/Function/sync/explorerPatch';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { throwOnFailedWrites } from './writeResults';
 import { supabase } from '@/lib/supabase';
-import type { AlconObject, ObjectTab, ObjectTabInsert } from '@/types/database';
+import type { ClaywareObject, ObjectTab, ObjectTabInsert } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -70,7 +70,7 @@ export async function createObject(obj: {
   type?: string | null;
   lead_id?: string | null;
   due_date?: string | null;
-}): Promise<AlconObject> {
+}): Promise<ClaywareObject> {
   // An Object always sits in a Domain (Domain → Object → Element).
   const primaryDomainId = obj.domain_id ?? obj.domain_ids?.[0] ?? null;
   if (!primaryDomainId) throw new Error(translate(DOMAIN_REQUIRED));
@@ -155,8 +155,8 @@ export async function createObject(obj: {
 
 export async function updateObject(
   id: string,
-  updates: Partial<Omit<AlconObject, 'id' | 'created_at'>>
-): Promise<AlconObject> {
+  updates: Partial<Omit<ClaywareObject, 'id' | 'created_at'>>
+): Promise<ClaywareObject> {
   const { data, error } = await supabase
     .from('objects')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -177,13 +177,13 @@ export async function updateObject(
 // different Objects to the same prefix, or see a collision in a private
 // Domain the caller isn't a member of. See the RPC's own migration
 // (20260905010000_object_prefix_rename_rpc.sql) for the full rationale.
-export async function renameObjectPrefix(objectId: string, newPrefix: string): Promise<AlconObject> {
+export async function renameObjectPrefix(objectId: string, newPrefix: string): Promise<ClaywareObject> {
   const { data, error } = await supabase.rpc('rename_object_prefix', {
     p_object_id: objectId,
     p_new_prefix: newPrefix,
   });
   if (error) throw error;
-  return data as AlconObject;
+  return data as ClaywareObject;
 }
 
 /**

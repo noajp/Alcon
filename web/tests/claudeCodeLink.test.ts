@@ -9,7 +9,7 @@ describe('Claude Code link', () => {
       path: ['APL_Div', 'リファクタリング'],
     });
     expect(prompt).toBe([
-      'Work on Alcon Element REF-3:',
+      'Work on Clayware Element REF-3:',
       '',
       '<element identifier="REF-3">',
       '<title>Error boundary</title>',
@@ -20,7 +20,7 @@ describe('Claude Code link', () => {
   });
 
   it('names an Object by its title when it has no id, and leaves out what is empty', () => {
-    expect(claudeCodePrompt({ kind: 'Object', title: 'Refactor' })).toBe('Work on Alcon Object "Refactor":\n\n<object>\n<title>Refactor</title>\n</object>');
+    expect(claudeCodePrompt({ kind: 'Object', title: 'Refactor' })).toBe('Work on Clayware Object "Refactor":\n\n<object>\n<title>Refactor</title>\n</object>');
   });
 
   it('opens a new Claude Code session with the prompt encoded', () => {

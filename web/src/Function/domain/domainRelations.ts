@@ -1,4 +1,4 @@
-import type { AlconObject, Domain, Strategy } from '@/types/database';
+import type { ClaywareObject, Domain, Strategy } from '@/types/database';
 
 export interface InitiativeRelation {
   initiative: Pick<Strategy, 'id' | 'name' | 'description' | 'status'>;
@@ -20,7 +20,7 @@ export function initiativesForObjects(
 }
 
 export function domainsForObjects(
-  objects: Pick<AlconObject, 'id' | 'name' | 'domain_id'>[],
+  objects: Pick<ClaywareObject, 'id' | 'name' | 'domain_id'>[],
   domains: Pick<Domain, 'id' | 'name' | 'description'>[],
   links: { domain_id: string; object_id: string }[],
 ) {

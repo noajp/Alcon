@@ -1,4 +1,4 @@
-// The AI agents Alcon knows by name: each provider's logo, the Worker made
+// The AI agents Clayware knows by name: each provider's logo, the Worker made
 // for it (its name and the model it runs), and how an existing Worker is
 // recognised as one of them — by its model, else its name. Any AI agent
 // Worker of a known provider wears that provider's logo wherever an avatar

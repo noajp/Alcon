@@ -6,8 +6,8 @@ import { useSyncExternalStore } from 'react';
 // user is currently in. Mirrors domainsStore: localStorage + a CustomEvent so
 // the shell and the Domain list react to a space switch. The active Domain is
 // resolved *within* the active space.
-const ACTIVE_KEY = 'alcon:active-space';
-const ACTIVE_SPACE_CHANGE_EVENT = 'alcon:active-space-change';
+const ACTIVE_KEY = 'clayware:active-space';
+const ACTIVE_SPACE_CHANGE_EVENT = 'clayware:active-space-change';
 export function getActiveSpaceId(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem(ACTIVE_KEY);

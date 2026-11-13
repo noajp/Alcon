@@ -23,7 +23,7 @@ export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {
 
 /** The environment the one line needs, ready to paste. */
 export function relayEnvLines(relayUrl: string, spaceId: string): string {
-  return [`ALCON_RELAY=${relayUrl}`, `ALCON_SPACE=${spaceId}`].join('\n');
+  return [`CLAYWARE_RELAY=${relayUrl}`, `CLAYWARE_SPACE=${spaceId}`].join('\n');
 }
 
 const str = (v: Json | undefined): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);

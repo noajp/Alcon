@@ -9,13 +9,13 @@ export { sanitizeName };
 // initialize / ping / tools/list / tools/call, which is all a tool server
 // needs. Pure: the HTTP entry (index.ts) supplies the tools and the caller.
 
-export const SERVER_INFO = { name: "alcon", version: "0.1.0" } as const;
+export const SERVER_INFO = { name: "clayware", version: "0.1.0" } as const;
 
 /** Newest first. An unknown requested version is answered with the newest. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
 
 export const INSTRUCTIONS = [
-  "Alcon の Domain → Object → Element と Initiative を、接続したユーザー本人の権限で読み書きする。",
+  "Clayware の Domain → Object → Element と Initiative を、接続したユーザー本人の権限で読み書きする。",
   "書き込む前に listElements / findByText / getElement で対象の UUID を確かめる。ELE_PLT-003 のような display_id も受け付けるが、曖昧なら候補をユーザーに示す。",
   "Element に着手する前に、所属 Object に紐づく Initiative（getInitiative）で目的と成功条件を確かめる。",
   "ステータス: backlog / todo / in_progress / review / done / blocked / cancelled。優先度: urgent / high / medium / low。日付は YYYY-MM-DD。",

@@ -6,7 +6,7 @@ import { iconNames } from '@/ui/icons/dynamic';
 import { standardIconKey, useStandardIcons } from '@/ui/icons/standardIcons';
 import { Search } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { ALCON_GLYPHS, ItemIcon } from './ItemIcon';
+import { CLAYWARE_GLYPHS, ItemIcon } from './ItemIcon';
 import {
   ITEM_COLORS, STANDARD_ICON_STROKE, glyphIcon, isPaletteColor, itemColor, lucideIcon, matchesSearch,
   parseItemIcon, readRecentEmoji, rememberEmoji,
@@ -41,7 +41,7 @@ const PAGE = 400;
 const RAINBOW = `conic-gradient(${[...ITEM_COLORS.slice(2), ITEM_COLORS[2]].map((c) => c.hex).join(', ')})`;
 
 /**
- * Picks an icon and a colour for a Strategy, Object or Element: Alcon's own
+ * Picks an icon and a colour for a Strategy, Object or Element: Clayware's own
  * drawings and the standard set (tinted by the colour above them), or an
  * emoji. Nothing is saved here — `onChange` gets the new look.
  */
@@ -124,7 +124,7 @@ function ColorRow({ value, onPick, defaultIcon }: { value: string | null; onPick
 function IconGrid({ query, value, onPick }: { query: string; value: ItemLook; onPick: (icon: string) => void }) {
   const { t } = useI18n();
   const tone = itemColor(value.color);
-  const alcon = useMemo(() => ALCON_GLYPHS.filter(([name]) => matchesSearch(query, name)), [query]);
+  const clayware = useMemo(() => CLAYWARE_GLYPHS.filter(([name]) => matchesSearch(query, name)), [query]);
   const icons = useStandardIcons();
   // Names the loaded set exports (old aliases of the same drawings dropped).
   const standard = useMemo(() => (icons ? iconNames.filter((name) => icons[standardIconKey(name)] && matchesSearch(query, name)) : []), [icons, query]);
@@ -152,8 +152,8 @@ function IconGrid({ query, value, onPick }: { query: string; value: ItemLook; on
 
   return (
     <>
-      {alcon.length > 0 && <Section title="Alcon">
-        {alcon.map(([name, Glyph]) => cell(`g-${name}`, glyphIcon(name), name, <Glyph size={16} />))}
+      {clayware.length > 0 && <Section title="Clayware">
+        {clayware.map(([name, Glyph]) => cell(`g-${name}`, glyphIcon(name), name, <Glyph size={16} />))}
       </Section>}
       {standard.length > 0 && <Section title={t('Standard')}>
         {icons && standard.slice(0, shown).map((name) => {
@@ -162,7 +162,7 @@ function IconGrid({ query, value, onPick }: { query: string; value: ItemLook; on
         })}
       </Section>}
       {shown < standard.length && <div ref={sentinel} className="h-6" />}
-      {alcon.length === 0 && standard.length === 0 && <Empty>{t('No icons match.')}</Empty>}
+      {clayware.length === 0 && standard.length === 0 && <Empty>{t('No icons match.')}</Empty>}
     </>
   );
 }

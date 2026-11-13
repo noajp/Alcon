@@ -32,7 +32,7 @@ describe('holderLabel', () => {
     expect(holderLabel('Claude@unmerged-wip-check-30418a')).toBe('Claude@…k-30418a');
   });
   it('leaves short tokens whole', () => {
-    expect(holderLabel('Claude@Alcon')).toBe('Claude@Alcon');
+    expect(holderLabel('Claude@Clayware')).toBe('Claude@Clayware');
     expect(holderLabel('Codex@box-7')).toBe('Codex@box-7');
   });
   it('two sessions never collapse to the same label', () => {

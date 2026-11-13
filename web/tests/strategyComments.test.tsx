@@ -66,13 +66,13 @@ function setup(overrides: Partial<Parameters<typeof StrategyCommentsPanel>[0]> =
   render(
     <StrategyCommentsPanel
       strategyId="s1"
-      strategyName="Alcon"
+      strategyName="Clayware"
       strategyOwnerId={USER_ID}
       workers={[]}
       {...overrides}
     />,
   );
-  return screen.getByPlaceholderText(/Comment on Alcon/i) as HTMLTextAreaElement;
+  return screen.getByPlaceholderText(/Comment on Clayware/i) as HTMLTextAreaElement;
 }
 
 beforeEach(() => {
@@ -133,7 +133,7 @@ describe('Strategy comments', () => {
   });
 
   it('honors an explicit "Enter" send-shortcut preference, and Shift+Enter still inserts a newline in that mode', async () => {
-    localStorage.setItem('alcon:pref:send-comment-shortcut', 'Enter');
+    localStorage.setItem('clayware:pref:send-comment-shortcut', 'Enter');
     createStrategyComment.mockImplementation(async (input: { content: string }) =>
       comment({ id: 'new', content: input.content }));
     const box = setup();

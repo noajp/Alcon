@@ -6,7 +6,7 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, updateElements, restoreElementsField, deleteElement,
   fetchAllWorkers,
@@ -52,7 +52,7 @@ const KNOWN_OBJECT_TAB_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
-  object: AlconObjectWithChildren;
+  object: ClaywareObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
   // refresh so the typed text stays visible until the new row appears.
@@ -311,9 +311,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   useEffect(() => {
     if (hideActionBar) return;
     const onQuickAdd = () => openQuickAddElement();
-    window.addEventListener('alcon:quick-add-element', onQuickAdd);
+    window.addEventListener('clayware:quick-add-element', onQuickAdd);
     return () => {
-      window.removeEventListener('alcon:quick-add-element', onQuickAdd);
+      window.removeEventListener('clayware:quick-add-element', onQuickAdd);
     };
   }, [hideActionBar, openQuickAddElement]);
 

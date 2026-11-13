@@ -138,14 +138,14 @@ export async function resolvesToPublic(raw: string, resolve: Resolve | null = de
 }
 
 /**
- * Pure. True when an integration points at this Alcon project itself — its
+ * Pure. True when an integration points at this Clayware project itself — its
  * Supabase host or the legacy `<ref>.functions.supabase.co` host, which also
- * serves alcon-mcp (REST API, any Edge Function). Case, a trailing dot and a
+ * serves clayware-mcp (REST API, any Edge Function). Case, a trailing dot and a
  * port do not change the answer. An agent already has the board tools under
- * its starter's RLS; reaching Alcon again through a stored credential would
+ * its starter's RLS; reaching Clayware again through a stored credential would
  * act outside that run (ADR 0032).
  */
-export function pointsAtAlcon(endpoint: string, supabaseUrl: string | null | undefined): boolean {
+export function pointsAtClayware(endpoint: string, supabaseUrl: string | null | undefined): boolean {
   if (!supabaseUrl) return false;
   const host = (raw: string): string | null => {
     try {
@@ -157,13 +157,13 @@ export function pointsAtAlcon(endpoint: string, supabaseUrl: string | null | und
   const target = host(endpoint);
   const own = host(supabaseUrl);
   if (!target || !own) return false;
-  const alcon = new Set([own]);
+  const clayware = new Set([own]);
   const ref = own.match(/^([a-z0-9-]+)\.(?:functions\.)?supabase\.(co|in|net)$/);
   if (ref) {
-    alcon.add(`${ref[1]}.supabase.${ref[2]}`);
-    alcon.add(`${ref[1]}.functions.supabase.${ref[2]}`);
+    clayware.add(`${ref[1]}.supabase.${ref[2]}`);
+    clayware.add(`${ref[1]}.functions.supabase.${ref[2]}`);
   }
-  return alcon.has(target);
+  return clayware.has(target);
 }
 
 /** Pure. The URL an http_request may hit: base + path, never outside base. */
@@ -327,7 +327,7 @@ export class McpSession {
     const r = await this.rpc("initialize", {
       protocolVersion: this.protocolVersion,
       capabilities: {},
-      clientInfo: { name: "alcon-agent", version: "1.0.0" },
+      clientInfo: { name: "clayware-agent", version: "1.0.0" },
     });
     if (r && typeof r.protocolVersion === "string") this.protocolVersion = r.protocolVersion;
     await this.rpc("notifications/initialized", {}, true).catch(() => {});

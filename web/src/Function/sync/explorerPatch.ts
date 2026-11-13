@@ -7,7 +7,7 @@
 // the optimistic writers both compose these.
 
 import type {
-  AlconObjectWithChildren,
+  ClaywareObjectWithChildren,
   Element,
   ElementAssigneeWithWorker,
   ElementWithDetails,
@@ -15,7 +15,7 @@ import type {
 } from '@/types/database';
 
 export interface ExplorerData {
-  objects: AlconObjectWithChildren[];  // Top-level Objects in the active Domain
+  objects: ClaywareObjectWithChildren[];  // Top-level Objects in the active Domain
   rootElements: ElementWithDetails[];  // Domain-direct Elements (object_id IS NULL)
 }
 
@@ -157,7 +157,7 @@ export function patchWorkerInExplorer(data: ExplorerData, workerId: string, patc
 export function patchObjectInExplorer(
   data: ExplorerData,
   id: string,
-  patch: Partial<AlconObjectWithChildren>,
+  patch: Partial<ClaywareObjectWithChildren>,
 ): ExplorerData {
   let hit = false;
   const objects = data.objects.map((obj) => {

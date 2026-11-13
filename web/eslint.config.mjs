@@ -45,7 +45,7 @@ const eslintConfig = defineConfig([
       "no-restricted-imports": ["error", { patterns: [NO_SURFACE_IMPORT, NO_DIRECT_QUERY] }],
     },
   },
-  // Icons come from ui/icons — Alcon's own drawings, with Lucide behind them
+  // Icons come from ui/icons — Clayware's own drawings, with Lucide behind them
   // for the ones not drawn yet — so a glyph drawn once shows everywhere.
   // (Its own rule name, so it sits beside the layer rules above.)
   {

@@ -8,7 +8,7 @@ import { FONT } from '@/shared/designTokens';
 import type { ConnectedApp, OAuthAccess } from '@/AIP/connectors/oauth/connectedApps';
 import { useConnectedAppActions, useConnectedApps } from '@/AIP/connectors/oauth/oauthData';
 
-// Settings › API & access › Connect to Alcon: the apps connected over OAuth
+// Settings › API & access › Connect to Clayware: the apps connected over OAuth
 // (claude.ai, ChatGPT, …; ADR 0034). Each row says what the app may do and
 // since when; access can be narrowed or widened, and Disconnect revokes the
 // grant so the app's next call is refused.

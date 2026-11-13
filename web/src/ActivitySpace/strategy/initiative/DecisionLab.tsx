@@ -5,7 +5,7 @@ import { ArrowRight, RefreshCw } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { ChoiceCard } from '@/ui/choice-card';
 import { formatElementDate, parseDateOnly } from '@/Function/shared/dateUtils';
-import type { AlconObject } from '@/types/database';
+import type { ClaywareObject } from '@/types/database';
 import { compareDecisionLab, type DecisionLabInput, type DecisionLabComparison, type DecisionLabScenario } from './decisionLabModel';
 import { displayIdOf } from '@/Function/shared/element/displayId';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -31,7 +31,7 @@ export interface DecisionLabChoice {
 /** The interactive reading. Data access and the existing Element editor belong to the host. */
 export function DecisionLab({ input, objects, refreshing, canRecord = true, onRefresh, onOpenElement, onRecord }: {
   input: DecisionLabInput;
-  objects: AlconObject[];
+  objects: ClaywareObject[];
   refreshing: boolean;
   canRecord?: boolean;
   onRefresh: () => Promise<unknown>;
@@ -241,7 +241,7 @@ function ImpactRows({ label, changes, input, objects, onOpen }: {
   label: string;
   changes: DecisionLabComparison['changes'];
   input: DecisionLabInput;
-  objects: AlconObject[];
+  objects: ClaywareObject[];
   onOpen: (id: string) => void;
 }) {
   const { t } = useI18n();

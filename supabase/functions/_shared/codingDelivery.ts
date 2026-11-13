@@ -42,7 +42,7 @@ async function ghBytes(path: string, token: string | null): Promise<Uint8Array> 
     headers: {
       accept: "application/vnd.github+json",
       "x-github-api-version": "2022-11-28",
-      "user-agent": "alcon-coding",
+      "user-agent": "clayware-coding",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     signal: AbortSignal.timeout(60_000),

@@ -88,7 +88,7 @@ export async function deleteDefinition(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** The harness the Space's Strategies are worked by when they name none (null: Alcon's built-in way). */
+/** The harness the Space's Strategies are worked by when they name none (null: Clayware's built-in way). */
 export function useSpaceDefaultHarness(spaceId: string | null) {
   const qc = useQueryClient();
   const k = ['space-default-harness', spaceId ?? 'none'] as const;

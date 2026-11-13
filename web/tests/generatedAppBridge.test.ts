@@ -8,7 +8,7 @@ describe('app data message boundary', () => {
     const messages: Record<string, unknown>[] = [];
     const listeners: ((event: unknown) => void)[] = [];
     const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
-    const html = appDocument({ title: 'read', usesObjectData: true, html: '<p>Read</p>', css: '', js: "const value=await alcon.readContext();parent.postMessage({observed:value},'*');" }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
+    const html = appDocument({ title: 'read', usesObjectData: true, html: '<p>Read</p>', css: '', js: "const value=await clayware.readContext();parent.postMessage({observed:value},'*');" }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
     const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
     runInNewContext(script, { parent, window: { addEventListener: (_: string, fn: (event: unknown) => void) => listeners.push(fn) }, document: { addEventListener: () => {} }, setTimeout: () => 1, clearTimeout: () => {} });
     const dispatch = (source: unknown, data: unknown) => listeners.forEach(fn => fn({ source, data }));
@@ -27,7 +27,7 @@ describe('app data message boundary', () => {
     const messages: Record<string, unknown>[] = [];
     const listeners: ((event: unknown) => void)[] = [];
     const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
-    const html = appDocument({ title: 'shared', html: '<p>Shared</p>', css: '', js: "alcon.onChange(state=>parent.postMessage({seen:state},'*'));await alcon.save({mine:1});parent.postMessage({after:alcon.state},'*');" }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
+    const html = appDocument({ title: 'shared', html: '<p>Shared</p>', css: '', js: "clayware.onChange(state=>parent.postMessage({seen:state},'*'));await clayware.save({mine:1});parent.postMessage({after:clayware.state},'*');" }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
     const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
     runInNewContext(script, { parent, window: { addEventListener: (_: string, fn: (event: unknown) => void) => listeners.push(fn) }, document: { addEventListener: () => {} }, setTimeout: () => 1, clearTimeout: () => {} });
     const dispatch = (source: unknown, data: unknown) => listeners.forEach(fn => fn({ source, data }));
@@ -86,7 +86,7 @@ describe('app data message boundary', () => {
     const messages: Record<string, unknown>[] = [];
     const listeners: ((event: unknown) => void)[] = [];
     const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
-    const html = appDocument({ title: 'names', html: '<p>Names</p>', css: '', js: "function measure(intent){return intent.kind;}function send(){throw new Error('app send');}const __alconMeasure=1;" }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
+    const html = appDocument({ title: 'names', html: '<p>Names</p>', css: '', js: "function measure(intent){return intent.kind;}function send(){throw new Error('app send');}const __claywareMeasure=1;" }, {}, { objectId: 'scope', objectName: '' }, 'channel', {});
     const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
     runInNewContext(script, { parent, window: { addEventListener: (type: string, fn: (event: unknown) => void) => { if (type === 'message') listeners.push(fn); } }, document: { addEventListener: () => {} }, setTimeout: () => 1, clearTimeout: () => {} });
     listeners.forEach(fn => fn({ source: parent, data: { channel: 'channel', type: 'start' } }));
@@ -102,7 +102,7 @@ describe('app data message boundary', () => {
     const listeners: ((event: unknown) => void)[] = [];
     const parent = { postMessage: (message: Record<string, unknown>) => messages.push(message) };
     // Two fields saved back to back, each from the state the app holds at that moment.
-    const html = appDocument({ title: 'fields', html: '<p>Fields</p>', css: '', js: "alcon.save({...alcon.state,a:1});alcon.save({...alcon.state,b:2});" }, { kept: true }, { objectId: 'scope', objectName: '' }, 'channel', {});
+    const html = appDocument({ title: 'fields', html: '<p>Fields</p>', css: '', js: "clayware.save({...clayware.state,a:1});clayware.save({...clayware.state,b:2});" }, { kept: true }, { objectId: 'scope', objectName: '' }, 'channel', {});
     const script = html.match(/<script>([\s\S]*)<\/script>/)![1];
     runInNewContext(script, { parent, window: { addEventListener: (_: string, fn: (event: unknown) => void) => listeners.push(fn) }, document: { addEventListener: () => {} }, setTimeout: () => 1, clearTimeout: () => {} });
     listeners.forEach(fn => fn({ source: parent, data: { channel: 'channel', type: 'start' } }));

@@ -6,8 +6,8 @@ export type { ExplorerData } from '@/Function/sync/explorerPatch';
 
 export type {
   AgentRun,
-  AlconObject,
-  AlconObjectWithChildren,
+  ClaywareObject,
+  ClaywareObjectWithChildren,
   ApprovalState,
   CustomColumnWithValues,
   DataTable,

@@ -1074,15 +1074,15 @@ export async function saveDefinitionTestCapture(
   return { ok: true, testId: (data as { id: string }).id };
 }
 
-/** The Space's in-Alcon AI worker — promotionTest's rule, kept
+/** The Space's in-Clayware AI worker — promotionTest's rule, kept
 * identical (#7): the worker the rehearsals run under, Claude
 * preferred, claude-code runners excluded. */
 async function aiWorkerOf(admin: SupabaseClient, spaceId: string): Promise<string | null> {
 const { data} = await admin.from("workers").select("id, name, ai_config")
 .eq("activity_space_id", spaceId).eq("type", "ai_agent").eq("status", "active");
-const inAlcon = ((data?? []) as { id: string; name: string; ai_config: unknown}[])
+const inClayware = ((data?? []) as { id: string; name: string; ai_config: unknown}[])
 .filter((w) => (w.ai_config as Record<string, unknown> | null)?.runner!== "claude-code");
-return (inAlcon.find((w) => w.name === "Claude")?? inAlcon[0])?.id?? null;
+return (inClayware.find((w) => w.name === "Claude")?? inClayware[0])?.id?? null;
 }
 
 /** Launches one test (§6.1): a NEW Element on the source run's
@@ -1258,7 +1258,7 @@ run_id: run.id, idx, type: "test", title, detail,
 await admin.from("agent_runs").update({ step_count: idx + 1}).eq("id", run.id);
 if (run.triggered_by) {
 await admin.from("notifications").insert({
-recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "definition_test",
+recipient_id: run.triggered_by, actor_name: "Clayware Agent", kind: "definition_test",
 definition_test_id: test.id, element_id: run.element_id,
 title: `定義テスト「${test.name}」が終わりました`,
 body: `${title}。${detail}`,

@@ -88,7 +88,7 @@ export function resolveAgentConfig(worker: WorkerConfigRow | null, domain: Domai
   const w = record(worker?.ai_config);
   const d = record(domain?.ai_config);
   const domainLabel = text(domain?.name) ? `「${text(domain?.name)}」` : "";
-  const agentName = text(worker?.name) ?? "Alcon Agent";
+  const agentName = text(worker?.name) ?? "Clayware Agent";
   const providerId = text(w.provider);
   const workerModel = text(worker?.ai_model);
   let disabledReason = d.enabled === false

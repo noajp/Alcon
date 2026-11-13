@@ -12,8 +12,8 @@ import { MainContent } from '@/Frame/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/Frame/CreateView';
 import { CommandPalette } from '@/Frame/CommandPalette';
 import { QuickAddElementLauncher } from '@/Frame/QuickAddElementLauncher';
-import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
-import { copilotSubjectFor } from '@/AIP/ai/useAlconCopilot';
+import { ClaywareCopilotPanel } from '@/AIP/ai/ClaywareCopilotPanel';
+import { copilotSubjectFor } from '@/AIP/ai/useClaywareCopilot';
 import { CopilotProvider, useCopilotConversation } from '@/AIP/ai/CopilotProvider';
 import type { AppTab } from '@/Frame/appTab';
 import { forwardAfterNavigation, recordNavigation, routeKeyOf, stepBack, stepForward, type HistoryStep } from '@/Frame/historyState';
@@ -119,10 +119,10 @@ const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
 
 // The person's own sidebar choice, once they make one, outranks the width
 // band: stored device-locally ('1' = collapsed, '0' = shown), like the
-// sidebar's width (alcon:sidebarWidth in AppSidebar). Which window on
+// sidebar's width (clayware:sidebarWidth in AppSidebar). Which window on
 // which monitor has its sidebar closed is a device habit, not an account
 // preference, so it does not go through user_preferences.
-const SIDEBAR_COLLAPSED_KEY = 'alcon:sidebarCollapsed';
+const SIDEBAR_COLLAPSED_KEY = 'clayware:sidebarCollapsed';
 
 function readSidebarCollapsedChoice(): boolean | null {
   if (typeof window === 'undefined') return null;
@@ -422,14 +422,14 @@ function WorkspaceContent({
   const lastScreen = useRef<string | null>(null);
   useEffect(() => {
     const depth = storedTab.back.length;
-    if (lastScreen.current === null) window.history.replaceState({ ...window.history.state, alconBack: depth }, '');
-    else if (lastScreen.current !== screenKey && !fromBrowser.current) window.history.pushState({ alconBack: depth }, '');
+    if (lastScreen.current === null) window.history.replaceState({ ...window.history.state, claywareBack: depth }, '');
+    else if (lastScreen.current !== screenKey && !fromBrowser.current) window.history.pushState({ claywareBack: depth }, '');
     fromBrowser.current = false;
     lastScreen.current = screenKey;
   }, [screenKey, storedTab.back.length]);
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
-      const target = (e.state as { alconBack?: number } | null)?.alconBack;
+      const target = (e.state as { claywareBack?: number } | null)?.claywareBack;
       if (typeof target !== 'number') return;
       const depth = storedTab.back.length;
       if (target < depth) { fromBrowser.current = true; goBack(); }
@@ -881,7 +881,7 @@ function WorkspaceContent({
             </div>
           </div>
           {!aiScreen && (
-            <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange}
+            <ClaywareCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange}
               subject={subject}
               variant="floating" onExpand={onSlides ? undefined : handleExpandAi} />
           )}

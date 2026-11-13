@@ -61,7 +61,7 @@ describe('the Copilot turn’s context block', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     userDb: {} as any, admin: null,
     context: { viewLabel: 'ボード', today: '2026-11-08' },
-    supabaseUrl: null, actor: { agent: 'Alcon Copilot', userId: 'u1' },
+    supabaseUrl: null, actor: { agent: 'Clayware Copilot', userId: 'u1' },
   };
 
   it('puts the memories in the uncached block, never in the cached prompt', async () => {

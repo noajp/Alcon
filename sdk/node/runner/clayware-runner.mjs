@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// Alcon runner — lends your own computer's browser to your Alcon AI runs.
+// Clayware runner — lends your own computer's browser to your Clayware AI runs.
 //
 //   cd sdk/node/runner && npm install
-//   ALCON_RELAY=https://<project>.supabase.co/functions/v1/asset-relay \
-//   ALCON_SPACE=<Space id> node alcon-runner.mjs
+//   CLAYWARE_RELAY=https://<project>.supabase.co/functions/v1/asset-relay \
+//   CLAYWARE_SPACE=<Space id> node clayware-runner.mjs
 //
 // It announces itself to the Space through the asset relay (kind ai_agent,
-// capability "browser"). Accept it in Alcon › Settings › Customize ›
+// capability "browser"). Accept it in Clayware › Settings › Customize ›
 // Connected assets; from then on, AI runs started by the person who accepted
 // it may ask it to open, read and click pages. It asks the relay for work and
 // answers; nothing on this computer is reachable from outside.
 //
-// The browser is Google Chrome with a profile of its own (~/.alcon/browser),
+// The browser is Google Chrome with a profile of its own (~/.clayware/browser),
 // visible on screen so you can watch what the AI does. It shares no cookies
 // or logins with your everyday Chrome; sign in there only to sites you want
 // the AI to see as you. Read-only by default: a page navigation that sends a
@@ -22,9 +22,9 @@
 // only for the fill — never logged, never written anywhere.
 //
 // Options (environment or flags):
-//   ALCON_RELAY / --relay       the relay URL                       required
-//   ALCON_SPACE / --space       the Space id                        first run only
-//   ALCON_NAME  / --name        the runner's name (default: "<host>'s browser")
+//   CLAYWARE_RELAY / --relay       the relay URL                       required
+//   CLAYWARE_SPACE / --space       the Space id                        first run only
+//   CLAYWARE_NAME  / --name        the runner's name (default: "<host>'s browser")
 //   --headless                  no visible window
 //   --allow-writes              let pages submit forms
 //   --browser chromium          use Playwright's bundled Chromium instead of Google Chrome
@@ -36,10 +36,10 @@
 //                               must never receive a person's browser calls (a
 //                               sign-in among them), so the capability is not
 //                               announced and the handlers are not even loaded.
-//   ALCON_TOKEN                 an asset token the server minted for this runner
+//   CLAYWARE_TOKEN                 an asset token the server minted for this runner
 //                               (a provisioned workspace's own identity). When
 //                               set, it is used as-is: no first-run announce.
-//   ALCON_HOME                  where token and profile live (default ~/.alcon)
+//   CLAYWARE_HOME                  where token and profile live (default ~/.clayware)
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -53,29 +53,30 @@ const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
 const opt = (name) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : undefined; };
 
-const RELAY = (opt('relay') ?? process.env.ALCON_RELAY ?? '').replace(/\/+$/, '');
-const SPACE = opt('space') ?? process.env.ALCON_SPACE ?? '';
-const NAME = opt('name') ?? process.env.ALCON_NAME ?? `${hostname().split('.')[0]}'s browser`;
-const HOME = process.env.ALCON_HOME ?? join(homedir(), '.alcon');
+const RELAY = (opt('relay') ?? process.env.CLAYWARE_RELAY ?? '').replace(/\/+$/, '');
+const SPACE = opt('space') ?? process.env.CLAYWARE_SPACE ?? '';
+const NAME = opt('name') ?? process.env.CLAYWARE_NAME ?? `${hostname().split('.')[0]}'s browser`;
+// A machine registered before the rename keeps its token in ~/.alcon.
+const HOME = process.env.CLAYWARE_HOME ?? (!existsSync(join(homedir(), '.clayware')) && existsSync(join(homedir(), '.alcon')) ? join(homedir(), '.alcon') : join(homedir(), '.clayware'));
 const STATE = join(HOME, 'runner.json');
 const PROFILE = join(HOME, 'browser');
 const HEADLESS = flag('headless');
 const BROWSER = opt('browser') ?? 'chrome';
 const ISOLATED = flag('isolated');
 const SHELL = ISOLATED && flag('shell');
-const NO_BROWSER = flag('no-browser') || process.env.ALCON_NO_BROWSER === '1';
-const ENV_TOKEN = (process.env.ALCON_TOKEN ?? '').trim();
+const NO_BROWSER = flag('no-browser') || process.env.CLAYWARE_NO_BROWSER === '1';
+const ENV_TOKEN = (process.env.CLAYWARE_TOKEN ?? '').trim();
 /** Where shell commands run and relative file paths point. */
-const WORKDIR = process.env.ALCON_WORKDIR ?? join(HOME, 'work');
+const WORKDIR = process.env.CLAYWARE_WORKDIR ?? join(HOME, 'work');
 const ALLOW_WRITES = flag('allow-writes');
 const VERSION = '0.3.0';
 
-const log = (...m) => console.error(`[alcon-runner ${new Date().toLocaleTimeString()}]`, ...m);
-if (!RELAY) { log('ALCON_RELAY (or --relay) is required'); process.exit(1); }
+const log = (...m) => console.error(`[clayware-runner ${new Date().toLocaleTimeString()}]`, ...m);
+if (!RELAY) { log('CLAYWARE_RELAY (or --relay) is required'); process.exit(1); }
 if (NO_BROWSER && !SHELL) { log('--no-browser only makes sense with --isolated --shell'); process.exit(1); }
 
 const manifest = {
-  runner: 'alcon-runner', version: VERSION, capabilities: SHELL ? (NO_BROWSER ? ['shell', 'files'] : ['browser', 'shell', 'files']) : ['browser'],
+  runner: 'clayware-runner', version: VERSION, capabilities: SHELL ? (NO_BROWSER ? ['shell', 'files'] : ['browser', 'shell', 'files']) : ['browser'],
   host: hostname(), platform: platform(), read_only: !ALLOW_WRITES, headless: HEADLESS, isolated: ISOLATED,
 };
 
@@ -113,13 +114,13 @@ async function announce() {
   if (state?.token) {
     const r = await relay('/hello', { token: state.token, name: NAME, kind: 'ai_agent', manifest });
     log(`Connected as "${NAME}" (${r.status}).`);
-    if (r.status !== 'active') log('Waiting to be accepted in Alcon › Settings › Customize › Connected assets.');
+    if (r.status !== 'active') log('Waiting to be accepted in Clayware › Settings › Customize › Connected assets.');
     return state.token;
   }
-  if (!SPACE) { log('First run: ALCON_SPACE (or --space) is required.'); process.exit(1); }
+  if (!SPACE) { log('First run: CLAYWARE_SPACE (or --space) is required.'); process.exit(1); }
   const r = await relay('/hello', { space: SPACE, name: NAME, kind: 'ai_agent', manifest });
   saveState({ token: r.token, asset_id: r.asset_id, space: SPACE });
-  log(`Announced "${NAME}" to the Space. Accept it in Alcon › Settings › Customize › Connected assets.`);
+  log(`Announced "${NAME}" to the Space. Accept it in Clayware › Settings › Customize › Connected assets.`);
   return r.token;
 }
 
@@ -448,7 +449,7 @@ async function main() {
         await relay(`/calls/${call.id}/result`, { ok: false, error: e.message }, token).catch(() => {});
       }
     } catch (e) {
-      if (e.status === 403) { log('This runner was revoked in Alcon. Stopping.'); process.exit(1); }
+      if (e.status === 403) { log('This runner was revoked in Clayware. Stopping.'); process.exit(1); }
       if (e.status === 401) { log('The token is not known any more; announcing again.'); saveState({}); token = await announce(); assetToken = token; continue; }
       log(`Relay unreachable (${e.message}); retrying.`);
       await new Promise((r) => setTimeout(r, backoff));

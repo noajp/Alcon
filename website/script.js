@@ -12,7 +12,7 @@ const english = {
 '実行し続ける力へ。':'into lasting momentum.',
 '戦略を描く。実行を動かす。活動を支え続ける。':'Set the direction. Move work forward. Sustain the momentum.',
 '組織活動のすべてと、自立するAIを、一つのプラットフォームに。':'Every activity. Autonomous AI. One connected platform.',
-'Alconを体験する ':'Explore Alcon ',
+'Claywareを体験する ':'Explore Clayware ',
 '3つのレイヤーを知る ':'Discover the three layers ',
 '目的も、仕事も、それを支える基盤も。':'Your purpose, your work, and the foundation behind it.',
 '組織を動かすすべてが、ここでつながる。':'Everything that moves your organization, connected.',
@@ -20,7 +20,7 @@ const english = {
 '動き続ける。':'Keep moving.',
 'よい戦略だけでは、組織は動かない。':'A great strategy is only the beginning.',
 '実行と、それを支える基盤まで。':'Connect execution with the foundation that sustains it.',
-'Alconは組織活動を、三つのレイヤーで捉えます。':'Alcon brings your organization together in three layers.',
+'Claywareは組織活動を、三つのレイヤーで捉えます。':'Clayware brings your organization together in three layers.',
 '組織の意志を、明確にする。':'Give your ambition a clear direction.',
 '目的と方針を定め、Initiativeへ。日々の仕事が何のためにあるのか、組織全体で同じ方向を見渡せます。':'Define your purpose and direction, then shape them into initiatives. Give everyone a shared view of why their work matters.',
 '組織の目標と、一人ひとりの実行をつなぐ。':'Connect organizational goals with everyday execution.',
@@ -82,8 +82,8 @@ function translatePage(){
   node.textContent=language==='en'?(english[original]??original):original;
  }
  document.documentElement.lang=language;
- document.title=language==='en'?'Alcon — Turn organizational intent into lasting momentum.':'Alcon — 組織の意志を、実行し続ける力へ。';
- document.querySelector('meta[name="description"]').content=language==='en'?'Connect Strategy, Execution, and Sustainment. Every organizational activity and autonomous AI on one platform, with integrity and auditability.':'AlconはStrategy・Execution・Sustainmentをつなぎ、組織活動とAIの完全性・自立性・監査性を一つのプラットフォームで支える。';
+ document.title=language==='en'?'Clayware — Turn organizational intent into lasting momentum.':'Clayware — 組織の意志を、実行し続ける力へ。';
+ document.querySelector('meta[name="description"]').content=language==='en'?'Connect Strategy, Execution, and Sustainment. Every organizational activity and autonomous AI on one platform, with integrity and auditability.':'ClaywareはStrategy・Execution・Sustainmentをつなぎ、組織活動とAIの完全性・自立性・監査性を一つのプラットフォームで支える。';
  const toggle=document.querySelector('.language-toggle');toggle.textContent=language==='ja'?'EN':'JP';toggle.setAttribute('aria-label',language==='ja'?'Switch to English':'日本語に切り替える');
  document.querySelector('nav').setAttribute('aria-label',language==='ja'?'メインナビゲーション':'Main navigation');
  document.querySelector('[role="tablist"]').setAttribute('aria-label',language==='ja'?'プラットフォームのレイヤー':'Platform layers');
@@ -92,6 +92,6 @@ function translatePage(){
 // Layer content is generated on selection; translate newly rendered text as well.
 const selectOriginal=selectLayer;
 selectLayer=function(key){selectOriginal(key);['panel-eyebrow','panel-title','panel-description','metric-label','table-title','insight-title','insight-description'].forEach(id=>{const node=document.getElementById(id).firstChild;if(node)originalText.delete(node)});translatePage()};
-document.querySelector('.language-toggle').addEventListener('click',()=>{language=language==='ja'?'en':'ja';translatePage();try{localStorage.setItem('alcon-site-language',language)}catch{}});
-try{if(localStorage.getItem('alcon-site-language')==='en')language='en'}catch{}
+document.querySelector('.language-toggle').addEventListener('click',()=>{language=language==='ja'?'en':'ja';translatePage();try{localStorage.setItem('clayware-site-language',language)}catch{}});
+try{if(localStorage.getItem('clayware-site-language')==='en')language='en'}catch{}
 translatePage();

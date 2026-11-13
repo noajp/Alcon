@@ -33,7 +33,7 @@ if (changed.length === 0) process.exit(0)
 const fingerprint = createHash('sha1')
   .update(changed.map((f) => f + readFileSync(join(root, f), 'utf8')).join('\0'))
   .digest('hex')
-const mark = join(tmpdir(), `alcon-stop-check-${createHash('sha1').update(root).digest('hex').slice(0, 10)}`)
+const mark = join(tmpdir(), `clayware-stop-check-${createHash('sha1').update(root).digest('hex').slice(0, 10)}`)
 if (existsSync(mark) && readFileSync(mark, 'utf8') === fingerprint) process.exit(0)
 
 const run = (args) => spawnSync('npx', args, { cwd: web, encoding: 'utf8', timeout: 240_000 })

@@ -3,7 +3,7 @@ export const SUPPORTED_LOCALES = ['en', 'ja', 'ko', 'fr', 'es'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = 'en';
-export const LOCALE_STORAGE_KEY = 'alcon:locale';
+export const LOCALE_STORAGE_KEY = 'clayware:locale';
 
 export const LOCALE_NAMES: Record<Locale, string> = {
   en: 'English',

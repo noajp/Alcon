@@ -9,7 +9,7 @@ import { readAllIn, readAllPages, rowId } from '@/hooks/readAllPages';
 import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import type { AlconObject, Element, ElementAssignee, ElementWithDetails, Worker } from '@/types/database';
+import type { ClaywareObject, Element, ElementAssignee, ElementWithDetails, Worker } from '@/types/database';
 import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type WorkloadScope, type WorkloadSelection } from '@/Function/workload/workloadModel';
 import { setWorkloadDomainChoice, useWorkloadDomainChoice } from '@/Function/workload/workloadStore';
 export type { WorkloadScope } from '@/Function/workload/workloadModel';
@@ -20,7 +20,7 @@ export type { WorkloadScope } from '@/Function/workload/workloadModel';
  * The ExplorerData shape lets existing optimistic edits and deltas update it. */
 export async function fetchWorkloadObject(objectId: string, signal?: AbortSignal): Promise<ExplorerData> {
   const abort = signal ?? new AbortController().signal;
-  const objects = await readAllPages<AlconObject>('Workload Object', (from, to) => supabase
+  const objects = await readAllPages<ClaywareObject>('Workload Object', (from, to) => supabase
     .from('objects').select('*', { count: 'exact' }).eq('id', objectId)
     .order('id').range(from, to).abortSignal(abort), rowId);
   const object = objects[0];

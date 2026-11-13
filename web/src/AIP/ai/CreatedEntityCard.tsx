@@ -16,9 +16,9 @@ import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } f
 import type { CodeChange, ElementStatus } from '@/types/database';
 import { CHART_CARD_CLASS } from './chartColors';
 import { flattenCreated } from './copilotSteps';
-import type { CreatedEntity, ToolEvent } from './useAlconCopilot';
+import type { CreatedEntity, ToolEvent } from './useClaywareCopilot';
 
-// Cards for what a chat turn created in Alcon — Elements, Objects and
+// Cards for what a chat turn created in Clayware — Elements, Objects and
 // Strategies the turn's creation tools made, and the pull request a
 // coding run's publish opened (coding capability PR3), drawn from the
 // tool events' created records (server-side truth), never from parsing the
@@ -143,7 +143,7 @@ const PR_STATE_META: Record<CodeChange['state'], { icon: typeof GitPullRequest; 
  *  follow the PR (open → merged → closed) after the run ends. The
  *  snapshot stands while the read loads; a link row that no longer
  *  resolves renders muted and unlinked, as with every kind here —
- *  the PR itself lives on GitHub, but its Alcon record is what the
+ *  the PR itself lives on GitHub, but its Clayware record is what the
  *  card vouches for. Clicking opens the PR on GitHub: a pull request
  *  has no in-app home of its own; code-changes is its durable record,
  *  reached from the Element. */

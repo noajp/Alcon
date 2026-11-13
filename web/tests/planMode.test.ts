@@ -19,7 +19,7 @@ type Cmd = { name: string; effect: string; input: Record<string, unknown>; requi
 
 const writeFile = (id: string, content = '# Smoke\n'): Call => ({
   id, name: 'gh__create_or_update_file',
-  input: { owner: 'noajp', repo: 'Alcon', path: 'SMOKE.md', branch: 'claude/smoke', content, message: 'smoke' },
+  input: { owner: 'noajp', repo: 'Clayware', path: 'SMOKE.md', branch: 'claude/smoke', content, message: 'smoke' },
 });
 
 const display = { id: 'd1', integration: 'GitHub', operation: 'create_or_update_file', destination: 'GitHub', detail: null, effect: 'write', critical: null, rememberable: false, title: 'ファイルを作成', fields: [], preview: null, askReason: null };
@@ -46,7 +46,7 @@ describe('planCallKey', () => {
   it('changes when any argument changes, and ignores object key order', async () => {
     const base = await pm.planCallKey(writeFile('c1'));
     expect(await pm.planCallKey(writeFile('c1', '# Other\n'))).not.toBe(base);
-    const reordered: Call = { id: 'c1', name: writeFile('x').name, input: { message: 'smoke', content: '# Smoke\n', branch: 'claude/smoke', path: 'SMOKE.md', repo: 'Alcon', owner: 'noajp' } };
+    const reordered: Call = { id: 'c1', name: writeFile('x').name, input: { message: 'smoke', content: '# Smoke\n', branch: 'claude/smoke', path: 'SMOKE.md', repo: 'Clayware', owner: 'noajp' } };
     expect(await pm.planCallKey(reordered)).toBe(base);
   });
 });
@@ -74,7 +74,7 @@ describe('matchPlanCall — the apply-time coverage rule', () => {
 
   it('an unlisted call is never covered', async () => {
     const plan = await planOf([writeFile('p1')]);
-    const other: Call = { id: 'a1', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', head: 'b', base: 'main' } };
+    const other: Call = { id: 'a1', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', head: 'b', base: 'main' } };
     expect(pm.matchPlanCall(plan, await pm.planCallKey(other))).toBeNull();
   });
 
@@ -206,7 +206,7 @@ describe('capturePlanExpected — the plan-time half performs zero writes', () =
         : { text: '{"head":"b","base":"main"}', isError: false }),
     });
     const tool = githubTool(GH_MANIFEST, 'create_pull_request', session);
-    const call: Call = { id: 'p1', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', head: 'b', base: 'main', title: 't' } };
+    const call: Call = { id: 'p1', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', head: 'b', base: 'main', title: 't' } };
     const expected = await pm.capturePlanExpected(tool, call);
     expect(expected?.verifyCommand).toBe('get_pull_request');
     expect(expected?.expected).toEqual({ head: 'b', base: 'main' });

@@ -394,13 +394,13 @@ async function routeOne(
 
   const comment = async (content: string) => {
     await admin.from("element_comments").insert({
-      element_id: change.element_id, author_id: actorId, author_kind: "ai_agent", author_name: "Alcon Agent",
+      element_id: change.element_id, author_id: actorId, author_kind: "ai_agent", author_name: "Clayware Agent",
       content,
     }).then(() => {}, () => {});
   };
   const notify = async (title: string, body: string) => {
     await admin.from("notifications").insert({
-      recipient_id: actorId, actor_name: "Alcon Agent", kind: "status_change", element_id: change.element_id,
+      recipient_id: actorId, actor_name: "Clayware Agent", kind: "status_change", element_id: change.element_id,
       title, body,
     }).then(() => {}, () => {});
   };
@@ -520,12 +520,12 @@ async function routeOne(
   }
 }
 
-/** The Space's in-Alcon AI Worker, when the publishing run's worker
+/** The Space's in-Clayware AI Worker, when the publishing run's worker
  *  is gone: the automation fire's own pick, mirrored as a read. */
 async function aiWorkerId(admin: SupabaseClient, spaceId: string | null): Promise<string | null> {
   if (!spaceId) return null;
   const { data } = await admin.from("workers").select("id, name, ai_config")
     .eq("activity_space_id", spaceId).eq("type", "ai_agent").eq("status", "active");
-  const inAlcon = (data ?? []).filter((w) => ((w as { ai_config?: unknown }).ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
-  return ((inAlcon.find((w) => (w as { name?: string }).name === "Claude") ?? inAlcon[0]) as { id: string } | undefined)?.id ?? null;
+  const inClayware = (data ?? []).filter((w) => ((w as { ai_config?: unknown }).ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
+  return ((inClayware.find((w) => (w as { name?: string }).name === "Claude") ?? inClayware[0]) as { id: string } | undefined)?.id ?? null;
 }

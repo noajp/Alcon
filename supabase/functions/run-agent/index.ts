@@ -1,4 +1,4 @@
-// run-agent — Athena, Alcon's one agent engine (ADR 0027).
+// run-agent — Athena, Clayware's one agent engine (ADR 0027).
 //
 // Executes an Element's task on behalf of the person who started it: plans,
 // works through the board and the Space's integrations, stops for that
@@ -61,7 +61,7 @@ import { resolveElementIdTraced, runBoardTool, updateElementById, errorMessage, 
 import { runStrategyTool } from "../_shared/strategyTools.ts";
 import { AGENT_MODELS, DEFAULT_AGENT_MODEL, costAt, costOf, type ModelUsage } from "../_shared/aiPricing.ts";
 import {
-  McpSession, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential, type IntegrationRow,
+  McpSession, HTTP_REQUEST_SCHEMA, isAuthFailure, isSafeEndpoint, pointsAtClayware, resolveCredential, type IntegrationRow,
 } from "../_shared/integrationClient.ts";
 import { isGoogleDriveRow } from "../_shared/googleOAuth.ts";
 import { fetchPull, githubTokens, pullUrlsIn, upsertCodeChange, withGithubToken, type GithubPull, type PullRef } from "../_shared/github.ts";
@@ -340,7 +340,7 @@ type Run = {
 
 // IntegrationTool and ApprovalDisplay live in _shared/integrationTools.ts,
 // with the manifest→tool planning, the approval facts and the executor every
-// caller shares (run-agent and alcon-copilot alike).
+// caller shares (run-agent and clayware-copilot alike).
 
 /** An integration this run cannot use, told to the agent with the reason. */
 function downIntegration(name: string, reason: string): TaskContext["integrations"][number] {
@@ -632,7 +632,7 @@ async function failRun(admin: SupabaseClient, run: Run, message: string) {
   await closeRunWorkspace(admin, (k) => Deno.env.get(k), run.id, "run_failed", new Date()).catch(() => false);
   if (run.triggered_by) {
     await admin.from("notifications").insert({
-      recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
+      recipient_id: run.triggered_by, actor_name: "Clayware Agent", kind: "status_change", element_id: run.element_id,
       title: "エージェントの実行が失敗しました", body: message.slice(0, 200),
     }).then(() => {}, () => {});
   }
@@ -662,7 +662,7 @@ async function pauseOnError(admin: SupabaseClient, run: Run, message: string) {
     }
     if (!told) {
       await admin.from("notifications").insert({
-        recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
+        recipient_id: run.triggered_by, actor_name: "Clayware Agent", kind: "status_change", element_id: run.element_id,
         title: known ? why.title : "エージェントがエラーで一時停止しました", body: why.body.slice(0, 200),
       }).then(() => {}, () => {});
     }
@@ -1041,10 +1041,10 @@ async function execute(a: ExecArgs): Promise<void> {
         integrationSummary.push(downIntegration(row.name, "接続テストが済んでいない（Settings › Customize で接続テストが必要）"));
         continue;
       }
-      // Never Alcon itself: the board tools already act as the starter, and a
+      // Never Clayware itself: the board tools already act as the starter, and a
       // stored token would act outside this run.
-      if (pointsAtAlcon(row.endpoint, Deno.env.get("SUPABASE_URL"))) {
-        await addStep(admin, run.id, "error", `連携「${row.name}」は Alcon 自身を指しているため使いません`, "Alcon のデータの操作はエージェントの標準の道具で行います。");
+      if (pointsAtClayware(row.endpoint, Deno.env.get("SUPABASE_URL"))) {
+        await addStep(admin, run.id, "error", `連携「${row.name}」は Clayware 自身を指しているため使いません`, "Clayware のデータの操作はエージェントの標準の道具で行います。");
         continue;
       }
       // OAuth is a sign-in this engine can complete (oauthRowOpens, shared
@@ -1488,7 +1488,7 @@ async function execute(a: ExecArgs): Promise<void> {
   const chainDeniedCalls = new Set<string>();
   let chainDeniedCount = 0;
   const factsForCall = (call: ToolCall, opts?: { noChain?: boolean }): ApprovalFacts => {
-    // Alcon's own operations: the Element entry's policy decides each call.
+    // Clayware's own operations: the Element entry's policy decides each call.
     if (isCatalogTool(call.name)) {
       const tool = catalogTool(call.name);
       return { catalogDecision: tool ? decideCall("element", tool, call.input) : "allow", isWrite: true, isRead: false };
@@ -1569,7 +1569,7 @@ async function execute(a: ExecArgs): Promise<void> {
   // the integrations (§5.5): the enabled installs joined to their
   // catalog items, in the catalog's order (sort, then install time),
   // each payload read through parseExceptionEntry — an unreadable
-  // payload is no entry at all (fail closed; the breakage is Alcon's
+  // payload is no entry at all (fail closed; the breakage is Clayware's
   // own content, so it is logged, never stepped onto the run). The
   // definition's exceptions section narrows the consulted set here,
   // once, so everything after — the call seam's retries, the
@@ -2305,7 +2305,7 @@ async function execute(a: ExecArgs): Promise<void> {
     if (isMachineTool(call.name)) return await callMachine(call);
     if (baseKindOf(call.name) === "board") {
       const r = await runCatalogTool(userDb, call.name, input, actor, { entry: "element", approved, spaceId: run.activity_space_id ?? null });
-      await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
+      await addStep(admin, run.id, "action", `Clayware: ${catalogOperation(call.name, input)}`, r.ok ? null : r.error);
       // A failed Element resolution is recorded with its evidence — the
       // raw identifier, the stage it died at, the session's user (audit
       // only; the surface keeps the translated line). A write-back that
@@ -2694,7 +2694,7 @@ async function execute(a: ExecArgs): Promise<void> {
     }
     if (isCatalogTool(call.name)) {
       const tool = catalogTool(call.name)!;
-      const label = `Alcon: ${catalogOperation(call.name, call.input)}`;
+      const label = `Clayware: ${catalogOperation(call.name, call.input)}`;
       if (effectOfCall(tool, call.input) === "read") return await live(label);
       const decision = decideCall("element", tool, call.input);
       return await plan(label, decision !== "deny", decision === "deny" ? catalogDenyRefusal(call.name, call.input) : null);
@@ -2816,7 +2816,7 @@ async function execute(a: ExecArgs): Promise<void> {
     }
     if (isCatalogTool(call.name)) {
       const tool = catalogTool(call.name)!;
-      const label = `Alcon: ${catalogOperation(call.name, call.input)}`;
+      const label = `Clayware: ${catalogOperation(call.name, call.input)}`;
       if (effectOfCall(tool, call.input) === "read") return await executeCall(call);
       const decision = decideCall("element", tool, call.input);
       return await record(label, {
@@ -4275,7 +4275,7 @@ async function execute(a: ExecArgs): Promise<void> {
         }
         if (isCatalogTool(call.name)) {
           const refusal = catalogDenyRefusal(call.name, call.input);
-          await addStep(admin, run.id, "action", `Alcon: ${catalogOperation(call.name, call.input)}`, refusal);
+          await addStep(admin, run.id, "action", `Clayware: ${catalogOperation(call.name, call.input)}`, refusal);
           return { content: refusal, is_error: true };
         }
         const deniedTool = integrationTools.get(call.name);
@@ -4840,7 +4840,7 @@ async function converse(a: ExecArgs, said: string): Promise<void> {
     const r = await runCatalogTool(userDb, call.name, call.input, actor, { entry: "conversation", spaceId: run.activity_space_id ?? null });
     const writes = (catalogTool(call.name)?.effect ?? "read") !== "read";
     // The page draws the conversation from these steps: what was done, about what, and whether it failed.
-    await addStep(admin, run.id, !r.ok ? "error" : writes ? "write" : "action", `Alcon: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);
+    await addStep(admin, run.id, !r.ok ? "error" : writes ? "write" : "action", `Clayware: ${call.name}`, r.ok ? conversationStepDetail(call.input) : r.error);
     // A recall's bodies count as uses of those memories (PR3).
     if (call.name === "recall_memory" && r.ok) await noteMemoryUse(admin, run.id, usedIdsOf(r.data));
     // A promotion the person just asked for starts drafting now (PR5).
@@ -5967,7 +5967,7 @@ function heartbeatSystemPrompt(agentName: string): string {
 }
 
 /** The Space's AI Worker a heartbeat speaks as: the run's own Worker
- *  when the tick named one, else the Space's in-Alcon worker (the
+ *  when the tick named one, else the Space's in-Clayware worker (the
  *  automations selection: an active AI worker not handed to Claude
  *  Code, "Claude" preferred). Null runs as the default agent. */
 async function loadHeartbeatWorker(admin: SupabaseClient, run: Run): Promise<WorkerConfigRow | null> {
@@ -5978,9 +5978,9 @@ async function loadHeartbeatWorker(admin: SupabaseClient, run: Run): Promise<Wor
   if (!run.activity_space_id) return null;
   const { data } = await admin.from("workers").select("name, ai_config, ai_model")
     .eq("activity_space_id", run.activity_space_id).eq("type", "ai_agent").eq("status", "active");
-  const inAlcon = ((data ?? []) as WorkerConfigRow[])
+  const inClayware = ((data ?? []) as WorkerConfigRow[])
     .filter((w) => (w.ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
-  return inAlcon.find((w) => w.name === "Claude") ?? inAlcon[0] ?? null;
+  return inClayware.find((w) => w.name === "Claude") ?? inClayware[0] ?? null;
 }
 
 /**
@@ -7085,7 +7085,7 @@ async function loadConversationContext(userDb: SupabaseClient, run: Run, strateg
   ]);
   // The harness the Strategy is worked by: its own, else the Space's
   // default. A disabled one is inert — the chain falls through to the next
-  // slot, and to no harness (Alcon's built-in conversation) at the end.
+  // slot, and to no harness (Clayware's built-in conversation) at the end.
   const strategyDefId = (row as { definition_id?: string | null } | null)?.definition_id ?? null;
   let defaultDefId: string | null = null;
   if (run.activity_space_id) {
@@ -7475,7 +7475,7 @@ async function decidePlan(a: ExecArgs): Promise<void> {
     }).eq("id", action.id);
     await addStep(admin, run.id, "approval", "計画が却下されました", note);
     await admin.from("element_comments").insert({
-      element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
+      element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Clayware Agent",
       content: `**計画が却下されました** — ${summary}${note ? `\n\n${note}` : ""}`,
     });
     // The plan run ends failed: the work was not done and the Element does
@@ -7486,7 +7486,7 @@ async function decidePlan(a: ExecArgs): Promise<void> {
     }).eq("id", run.id).eq("status", "running");
     if (run.triggered_by) {
       await admin.from("notifications").insert({
-        recipient_id: run.triggered_by, actor_name: "Alcon Agent", kind: "status_change", element_id: run.element_id,
+        recipient_id: run.triggered_by, actor_name: "Clayware Agent", kind: "status_change", element_id: run.element_id,
         title: "計画が却下されました", body: summary,
       }).then(() => {}, () => {});
     }
@@ -7541,7 +7541,7 @@ async function decidePlan(a: ExecArgs): Promise<void> {
     finished_at: new Date().toISOString(), continuation_token: null,
   }).eq("id", run.id).eq("status", "running");
   await admin.from("element_comments").insert({
-    element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
+    element_id: run.element_id, author_id: user.id, author_kind: "ai_agent", author_name: "Clayware Agent",
     content: `**計画が承認されました** — ${summary}。適用 run が計画どおりに実行します。`,
   });
   // Drive the apply run as the approver (advanceFrom's pattern) —
@@ -7761,12 +7761,12 @@ async function advanceFrom(
       `開始しなかった作業: ${titles.join("、")}`);
     for (const c of capped) {
       await admin.from("element_comments").insert({
-        element_id: c.elementId, author_id: user.id, author_kind: "ai_agent", author_name: "Alcon Agent",
+        element_id: c.elementId, author_id: user.id, author_kind: "ai_agent", author_name: "Clayware Agent",
         content: `**連鎖の上限** — 連鎖の深さ上限（${maxDepth}）に達したため、この作業は自動では開始しませんでした。起点の実行: ${parent.scope?.rootRunId ?? parent.id}。開始ボタンで新しく始められます（新しい連鎖として始まります）。`,
       }).then(() => {}, () => {});
     }
     await admin.from("notifications").insert({
-      recipient_id: parent.triggeredBy ?? user.id, actor_name: "Alcon Agent", kind: "status_change", element_id: doneId,
+      recipient_id: parent.triggeredBy ?? user.id, actor_name: "Clayware Agent", kind: "status_change", element_id: doneId,
       title: "連鎖の上限に達しました", body: titles.join("、"),
     }).then(() => {}, () => {});
   }

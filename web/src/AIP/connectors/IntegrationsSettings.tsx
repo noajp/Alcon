@@ -30,7 +30,7 @@ import { Textarea } from '@/ui/textarea';
 import type { IntegrationDraft } from '@/types/database';
 import { IntegrationIcon } from './IntegrationDetailDialog';
 import { ConnectDialogHost, openedForIntegration, openedForPreset, openedForRegistryEntry, type OpenedConnection } from './ConnectDialogHost';
-import { AlconConnectPanel } from './AlconConnectPanel';
+import { ClaywareConnectPanel } from './ClaywareConnectPanel';
 import { AssetRelayPanel } from './AssetRelayPanel';
 import { setOAuthOutcome, useOAuthOutcome } from './oauthReturn';
 import { HarnessesPanel } from '@/AIP/harness/HarnessesPanel';
@@ -45,9 +45,9 @@ import type { DirectoryEntry } from '@/hooks/customizeData';
 //                how a connection is made, and the public MCP Registry
 //                (RegistrySection)
 // Settings › API & access: the other direction.
-//   alcon        point an MCP client or script at Alcon
+//   clayware        point an MCP client or script at Clayware
 //                with an OAuth sign-in or a personal access token
-//                (AlconConnectPanel, ADR 0032 / 0034).
+//                (ClaywareConnectPanel, ADR 0032 / 0034).
 //   assets       the apps and AIs that joined the Space by adding one line to
 //                their backend (AssetRelayPanel, ADR 0036).
 // Members see everything read-only; only owners can connect or change.
@@ -55,7 +55,7 @@ import type { DirectoryEntry } from '@/hooks/customizeData';
 const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
 
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
-  return tab === 'alcon' ? <AlconConnectPanel />
+  return tab === 'clayware' ? <ClaywareConnectPanel />
     : tab === 'assets' ? <AssetRelayPanel />
     : tab === 'definitions' ? <HarnessesPanel />
     : tab === 'external' ? <ExternalServicesPanel />

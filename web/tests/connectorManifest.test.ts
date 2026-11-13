@@ -146,7 +146,7 @@ describe('argument rules', () => {
     commands: [
       { name: 'create_pull_request', effect: 'write', mcp: 'create_pull_request',
         rules: [
-          { when: { owner: 'noajp', repo: 'Alcon' }, permission: 'allow' },
+          { when: { owner: 'noajp', repo: 'Clayware' }, permission: 'allow' },
           { when: { repo: 'secret-*' }, permission: 'deny' },
           { when: { owner: 'noajp' }, permission: 'ask' },
           { when: {}, permission: 'allow' },
@@ -165,7 +165,7 @@ describe('argument rules', () => {
   });
 
   it('lets the first matching rule decide, then the command', () => {
-    expect(cm.decide(manifest, pr, { owner: 'NOAJP', repo: 'alcon', title: 'x' })).toEqual({ permission: 'allow', rule: 0 });
+    expect(cm.decide(manifest, pr, { owner: 'NOAJP', repo: 'clayware', title: 'x' })).toEqual({ permission: 'allow', rule: 0 });
     expect(cm.decide(manifest, pr, { owner: 'other', repo: 'secret-plans' })).toEqual({ permission: 'deny', rule: 1 });
     expect(cm.decide(manifest, pr, { owner: 'noajp', repo: 'web' })).toEqual({ permission: 'ask', rule: 2 });
     expect(cm.decide(manifest, pr, { owner: 'other', repo: 'web' })).toEqual({ permission: 'ask', rule: null });
@@ -190,8 +190,8 @@ describe('argument rules', () => {
   });
 
   it('builds a remembered rule only from values every call shares', () => {
-    const calls = [{ owner: 'noajp', repo: 'Alcon', title: 'a' }, { owner: 'noajp', repo: 'Alcon', title: 'b' }];
-    expect(cm.ruleFromCalls(calls, ['owner', 'repo'])).toEqual({ when: { owner: 'noajp', repo: 'Alcon' }, permission: 'allow' });
+    const calls = [{ owner: 'noajp', repo: 'Clayware', title: 'a' }, { owner: 'noajp', repo: 'Clayware', title: 'b' }];
+    expect(cm.ruleFromCalls(calls, ['owner', 'repo'])).toEqual({ when: { owner: 'noajp', repo: 'Clayware' }, permission: 'allow' });
     expect(cm.ruleFromCalls(calls, ['title'])).toHaveProperty('error');
     expect(cm.ruleFromCalls([{ q: 'a*' }], ['q'])).toHaveProperty('error');
     expect(cm.ruleFromCalls([{ body: { x: 1 } }], ['body'])).toHaveProperty('error');

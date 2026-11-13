@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { ElementWithDetails, AlconObjectWithChildren } from '@/types/database';
+import type { ElementWithDetails, ClaywareObjectWithChildren } from '@/types/database';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import {
   useBoard,
@@ -17,7 +17,7 @@ const SURFACE_ZONES: Zone[] = ['band', 'main'];
 
 interface SummaryViewProps {
   elements: ElementWithDetails[];
-  object: AlconObjectWithChildren;
+  object: ClaywareObjectWithChildren;
 }
 
 /** Object Summary — a two-column board and nothing else. No fixed spine: the

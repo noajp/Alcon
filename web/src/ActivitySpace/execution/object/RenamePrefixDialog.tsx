@@ -5,10 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { renameObjectPrefix, type AlconObjectWithChildren } from '@/hooks/useSupabase';
+import { renameObjectPrefix, type ClaywareObjectWithChildren } from '@/hooks/useSupabase';
 
 interface RenamePrefixDialogProps {
-  object: AlconObjectWithChildren;
+  object: ClaywareObjectWithChildren;
   onClose: () => void;
   onRenamed: () => void;
 }

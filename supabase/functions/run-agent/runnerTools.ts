@@ -1,5 +1,5 @@
 // The browser on a person's own computer, as an agent's tools. A runner
-// (sdk/node/alcon-runner.mjs) announces itself to the Space through the asset
+// (sdk/node/clayware-runner.mjs) announces itself to the Space through the asset
 // relay with the capability "browser"; once the person accepts it, their runs
 // may ask it to open, read and click pages in a Chrome profile of its own.
 // The call goes into asset_calls; the runner takes it, does it and answers.

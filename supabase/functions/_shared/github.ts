@@ -4,7 +4,7 @@ import { parseGithubSecret } from "./githubOAuth.ts";
 // Pull requests on GitHub for code_changes, with the credential of the
 // Space's GitHub integration (the fine-grained token stored in Vault for the
 // GitHub MCP preset works on the REST API too): reading them, and carrying
-// reviews, line comments and merges made in Alcon back. Used by the
+// reviews, line comments and merges made in Clayware back. Used by the
 // code-changes Edge Function and by run-agent when an agent opens a PR.
 //
 // The token goes only into the outgoing Authorization header; it is never
@@ -70,7 +70,7 @@ async function gh(path: string, token: string | null, write?: { method: "POST" |
     headers: {
       accept: "application/vnd.github+json",
       "x-github-api-version": "2022-11-28",
-      "user-agent": "alcon-code-changes",
+      "user-agent": "clayware-code-changes",
       ...(write ? { "content-type": "application/json" } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },

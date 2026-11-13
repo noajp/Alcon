@@ -85,7 +85,7 @@ const sealedDisplay = [
     detail: null, effect: 'write', critical: null, rememberable: false,
     title: 'Create a pull request',
     fields: [
-      { label: 'Repository', value: 'Alcon' },
+      { label: 'Repository', value: 'Clayware' },
       { label: '読み戻し確認', value: '「get_pull_request」で title を照合します' },
     ],
     preview: null, askReason: null,
@@ -102,7 +102,7 @@ const sealedDisplay = [
   },
 ];
 const sealedCalls = [
-  { id: 'a', name: 'github__create_pull_request', input: { repo: 'Alcon' } },
+  { id: 'a', name: 'github__create_pull_request', input: { repo: 'Clayware' } },
   { id: 'b', name: 'github__delete_file', input: { path: 'old.md' } },
 ];
 

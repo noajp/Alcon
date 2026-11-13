@@ -4,14 +4,14 @@
 //   node .claude/ops/rename-product.mjs <NewName>            # rewrite
 //   node .claude/ops/rename-product.mjs <NewName> --dry-run  # count only
 //
-// What changes: every case-sensitive "Alcon" in tracked text files (docs, UI
-// strings, component and file names such as AlconCopilotPanel.tsx), and the
-// skill folder .claude/skills/alcon with its `name:`. CURRENT below is
+// What changes: every case-sensitive "Clayware" in tracked text files (docs, UI
+// strings, component and file names such as ClaywareCopilotPanel.tsx), and the
+// skill folder .claude/skills/clayware with its `name:`. CURRENT below is
 // rewritten too, so the next run starts from the new name.
 //
 // What does not: lowercase and upper-case identifiers that something outside
-// this repo already depends on — Edge Function names (alcon-mcp, alcon-api,
-// alcon-copilot), HTTP headers (x-alcon-*), env vars and secrets (ALCON_*),
+// this repo already depends on — Edge Function names (clayware-mcp, clayware-api,
+// clayware-copilot), HTTP headers (x-clayware-*), env vars and secrets (CLAYWARE_*),
 // the SDK file names, token prefixes. Renaming those means redeploying and
 // telling every caller, so they stay. supabase/migrations is history that has
 // already run, so it stays too.
@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const CURRENT = 'Alcon'
+const CURRENT = 'Clayware'
 
 const args = process.argv.slice(2)
 const dryRun = args.includes('--dry-run')

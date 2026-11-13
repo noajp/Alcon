@@ -30,7 +30,7 @@ export function AppShell() {
   }, []);
   const view = useDeckView();
   const locale = useKata((s) => s.locale);
-  // Alcon keeps hidden tabs mounted: a shell that is not on screen takes no keys and prints nothing.
+  // Clayware keeps hidden tabs mounted: a shell that is not on screen takes no keys and prints nothing.
   const shell = useRef<HTMLDivElement>(null);
   useShortcuts(shell);
   // ブラウザのメニューから印刷したときも、全ページを描いてから印刷する
@@ -178,7 +178,7 @@ function useShortcuts(shell: RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !shown(shell.current)) return;
-      // ⌘K stays Alcon's search; the editor's commands open with "/".
+      // ⌘K stays Clayware's search; the editor's commands open with "/".
       // ダイアログを開いている間は、後ろのデッキを動かさない（エディタ自身を包むダイアログは除く）
       if ([...document.querySelectorAll('[aria-modal="true"]')].some((d) => !d.contains(shell.current))) return;
       const t = e.target as HTMLElement | null;
@@ -195,7 +195,7 @@ function useShortcuts(shell: RefObject<HTMLDivElement | null>) {
         s.setShortcuts(true);
         return;
       }
-      // The editor's own commands (layouts, pages, looks); ⌘K stays Alcon's search.
+      // The editor's own commands (layouts, pages, looks); ⌘K stays Clayware's search.
       if (e.key === "/" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         s.setPalette(true);

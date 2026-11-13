@@ -1,7 +1,7 @@
 'use client';
 
-import { AlconCopilotPanel } from '@/AIP/ai/AlconCopilotPanel';
-import type { CopilotSubject } from '@/AIP/ai/useAlconCopilot';
+import { ClaywareCopilotPanel } from '@/AIP/ai/ClaywareCopilotPanel';
+import type { CopilotSubject } from '@/AIP/ai/useClaywareCopilot';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
@@ -257,7 +257,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {/* The AI on a screen of its own — the same conversation as the pop-up. */}
-          {activeActivity === 'ai' && <AlconCopilotPanel variant="page" open onOpenChange={() => {}} subject={aiSubject} onMinimize={onMinimizeAi} />}
+          {activeActivity === 'ai' && <ClaywareCopilotPanel variant="page" open onOpenChange={() => {}} subject={aiSubject} onMinimize={onMinimizeAi} />}
 
           {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} />}
 

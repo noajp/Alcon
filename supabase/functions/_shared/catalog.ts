@@ -9,7 +9,7 @@ import { HARNESS_TOOLS, runHarnessTool } from "./harnessTools.ts";
 import { MEMORY_TOOLS, runMemoryTool } from "./memoryTools.ts";
 import type { RunToolDef } from "./toolLoading.ts";
 
-// Every operation Alcon's AI can perform inside Alcon, in one list, with one
+// Every operation Clayware's AI can perform inside Clayware, in one list, with one
 // executor. Each entry — the AI panel, a conversation on a Strategy, an
 // Element's run (automations start those) — takes its tools from here through
 // its policy (ENTRY_POLICIES): the entries differ in the context they give

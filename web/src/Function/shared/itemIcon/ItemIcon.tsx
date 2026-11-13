@@ -9,12 +9,12 @@ import { STANDARD_ICON_STROKE, itemColor, parseItemIcon } from './itemIconValue'
 
 type Glyph = ComponentType<IconProps>;
 
-/** Alcon's own concept marks, shown first in the picker. */
+/** Clayware's own concept marks, shown first in the picker. */
 const FEATURED = ['GuidingStar', 'CompassRose', 'Spearhead', 'Milestone', 'Layers', 'Box', 'Component', 'Flag', 'Bot', 'Users', 'FileText', 'BookOpen', 'Calendar', 'Inbox', 'ShieldCheck', 'HeartHandshake'];
 
-/** Alcon's own drawings by name, one entry per drawing (aliases dropped),
+/** Clayware's own drawings by name, one entry per drawing (aliases dropped),
  *  its concept marks first. */
-export const ALCON_GLYPHS: [name: string, Glyph][] = (() => {
+export const CLAYWARE_GLYPHS: [name: string, Glyph][] = (() => {
   const seen = new Set<unknown>();
   const out: [string, Glyph][] = [];
   for (const [name, value] of Object.entries(GLYPH_MODULE)) {
@@ -31,7 +31,7 @@ const GLYPH_BY_NAME = new Map<string, Glyph>(
 
 /**
  * A Strategy's, Object's or Element's icon: its own when it has one (an
- * Alcon drawing, a standard icon or an emoji), else the concept's default
+ * Clayware drawing, a standard icon or an emoji), else the concept's default
  * (`fallback`), in its own colour when it has one.
  */
 export function ItemIcon({ icon, color, fallback, size = 16, className = '' }: {

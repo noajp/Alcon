@@ -162,12 +162,12 @@ describe('approvalDisplayForCall — display v2 (title, fields, preview, askReas
     const tools = new Map<string, IntegrationToolLike>([['gh__create_pull_request', mcpTool(PR_MANIFEST, 'create_pull_request', 'create_pull_request')]]);
     const d = it8n.approvalDisplayForCall(tools, {
       id: 'c1', name: 'gh__create_pull_request',
-      input: { owner: 'noajp', repo: 'Alcon', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.' },
+      input: { owner: 'noajp', repo: 'Clayware', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.' },
     });
     expect(d.title).toBe('Create a pull request');
     expect(d.fields).toEqual([
       { label: 'Repository owner', value: 'noajp' },
-      { label: 'Repository', value: 'Alcon' },
+      { label: 'Repository', value: 'Clayware' },
       { label: 'Title', value: 'Add the card' },
       { label: 'Base', value: 'main' },
       { label: 'Head', value: 'claude/card' },
@@ -189,7 +189,7 @@ describe('approvalDisplayForCall — display v2 (title, fields, preview, askReas
     const tools = new Map<string, IntegrationToolLike>([['gh__create_or_update_file', mcpTool(PR_MANIFEST, 'create_or_update_file', 'create_or_update_file')]]);
     const d = it8n.approvalDisplayForCall(tools, {
       id: 'c1', name: 'gh__create_or_update_file',
-      input: { owner: 'noajp', repo: 'Alcon', path: 'README.md', branch: 'main', content: 'x'.repeat(2000), message: 'docs' },
+      input: { owner: 'noajp', repo: 'Clayware', path: 'README.md', branch: 'main', content: 'x'.repeat(2000), message: 'docs' },
     });
     expect(d.title).toBe('Create or update a file');
     expect(d.preview).toHaveLength(601);

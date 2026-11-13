@@ -12,7 +12,7 @@ import {
   fetchObjectDomainIds,
   fileObjectUnderDomains,
   useDomains,
-  type AlconObjectWithChildren,
+  type ClaywareObjectWithChildren,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/Function/shared/EntityActionsMenu';
 import { DropdownMenuItem } from '@/ui/dropdown-menu';
@@ -36,7 +36,7 @@ export function ObjectActionsMenu({
   onRefresh,
   onDeleted,
 }: {
-  object: AlconObjectWithChildren;
+  object: ClaywareObjectWithChildren;
   onRefresh?: () => void | Promise<void>;
   /** Navigate away after the Object is deleted or archived (close detail → Domain view). */
   onDeleted?: () => void;

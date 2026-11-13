@@ -7,7 +7,7 @@
     "src/AIP/harness/harnessDefinition.ts": "エンジンの読み取り（supabase/functions/_shared/definition.ts）をバイト単位で写したもの（tests/definition.test.ts が一致を検査）。run-agent / plan-initiative が使う export も残るので、エディタで使わない export を削らない"
   },
   "accepted": {
-    "src/ActivitySpace/artifacts/slides/SlidesAssistant.tsx#SlidesAssistant": "AI パネル（AlconCopilotPanel）が Slides のときだけ next/dynamic で読み込む。動的 import は静的な走査から見えない",
+    "src/ActivitySpace/artifacts/slides/SlidesAssistant.tsx#SlidesAssistant": "AI パネル（ClaywareCopilotPanel）が Slides のときだけ next/dynamic で読み込む。動的 import は静的な走査から見えない",
     "src/Frame/openScreen.ts#openScreenFrom": "readOpenScreen の中身（保存値の読み取りと検証）。sessionStorage のない node のテストから直接確かめるために export している",
     "src/Frame/historyState.ts#routeKeyOf": "recordNavigation が使う純粋なルートキー合成。呼び出し元が同一ファイルのため走査からは未配線に見える。tests/historyState.test.ts が直接確かめるために export している",
     "src/Function/shared/workTrace.ts#splitStepTitle": "traceStepFromRunStep が使う純粋な分割（ステップ名のラベル／チップ分離）。呼び出し元が同一ファイルのため走査からは未配線に見える。tests/workTrace.test.ts が直接確かめるために export している",

@@ -285,7 +285,7 @@ Deno.serve(async (req: Request) => {
         .filter((r) => (r.scope === "space" ? r.activity_space_id === row.activity_space_id : r.user_id === user.id));
       for (const rule of matchPendingCapabilities(scoped, row.preset, commandNames)) {
         await admin.from("notifications").insert({
-          recipient_id: user.id, actor_name: "Alcon Agent", kind: "status_change", element_id: null,
+          recipient_id: user.id, actor_name: "Clayware Agent", kind: "status_change", element_id: null,
           title: `使えるようになりました: ${rule.command}`,
           body: `${row.name} で ${rule.command} が使えるようになりました。能力待ちのルール「${rule.title}」を効かせ始められます。`,
         }).then(() => {}, () => {});

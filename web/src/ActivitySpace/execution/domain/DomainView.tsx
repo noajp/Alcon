@@ -14,7 +14,7 @@ import { linkConflicts, linkWouldLoop } from '@/Function/shared/objectDependency
 import { Plus } from '@/ui/icons';
 import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
-import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
@@ -422,7 +422,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
       {/* The overview is for reading the Object; Elements are added on its lists. */}
       {!isEmptyObjectElements && effectiveActiveType !== 'overview' && (
         <Button variant="ghost" size="sm" type="button" className="text-muted-foreground"
-          onClick={() => window.dispatchEvent(new CustomEvent('alcon:quick-add-element'))}>
+          onClick={() => window.dispatchEvent(new CustomEvent('clayware:quick-add-element'))}>
           <Plus size={14} />{t('Add Element')}
         </Button>
       )}
@@ -735,13 +735,13 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
 // pinned to 'todo' for a neutral bar colour — Objects don't carry a status of
 // their own, and showing them all the same colour is the honest read.
 /** Pure. The share of an Object's Elements that are done, 0–100; null with none. */
-function objectProgress(o: AlconObjectWithChildren): number | null {
+function objectProgress(o: ClaywareObjectWithChildren): number | null {
   const open = (o.elements ?? []).filter((e) => e.status !== 'cancelled');
   if (open.length === 0) return null;
   return Math.round((open.filter((e) => e.status === 'done').length / open.length) * 100);
 }
 
-export function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
+export function objectToGanttBar(o: ClaywareObjectWithChildren): ElementWithDetails {
   return {
     id: o.id,
     object_id: null,

@@ -7,14 +7,14 @@
 // request reaches the Space's owners in their Inbox. When the gateway is
 // ready to send, it redeems the approval with the hash of what it is about to
 // send; the database spends it once, and only for that hash, and this
-// function signs the proof with Alcon's key. Content changed after the
+// function signs the proof with Clayware's key. Content changed after the
 // approval, a second use, an expired or a rejected approval get no proof.
 //
 // Request:  POST <JSON: { action: "request", ... } | { action: "redeem", approval_id, input_hash }>
-//           x-alcon-gateway-key: <workflow_gateway_keys.id>
-//           x-alcon-signature:   <base64url Ed25519 signature of the raw body>
+//           x-clayware-gateway-key: <workflow_gateway_keys.id>
+//           x-clayware-signature:   <base64url Ed25519 signature of the raw body>
 // Response: request — 200 { status: requested | held, approval_id, expires_at } · 409 { status: refused, reason }
-//           redeem  — 200 <ApprovalProof JSON>, x-alcon-signature: <signature of the raw body>
+//           redeem  — 200 <ApprovalProof JSON>, x-clayware-signature: <signature of the raw body>
 //                     202 { status: pending } · 409 { status: rejected | used | expired | mismatch | refused }
 //           400 malformed · 401 no valid key or signature · 413 too large · 503 nothing decided — ask again
 //
@@ -39,14 +39,14 @@ Deno.serve(async (req) => {
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  // One Alcon key signs both what the gateway may do (audit-grants) and what
+  // One Clayware key signs both what the gateway may do (audit-grants) and what
   // a person approved; the proof's `kind` keeps the two apart.
   const signing = await loadSigningKey(Deno.env.get("AUDIT_GRANTS_SIGNING_KEY") ?? "");
   if (!url || !serviceKey || !signing) return json({ error: "approval signing is not configured" }, 500);
   const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" };
 
-  const keyId = req.headers.get("x-alcon-gateway-key") ?? "";
-  const signature = req.headers.get("x-alcon-signature") ?? "";
+  const keyId = req.headers.get("x-clayware-gateway-key") ?? req.headers.get("x-alcon-gateway-key") ?? "";
+  const signature = req.headers.get("x-clayware-signature") ?? req.headers.get("x-alcon-signature") ?? "";
   if (!UUID.test(keyId) || !signature) return json({ error: "unauthorized" }, 401);
   const declared = Number(req.headers.get("content-length") ?? "0");
   if (declared > MAX_APPROVAL_BODY_BYTES) return json({ error: "body too large" }, 413);
@@ -101,6 +101,6 @@ Deno.serve(async (req) => {
   const sealed = await crypto.subtle.sign({ name: "Ed25519" }, signing.key, proofBody as BufferSource);
   return new Response(proofBody, {
     status: 200,
-    headers: { "Content-Type": "application/json", "x-alcon-signature": base64UrlEncode(sealed), "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/json", "x-clayware-signature": base64UrlEncode(sealed), "Cache-Control": "no-store" },
   });
 });

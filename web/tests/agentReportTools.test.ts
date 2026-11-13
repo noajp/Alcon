@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 const report = await import(new URL('../../supabase/functions/_shared/agentReportTools.ts', import.meta.url).pathname);
-const { mcpTools } = await import(new URL('../../supabase/functions/alcon-mcp/tools.ts', import.meta.url).pathname);
+const { mcpTools } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
 const { runExternalTool } = await import(new URL('../../supabase/functions/_shared/externalTools.ts', import.meta.url).pathname);
 
 const { leaseHolder, progressComment, outcomeComment, outcomeNotice, outcomeStatus, sanitizeBranch, runAgentReportTool, AGENT_REPORT_TOOL_NAMES } = report;

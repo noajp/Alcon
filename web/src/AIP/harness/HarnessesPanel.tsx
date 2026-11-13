@@ -41,7 +41,7 @@ import { TryDefinition } from './TryDefinition';
 // connectors it uses and, for a Strategy, how it is broken down. Yours is the
 // Space's library, shared by its members; one of them may be the Space's
 // default, which Strategies are worked by when they name none (otherwise
-// Alcon's built-in way). Discover is the catalog Alcon offers to start from,
+// Clayware's built-in way). Discover is the catalog Clayware offers to start from,
 // added by copying into the library. Adding one starts an install walk: the
 // connectors it still needs are connected one at a time through the usual
 // connection dialog, then the harness is checked again. A walk left
@@ -263,8 +263,8 @@ export function HarnessesPanel() {
         {defaultHarness
           ? defaultHarness.enabled
             ? t('Default harness: {name}', { name: defaultHarness.name })
-            : t('Default harness: {name} · Off — Strategies use Alcon’s built-in way', { name: defaultHarness.name })
-          : t('No default harness — Strategies use Alcon’s built-in way')}
+            : t('Default harness: {name} · Off — Strategies use Clayware’s built-in way', { name: defaultHarness.name })
+          : t('No default harness — Strategies use Clayware’s built-in way')}
       </div>
       {error && <p className="text-[12px] text-[var(--status-danger)]">{error}</p>}
 

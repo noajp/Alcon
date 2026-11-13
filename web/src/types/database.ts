@@ -49,7 +49,7 @@ export type DomainPrivacy = 'workspace' | 'private'
 export interface Domain {
   id: string
   name: string
-  identifier: string | null  // short code e.g. "ALCON"
+  identifier: string | null  // short code e.g. "CLAYWARE"
   description: string | null
   color: string | null
   icon: string | null  // emoji or uploaded image URL; null = the built-in DomainIcon silhouette
@@ -348,9 +348,9 @@ export interface ObjectDomainInsert {
 }
 
 // =====================================================
-// AlconObject - フラット 2 階層: Domain > Object > Elements
+// ClaywareObject - フラット 2 階層: Domain > Object > Elements
 // =====================================================
-export interface AlconObject {
+export interface ClaywareObject {
   id: string
   name: string
   description: string | null
@@ -374,7 +374,7 @@ export interface AlconObject {
   archived_by?: string | null      // アーカイブした人 (auth.users.id)
 }
 
-export interface AlconObjectInsert {
+export interface ClaywareObjectInsert {
   id?: string
   name: string
   description?: string | null
@@ -393,7 +393,7 @@ export interface AlconObjectInsert {
   note_id?: string | null
 }
 
-export interface AlconObjectUpdate {
+export interface ClaywareObjectUpdate {
   id?: string
   name?: string
   description?: string | null
@@ -866,7 +866,7 @@ export interface ObjectTabUpdate {
 // =====================================================
 
 // An Object with its Elements. Objects live directly under a Domain.
-export interface AlconObjectWithChildren extends AlconObject {
+export interface ClaywareObjectWithChildren extends ClaywareObject {
   elements?: ElementWithDetails[]
   parentIds?: string[];
   isMultiHomed?: boolean;
@@ -2000,7 +2000,7 @@ export interface AssetEvent {
 export type PersonalAccessTokenAccess = 'read' | 'read_write'
 
 // A personal access token (ADR 0032): lets an external client act as its
-// owner through alcon-mcp, under the owner's RLS. Only the owner reads their
+// owner through clayware-mcp, under the owner's RLS. Only the owner reads their
 // rows, and never the hash; the plaintext exists once, in the result of
 // create_personal_access_token. Issue and revoke go through RPCs.
 export interface PersonalAccessToken {

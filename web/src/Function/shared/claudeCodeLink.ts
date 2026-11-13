@@ -32,7 +32,7 @@ function plainText(html: string): string {
 /** Pure. The prompt a Claude Code session starts with. */
 export function claudeCodePrompt(s: ClaudeCodeSubject): string {
   const tag = s.kind.toLowerCase();
-  const head = s.identifier ? `Work on Alcon ${s.kind} ${s.identifier}:` : `Work on Alcon ${s.kind} "${s.title}":`;
+  const head = s.identifier ? `Work on Clayware ${s.kind} ${s.identifier}:` : `Work on Clayware ${s.kind} "${s.title}":`;
   let description = s.description ? plainText(s.description) : '';
   if (description.length > MAX_DESCRIPTION) description = `${description.slice(0, MAX_DESCRIPTION)}…`;
   const lines = [

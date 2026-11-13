@@ -3,7 +3,7 @@
 // request waits here: the Object page takes it when it opens, or at once if
 // it is already open on that Element's Object.
 
-export const ELEMENT_DETAIL_EVENT = 'alcon:element-detail';
+export const ELEMENT_DETAIL_EVENT = 'clayware:element-detail';
 let pending: string | null = null;
 
 export function requestElementDetail(elementId: string): void {

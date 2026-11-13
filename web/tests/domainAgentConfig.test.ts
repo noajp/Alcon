@@ -39,7 +39,7 @@ describe('resolveAgentConfig', () => {
 
   it('runs as the default agent with no Worker and no Domain settings', () => {
     expect(resolveAgentConfig(null, null)).toEqual({
-      disabledReason: null, agentName: 'Alcon Agent', model: pricing.DEFAULT_AGENT_MODEL,
+      disabledReason: null, agentName: 'Clayware Agent', model: pricing.DEFAULT_AGENT_MODEL,
       providerId: null, price: pricing.AGENT_MODELS[pricing.DEFAULT_AGENT_MODEL],
       modelLabel: pricing.AGENT_MODELS[pricing.DEFAULT_AGENT_MODEL].label,
       maxTotalTurns: cfg.DEFAULT_MAX_TOTAL_TURNS, instructions: null, domainInstructions: null, routedBy: null,

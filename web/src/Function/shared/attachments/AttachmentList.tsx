@@ -27,7 +27,7 @@ import {
  * preview right under it (where Word and Excel can be edited and saved as
  * a new version). A bin moves a file to the trash, kept out of the list
  * for TRASH_DAYS and restored from Files. `actions` adds the caller's own
- * tools to a preview (what the file can become in Alcon).
+ * tools to a preview (what the file can become in Clayware).
  */
 export function AttachmentList({ owner, actions, empty = null }: {
   owner: AttachmentOwner;

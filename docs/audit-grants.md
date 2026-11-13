@@ -1,6 +1,6 @@
 # 権限表の配布（audit-grants）
 
-ゲートウェイ（Metaxy の実行基盤）が守る権限を、Alcon から受け取るための口。記録の送り方は [audit-intake](audit-intake.md)。
+ゲートウェイ（Metaxy の実行基盤）が守る権限を、Clayware から受け取るための口。記録の送り方は [audit-intake](audit-intake.md)。
 
 ## 権限を決める
 
@@ -12,19 +12,19 @@ Space のオーナーが、ワークフローの導入ごと・接続ごとに �
 
 ```
 POST https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/audit-grants
-x-alcon-gateway-key: <鍵 id>
-x-alcon-timestamp:   <Unix 秒>
-x-alcon-signature:   <"alcon-grants\n<鍵 id>\n<Unix 秒>" への Ed25519 署名、base64url>
+x-clayware-gateway-key: <鍵 id>
+x-clayware-timestamp:   <Unix 秒>
+x-clayware-signature:   <"clayware-grants\n<鍵 id>\n<Unix 秒>" への Ed25519 署名、base64url>
 ```
 
-時刻は Alcon の時計から5分以内。返事は次の本文と、本文のバイト列への Alcon の署名（`x-alcon-signature`）。
+時刻は Clayware の時計から5分以内。返事は次の本文と、本文のバイト列への Clayware の署名（`x-clayware-signature`）。
 
 ```json
 {
-  "kind": "alcon.grants",
+  "kind": "clayware.grants",
   "space_id": "<uuid>",
   "key_id": "<鍵 id>",
-  "signing_key": "<Alcon の公開鍵>",
+  "signing_key": "<Clayware の公開鍵>",
   "issued_at": "2026-10-28T09:00:00.000Z",
   "expires_at": "2026-10-28T09:15:00.000Z",
   "deployments": [
@@ -39,11 +39,11 @@ x-alcon-signature:   <"alcon-grants\n<鍵 id>\n<Unix 秒>" への Ed25519 署名
 | 200 | 権限表。署名を確かめてから使う |
 | 401 | 鍵が未登録・失効済み、署名が違う、または時刻がずれている |
 | 503 | 何も決めていない。少し待って取り直す |
-| 500 | Alcon 側で署名鍵が設定されていない |
+| 500 | Clayware 側で署名鍵が設定されていない |
 
 ## ゲートウェイが守ること
 
-- 本文の署名は、導入時に固定した Alcon の公開鍵で確かめる。本文の `signing_key` は鍵の差し替えに気づくための表示で、検証には使わない
+- 本文の署名は、導入時に固定した Clayware の公開鍵で確かめる。本文の `signing_key` は鍵の差し替えに気づくための表示で、検証には使わない
 - `key_id`・`space_id` が自分のものでない表、手元の表より `issued_at` が古い表は捨てる（古い署名済みの表を差し込まれて、新しい表を巻き戻されないため）
 - 操作のたびに、手元の最新の表で判断する（参照実装は `supabase/functions/_shared/auditGrants.ts` の `decideOperation`）
   - 表がない・導入が表にない・導入が `paused` → 何もしない
@@ -52,7 +52,7 @@ x-alcon-signature:   <"alcon-grants\n<鍵 id>\n<Unix 秒>" への Ed25519 署名
 - 期限の前（目安は5分ごと）に取り直す
 - 止めた操作も `result: "blocked"` で記録し、行った操作も止めた操作も、判断に使った `version` を記録の `grants_version` に入れる
 
-## Alcon の署名鍵
+## Clayware の署名鍵
 
 署名鍵は関数の秘密 `AUDIT_GRANTS_SIGNING_KEY`（Ed25519 の秘密鍵、PKCS #8 DER を base64url）に置く。作り方と設定のしかた：
 
