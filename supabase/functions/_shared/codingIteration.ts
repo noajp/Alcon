@@ -478,7 +478,7 @@ async function routeOne(
         runId,
         derived: deriveScopeFromDefinition({
           connectors: parsed.connectors,
-          integrations: await loadDerivationIntegrations(admin, spaceId).catch(() => []),
+          integrations: spaceId ? await loadDerivationIntegrations(admin, spaceId).catch(() => []) : [],
           strategyId: null,
         }),
         strategyId: el.object_id ? await strategyIdForObject(admin, el.object_id as string).catch(() => null) : null,
