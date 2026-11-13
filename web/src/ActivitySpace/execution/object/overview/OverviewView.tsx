@@ -34,6 +34,7 @@ import {
 /** The band above (how it is going) and the rail beside; the document
  *  column between them is fixed, as on an Element's page. */
 const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
+const CANVAS_ONLY = ['generated-app'];
 
 // =============================================================
 // Object Overview — read like an Element's page.
@@ -230,7 +231,7 @@ export function OverviewView({
               </div>
 
               {/* Canvases: what was asked to be drawn for this Object. */}
-              {board.layout.main.length > 0 && <WidgetZone zone="main" />}
+              {board.layout.main.some((w) => w.type === 'generated-app') && <WidgetZone zone="main" only={CANVAS_ONLY} />}
 
               <PageSection title={t('Milestones')} action={
                 <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAddingMilestone(true)}>
