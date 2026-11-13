@@ -7,8 +7,10 @@
 //
 //   - a decision bound to an Object AND to one of its Elements is one row,
 //     and "via" is dropped because the direct binding is the stronger claim
-//   - the root Intent and measures never appear — the root is scope, not
-//     intent, and a measure is the Strategy's own number
+//   - the root Intent never appears — it is scope, not a reason; a measure
+//     does, because the Planner binds work to the success condition it serves
+//   - a reason the Strategy has rewritten since floats above everything
+//   - with no reason named, an Element still serves its Objects' Strategies
 //   - a binding on something outside the scope is not ours, even when its
 //     intent is
 //   - a review that is due floats above everything, including an off-track
@@ -16,7 +18,7 @@
 //   - assumptions carry no review chip, whatever their horizon column says
 
 import { describe, expect, it } from 'vitest';
-import { intentTrailRows, type TrailScope } from '@/Function/widget/widgets/intentTrailModel';
+import { intentTrailRows, strategiesOfObjects, type TrailScope } from '@/Function/widget/widgets/intentTrailModel';
 import type { Intent, IntentBinding } from '@/types/database';
 
 const NOW = new Date(2026, 8, 2); // 2026-09-02, local
@@ -102,7 +104,7 @@ describe('intentTrailRows', () => {
     expect(rows[0].via).toBeNull();
   });
 
-  it('never lists the root or a measure', () => {
+  it('lists a measure as a reason but never the root', () => {
     const rows = intentTrailRows(
       [
         binding({ intent_id: 'root', target_id: 'obj-1', target_type: 'object' }),
@@ -118,7 +120,24 @@ describe('intentTrailRows', () => {
       names,
       NOW,
     );
-    expect(rows.map((r) => r.intentId)).toEqual(['a1']);
+    expect(rows.map((r) => [r.intentId, r.kind, r.review])).toEqual([['m1', 'measure', null], ['a1', 'assumption', null]]);
+  });
+
+  it('puts a reason the Strategy has rewritten above a review that is due', () => {
+    const rows = intentTrailRows(
+      [
+        binding({ intent_id: 'late', target_id: 'el-1' }),
+        binding({ intent_id: 'old', target_id: 'el-1', relationship_type: 'tests' }),
+      ],
+      [
+        intent({ id: 'late', kind: 'decision', horizon: '2026-08-30', order_index: 0 }),
+        intent({ id: 'old', kind: 'assumption', superseded_by_intent_id: 'new', order_index: 1 }),
+      ],
+      objectScope,
+      names,
+      NOW,
+    );
+    expect(rows.map((r) => [r.intentId, r.replaced])).toEqual([['old', true], ['late', false]]);
   });
 
   it('ignores an edge that lands outside the scope, even for an intent it knows', () => {
@@ -230,5 +249,18 @@ describe('intentTrailRows', () => {
     expect(rows).toEqual([
       expect.objectContaining({ title: 'Ship the pilot', via: null, initiativeName: null }),
     ]);
+  });
+});
+
+describe('strategiesOfObjects', () => {
+  it('names the Strategies an Element\'s Objects belong to, by name, and none for an Object in none', () => {
+    const strategies = [
+      { id: 's2', name: 'Retention', objectIds: ['o1', 'o9'] },
+      { id: 's1', name: 'Acquisition', objectIds: ['o1'] },
+      { id: 's3', name: 'Elsewhere', objectIds: ['o5'] },
+    ];
+    expect(strategiesOfObjects(strategies, ['o1'])).toEqual([{ id: 's1', name: 'Acquisition' }, { id: 's2', name: 'Retention' }]);
+    expect(strategiesOfObjects(strategies, ['o7'])).toEqual([]);
+    expect(strategiesOfObjects(strategies, [])).toEqual([]);
   });
 });

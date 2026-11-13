@@ -38,7 +38,10 @@ export interface TrailScope {
 
 export interface TrailRow {
   intentId: string;
-  kind: 'decision' | 'assumption';
+  kind: 'decision' | 'assumption' | 'measure';
+  /** The Strategy has since rewritten this part (a newer version replaced it):
+   *  the reason this work stood on is no longer the one in force. */
+  replaced: boolean;
   title: string;
   status: DecisionStatus;
   statusLabel: string;
@@ -55,13 +58,16 @@ export interface TrailRow {
   initiativeName: string | null;
 }
 
-/** Only the two kinds a Strategy writes by hand. The root is scope, not
- *  intent; a measure is a number, which the Strategy's own section shows. */
-function isTrailKind(kind: Intent['kind']): kind is 'decision' | 'assumption' {
-  return kind === 'decision' || kind === 'assumption';
+/** The kinds that can be a reason for work: a decision carried out, a premise
+ *  tested, a success condition delivered. The root is scope, not a reason. */
+function isTrailKind(kind: Intent['kind']): kind is 'decision' | 'assumption' | 'measure' {
+  return kind === 'decision' || kind === 'assumption' || kind === 'measure';
 }
 
 function urgency(row: TrailRow): number {
+  // A reason rewritten under the work is the first thing to look at: the work
+  // may no longer be needed, or needed differently.
+  if (row.replaced) return 4;
   if (row.review?.due) return 3;
   if (row.status === 'off_track' || row.status === 'at_risk') return 2;
   if (row.status === 'done') return 0;
@@ -107,7 +113,7 @@ export function intentTrailRows(
   const out: TrailRow[] = [];
   for (const [intentId, acc] of rows) {
     const intent = byId.get(intentId)!;
-    const kind = intent.kind as 'decision' | 'assumption';
+    const kind = intent.kind as TrailRow['kind'];
 
     const decision = toDecision(
       {
@@ -136,6 +142,7 @@ export function intentTrailRows(
     out.push({
       intentId,
       kind,
+      replaced: intent.superseded_by_intent_id != null,
       title: intent.title,
       status: decision.status,
       statusLabel: decisionStatusLabel(decision.status),
@@ -165,6 +172,20 @@ export function intentTrailRows(
     if (c !== 0) return c;
     return byId.get(a.intentId)!.order_index - byId.get(b.intentId)!.order_index;
   });
+}
+
+/** The Strategies an Element serves when nothing names a reason for it: those
+ *  its Objects belong to. Weaker than a bound reason, so shown only in its
+ *  place — a person files work into an Object, not against a premise. */
+export function strategiesOfObjects(
+  strategies: readonly { id: string; name: string; objectIds: readonly string[] }[],
+  objectIds: readonly string[],
+): { id: string; name: string }[] {
+  const mine = new Set(objectIds);
+  return strategies
+    .filter((s) => s.objectIds.some((o) => mine.has(o)))
+    .map((s) => ({ id: s.id, name: s.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** The verb the Strategy side attached to the edge, as a phrase. */

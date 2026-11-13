@@ -130,7 +130,7 @@ interface ElementDetailViewProps {
   onNavigateRoot: () => void;
   onNavigateObject?: (objectId: string) => void;
   /** Open a Strategy on the Strategy surface — the return leg of the round
-   *  trip, taken from the Decisions & assumptions widget. Optional because
+   *  trip, taken from the Why this exists widget. Optional because
    *  some hosts (Inbox, My Elements) have no Strategy surface to hand off to;
    *  the widget then names the Strategy without a link. */
   onOpenStrategy?: (strategyId: string) => void;

@@ -114,7 +114,11 @@ const WIDGET_MESSAGES: Record<string, Row> = {
   'No key results': ['主要な成果なし', '핵심 결과 없음', 'Aucun résultat clé', 'Sin resultados clave'],
   'Nothing here says how this Strategy would be judged. Record a condition in Measures and it becomes a key result.': ['この Strategy をどう評価するかがまだ書かれていません。Measures に条件を記録すると、それが主要な成果になります。', '이 Strategy를 어떻게 평가할지 아직 정해지지 않았습니다. Measures에 조건을 기록하면 핵심 결과가 됩니다.', 'Rien n’indique comment cette Strategy serait jugée. Enregistrez une condition dans Measures pour en faire un résultat clé.', 'Nada indica cómo se juzgaría esta Strategy. Registra una condición en Measures y se convertirá en un resultado clave.'],
 
-  // Decisions & assumptions trail
+  // Why this exists trail
+  'Rewritten': ['書き換えられた', '변경됨', 'Réécrit', 'Reescrito'],
+  'The Strategy has rewritten this since the work was made.': ['作業を作ったあとで、Strategy のこの部分が書き換えられました。', '작업을 만든 뒤 Strategy의 이 부분이 바뀌었습니다.', 'La Strategy a réécrit ce point depuis la création du travail.', 'La Strategy reescribió esto después de crear el trabajo.'],
+  'Its Object belongs to this Strategy': ['Object がこの Strategy に属している', 'Object가 이 Strategy에 속함', 'Son Object relève de cette Strategy', 'Su Object pertenece a esta Strategy'],
+  'Its Object belongs to these Strategies': ['Object がこれらの Strategy に属している', 'Object가 이 Strategy들에 속함', 'Son Object relève de ces Strategies', 'Su Object pertenece a estas Strategies'],
   'Could not read what this is standing on.': ['これが前提としているものを読み込めませんでした。', '이 항목의 근거를 읽지 못했습니다.', 'Impossible de lire ce sur quoi cela repose.', 'No se pudo leer en qué se apoya esto.'],
   'Assumption': ['前提', '가정', 'Hypothèse', 'Supuesto'],
   'On track': ['順調', '순조로움', 'En bonne voie', 'En curso'],
