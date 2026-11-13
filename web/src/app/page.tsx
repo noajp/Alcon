@@ -27,7 +27,6 @@ import { QuickAddNotebookPopup } from '@/ActivitySpace/artifacts/notebook/QuickA
 import { placeNewNotebook, seedNotebook, setNextNotebookFolder } from '@/ActivitySpace/artifacts/notebook/notebookActions';
 import { useNotes } from '@/hooks/useNotesDb';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { useActiveSpaceId, setActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { OnboardingCreate } from '@/Function/space/OnboardingCreate';
@@ -49,7 +48,12 @@ import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNa
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
 
-  if (!authLoading && !isAuthenticated) return <AuthPage />;
+  // Signed out: / is the homepage, like linear.app. Sign-in is at /login.
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) window.location.replace('/homepage');
+  }, [authLoading, isAuthenticated]);
+
+  if (!authLoading && !isAuthenticated) return null;
   // Assume the happy path during the (usually instant) session check and
   // paint the app shell — if it turns out logged-out, the line above flips
   // to AuthPage on the next render.

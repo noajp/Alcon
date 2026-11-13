@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Design fonts — copied from node_modules by scripts/design-fonts.mjs
 /public/design-fonts/
+
+# Homepage — copied from ../website by scripts/homepage.mjs
+/public/homepage/

@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The homepage (../website, copied by scripts/homepage.mjs). A signed-out
+  // visitor to / is sent here; the app itself stays at /.
+  async rewrites() {
+    return [{ source: '/homepage', destination: '/homepage/index.html' }];
+  },
   async headers() {
     // srcdoc apps still render, but cannot navigate their frame to an external
     // URL carrying private inputs. Inner CSP also blocks subresource requests.
