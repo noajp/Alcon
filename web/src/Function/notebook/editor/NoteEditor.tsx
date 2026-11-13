@@ -22,6 +22,7 @@ import { ArtifactPicker, FILE_VIEW } from './fileBlocks';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { uploadToArtifacts } from '@/hooks/artifactData';
 import { formatError } from '@/Function/shared/formatError';
+import { openInApp } from '@/Function/shared/appNavigation';
 
 export interface NoteEditorProps {
   initialHtml?: string;
@@ -323,9 +324,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     emit();
   }, [emit, elementStatusById]);
 
+  // While a Japanese (or any IME) word is being composed, the text being
+  // converted reads as a selection; the toolbar is for text the person chose,
+  // so it stays away until the composition ends.
   const updateToolbarPosition = useCallback(() => {
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    if (composingRef.current || !sel || sel.rangeCount === 0 || sel.isCollapsed) {
       setToolbar(null);
       return;
     }
@@ -406,12 +410,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
+    setToolbar(null);
     compositionStartHtmlRef.current = ref.current?.innerHTML ?? '';
     deferredBodyRef.current = null;
   }, []);
 
   const handleCompositionEnd = useCallback(() => {
     composingRef.current = false;
+    setToolbar(null);
     const locallyChanged = ref.current?.innerHTML !== compositionStartHtmlRef.current;
     const deferred = deferredBodyRef.current;
     deferredBodyRef.current = null;
@@ -762,6 +768,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     // a nested list) is not on this item's box.
     const target = e.target as HTMLElement;
     const li = target.tagName === 'UL' || target.tagName === 'OL' ? null : target.closest('li');
+    // A linked line's mark (left) and arrow (right) open its Element, as a
+    // created Element's card in the chat does; the text between stays text.
+    const linkedId = li?.getAttribute('data-element-id');
+    if (li && linkedId && li.parentElement?.getAttribute('data-checklist') === 'true') {
+      const rect = li.getBoundingClientRect();
+      if (e.clientX - rect.left < LINKED_EDGE_PX || rect.right - e.clientX < LINKED_EDGE_PX) {
+        e.preventDefault();
+        openInApp('domain-elements', { elementId: linkedId });
+        return;
+      }
+    }
     if (li && !li.hasAttribute('data-element-id') && li.parentElement?.getAttribute('data-checklist') === 'true') {
       const rect = li.getBoundingClientRect();
       const lineHeight = parseFloat(getComputedStyle(li).lineHeight) || CHECK_BOX_HIT_PX;
@@ -1340,9 +1357,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         .note-editor [data-align="center"] { text-align: center; }
         .note-editor [data-align="right"]  { text-align: right;  }
 
-        /* Checklist row — visually identical to an ElementTableRow:
-           [status ○] [ElementIcon] [text]. Both markers are pure CSS
-           pseudo-elements. Every item is a task: un-linked items show the
+        /* Checklist row: [status ○] [text], the mark a pure CSS
+           pseudo-element. Every item is a task: un-linked items show the
            Backlog dashed ring; → Element 化 links one to an Element and the
            ○ then mirrors that Element's live status. */
         .note-editor ul[data-checklist="true"] {
@@ -1351,7 +1367,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         }
         .note-editor ul[data-checklist="true"] > li {
           position: relative;
-          padding-left: 2.5rem; /* 16px checkbox + 6px gap + 14px atom + 4px gap */
+          padding-left: 1.5rem; /* 16px mark + 8px gap */
           cursor: text;
         }
         /* ::before = the status ○. Default (un-linked) = Backlog dashed
@@ -1369,21 +1385,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           background-position: center;
           background-size: contain;
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
-        }
-        /* ::after = the ElementIcon (the same concept glyph used in Element list rows) */
-        .note-editor ul[data-checklist="true"] > li::after {
-          content: "";
-          position: absolute;
-          left: 1.4rem;
-          top: 0.5lh;
-          transform: translateY(-50%);
-          width: 14px;
-          height: 14px;
-          background-repeat: no-repeat;
-          background-position: center;
-          background-size: contain;
-          pointer-events: none;
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z'/><path d='M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z'/><path d='M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z'/><path d='M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z'/></svg>");
         }
         /* An un-linked item's box is clicked to check it; checked, it fills
            with a tick and the text recedes. */
@@ -1407,10 +1408,41 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         .note-editor ul[data-checklist="true"] > li[data-element-id] {
           color: inherit;
           text-decoration: none;
+          /* An Element made from this line stands out as a card, the way the
+             chat shows the Elements it made: a framed band. The mark at its
+             left and the arrow at its right open the Element. */
+          margin: 4px 0;
+          padding: 6px 2rem 6px 2.1rem;
+          border: 1px solid var(--border-default);
+          border-radius: var(--radius-md);
+          background: var(--card);
+          box-shadow: var(--shadow-card);
+        }
+        .note-editor ul[data-checklist="true"] > li[data-element-id]::before {
+          left: 0.6rem;
+          top: calc(6px + 0.5lh);
+          cursor: pointer;
+        }
+        .note-editor ul[data-checklist="true"] > li[data-element-id]::after {
+          content: "";
+          position: absolute;
+          right: 0.6rem;
+          top: calc(6px + 0.5lh);
+          transform: translateY(-50%);
+          width: 14px;
+          height: 14px;
+          cursor: pointer;
+          opacity: 0.55;
+          background-color: var(--muted-foreground);
+          -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7M8 7h9v9'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7M8 7h9v9'/></svg>") center / contain no-repeat;
+        }
+        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::after { opacity: 1; }
+        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
+          cursor: pointer;
         }
         .note-editor ul[data-checklist="true"] > li[data-element-id]::before,
         .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
-          cursor: default;
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
         }
         .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="todo"]::before {
@@ -2089,6 +2121,8 @@ function liIsRegularText(li: HTMLLIElement): boolean {
 
 // How far from a checklist item's left edge a click lands on its box
 // (the 1rem box at the item's start, with a little slack).
+/** How far in from a linked line's edges its mark and arrow answer a click. */
+const LINKED_EDGE_PX = 30;
 const CHECK_BOX_HIT_PX = 20;
 
 // True when the editor holds no user content — blank text and no embedded

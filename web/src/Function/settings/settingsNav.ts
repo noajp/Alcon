@@ -1,5 +1,6 @@
 'use client';
 
+import { openInApp } from '@/Function/shared/appNavigation';
 import type React from 'react';
 import { useSyncExternalStore } from 'react';
 import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Sparkles, Link2, Tag, FileText, Boxes } from '@/ui/icons';
@@ -118,4 +119,10 @@ export function useActiveSettingsSection(): string {
  *  cue to start the revealed page at its top. */
 export function useSettingsRevealNonce(): number {
   return useSyncExternalStore(subscribe, () => active.nonce, () => DEFAULT_ACTIVE.nonce);
+}
+
+/** Opens Settings at the model connections, where an AI's API key is set. */
+export function openModelKeySettings(): void {
+  setActiveSettingsSection('connectors');
+  openInApp('settings');
 }

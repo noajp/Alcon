@@ -22,6 +22,7 @@ import {
   DropdownMenuLabel,
   MenuCheck,
 } from '@/ui/dropdown-menu';
+import { ModelKeyRow } from '@/Function/team/ModelKeyRow';
 
 // One Object, including its initial fields and Domain memberships.
 export interface NewObjectInput {
@@ -42,6 +43,9 @@ interface QuickAddObjectPopupProps {
   onSubmit: (input: NewObjectInput) => void | Promise<void>;
   /** Workers for the Lead pill picker. */
   workers?: (WorkerAvatarSubject & { id: string; name: string })[];
+  /** Whether an AI Worker still needs its model's API key (useModelKeyCheck); such a
+   *  Worker is listed but sends to the key's settings. Absent: none does. */
+  keyMissing?: (worker: WorkerAvatarSubject) => boolean;
   /** Available Domains for the Domain pill (hidden when ≤1). */
   domains?: { id: string; name: string; icon?: string | null; color?: string | null }[];
   /** Object-type catalog (domain.object_types) for the Type pill. */
@@ -56,6 +60,8 @@ interface QuickAddObjectPopupProps {
  * Linear-style: rounded card lifted on a thin border at the bottom of the
  * viewport, no dimmer behind.
  */
+const NO_KEY_MISSING = () => false;
+
 export function QuickAddObjectPopup({
   open,
   contextLabel,
@@ -63,6 +69,7 @@ export function QuickAddObjectPopup({
   onClose,
   onSubmit,
   workers = [],
+  keyMissing = NO_KEY_MISSING,
   domains = [],
   types = [],
   defaultDomainId = null,
@@ -245,7 +252,7 @@ export function QuickAddObjectPopup({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Object lead')}</DropdownMenuLabel>
-                {workers.map((w) => (
+                {workers.map((w) => leadId !== w.id && keyMissing(w) ? <ModelKeyRow key={w.id} worker={w} /> : (
                   <DropdownMenuItem key={w.id} onSelect={() => setLeadId(w.id)} className="gap-2 text-[12px]">
                     <WorkerAvatar worker={w} size={16} />
                     <span className="flex-1 truncate">{w.name}</span>

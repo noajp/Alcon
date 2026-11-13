@@ -23,6 +23,8 @@ import { translate, useI18n } from '@/Function/i18n/I18nProvider';
 import { AI_AGENT_PRESETS, aiProviderOf, type AiAgentPreset } from '@/Function/team/aiAgents';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { createWorker } from '@/hooks/teamData';
+import { useModelKeyCheck } from '@/Function/team/useModelKeyCheck';
+import { ModelKeyRow } from '@/Function/team/ModelKeyRow';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
 // legitimately differ per view (avatar stack in table rows, RailRow in the
@@ -85,6 +87,8 @@ export function AssigneeMenuContent({
   const current = assignees ?? [];
   const assigneeWorkerId = (a: AssigneeEntry) => a.worker_id ?? a.worker?.id;
   const readings = useAssignmentReadings(element, workers);
+  // An AI whose model has no API key yet is shown but sends to the key's settings.
+  const keyMissing = useModelKeyCheck();
 
   if (variant === 'toggle') {
     return (
@@ -94,6 +98,7 @@ export function AssigneeMenuContent({
         )}
         {workers.map((w) => {
           const existing = current.find((a) => assigneeWorkerId(a) === w.id);
+          if (!existing && keyMissing(w)) return <ModelKeyRow key={w.id} worker={w} avatarSize={20} />;
           return (
             <DropdownMenuItem
               key={w.id}
@@ -143,7 +148,7 @@ export function AssigneeMenuContent({
         </>
       )}
       {available.length > 0 ? (
-        available.map((w) => (
+        available.map((w) => keyMissing(w) ? <ModelKeyRow key={w.id} worker={w} avatarSize={20} /> : (
           <DropdownMenuItem
             key={w.id}
             onClick={() => onAdd(w.id)}
