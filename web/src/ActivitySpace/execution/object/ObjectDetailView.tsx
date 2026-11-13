@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
 import type { ClaywareObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
-  createElement, addElementToObject, removeElementFromObject, updateElement, updateElements, restoreElementsField, deleteElement,
+  createElement, addElementToObject, removeElementFromObject, updateElement, updateElements, restoreElementsField, deleteElement, deleteElements, noticeElementSaveFailed,
   fetchAllWorkers,
   useObjectTabs, reorderObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
   deleteObject, addDomainElementType, removeDomainElementType,
@@ -338,9 +338,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   // Bulk DB ops — sequential to keep error reporting simple. Refresh once
   // at the end so the list updates in a single render.
   const bulkDelete = async () => {
-    for (const id of selectedRowIds) {
-      try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
-    }
+    try { await deleteElements([...selectedRowIds]); } catch (e) { noticeElementSaveFailed(e); }
     clearSelection();
     await onRefresh?.();
   };

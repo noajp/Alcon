@@ -11,7 +11,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import {
   createElement,
   updateElement, updateElements, restoreElementsField,
-  deleteElement,
+  deleteElement, deleteElements, noticeElementSaveFailed,
   useDomains,
   useElementTemplates,
   useWorkers,
@@ -188,9 +188,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange, embedded =
   // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
   const { selectedRowIds, handleRowSelect, clearSelection, selectOnly } = useElementSelection();
   const bulkDelete = useCallback(async () => {
-    for (const id of selectedRowIds) {
-      try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
-    }
+    try { await deleteElements([...selectedRowIds]); } catch (e) { noticeElementSaveFailed(e); }
     clearSelection();
     await fetchMine();
     await onRefresh?.();

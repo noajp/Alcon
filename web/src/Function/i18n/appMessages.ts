@@ -123,6 +123,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Athena settings': ['Athena の設定', 'Athena 설정', 'Réglages d’Athena', 'Ajustes de Athena'],
   'Edit with Athena': ['Athena で編集', 'Athena로 편집', 'Modifier avec Athena', 'Editar con Athena'],
   'Compact rows': ['行を詰める', '행 간격 좁게', 'Lignes compactes', 'Filas compactas'],
+  'The Object could not be deleted. Try again.': ['Object を削除できませんでした。もう一度お試しください。', 'Object를 삭제하지 못했습니다. 다시 시도하세요.', 'Impossible de supprimer l’Object. Réessayez.', 'No se pudo eliminar el Object. Inténtalo de nuevo.'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

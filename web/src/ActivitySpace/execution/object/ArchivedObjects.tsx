@@ -8,7 +8,7 @@ import { appDialog } from '@/Function/shared/appDialogStore';
 import { canManageObject } from '@/Function/shared/objectArchive';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useCurrentUserId } from '@/providers/authContext';
-import { restoreObject, useArchivedObjects } from '@/hooks/useObjectArchive';
+import { deleteArchivedObject, restoreObject, useArchivedObjects } from '@/hooks/useObjectArchive';
 import { useMyDomainRoles, useMyObjectRoles } from '@/hooks/useMyMemberships';
 
 /** Whether the viewer manages a given Object (may archive / restore it). */
@@ -37,7 +37,19 @@ function useRestore() {
       setBusyId(null);
     }
   };
-  return { busyId, restore };
+  const remove = async (object: { id: string; name: string }) => {
+    if (busyId) return;
+    if (!await appDialog.confirm(t('Delete “{name}”? This can’t be undone.', { name: object.name }))) return;
+    setBusyId(object.id);
+    try {
+      await deleteArchivedObject(object.id);
+    } catch (e) {
+      await appDialog.alert(e instanceof Error && e.message ? e.message : t('The Object could not be deleted. Try again.'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+  return { busyId, restore, remove };
 }
 
 /** Shown above an archived Object opened by id (link, search, the Archived list). */
@@ -75,7 +87,7 @@ export function ArchivedObjectBanner({
 /**
  * The Domain's archived Objects, folded under the Objects list. Opening one
  * shows it read-only-by-intent with the banner above; managers restore here
- * or from that banner.
+ * or from that banner, and delete here.
  */
 export function ArchivedObjectsSection({
   domainId,
@@ -87,7 +99,7 @@ export function ArchivedObjectsSection({
   const { t, locale } = useI18n();
   const { objects } = useArchivedObjects(domainId);
   const managesObject = useManagesObject();
-  const { busyId, restore } = useRestore();
+  const { busyId, restore, remove } = useRestore();
   const [open, setOpen] = useState(false);
   if (objects.length === 0) return null;
   return (
@@ -127,6 +139,17 @@ export function ArchivedObjectsSection({
                   onClick={() => { void restore(object.id); }}
                 >
                   {t('Restore')}
+                </Button>
+              )}
+              {managesObject(object) && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={busyId === object.id}
+                  onClick={() => { void remove(object); }}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  {t('Delete')}
                 </Button>
               )}
             </li>

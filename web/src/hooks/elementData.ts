@@ -311,6 +311,25 @@ export async function deleteElement(id: string): Promise<void> {
   }
 }
 
+/** Deletes many Elements at once: the rows vanish together and the database
+ *  gets one request per hundred instead of one per Element. */
+export async function deleteElements(ids: readonly string[]): Promise<void> {
+  if (!ids.length) return;
+  const rollback = applyOptimisticExplorerPatch(data => ids.reduce((d, id) => removeElementFromExplorer(d, id), data));
+  try {
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+    const results = await Promise.all(chunks.map(chunk =>
+      supabase.from('elements').delete().in('id', chunk)
+    ));
+    const failed = results.find(r => r.error);
+    if (failed?.error) throw failed.error;
+  } catch (err) {
+    rollback();
+    throw err;
+  }
+}
+
 /**
  * One Element, hydrated the way the lists hydrate theirs, so it can be handed
  * straight to ElementDetailView.

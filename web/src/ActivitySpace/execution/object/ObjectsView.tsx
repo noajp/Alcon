@@ -11,7 +11,6 @@ import { updateObject, addDomainObjectType, fetchAllWorkers, useDomains } from '
 import { applyObjectFilter, orderObjects, DEFAULT_STATE, type ListControlsState } from '@/Function/shared/listControls';
 import { getActiveDomainId, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { hydrateLabelColors } from '@/Function/shared/labelColor';
-import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { ListTable } from '@/Function/shared/listTable/ListTable';
 import type { ListSection } from '@/Function/shared/listTable/shared';
@@ -57,10 +56,6 @@ export function ObjListView({
   const explorerData = useExplorerData();
   const objects = explorerData.objects;
   const domainId = getActiveDomainId();
-  // Reuse the element-selection hook for Objects too — the logic is just
-  // id-based multi-select with Shift-range and Esc-to-clear, doesn't care
-  // whether the ids belong to Elements or Objects.
-  const { selectedRowIds: selectedObjectIds, handleRowSelect: handleObjectRowSelect } = useElementSelection();
   const { data: domains, guestDomains, loading: domainsLoading } = useDomains();
   // An Object needs a Domain to live in, so a Space without one asks for that first.
   const noDomains = !domainsLoading && domains.length === 0 && guestDomains.length === 0;
@@ -132,8 +127,6 @@ export function ObjListView({
             }
           }}
           objectWorkers={leadWorkers}
-          selectedObjectIds={selectedObjectIds}
-          onObjectRowSelect={handleObjectRowSelect}
         />
         <ArchivedObjectsSection domainId={domainId} onOpen={onSelect} />
       </div>
