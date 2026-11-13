@@ -16,7 +16,7 @@
 
 削除、一括変更、Object 間の移動、Object の編集はできない。この許可リスト（`_shared/externalTools.ts`）は REST API（[api.md](api.md)）と共通。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
 
-担当にできるのは、Element と同じ Space の Worker だけ。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。`createElement` の `basisIntentIds` には、その Element が何のためにあるか（Strategy の成功条件・前提・意思決定の intent id。`getInitiative` で読める）を渡す。置き換えられた intent や、編集できない Strategy の intent は結び付けず、`basisError` に id を返す。
+担当にできるのは、Element と同じ Space の Worker だけ。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。`createElement` の `basisIntentIds` には、その Element が何のためにあるか（Strategy の成功条件・前提・意思決定の intent id。`getInitiative` で読める）を渡す。一つずつ判定し、置き換えられた intent、Element の Object が属していない Strategy の intent、編集できない Strategy の intent は結び付けず、`basisError` に id と理由を返す（ほかの id は結び付く）。
 
 ## Element を進めるとき（着手・報告）
 

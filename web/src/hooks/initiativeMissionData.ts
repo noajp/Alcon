@@ -209,8 +209,11 @@ async function approverWorkerId(): Promise<string | null> {
 async function liveReasons(initiativeId: string, ids: readonly string[]): Promise<Map<string, 'tests' | 'delivers'>> {
   const out = new Map<string, 'tests' | 'delivers'>();
   if (ids.length === 0) return out;
-  const { data } = await supabase.from('intents').select('id, kind')
+  const { data, error } = await supabase.from('intents').select('id, kind')
     .eq('strategy_id', initiativeId).in('id', [...new Set(ids)]).is('superseded_by_intent_id', null);
+  // Unread is not "no reasons": approving without them would file work that
+  // cannot say why it exists, so the approval fails and can be retried.
+  if (error) throw new Error(error.message);
   for (const r of (data ?? []) as { id: string; kind: string }[]) {
     if (r.kind === 'assumption') out.set(r.id, 'tests');
     else if (r.kind === 'decision') out.set(r.id, 'delivers');
@@ -266,6 +269,13 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       if (t.definitionId) await setElementDefinition(el.id, t.definitionId);
       // How heavy the Planner judged it, for the model an AI run picks.
       if (t.assignee === 'ai' && t.weight) await setElementAiWeight(el.id, t.weight);
+      const workerId = t.assignee === 'ai' ? input.aiWorkerId : t.assigneeWorkerId || approverId;
+      if (workerId) {
+        const { error } = await supabase.from('element_assignees').insert({ element_id: el.id, worker_id: workerId, role: 'assignee' });
+        if (error) throw new Error(error.message);
+      }
+      // Why it exists, after it has someone on it: a reason that fails to
+      // bind is reported without leaving the work unassigned.
       const measureId = t.objective ? measureFor.get(t.objective) : undefined;
       if (measureId) {
         await addIntentBinding({ intent_id: measureId, target_type: 'element', target_id: el.id, relationship_type: 'delivers' });
@@ -274,11 +284,6 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       for (const id of t.basisIds ?? []) {
         const relationship = reasonOf.get(id);
         if (relationship) await addIntentBinding({ intent_id: id, target_type: 'element', target_id: el.id, relationship_type: relationship });
-      }
-      const workerId = t.assignee === 'ai' ? input.aiWorkerId : t.assigneeWorkerId || approverId;
-      if (workerId) {
-        const { error } = await supabase.from('element_assignees').insert({ element_id: el.id, worker_id: workerId, role: 'assignee' });
-        if (error) throw new Error(error.message);
       }
     } catch {
       failed.push(t.title);

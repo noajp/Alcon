@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { basisIds, bindBasis } from "./elementBasis.ts";
+import { basisErrorText, bindBasis } from "./elementBasis.ts";
 
 // Board tools — Domain / Object / Element / Sub-element reads and writes that
 // run with the caller's JWT, so RLS decides what each call can see and touch.
@@ -813,10 +813,8 @@ export async function runBoardTool(
         }
         // The reason it exists — like a refused assignee, an intent that did not
         // bind is reported; the Element stands either way.
-        const basis = await bindBasis(supabase, [data.id], basisIds(input.basisIntentIds));
-        const basisError = basis.refused.length > 0
-          ? `Not bound as the reason: ${basis.refused.join(", ")}${basis.error ? ` (${basis.error})` : " (not a live intent of a Strategy)"}`
-          : undefined;
+        const basis = await bindBasis(supabase, { id: data.id, objectId }, input.basisIntentIds);
+        const basisError = basisErrorText(basis.refused);
         const extra = { ...(assigneeError ? { assigneeError } : {}), ...(basisError ? { basisError } : {}) };
         return { ok: true, data: { ...data, ...extra }, meta: { rows: 1 } };
       }

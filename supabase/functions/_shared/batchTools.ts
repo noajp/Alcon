@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
-import { basisIds, bindBasis } from "./elementBasis.ts";
+import { basisErrorText, bindBasis, type BasisRefusal } from "./elementBasis.ts";
 
 // Several Elements under one Object in one write. Filing a list one
 // createElement at a time spent a tool call, an insert and an audit insert per
@@ -56,13 +56,12 @@ export async function runBatchTool(db: SupabaseClient, input: Record<string, unk
   const rows: Record<string, unknown>[] = [];
   // Ids chosen here, so each row's reasons find their Element without
   // relying on the order the insert returns rows in.
-  const reasons = new Map<string, string[]>();
+  const reasons = new Map<string, unknown>();
   for (const [i, item] of items.entries()) {
     const title = String(item?.title ?? "").trim();
     if (!title) return { ok: false, error: `elements[${i}].title is required` };
     const id = crypto.randomUUID();
-    const basis = basisIds(item.basisIntentIds);
-    if (basis.length > 0) reasons.set(id, basis);
+    if (Array.isArray(item.basisIntentIds) && item.basisIntentIds.length > 0) reasons.set(id, item.basisIntentIds);
     const row: Record<string, unknown> = { id, object_id: objectId, title };
     for (const k of FIELDS) if (item[k] !== undefined) row[k] = item[k];
     if (Array.isArray(item.labels)) row.labels = item.labels;
@@ -81,22 +80,13 @@ export async function runBatchTool(db: SupabaseClient, input: Record<string, unk
   })));
   if (auditError) console.error("element_activity audit failed:", auditError.message);
 
-  // One lookup per distinct set of reasons; a refused one is reported, the rows stand.
-  const bySet = new Map<string, string[]>();
-  for (const [id, basis] of reasons) {
-    const key = basis.join(",");
-    bySet.set(key, [...(bySet.get(key) ?? []), id]);
+  // Each row's reasons on their own; a refused one is reported, the rows stand.
+  const refused: BasisRefusal[] = [];
+  for (const [id, raw] of reasons) {
+    const result = await bindBasis(db, { id, objectId }, raw);
+    refused.push(...result.refused);
   }
-  const refused = new Set<string>();
-  let basisFailure: string | undefined;
-  for (const [key, ids] of bySet) {
-    const result = await bindBasis(db, ids, key.split(","));
-    for (const r of result.refused) refused.add(r);
-    basisFailure ??= result.error;
-  }
-  const basisError = refused.size > 0
-    ? `Not bound as the reason: ${[...refused].join(", ")}${basisFailure ? ` (${basisFailure})` : " (not a live intent of a Strategy)"}`
-    : undefined;
+  const basisError = basisErrorText(refused);
 
   return { ok: true, data: basisError ? { created, basisError } : { created }, meta: { rows: created.length } };
 }
