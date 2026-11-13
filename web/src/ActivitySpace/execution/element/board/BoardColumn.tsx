@@ -1,9 +1,11 @@
 'use client';
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Hand } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { extractPlainText } from '@/Function/notebook/contentUtils';
 import type { WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 
 // One column of Element cards: a mark and a name, the count as a chip,
@@ -22,7 +24,7 @@ export function Chip({ children, className, style, title }: {
 }) {
   return (
     <span title={title} style={style}
-      className={cn('inline-flex h-5 min-w-0 shrink-0 items-center gap-1 rounded-full border border-[var(--border-default)] px-2 text-[11px] leading-none tabular-nums text-[var(--text-secondary)]', className)}>
+      className={cn('inline-flex h-5 min-w-0 shrink-0 items-center gap-1 rounded-full border border-transparent bg-foreground/[0.06] px-2 text-[11px] leading-none tabular-nums text-[var(--text-secondary)]', className)}>
       {children}
     </span>
   );
@@ -55,6 +57,14 @@ export function CardMeta({ icon, children, title }: { icon?: React.ReactNode; ch
       <span className="truncate tabular-nums">{children}</span>
     </span>
   );
+}
+
+/** A card's description: the first lines of what was written, as plain
+ *  text. Renders nothing when there is nothing to say. */
+export function CardDescription({ html }: { html: string | null | undefined }) {
+  const text = useMemo(() => (html ? extractPlainText(html).replace(/\s+/g, ' ').trim() : ''), [html]);
+  if (!text) return null;
+  return <p className="mt-1 line-clamp-2 text-[12.5px] leading-[18px] text-muted-foreground">{text}</p>;
 }
 
 /** The group's header: mark, name, and how many — the count as plain text. */

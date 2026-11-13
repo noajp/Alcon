@@ -26,7 +26,7 @@ import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { BOARD_CARD, Chip } from './BoardColumn';
+import { BOARD_CARD, CardDescription, Chip } from './BoardColumn';
 
 // The Element card: every Execution Chain draws the same one.
 // Top to bottom: the headline — the title on one line, and the priority
@@ -263,7 +263,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 />
               ) : (
                 <p
-                  className="min-w-0 flex-1 truncate text-[14px] font-normal text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
+                  className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
                   title={element.title}
                   onPointerDown={stop}
                   onClick={(e) => { stop(e); setEditingTitle(true); }}
@@ -302,20 +302,22 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <CardDescription html={element.description} />
             {/* Where it belongs: a chip in the Label chips' own form —
                 the Object's icon and name inside the pill, never a bare
                 text line. */}
-            {object && (
-              <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+            {(object || element.type) && (
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1">
+                {element.type && <Chip className="max-w-full"><span className="truncate">{element.type}</span></Chip>}
                 {/* On a board that spans a Strategy's subtree: the
                     Strategy under it that this work came by. */}
-                {object.via && (
+                {object?.via && (
                   <Chip title={object.via} className="max-w-full">
                     <NavStrategyIcon size={11} className="shrink-0" />
                     <span className="truncate">{object.via}</span>
                   </Chip>
                 )}
-                <Chip title={object.name} className="max-w-full">
+                {object && <Chip title={object.name} className="max-w-full">
                   <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
                   <span className="truncate">{object.name}</span>
                   {object.isNew && <span className="shrink-0 text-muted-foreground/70">· {t('new')}</span>}
@@ -336,7 +338,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                       <ThickArrowRight size={11} />
                     </button>
                   )}
-                </Chip>
+                </Chip>}
               </div>
             )}
           </div>
@@ -358,7 +360,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         )}
         {extra}
 
-        <div className="mt-5 flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
           <div className="flex min-w-0 items-center gap-1">
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
