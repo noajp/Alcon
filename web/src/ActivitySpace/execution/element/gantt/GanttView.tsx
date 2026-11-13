@@ -16,6 +16,7 @@ import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { dragRange } from './ganttRange';
+import { deadlineUrgency, daysToNextDate, warnsAboutTime } from './ganttUrgency';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
@@ -238,6 +239,7 @@ export function GanttView({
 }: GanttViewProps) {
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
+  const todayKey = fmtDateOnly(new Date());
   const objectRows = rowScale === 'object';
   // Drawing a dependency: from a bar's end handle to wherever the pointer is,
   // in the timeline's own coordinates; released over another bar, it links.
@@ -1014,6 +1016,14 @@ export function GanttView({
                   const showLabel = barPos.width > 50;
                   const showDueDate = barPos.width > 100 && element.due_date;
                   const progress = getElementProgress(element);
+                  // Unfinished work warms toward a faint red as its deadline —
+                  // or the next milestone of its Object — comes near.
+                  const urgency = warnsAboutTime(element.status)
+                    ? deadlineUrgency(daysToNextDate(todayKey, [
+                        element.due_date,
+                        ...(objectRows ? milestones.filter((m) => m.object_id === element.id).map((m) => m.date) : []),
+                      ]))
+                    : 0;
                   const assignedWorkers = (element.assignees ?? [])
                     .map((a) => a.worker)
                     .filter((w): w is NonNullable<typeof w> => !!w);
@@ -1084,6 +1094,8 @@ export function GanttView({
                         height: BAR_H,
                         top: barTopOf(top),
                         boxShadow: isDraggingThis ? undefined : '0 1px 2px var(--gantt-bar-shadow)',
+                        borderColor: urgency > 0 && selectedElement !== element.id && !isDraggingThis
+                          ? `color-mix(in oklab, var(--status-danger) ${Math.round(urgency * 45)}%, var(--border-default))` : undefined,
                       }}
                       onClick={() => { if (!draggedRef.current) activateElement(element); }}
                       onMouseDown={(e) => handleDragStart(e, element.id, 'move')}
@@ -1099,6 +1111,10 @@ export function GanttView({
                       }}
                       onMouseLeave={() => setTooltip(null)}
                     >
+                      {urgency > 0 && (
+                        <div className="pointer-events-none absolute inset-0 rounded-[inherit]"
+                          style={{ backgroundColor: `color-mix(in oklab, var(--status-danger) ${Math.round(urgency * 18)}%, transparent)` }} />
+                      )}
                       {/* Progress fill — a lighter wash over the status color,
                           not a second hue, so the bar's color keeps meaning
                           "status" and the fill alone reads as "how much". */}
