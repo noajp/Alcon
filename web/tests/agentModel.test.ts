@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentModelDraft, agentModelPatch, runsInClaudeCode, type AgentModelDraft } from '@/Function/team/agentModel';
+import { agentModelDraft, agentModelPatch, needsModelKey, runsInClaudeCode, type AgentModelDraft } from '@/Function/team/agentModel';
 
 const cfg = await import(new URL('../../supabase/functions/run-agent/agentConfig.ts', import.meta.url).pathname);
 
@@ -56,5 +56,22 @@ describe('Claude Code runner', () => {
     expect(runsInClaudeCode({ runner: 'claude-code' })).toBe(true);
     expect(runsInClaudeCode({ provider: 'x' })).toBe(false);
     expect(runsInClaudeCode(null)).toBe(false);
+  });
+});
+
+
+describe('needsModelKey', () => {
+  const connected = new Set(['conn-1']);
+  it('never for people or Claude Code workers', () => {
+    expect(needsModelKey({ type: 'human' }, connected, null)).toBe(false);
+    expect(needsModelKey({ type: 'ai_agent', ai_config: { runner: 'claude-code' } }, connected, 'gemini')).toBe(false);
+  });
+  it('Claude on Clayware\'s own key needs none; another provider without a connection does', () => {
+    expect(needsModelKey({ type: 'ai_agent', ai_model: 'claude-opus-5-5' }, connected, 'claude')).toBe(false);
+    expect(needsModelKey({ type: 'ai_agent', ai_model: 'gemini' }, connected, 'gemini')).toBe(true);
+  });
+  it('follows the connection a worker names', () => {
+    expect(needsModelKey({ type: 'ai_agent', ai_config: { provider: 'conn-1' } }, connected, 'deepseek')).toBe(false);
+    expect(needsModelKey({ type: 'ai_agent', ai_config: { provider: 'gone' } }, connected, 'claude')).toBe(true);
   });
 });

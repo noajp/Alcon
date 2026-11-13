@@ -135,6 +135,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Finish to finish': ['完了→完了', '완료→완료', 'Fin → fin', 'Fin → fin'],
   'Start to finish': ['開始→完了', '시작→완료', 'Début → fin', 'Inicio → fin'],
   'Scale': ['表示単位', '표시 단위', 'Échelle', 'Escala'],
+  'Set API key': ['APIキーを設定', 'API 키 설정', 'Définir la clé API', 'Configurar la clave API'],
+  '{name} needs an API key before it can take work. Set it in Settings › Connectors.': ['{name} は API キーを設定するまで仕事を受けられません。設定 › Connectors で設定してください。', '{name}은(는) API 키를 설정해야 작업을 맡을 수 있습니다. 설정 › Connectors에서 설정하세요.', '{name} a besoin d’une clé API avant de recevoir du travail. Définissez-la dans Paramètres › Connectors.', '{name} necesita una clave API antes de recibir trabajo. Configúrala en Ajustes › Connectors.'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

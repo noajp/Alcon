@@ -21,6 +21,8 @@ import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/prefer
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { ExecutionChain, emptyChain } from './ExecutionChain';
 import { objectStatusOf } from './objectStatus';
+import { useModelKeyCheck } from '@/Function/team/useModelKeyCheck';
+import { ModelKeyRow } from '@/Function/team/ModelKeyRow';
 
 // A Board of Objects: each Object a card, in the Status column its
 // Elements put it in (objectStatusOf). The Domain's Board and a
@@ -102,6 +104,7 @@ function ObjectCard({ object: o, lead, workers, from, total, done, onOpen }: {
 }) {
   const { t } = useI18n();
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
+  const keyMissing = useModelKeyCheck();
   // What was just set here shows at once; the board's own data catches up.
   const [set, setSet] = useState<{ lead_id?: string | null; due_date?: string | null }>({});
   const [dateOpen, setDateOpen] = useState(false);
@@ -143,7 +146,7 @@ function ObjectCard({ object: o, lead, workers, from, total, done, onOpen }: {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-[260px] min-w-[200px] overflow-y-auto" onClick={stop}>
-            {workers.map((w) => (
+            {workers.map((w) => leadId !== w.id && keyMissing(w) ? <ModelKeyRow key={w.id} worker={w} /> : (
               <DropdownMenuItem key={w.id} onSelect={() => { void save({ lead_id: w.id }); }} className="gap-2 text-[12px]">
                 <WorkerAvatar worker={w} size={16} />
                 <span className="flex-1 truncate">{w.name}</span>

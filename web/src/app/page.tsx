@@ -44,6 +44,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { SidebarRevealContext } from '@/Function/shared/SidebarReveal';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNavigation';
+import { useModelKeyCheck } from '@/Function/team/useModelKeyCheck';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -620,6 +621,7 @@ function WorkspaceContent({
   // Where the open Object popup was raised from (a Board's "+"), if anywhere.
   const [objectPopupContext, setObjectPopupContext] = useState<CreateObjectContext | null>(null);
   const [objectPopupWorkers, setObjectPopupWorkers] = useState<Worker[]>([]);
+  const keyMissing = useModelKeyCheck();
   // The Object popup uses the same visible Domain list as shell navigation.
   const previousDomainIdRef = useRef(activeDomainId);
 
@@ -923,6 +925,7 @@ function WorkspaceContent({
         open={objectPopupOpen}
         onClose={() => setObjectPopupOpen(false)}
         workers={objectPopupWorkers}
+        keyMissing={keyMissing}
         domains={domains}
         types={activeDomainObjectTypes}
         defaultDomainId={objectPopupContext?.domainId ?? (activeDomainId || null)}

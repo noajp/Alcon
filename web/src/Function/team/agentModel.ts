@@ -88,3 +88,22 @@ export function agentModelPatch(aiConfig: Json | null, draft: AgentModelDraft): 
   }
   return { ok: true, patch: { ai_model: model, ai_config: config } };
 }
+
+/**
+ * Pure. Whether an AI agent Worker cannot run yet for want of a model API key.
+ * It runs on the model connection its ai_config names, when that connection
+ * is in `connected` (the Space's model connections that hold a key); with no
+ * connection named it runs on Anthropic with Clayware's own key — which only
+ * serves Claude, so a Worker that names another provider's model needs one.
+ * Claude Code Workers and people never do.
+ */
+export function needsModelKey(
+  worker: { type?: string | null; ai_model?: string | null; ai_config?: Json | null },
+  connected: ReadonlySet<string>,
+  provider: string | null,
+): boolean {
+  if (worker.type !== 'ai_agent' || runsInClaudeCode(worker.ai_config)) return false;
+  const named = record(worker.ai_config).provider;
+  if (typeof named === 'string' && named) return !connected.has(named);
+  return provider !== null && provider !== 'claude';
+}

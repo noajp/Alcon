@@ -39,6 +39,8 @@ import type { WidgetHost } from '../types';
 import { completionOf, isOpenStatus } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { parseDateOnly, toDateOnlyString, isOverdue } from '@/Function/shared/dateUtils';
+import { useModelKeyCheck } from '@/Function/team/useModelKeyCheck';
+import { ModelKeyRow } from '@/Function/team/ModelKeyRow';
 
 // =============================================================
 // Properties — the Object's typed metadata, as a rail island.
@@ -371,6 +373,7 @@ function LeadPickerRow({
   onChange: (leadId: string | null) => void;
 }) {
   const { t } = useI18n();
+  const keyMissing = useModelKeyCheck();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -395,7 +398,7 @@ function LeadPickerRow({
         {workers.length === 0 && (
           <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">{t('No Workers')}</div>
         )}
-        {workers.map((w) => (
+        {workers.map((w) => lead?.id !== w.id && keyMissing(w) ? <ModelKeyRow key={w.id} worker={w} /> : (
           <DropdownMenuItem key={w.id} onClick={() => onChange(w.id)} className="gap-2">
             <WorkerAvatar worker={w} size={16} />
             <span className="flex-1 truncate">{w.name}</span>

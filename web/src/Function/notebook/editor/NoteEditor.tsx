@@ -323,9 +323,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     emit();
   }, [emit, elementStatusById]);
 
+  // While a Japanese (or any IME) word is being composed, the text being
+  // converted reads as a selection; the toolbar is for text the person chose,
+  // so it stays away until the composition ends.
   const updateToolbarPosition = useCallback(() => {
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    if (composingRef.current || !sel || sel.rangeCount === 0 || sel.isCollapsed) {
       setToolbar(null);
       return;
     }
@@ -406,12 +409,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
+    setToolbar(null);
     compositionStartHtmlRef.current = ref.current?.innerHTML ?? '';
     deferredBodyRef.current = null;
   }, []);
 
   const handleCompositionEnd = useCallback(() => {
     composingRef.current = false;
+    setToolbar(null);
     const locallyChanged = ref.current?.innerHTML !== compositionStartHtmlRef.current;
     const deferred = deferredBodyRef.current;
     deferredBodyRef.current = null;
