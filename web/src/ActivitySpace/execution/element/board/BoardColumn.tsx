@@ -1,9 +1,11 @@
 'use client';
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Hand } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { extractPlainText } from '@/Function/notebook/contentUtils';
 import type { WaitingReason } from '@/ActivitySpace/execution/chain/waiting';
 
 // One column of Element cards: a mark and a name, the count as a chip,
@@ -22,7 +24,7 @@ export function Chip({ children, className, style, title }: {
 }) {
   return (
     <span title={title} style={style}
-      className={cn('inline-flex h-5 min-w-0 shrink-0 items-center gap-1 rounded-full border border-[var(--border-default)] px-2 text-[11px] leading-none tabular-nums text-[var(--text-secondary)]', className)}>
+      className={cn('inline-flex h-5 min-w-0 shrink-0 items-center gap-1 rounded-full border border-transparent bg-foreground/[0.06] px-2 text-[11px] leading-none tabular-nums text-[var(--text-secondary)]', className)}>
       {children}
     </span>
   );
@@ -40,6 +42,50 @@ export const CHAIN_COLUMN_WIDTH = 'w-80';
  *  the cards that stand on it. Every board — Chain and Cascade alike —
  *  stands on this and nothing else. */
 export const BOARD_GROUND = 'bg-muted';
+
+/** A card standing on the board: a soft frame that firms up under the
+ *  pointer (the border and the shadow, not the ground), so a column of cards
+ *  stays quiet until one is reached for. Element and Object cards share it. */
+export const BOARD_CARD = 'rounded-xl border border-[var(--border-subtle)] bg-card shadow-[var(--shadow-card)] transition-[border-color,box-shadow] hover:border-[var(--border-default)] hover:shadow-[var(--shadow-1)] dark:bg-[var(--surface-rail)]';
+
+/** What a card says under its title — a count, a source — as quiet text
+ *  with its glyph, not a framed chip. */
+export function CardMeta({ icon, children, title }: { icon?: React.ReactNode; children: React.ReactNode; title?: string }) {
+  return (
+    <span title={title} className="inline-flex min-w-0 items-center gap-1 text-[12px] leading-4 text-muted-foreground">
+      {icon != null && <span className="grid shrink-0 place-items-center text-muted-foreground/70">{icon}</span>}
+      <span className="truncate tabular-nums">{children}</span>
+    </span>
+  );
+}
+
+/** A card's description: the first lines of what was written, as plain
+ *  text. Renders nothing when there is nothing to say. */
+export function CardDescription({ html }: { html: string | null | undefined }) {
+  const text = useMemo(() => (html ? extractPlainText(html).replace(/\s+/g, ' ').trim() : ''), [html]);
+  if (!text) return null;
+  return <p className="mt-1 line-clamp-2 text-[12.5px] leading-[18px] text-muted-foreground">{text}</p>;
+}
+
+/** The group's header: mark, name, and how many — the count as plain text. */
+function GroupHeading({ mark, label, count }: { mark?: React.ReactNode; label: string; count: number }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {mark}
+      <span className="truncate text-[13px] font-semibold">{label}</span>
+      <span className="text-[12px] tabular-nums text-muted-foreground">{count}</span>
+    </div>
+  );
+}
+
+/** An empty group: a dashed outline where its cards would stand. */
+function EmptyGroup({ text }: { text?: string }) {
+  return (
+    <div className="grid min-h-[72px] w-full place-items-center rounded-xl border border-dashed border-[var(--border-default)] px-3 text-center text-[12px] text-muted-foreground">
+      {text}
+    </div>
+  );
+}
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -92,20 +138,16 @@ export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, em
   return (
     <section
       aria-label={label}
-      className={cn('flex flex-shrink-0 flex-col rounded-lg', BOARD_GROUND, CHAIN_COLUMN_WIDTH)}
+      className={cn('flex flex-shrink-0 flex-col rounded-xl', BOARD_GROUND, CHAIN_COLUMN_WIDTH)}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
       <header className="flex h-10 items-center justify-between px-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {mark}
-          <span className="truncate text-[13px] font-medium">{label}</span>
-          <Chip>{count}</Chip>
-        </div>
+        <GroupHeading mark={mark} label={label} count={count} />
         {action}
       </header>
-      <div className="min-h-[80px] flex-1 space-y-1.5 overflow-y-auto px-1.5 pb-1.5">
-        {count === 0 && empty ? <p className="px-1.5 py-2 text-[12px] text-muted-foreground">{empty}</p> : children}
+      <div className="min-h-[80px] flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+        {count === 0 ? <EmptyGroup text={empty} /> : children}
       </div>
     </section>
   );
@@ -131,20 +173,16 @@ export function BoardLane({ mark, label, count, action, onDragOver, onDrop, empt
   return (
     <section
       aria-label={label}
-      className={cn('flex w-full flex-shrink-0 rounded-lg', BOARD_GROUND)}
+      className={cn('flex w-full flex-shrink-0 rounded-xl', BOARD_GROUND)}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
       <header className="flex h-10 w-52 flex-shrink-0 items-center justify-between self-start px-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {mark}
-          <span className="truncate text-[13px] font-medium">{label}</span>
-          <Chip>{count}</Chip>
-        </div>
+        <GroupHeading mark={mark} label={label} count={count} />
         {action}
       </header>
-      <div className="flex min-h-[80px] min-w-0 flex-1 items-start gap-1.5 overflow-x-auto px-1.5 py-1.5">
-        {count === 0 && empty ? <p className="px-1.5 py-2 text-[12px] text-muted-foreground">{empty}</p> : children}
+      <div className="flex min-h-[80px] min-w-0 flex-1 items-start gap-2 overflow-x-auto p-2">
+        {count === 0 ? <EmptyGroup text={empty} /> : children}
       </div>
     </section>
   );

@@ -3,7 +3,7 @@
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useState } from 'react';
-import { Check, Plus, Trash2, Settings, Users, ChevronRight, LogOut, ArrowLeft } from '@/ui/icons';
+import { Plus, Trash2, Settings, Users, ChevronRight, LogOut, ArrowLeft } from '@/ui/icons';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import {
   useActivitySpaces,
@@ -13,6 +13,7 @@ import {
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId, setActiveSpaceId } from './activeSpaceStore';
 import { countSpaceDomains } from './data';
+import { MenuCheck } from '@/ui/dropdown-menu';
 
 type Panel = 'main' | 'spaces' | 'create';
 
@@ -154,7 +155,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
               >
                 <SpaceMark space={s} size={20} />
                 <span className="flex-1 truncate text-foreground">{s.name}</span>
-                {s.id === active?.id && <Check size={13} className="shrink-0 text-muted-foreground" />}
+                {s.id === active?.id && <MenuCheck />}
               </button>
             ))}
             <div className="my-0.5 border-t border-border/60" />

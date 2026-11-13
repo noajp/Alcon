@@ -1,10 +1,7 @@
 'use client';
 
-import {
-  Activity, Check, FileText, Forward, ListTree, MessageCircleQuestion, PenLine, Play, Scale, Search, SearchCheck, Send, ShieldCheck,
-  Stamp,
-} from '@/ui/icons';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { Activity, FileText, Forward, ListTree, MessageCircleQuestion, PenLine, Play, Scale, Search, SearchCheck, Send, ShieldCheck, Stamp } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
 import { ELEMENT_ACTIONS, isHumanAction, type ElementAction } from './elementActionKinds';
@@ -73,7 +70,7 @@ export function ActionPicker({ value, onChange, disabled, trigger }: {
     <DropdownMenuItem key={a} onSelect={() => { if (a !== value) onChange(a); }} className="gap-2.5 py-1.5 text-[13px]">
       <ActionIcon action={a} size={15} />
       <span className="flex-1">{t(ACTION_LABEL[a])}</span>
-      {a === value && <Check size={13} />}
+      {a === value && <MenuCheck />}
     </DropdownMenuItem>
   );
   return (

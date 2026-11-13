@@ -2,11 +2,12 @@
 
 import { formatError } from './formatError';
 import * as React from 'react';
-import { Check, X } from '@/ui/icons';
+import { X } from '@/ui/icons';
 import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { useWorkerAvailability, useWorkerCommitments } from '@/hooks/useSupabase';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/Function/shared/dateUtils';
@@ -103,7 +104,7 @@ export function AssigneeMenuContent({
               <span className="flex-1 truncate">{w.name}</span>
               <ReachHint worker={w} />
               <LoadHint reading={readings[w.id]} name={w.name} />
-              {existing && <Check size={12} className="text-muted-foreground" />}
+              {existing && <MenuCheck />}
             </DropdownMenuItem>
           );
         })}

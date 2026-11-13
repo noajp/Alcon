@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronRight, ListChecks, Loader2, MessageSquare, Play, Square,
+  ChevronRight, ListChecks, MessageSquare, Play, Square,
 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
 import { SendIcon } from '@/Function/shared/SendIcon';
+import { ThinkingTrace } from '@/Function/shared/ThinkingTrace';
 import { TraceStepList } from '@/Function/shared/workTraceView';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
@@ -134,11 +135,7 @@ export function StrategyConversation({ strategyId, spaceId, strategyDefinitionId
         {talk.pendingText && !items.some((it, i) => i === items.length - 1 && it.kind === 'person' && it.text === talk.pendingText) && (
           <PersonTurn text={talk.pendingText} />
         )}
-        {talk.working && (
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <Loader2 size={13} className="animate-spin" />{t('Thinking…')}
-          </div>
-        )}
+        <ThinkingTrace working={talk.working} />
         {(talk.error || stopped) && (
           <p role="alert" className="text-[12px] text-[var(--status-danger)]">{talk.error ?? stopped}</p>
         )}

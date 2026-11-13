@@ -3,9 +3,9 @@
 import { FieldVisibility } from '@/Function/property/FieldVisibility';
 import { Button } from '@/ui/button';
 import { useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Pencil, ArrowDown, ArrowUp, EyeOff, Plus, X, Check } from '@/ui/icons';
+import { ArrowLeft, ArrowRight, Pencil, ArrowDown, ArrowUp, EyeOff, Plus, X } from '@/ui/icons';
 import { useSortable } from '@dnd-kit/sortable';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_ROW, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { type ColumnId, type ColumnSort, type DataColumn } from '@/Function/shared/listTable/useListColumns';
@@ -84,12 +84,12 @@ export function ColumnHeader({
           <DropdownMenuItem onSelect={() => onSort('asc')}>
             <ArrowUp size={14} />
             <span className="flex-1">{t('Sort ascending')}</span>
-            {sort === 'asc' && <Check size={13} />}
+            {sort === 'asc' && <MenuCheck />}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => onSort('desc')}>
             <ArrowDown size={14} />
             <span className="flex-1">{t('Sort descending')}</span>
-            {sort === 'desc' && <Check size={13} />}
+            {sort === 'desc' && <MenuCheck />}
           </DropdownMenuItem>
           {sort && (
             <DropdownMenuItem onSelect={() => onSort(null)}>

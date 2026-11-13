@@ -2,10 +2,10 @@
 import { formatError } from '@/Function/shared/formatError';
 import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
+import { SendIcon } from '@/Function/shared/SendIcon';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Maximize2, Minimize2, Paperclip, Square } from '@/ui/icons';
-import { SendIcon } from '@/Function/shared/SendIcon';
+import { CornerDownRight, X, Maximize2, Minimize2, Paperclip, Square } from '@/ui/icons';
 import { buildCopilotContext, type CopilotAttachment, type CopilotContext, type CopilotSubject } from './useClaywareCopilot';
 import { useStrategies } from '@/hooks/strategyData';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
@@ -20,6 +20,15 @@ import { getActiveDomainId } from '@/Function/space/domainsStore';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 const SlidesAssistant = dynamic(() => import('@/ActivitySpace/artifacts/slides/SlidesAssistant').then((m) => m.SlidesAssistant), { ssr: false });
+
+/** Where a conversation can start. Each is a request the AI can carry out
+ *  with what the Space already holds. */
+const STARTERS = [
+  'Show what is waiting on me',
+  'Find Elements that have stalled',
+  'Plan the next steps for a Strategy',
+  'Summarize this week’s progress',
+];
 
 const FLOAT_KEY = 'clayware.copilot.float';
 const FLOAT_MIN_W = 320;
@@ -340,59 +349,71 @@ export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, varia
         <div className={column}>
           <CredentialChatHint requestIds={credentialRequestIds} />
         </div>
+        {messages.length === 0 && !streaming && (
+          // Places to start, while nothing has been said: picking one writes
+          // it into the box, for the person to send or change.
+          <div className={`mb-2 flex flex-wrap gap-1.5 ${column}`}>
+            {STARTERS.map((starter) => (
+              <Button key={starter} type="button" variant="secondary" size="sm" shape="tab"
+                onClick={() => { setInput(t(starter)); inputRef.current?.focus(); }}>
+                <CornerDownRight size={12} />
+                {t(starter)}
+              </Button>
+            ))}
+          </div>
+        )}
         <form
           onSubmit={(e) => { e.preventDefault(); submit(); }}
           onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); void addFiles(e.dataTransfer.files); } }}
-          className={`flex flex-col gap-1 rounded-lg border bg-[var(--surface-rail)] px-1.5 py-1.5 shadow-[var(--shadow-island)] transition-colors focus-within:border-border ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/30'} ${column}`}
+          className={`flex flex-col gap-2 rounded-2xl border bg-[var(--surface-rail)] px-3 pb-2 pt-3 shadow-[var(--shadow-card)] transition-colors focus-within:border-border ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/40'} ${column}`}
         >
-          {files.length > 0 && <div className="flex px-1 pt-0.5"><AttachmentChips files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, k) => k !== i))} /></div>}
-          <div className="flex items-end gap-1">
+          {files.length > 0 && <div className="flex"><AttachmentChips files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, k) => k !== i))} /></div>}
+          {/* The request on top, on its own line; what acts on it underneath. */}
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              // Grows with what is written, up to the cap.
+              e.target.style.height = 'auto';
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 192)}px`;
+              // No scrollbar until the text outgrows the cap.
+              e.target.style.overflowY = e.target.scrollHeight > 192 ? 'auto' : 'hidden';
+            }}
+            onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); void addFiles(e.clipboardData.files); } }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            rows={1}
+            placeholder={streaming ? '…' : t('Ask Athena anything')}
+            aria-label={t('Message AI')}
+            disabled={streaming}
+            className={`max-h-48 min-h-6 w-full resize-none overflow-hidden bg-transparent px-1 leading-6 disabled:opacity-60 ${page ? 'text-[14px]' : 'text-[13px]'}`}
+            style={{ fontWeight: 400 }}
+          />
+          <div className="flex items-center gap-1">
             <input ref={fileInputRef} type="file" accept={ATTACH_ACCEPT} multiple hidden
               onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ''; }} />
-            <Button size="icon-sm" type="button" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={streaming}
-              title={t('Attach a file (PDF, Markdown, text)')} aria-label={t('Attach a file (PDF, Markdown, text)')} className="text-muted-foreground">
+            <Button size="icon-sm" type="button" variant="ghost" shape="tab" onClick={() => fileInputRef.current?.click()} disabled={streaming}
+              title={t('Attach a file (PDF, Markdown, text)')} aria-label={t('Attach a file (PDF, Markdown, text)')}>
               <Paperclip size={14} />
             </Button>
             <ClaywareFilePicker disabled={streaming || files.length >= MAX_FILES} onPick={(f) => { setFileError(null); setFiles((prev) => [...prev, f]); }} />
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                // Grows with what is written, up to the cap.
-                e.target.style.height = 'auto';
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-                // No scrollbar until the text outgrows the cap.
-                e.target.style.overflowY = e.target.scrollHeight > 160 ? 'auto' : 'hidden';
-              }}
-              onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); void addFiles(e.clipboardData.files); } }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              rows={1}
-              placeholder={streaming ? '…' : t('Type anything')}
-              aria-label={t('Message AI')}
-              disabled={streaming}
-              className="max-h-40 min-h-[24px] flex-1 resize-none overflow-hidden bg-transparent px-0.5 py-1 text-[12.5px] leading-[1.5] disabled:opacity-60"
-              style={{ fontWeight: 400 }}
-            />
+            <div className="flex-1" />
             {streaming ? (
               // One Stop face on every chat surface: the Square — an X
               // here read as "close the panel", which has its own X in
               // the header.
-              <Button size="icon-sm" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="ghost">
-                <Square size={14} />
+              <Button size="xs" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="secondary" className="rounded-md px-2">
+                <Square size={13} />
               </Button>
             ) : (
-              // Same rectangular send as the Updates composer; mb-0.5 centres
-              // its 24px against the 28px row while one line is written.
-              <Button size="xs" type="submit" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary"
-                className="mb-0.5 rounded-md px-2">
+              <Button size="xs" type="submit" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary" className="rounded-md px-2">
                 <SendIcon size={13} />
               </Button>
             )}

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { CheckIcon, CircleIcon, PlayIcon } from '@/ui/icons'
+import { CheckIcon, PlayIcon } from '@/ui/icons'
 
 import { anchoredOverlayMotion, cn } from "@/lib/utils"
 
@@ -83,6 +83,15 @@ function DropdownMenuItem({
   )
 }
 
+/** The mark of the chosen row in any menu: one check, at the row's end. Radio and checkbox rows draw it themselves; a plain row
+ *  that marks a choice places it after its label. */
+function MenuCheck({ className }: { className?: string }) {
+  return <CheckIcon aria-hidden="true" className={cn("ml-auto size-3.5 shrink-0 !text-foreground", className)} />
+}
+
+const CHOICE_ITEM =
+  "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -92,19 +101,14 @@ function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(CHOICE_ITEM, className)}
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
-        </DropdownMenuPrimitive.ItemIndicator>
-      </span>
       {children}
+      <DropdownMenuPrimitive.ItemIndicator className="ml-auto flex">
+        <MenuCheck />
+      </DropdownMenuPrimitive.ItemIndicator>
     </DropdownMenuPrimitive.CheckboxItem>
   )
 }
@@ -128,18 +132,13 @@ function DropdownMenuRadioItem({
   return (
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(CHOICE_ITEM, className)}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.ItemIndicator>
-          <CircleIcon className="size-2 fill-current" />
-        </DropdownMenuPrimitive.ItemIndicator>
-      </span>
       {children}
+      <DropdownMenuPrimitive.ItemIndicator className="ml-auto flex">
+        <MenuCheck />
+      </DropdownMenuPrimitive.ItemIndicator>
     </DropdownMenuPrimitive.RadioItem>
   )
 }
@@ -250,6 +249,7 @@ export {
   DropdownMenuLabel,
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
+  MenuCheck,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,

@@ -7,14 +7,7 @@ import { Button } from '@/ui/button';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/shared/designTokens';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import {
-  Check,
-  ChevronDown,
-  LayoutTemplate,
-  Tag as TagIcon,
-  User as UserIcon,
-  X,
-} from '@/ui/icons';
+import { ChevronDown, LayoutTemplate, Tag as TagIcon, User as UserIcon, X } from '@/ui/icons';
 import { ElementIcon, ObjectIcon as BoxIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
@@ -33,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 
 // Sentinel used in the Object pill for the "My Elements (personal)" entry.
@@ -395,7 +389,7 @@ export function QuickAddElementPopup({
                 {templates.map((t) => (
                   <DropdownMenuItem key={t.id} onSelect={() => applyTemplate(t)} className="gap-2 text-[12px]">
                     <span className="flex-1 truncate">{t.name}</span>
-                    {templateId === t.id && <Check size={12} />}
+                    {templateId === t.id && <MenuCheck />}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -420,7 +414,7 @@ export function QuickAddElementPopup({
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
                     <TypeMark type={t} icons={typeIcons} size={13} />
                     <span className="flex-1 truncate">{t}</span>
-                    {type === t && <Check size={12} />}
+                    {type === t && <MenuCheck />}
                   </DropdownMenuItem>
                 ))}
                 {type && (
@@ -449,7 +443,7 @@ export function QuickAddElementPopup({
                 <DropdownMenuItem key={s.value} onSelect={() => setStatus(s.value)} className="gap-2 text-[12px]">
                   <ElementProgressMark status={s.value} size={13} />
                   <span className="flex-1">{t(s.label)}</span>
-                  {status === s.value && <Check size={12} />}
+                  {status === s.value && <MenuCheck />}
                 </DropdownMenuItem>
               ))}
               {status && (
@@ -509,7 +503,7 @@ export function QuickAddElementPopup({
                       <WorkerAvatar worker={w} size={16} />
                       <span className="flex-1 truncate">{w.name}</span>
                       <ReachHint worker={w} />
-                      {on && <Check size={12} />}
+                      {on && <MenuCheck />}
                     </DropdownMenuItem>
                   );
                 })}
@@ -543,7 +537,7 @@ export function QuickAddElementPopup({
                     <DropdownMenuItem onSelect={() => setObjectId(PERSONAL_SCOPE_ID)} className="gap-2 text-[12px]">
                       <NavMyTasksIcon size={12} />
                       <span className="flex-1 truncate">{t('My Elements (personal)')}</span>
-                      {isPersonalChoice && <Check size={12} />}
+                      {isPersonalChoice && <MenuCheck />}
                     </DropdownMenuItem>
                     {objects.length > 0 && <DropdownMenuSeparator />}
                   </>
@@ -552,7 +546,7 @@ export function QuickAddElementPopup({
                   <DropdownMenuItem key={o.id} onSelect={() => setObjectId(o.id)} className="gap-2 text-[12px]">
                     <BoxIcon size={12} className="text-muted-foreground" />
                     <span className="flex-1 truncate">{o.name}</span>
-                    {objectId === o.id && <Check size={12} />}
+                    {objectId === o.id && <MenuCheck />}
                   </DropdownMenuItem>
                 ))}
                 {(objectOpt && !isPersonalChoice) && (
@@ -587,7 +581,7 @@ export function QuickAddElementPopup({
                     >
                       <TagIcon size={12} className="shrink-0" style={{ color: labelColor(l) }} />
                       <span className="flex-1 truncate">{l}</span>
-                      {on && <Check size={12} />}
+                      {on && <MenuCheck />}
                     </DropdownMenuItem>
                   );
                 })}

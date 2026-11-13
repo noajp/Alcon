@@ -1,7 +1,7 @@
 'use client';
 
-import { Check, ChevronDown, Languages } from '@/ui/icons';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { ChevronDown, Languages } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { Button } from '@/ui/button';
 import { LOCALE_NAMES, SUPPORTED_LOCALES } from './locales';
 import { useI18n } from './I18nProvider';
@@ -27,7 +27,7 @@ export function LanguageSelect({ compact = false }: { compact?: boolean }) {
         {SUPPORTED_LOCALES.map((option) => (
           <DropdownMenuItem key={option} onSelect={() => setLocale(option)} className="gap-2 text-[12px]">
             <span className="flex-1" lang={option}>{LOCALE_NAMES[option]}</span>
-            {locale === option && <Check size={12} />}
+            {locale === option && <MenuCheck />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

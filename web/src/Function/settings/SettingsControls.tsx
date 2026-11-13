@@ -2,9 +2,10 @@
 
 import type React from 'react';
 import { useRef } from 'react';
-import { Check, ChevronDown } from '@/ui/icons';
+import { ChevronDown } from '@/ui/icons';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FONT, SETTINGS_ISLAND } from '@/shared/designTokens';
@@ -202,7 +203,7 @@ export function SelectControl({
         {options.map((opt) => (
           <DropdownMenuItem key={opt} onSelect={() => onChange(opt)} className="gap-2 text-[12px]">
             <span className="flex-1">{t(opt)}</span>
-            {value === opt && <Check size={12} />}
+            {value === opt && <MenuCheck />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

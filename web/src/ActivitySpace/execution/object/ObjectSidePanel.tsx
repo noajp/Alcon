@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronRight, Plus, X } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { addObjectDependency, removeObjectDependency } from '@/hooks/objectDependencyData';
-import { linkConflicts, linkWouldLoop } from '@/Function/shared/objectDependencyModel';
+import { asDependencyKind, dependencyConflicts, linkWouldLoop } from '@/Function/shared/objectDependencyModel';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
@@ -137,7 +137,7 @@ function DependencyList({ title, object, objects, links, side }: {
               const other = byId.get(otherOf(l));
               const blocker = byId.get(l.blocker_object_id);
               const blocked = byId.get(l.blocked_object_id);
-              const conflict = linkConflicts(blocker?.due_date, blocked?.start_date);
+              const conflict = dependencyConflicts(asDependencyKind(l.kind), { start: blocker?.start_date, due: blocker?.due_date }, { start: blocked?.start_date, due: blocked?.due_date });
               return (
                 <li key={l.id} className="flex min-w-0 items-center gap-2 rounded-md border border-border/60 px-2 py-1 text-[13px]">
                   <ItemIcon icon={other?.icon ?? null} color={other?.color ?? null} size={13} fallback={<ObjectIcon size={13} />} />

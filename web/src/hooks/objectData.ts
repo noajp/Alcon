@@ -6,6 +6,8 @@ import { reorderObjectsInExplorer } from '@/Function/sync/explorerPatch';
 import { translate } from '@/Function/i18n/I18nProvider';
 import { throwOnFailedWrites } from './writeResults';
 import { supabase } from '@/lib/supabase';
+import { getQueryClient } from '@/lib/queryClient';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import type { ClaywareObject, ObjectTab, ObjectTabInsert } from '@/types/database';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
@@ -166,6 +168,18 @@ export async function updateObject(
 
   if (error) throw error;
   return data;
+}
+
+/** Sets an Object's Lead or due date from its board card, then has every
+ *  list that shows the Object read it again. */
+export async function setObjectFromCard(id: string, updates: { lead_id?: string | null; due_date?: string | null }): Promise<void> {
+  await updateObject(id, updates);
+  void getQueryClient().invalidateQueries({ queryKey: ['explorer'] });
+}
+
+export function noticeObjectSaveFailed(error: unknown): void {
+  console.error('Object change was not saved:', error);
+  void appDialog.alert(translate('The change could not be saved. Try again.'));
 }
 
 // Manual prefix rename (RenamePrefixDialog.tsx) — routed through a

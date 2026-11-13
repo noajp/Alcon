@@ -4967,6 +4967,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          kind: string
         }
         Insert: {
           blocked_object_id: string
@@ -4974,6 +4975,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: string
         }
         Update: {
           blocked_object_id?: string
@@ -4981,6 +4983,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: string
         }
         Relationships: [
           {

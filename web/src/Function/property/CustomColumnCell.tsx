@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 
 interface CustomColumnCellProps {
@@ -187,7 +188,7 @@ function CustomColumnCellBody({
         {options.filter((opt) => !opt.archived).map((opt) => <DropdownMenuItem key={opt.value} onSelect={(e) => {
           if (multiple) { e.preventDefault(); onChange(selected.includes(opt.value) ? selected.filter((v) => v !== opt.value) : [...selected, opt.value]); }
           else onChange(opt.value);
-        }}><span className="size-2 rounded-full" style={{ backgroundColor: opt.color ?? 'var(--text-secondary)' }} /><span className="flex-1">{optionLabel(opt)}</span>{selected.includes(opt.value) && <Check size={12} />}</DropdownMenuItem>)}
+        }}><span className="size-2 rounded-full" style={{ backgroundColor: opt.color ?? 'var(--text-secondary)' }} /><span className="flex-1">{optionLabel(opt)}</span>{selected.includes(opt.value) && <MenuCheck />}</DropdownMenuItem>)}
         {options.every((opt) => opt.archived) && <p className="p-2 text-sm text-muted-foreground">{t('No active options')}</p>}
         {!!selected.length && <DropdownMenuItem onSelect={() => onChange(multiple ? [] : null)}>{t('Clear')}</DropdownMenuItem>}
       </MenuShell>
@@ -280,7 +281,7 @@ function PersonCell({
                 <WorkerAvatar worker={w} size={20} />
                 <span className="flex-1 truncate">{w.name}</span>
                 <ReachHint worker={w} />
-                {sel && <Check size={12} className="text-muted-foreground" />}
+                {sel && <MenuCheck />}
               </button>
             );
           })}

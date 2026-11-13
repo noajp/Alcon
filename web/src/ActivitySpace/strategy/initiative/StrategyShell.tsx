@@ -10,7 +10,7 @@ import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/b
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, FileText, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
+import { ChevronDown, ChevronRight, FileText, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
 import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
@@ -70,7 +70,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { InitiativeCodeChanges } from '@/ActivitySpace/execution/codeChanges/InitiativeCodeChanges';
 import { StrategyEvaluationPanel } from './StrategyEvaluationPanel';
 import { InitiativeMission } from './mission/InitiativeMission';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ProgressBelt } from '@/Function/shared/ProgressBelt';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { canEditInitiative } from '@/Function/strategy/initiativeAccess';
 import { useSpaceRole } from '@/Function/space/data';
@@ -81,8 +81,12 @@ import type { InitiativeHealth } from './initiativeHealthModel';
 import { useInitiativeMeasureTallies } from './useInitiativeMeasureTallies';
 import { MeasureStatus } from './MeasureStatus';
 import type { MeasureTally } from './initiativeMeasureModel';
-import { useNow } from '@/Function/shared/useNow';
-import { formatRelative } from '@/Function/shared/dateUtils';
+import { formatDateOnly } from '@/Function/shared/dateUtils';
+import { HealthBelt } from '@/Function/shared/HealthBelt';
+import { extractPlainText } from '@/Function/notebook/contentUtils';
+import { strategyFacts } from '@/Function/strategy/strategyFacts';
+import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
+import { useWorkersByIds } from '@/hooks/teamData';
 import {
   useBoard,
   WidgetSurface,
@@ -99,6 +103,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -268,7 +273,7 @@ export function StrategyShell({
 // the same predicates the Strategy page uses (initiativeRiskModel), so the
 // row never disagrees with the page it opens. Quiet register throughout — a
 // row is not the place to shout; the number is the signal.
-function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth | undefined; measures: MeasureTally | undefined }) {
+function InitiativeHealthCell({ health, measures, start, due }: { health: InitiativeHealth | undefined; measures: MeasureTally | undefined; start: string | null; due: string | null }) {
   const { t } = useI18n();
   if (!health) {
     return <span className="text-[11px] text-muted-foreground/50">…</span>;
@@ -278,44 +283,40 @@ function InitiativeHealthCell({ health, measures }: { health: InitiativeHealth |
   if (risk.overdue > 0) alerts.push(t('{n} overdue', { n: risk.overdue }));
   if (risk.stalled > 0) alerts.push(t('{n} stalled', { n: risk.stalled }));
   if (risk.blocked > 0) alerts.push(t('{n} blocked', { n: risk.blocked }));
-  const moved = health.lastActivityAt !== null
-    ? formatRelative(new Date(health.lastActivityAt).toISOString())
-    : null;
-  const unmeasured = health.risk.openTotal > 0 && !health.scheduleMeasured;
   return (
-    <div className="flex items-center gap-3 min-w-0 text-[11px] text-muted-foreground tabular-nums">
-      {/* Outcome before effort: the success conditions lead, the Element
-          completion that follows is only how much work has been done. */}
-      <MeasureStatus tally={measures} />
+    <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
       {health.progressPct === null ? (
         <span className="shrink-0 text-muted-foreground/60">{t('No Elements')}</span>
       ) : (
-        <span className="flex items-center gap-1.5 shrink-0 w-24">
-          <SegmentedProgress value={health.progressPct} className="flex-1" />
+        <span className="flex shrink-0 items-center gap-1.5">
+          <HealthBelt progress={health.progressPct} start={start} due={due} />
           <span className="w-7 text-right">{health.progressPct}%</span>
         </span>
       )}
-      {/* An empty Strategy already said "No Elements"; "No activity" would
-          be the same fact twice. */}
-      {!(health.total === 0 && moved === null) && (
-        <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? t('Last movement {when}', { when: moved }) : t('Nothing has reported yet')}>
-          {moved ?? t('No activity')}
-        </span>
+      {/* What it is measured by, then what is on fire — after the belt, so
+          the belt stands at the column's start under its heading. */}
+      <MeasureStatus tally={measures} />
+      {alerts.length > 0 && (
+        <span className="min-w-0 truncate text-foreground/80" title={alerts.join(' · ')}>{alerts.join(' · ')}</span>
       )}
-      {alerts.length > 0 ? (
-        <span
-          className="min-w-0 truncate text-foreground/80"
-          // The alerts take the slot, but an unmeasured schedule is still a
-          // fact — it rides in the title rather than costing width.
-          title={unmeasured ? t('{alerts} — open Elements carry no due dates, so the schedule is unmeasured', { alerts: alerts.join(' · ') }) : alerts.join(' · ')}
-        >
-          {alerts.join(' · ')}
-        </span>
-      ) : unmeasured ? (
-        // 0 overdue with no dated work is not "on time" — it is unmeasured.
-        <span className="min-w-0 truncate text-muted-foreground/60" title={t('Open Elements carry no due dates, so the schedule is unmeasured')}>{t('No dates')}</span>
-      ) : null}
     </div>
+  );
+}
+
+/** A description as one plain line, for a list row; null when there is none. */
+function plainLine(text: string | null | undefined): string | null {
+  const line = text ? extractPlainText(text).replace(/\s+/g, ' ').trim() : '';
+  return line || null;
+}
+
+/** Who leads a Strategy's Objects: their avatar and name; nothing when no Object has a lead. */
+function StrategyLead({ worker }: { worker: Parameters<typeof WorkerAvatar>[0]['worker'] }) {
+  if (!worker) return null;
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <WorkerAvatar worker={worker} size={18} />
+      <span className="truncate text-[13px] text-muted-foreground">{worker.name}</span>
+    </span>
   );
 }
 
@@ -333,7 +334,7 @@ function StrategyListView({
   nodes: InitiativeNode<StrategyWithObjects>[];
   onSelectStrategy: (strategy: StrategyWithObjects) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const rows = useMemo(() => flattenInitiativeTree(nodes, (key) => !folded.has(key)), [nodes, folded]);
   const strategies = useMemo(() => rows.map((n) => n.initiative), [rows]);
@@ -343,9 +344,15 @@ function StrategyListView({
   const tallies = useInitiativeMeasureTallies(strategies.map((s) => s.id));
   // Archived Objects stay linked but are not counted.
   const countObjects = useActiveObjectCount();
-  // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
-  // honestly while the list stays open; the cells re-render with this view.
-  useNow();
+  // What each row says of the schedule and the people: read off its Objects.
+  const { data: explorer } = useObjects(null);
+  const facts = useMemo(() => {
+    const byId = new Map(explorer.objects.map((o) => [o.id, o]));
+    return new Map(strategies.map((s) => [s.id, strategyFacts(s.objectIds.map((id) => byId.get(id)).filter((o): o is NonNullable<typeof o> => !!o))]));
+  }, [explorer.objects, strategies]);
+  const leadIds = useMemo(() => Array.from(new Set(Array.from(facts.values()).map((f) => f.leadId).filter((id): id is string => !!id))), [facts]);
+  const leadWorkers = useWorkersByIds(leadIds);
+  const leadsById = useMemo(() => new Map(leadWorkers.map((w) => [w.id, w])), [leadWorkers]);
 
   // Drag a row to reorder it, or onto the middle of another row to put it
   // inside that one. The pointer's height in the row picks which.
@@ -366,7 +373,7 @@ function StrategyListView({
     }
   };
   return (
-    <IndexList headers={[t('Name'), t('Health'), t('Objects')]} withActions>
+    <IndexList headers={[t('Name'), t('Health'), t('Due date'), t('Lead'), t('Objects')]} withActions>
       {rows.map(({ initiative: s, key, depth, children }) => {
         const over = drop?.key === key && dragKey !== null ? drop.place : null;
         return (
@@ -396,7 +403,7 @@ function StrategyListView({
                 style={{ left: depth * 20 + 22 }} />
             )}
             <IndexRow indent={depth * 20} icon={<ItemIcon icon={s.icon} color={s.color} fallback={<NavStrategyIcon size={16} />} />} name={s.name}
-              lead={children.length > 0 ? (
+              fold={children.length > 0 ? (
                 <button type="button"
                   onClick={() => setFolded((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; })}
                   className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
@@ -404,8 +411,11 @@ function StrategyListView({
                   <DisclosureTriangle open={!folded.has(key)} />
                 </button>
               ) : undefined}
-              health={<InitiativeHealthCell health={health.get(s.id)} measures={tallies.get(s.id)} />}
-              count={countObjects(s.objectIds)}
+              health={<InitiativeHealthCell health={health.get(s.id)} measures={tallies.get(s.id)} start={facts.get(s.id)?.start ?? null} due={facts.get(s.id)?.due ?? null} />}
+              description={plainLine(s.description)}
+              due={facts.get(s.id)?.due ? formatDateOnly(facts.get(s.id)!.due!, locale) : undefined}
+              person={<StrategyLead worker={facts.get(s.id)?.leadId ? leadsById.get(facts.get(s.id)!.leadId!) : undefined} />}
+              count={<span className="inline-flex items-center gap-1" title={t('Objects')}><ObjectIcon size={13} className="text-muted-foreground/70" />{countObjects(s.objectIds)}</span>}
               onOpen={() => onSelectStrategy(s)}
               actions={<InitiativeActionsButton initiative={s} />} />
           </div>
@@ -1228,7 +1238,7 @@ function StrategyDetailView({
                           <LeadCell obj={obj} workers={workers} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
                         </div>
                         <div className="w-24 shrink-0 flex items-center gap-1.5">
-                          <SegmentedProgress value={progress} className="flex-1" />
+                          <ProgressBelt value={progress} className="flex-1" />
                           <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{progress}%</span>
                         </div>
                       </div>
@@ -1397,7 +1407,7 @@ function StrategyCreateDialog({
                 <CommandGroup key={did} heading={domainName}>
                   {objects.map((o) => (
                     <CommandItem key={o.id} value={`${o.name} ${o.id}`} onSelect={() => toggleObject(o.id)}>
-                      <ObjectIcon size={12} /><span className="flex-1 truncate">{o.name}</span>{selectedIds.has(o.id) && <Check size={12} />}
+                      <ObjectIcon size={12} /><span className="flex-1 truncate">{o.name}</span>{selectedIds.has(o.id) && <MenuCheck />}
                     </CommandItem>
                   ))}
                 </CommandGroup>

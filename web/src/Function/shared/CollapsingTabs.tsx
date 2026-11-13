@@ -1,10 +1,11 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { Check, ChevronDown } from '@/ui/icons';
+import { ChevronDown } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuShell, MENU_ROW } from '@/Function/shared/menu';
+import { MenuCheck } from '@/ui/dropdown-menu';
 
 // =============================================================
 // CollapsingTabs — a strip of view tabs that folds into one menu when the
@@ -86,7 +87,7 @@ export function CollapsingTabs({ items, activeId, onSelect, strip, trailing, men
                 <span className="text-muted-foreground"><item.icon size={14} /></span>
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
                 {item.badge}
-                {item.id === active.id && <Check size={13} className="text-muted-foreground" />}
+                {item.id === active.id && <MenuCheck />}
               </button>
             ))}
           </MenuShell>

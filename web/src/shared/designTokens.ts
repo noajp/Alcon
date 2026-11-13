@@ -1,8 +1,8 @@
 /**
  * Clayware Design Tokens
  *
- * Accent: Matte blue (#426fac) — muted, single accent
- * Danger: Matte red (#d05249) — muted, warm red
+ * Accent: Blue (#3d5fae) — single accent
+ * Danger: Red (#c43939) — what is stopped or lost
  * Surfaces: neutral light / dark ramp
  * Typography: Inter Variable, 13px base
  *
@@ -105,7 +105,7 @@ export const CONTROL = {
 } as const;
 
 export const FIELD = {
-  base: `${CONTROL.border} rounded-[var(--control-field-radius)] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:bg-[var(--accent-subtle)]`,
+  base: `${CONTROL.border} rounded-[var(--control-field-radius)] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:bg-[var(--surface-strong)]`,
 } as const;
 
 export type ControlSize = keyof typeof CONTROL.height;

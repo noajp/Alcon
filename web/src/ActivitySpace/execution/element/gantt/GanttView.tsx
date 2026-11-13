@@ -7,7 +7,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ClaywareObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { CalendarDays, X, ZoomIn, ZoomOut } from '@/ui/icons';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { ObjectIcon } from '@/Frame/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
@@ -15,7 +15,10 @@ import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
-import { dragRange } from './ganttRange';
+import { dragRange, linkRoute, roundedPath } from './ganttRange';
+import { DEPENDENCY_KINDS, asDependencyKind, endsOfKind, kindOfEnds, type BarEnd, type DependencyKind } from '@/Function/shared/objectDependencyModel';
+import { addElementDependency, removeElementDependency, setElementDependencyKind } from '@/hooks/elementDependencyData';
+import { outlook, warmthGradient, warnsAboutTime } from '@/Function/shared/pace';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
@@ -61,12 +64,24 @@ interface GanttViewProps {
   links?: GanttLink[];
   /** Present when the viewer may add a dependency: a bar grows a handle at
    *  its end; dragging it onto another bar asks for `to` to wait for `from`. */
-  onLinkCreate?: (from: string, to: string) => void;
+  onLinkCreate?: (from: string, to: string, kind: DependencyKind) => void;
+  /** Present when the viewer may change which ends a dependency ties. */
+  onLinkKindChange?: (link: GanttLink, kind: DependencyKind) => void;
   /** Present when the viewer may remove one, from the mark on its line. */
   onLinkRemove?: (link: GanttLink) => void;
 }
 
-export interface GanttLink { id?: string; from: string; to: string; conflict?: boolean }
+export interface GanttLink {
+  id?: string;
+  from: string;
+  to: string;
+  /** Which ends it ties (fs when absent). */
+  kind?: DependencyKind;
+  /** The dates break it: drawn in red. */
+  conflict?: boolean;
+  /** Drawn in a quiet grey, never red or blue (Element dependencies). */
+  quiet?: boolean;
+}
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 
@@ -232,36 +247,81 @@ export function GanttView({
   milestones = EMPTY_MILESTONES,
   defaultZoom = 'day',
   rowScale = 'element',
-  links = EMPTY_LINKS,
-  onLinkCreate,
-  onLinkRemove,
+  links: linksProp,
+  onLinkCreate: onLinkCreateProp,
+  onLinkRemove: onLinkRemoveProp,
+  onLinkKindChange: onLinkKindChangeProp,
 }: GanttViewProps) {
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
+  const todayKey = fmtDateOnly(new Date());
+
+  // Elements bring their own dependencies (their depends_on edges) and are
+  // linked, re-tied and unlinked here; a caller that passes `links` (the
+  // Objects' Timeline) owns them instead. Element lines stay grey.
+  const ownsElementLinks = rowScale === 'element' && linksProp === undefined;
+  const elementLinks = useMemo<GanttLink[]>(() => {
+    if (!ownsElementLinks) return EMPTY_LINKS;
+    const out: GanttLink[] = [];
+    for (const el of elements) {
+      for (const edge of el.edges?.incoming ?? []) {
+        if (edge.edge_type !== 'depends_on') continue;
+        const attributes = (edge.attributes ?? {}) as { kind?: unknown };
+        out.push({ id: edge.id, from: edge.from_element, to: el.id, kind: asDependencyKind(attributes.kind), quiet: true });
+      }
+    }
+    return out;
+  }, [ownsElementLinks, elements]);
+  const links = linksProp ?? elementLinks;
+  const { onLinkCreate, onLinkRemove, onLinkKindChange } = useMemo(() => {
+    if (!ownsElementLinks) {
+      return { onLinkCreate: onLinkCreateProp, onLinkRemove: onLinkRemoveProp, onLinkKindChange: onLinkKindChangeProp };
+    }
+    const after = (work: Promise<void>) => {
+      void work.then(() => onRefresh?.()).catch((e) => console.error('Dependency change failed', e));
+    };
+    return {
+      onLinkCreate: onLinkCreateProp ?? ((from: string, to: string, kind: DependencyKind) => {
+        if (from === to || elementLinks.some((l) => l.from === from && l.to === to)) return;
+        after(addElementDependency(from, to, kind));
+      }),
+      onLinkRemove: onLinkRemoveProp ?? ((link: GanttLink) => { if (link.id) after(removeElementDependency(link.id)); }),
+      onLinkKindChange: onLinkKindChangeProp ?? ((link: GanttLink, kind: DependencyKind) => { if (link.id) after(setElementDependencyKind(link.id, kind)); }),
+    };
+  }, [ownsElementLinks, onLinkCreateProp, onLinkRemoveProp, onLinkKindChangeProp, elementLinks, onRefresh]);
   const objectRows = rowScale === 'object';
   // Drawing a dependency: from a bar's end handle to wherever the pointer is,
   // in the timeline's own coordinates; released over another bar, it links.
   const canvasRef = useRef<HTMLDivElement | null>(null);
-  const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null);
+  const [hoveredBar, setHoveredBar] = useState<string | null>(null);
+  const [linking, setLinking] = useState<{ from: string; fromEnd: BarEnd; x: number; y: number } | null>(null);
   const linkCreateRef = useRef(onLinkCreate);
   useEffect(() => { linkCreateRef.current = onLinkCreate; }, [onLinkCreate]);
   const linkingFrom = linking?.from ?? null;
+  const linkingEnd = linking?.fromEnd ?? 'finish';
   useEffect(() => {
     if (!linkingFrom) return;
     const point = (e: MouseEvent) => {
       const rect = canvasRef.current?.getBoundingClientRect();
       return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : null;
     };
-    const move = (e: MouseEvent) => { const p = point(e); if (p) setLinking({ from: linkingFrom, ...p }); };
+    const move = (e: MouseEvent) => { const p = point(e); if (p) setLinking({ from: linkingFrom, fromEnd: linkingEnd, ...p }); };
     const up = (e: MouseEvent) => {
-      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-bar-id]')?.getAttribute('data-bar-id');
-      if (target && target !== linkingFrom) linkCreateRef.current?.(linkingFrom, target);
+      // Dropped on a bar: its nearer end — the left half its start, the right
+      // half its finish — is the end the line ties to.
+      const bar = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-bar-id]');
+      const target = bar?.getAttribute('data-bar-id');
+      if (bar && target && target !== linkingFrom) {
+        const rect = bar.getBoundingClientRect();
+        const toEnd: BarEnd = e.clientX < rect.left + rect.width / 2 ? 'start' : 'finish';
+        linkCreateRef.current?.(linkingFrom, target, kindOfEnds(linkingEnd, toEnd));
+      }
       setLinking(null);
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
     return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
-  }, [linkingFrom]);
+  }, [linkingFrom, linkingEnd]);
 
   /** Where a row's bar starts, from the row's top. */
   const barTopOf = (rowTop: number) => rowTop + (objectRows ? OBJECT_BAR_TOP : (ROW_H - BAR_H) / 2);
@@ -395,8 +455,11 @@ export function GanttView({
     };
   }, [dateRange.start, pxPerDay, dragging, dragDaysDelta]);
 
-  /** A dependency's line: out of the blocker's end, into the waiting bar's
-   *  start, as an S-curve that loops back when the waiting bar starts early. */
+  /** A dependency's line, between the ends its kind ties: out of the first
+   *  bar's start (leftward) or finish (rightward) in a straight run, rounded
+   *  turns, and into the second bar's start (from the left) or finish (from
+   *  the right); when the ends face away it doubles back between the rows.
+   *  The mark sits on the run between the rows. */
   const linkGeometry = (link: GanttLink) => {
     const source = elements.find((el) => el.id === link.from);
     const target = elements.find((el) => el.id === link.to);
@@ -405,15 +468,21 @@ export function GanttView({
     const sourceTop = layout.tops.get(link.from);
     const targetTop = layout.tops.get(link.to);
     if (!sourcePos || !targetPos || sourceTop === undefined || targetTop === undefined) return null;
-    const sx = sourcePos.left + Math.max(sourcePos.width, 20);
+    const ends = endsOfKind(link.kind ?? 'fs');
+    const sx = ends.from === 'start' ? sourcePos.left : sourcePos.left + Math.max(sourcePos.width, 20);
+    const tx = ends.to === 'start' ? targetPos.left : targetPos.left + Math.max(targetPos.width, 20);
     const sy = barTopOf(sourceTop) + BAR_H / 2;
-    const tx = targetPos.left;
     const ty = barTopOf(targetTop) + BAR_H / 2;
-    const reach = Math.min(90, Math.max(36, Math.abs(tx - sx) / 2));
+    const route = linkRoute(sx, sy, ends.from === 'start' ? -1 : 1, tx, ty, ends.to === 'start' ? 1 : -1, ROW_H, LINK_OUT);
     return {
       sx, sy, tx, ty,
-      d: `M ${sx} ${sy} C ${sx + reach} ${sy}, ${tx - reach} ${ty}, ${tx} ${ty}`,
-      stroke: link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 80%, transparent)',
+      markX: route.mark[0],
+      markY: route.mark[1],
+      d: roundedPath(route.points, LINK_RADIUS),
+      // The key blue for an order kept, the key red for one the dates break;
+      // grey where colour says nothing (Elements).
+      stroke: link.quiet ? 'color-mix(in oklab, var(--muted-foreground) 75%, transparent)'
+        : link.conflict ? 'var(--status-danger)' : 'var(--accent-default)',
     };
   };
 
@@ -551,18 +620,7 @@ export function GanttView({
   }, [scrollToToday]);
 
   // Find dependencies for drawing arrows
-  const getDependencies = (element: ElementWithDetails): ElementWithDetails[] => {
-    const deps: ElementWithDetails[] = [];
-    if (element.edges?.incoming) {
-      element.edges.incoming
-        .filter(edge => edge.edge_type === 'depends_on')
-        .forEach(edge => {
-          const depElement = elements.find(el => el.id === edge.from_element);
-          if (depElement) deps.push(depElement);
-        });
-    }
-    return deps;
-  };
+
 
   const toggleSection = (key: string) => {
     const next = new Set(collapsedSections);
@@ -1013,11 +1071,27 @@ export function GanttView({
                   const isBlocked = element.status === 'blocked';
                   const showLabel = barPos.width > 50;
                   const showDueDate = barPos.width > 100 && element.due_date;
+                  const barWidth = Math.max(barPos.width, 20);
                   const progress = getElementProgress(element);
+                  // An Object's unfinished work takes on colour as the schedule
+                  // really runs: clear at its start, a pale blue or red from there
+                  // to today by whether it keeps pace, red from its first
+                  // milestone on. Elements are not painted.
+                  const startIdx = Math.round(barPos.left / pxPerDay);
+                  const firstMilestone = objectRows
+                    ? milestones.filter((m) => m.object_id === element.id).map((m) => m.date).sort()[0]
+                    : undefined;
+                  const milestoneDay = firstMilestone ? parseDateOnly(firstMilestone, null) : null;
+                  const warmth = objectRows && warnsAboutTime(element.status)
+                    ? warmthGradient(
+                        barWidth,
+                        (daysBetween(dateRange.start, startOfDay(new Date())) - startIdx + 1) * pxPerDay,
+                        outlook(progress, element.start_date, element.due_date, todayKey),
+                        milestoneDay ? (daysBetween(dateRange.start, milestoneDay) - startIdx + 0.5) * pxPerDay : null)
+                    : null;
                   const assignedWorkers = (element.assignees ?? [])
                     .map((a) => a.worker)
                     .filter((w): w is NonNullable<typeof w> => !!w);
-                  const barWidth = Math.max(barPos.width, 20);
 
                   return (
                     <React.Fragment key={element.id}>
@@ -1088,6 +1162,7 @@ export function GanttView({
                       onClick={() => { if (!draggedRef.current) activateElement(element); }}
                       onMouseDown={(e) => handleDragStart(e, element.id, 'move')}
                       onMouseEnter={(e) => {
+                        setHoveredBar(element.id);
                         if (!dragging) {
                           setTooltip({ x: e.clientX, y: e.clientY, element });
                         }
@@ -1097,13 +1172,16 @@ export function GanttView({
                           setTooltip({ x: e.clientX, y: e.clientY, element });
                         }
                       }}
-                      onMouseLeave={() => setTooltip(null)}
+                      onMouseLeave={() => { setTooltip(null); setHoveredBar((cur) => (cur === element.id ? null : cur)); }}
                     >
+                      {warmth && (
+                        <div className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ backgroundImage: warmth }} />
+                      )}
                       {/* Progress fill — a lighter wash over the status color,
                           not a second hue, so the bar's color keeps meaning
                           "status" and the fill alone reads as "how much". */}
                       {/* Done needs no wash: its mark and muted title say so. */}
-                      {progress > 0 && !isDone && (
+                      {progress > 0 && !isDone && !warmth && (
                         <div
                           className="absolute inset-y-0 left-0 pointer-events-none"
                           style={{ width: `${Math.min(100, progress)}%`, backgroundColor: `color-mix(in oklab, ${barColor} 16%, transparent)` }}
@@ -1143,17 +1221,20 @@ export function GanttView({
                       )}
                     </div>
 
-                    {onLinkCreate && !dragging && (
-                      // The dependency handle: drag it onto the bar that waits for this one.
-                      <button type="button" title={t('Drag to add dependency')} aria-label={t('Drag to add dependency')}
-                        className="absolute z-20 size-3 cursor-crosshair rounded-full border border-[var(--accent-default)] bg-card opacity-40 transition-opacity hover:opacity-100"
-                        style={{ left: barPos.left + barWidth + 8, top: barTopOf(top) + (BAR_H - 12) / 2 }}
+                    {onLinkCreate && !dragging && (['start', 'finish'] as const).map((end) => (
+                      // A dependency handle at each end: drag one onto another
+                      // bar's start or finish to tie those two ends.
+                      <button key={end} type="button" title={t('Drag to add dependency')} aria-label={t('Drag to add dependency')}
+                        // Only while its bar is under the pointer: at rest the
+                        // handles would sit on the very lines they draw.
+                        className={`absolute z-20 size-3 cursor-crosshair rounded-full border border-[var(--accent-default)] bg-card transition-opacity hover:opacity-100 ${hoveredBar === element.id ? 'opacity-70' : 'opacity-0'}`}
+                        style={{ left: end === 'start' ? barPos.left - 20 : barPos.left + barWidth + 8, top: barTopOf(top) + (BAR_H - 12) / 2 }}
                         onMouseDown={(e) => {
                           e.preventDefault(); e.stopPropagation();
                           const rect = canvasRef.current?.getBoundingClientRect();
-                          if (rect) setLinking({ from: element.id, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                          if (rect) setLinking({ from: element.id, fromEnd: end, x: e.clientX - rect.left, y: e.clientY - rect.top });
                         }} />
-                    )}
+                    ))}
                     {/* Assignee avatars — sibling of the bar, not a child:
                         the bar has overflow-hidden (for the progress fill's
                         clip) and this deliberately overlaps its right edge,
@@ -1178,25 +1259,12 @@ export function GanttView({
 
               {/* Dependency arrows */}
               <svg className="absolute inset-0 pointer-events-none" style={{ width: timelineWidth, height: layout.totalHeight }}>
-                <defs>
-                  <marker
-                    id="arrowhead"
-                    markerWidth="6"
-                    markerHeight="6"
-                    refX="5"
-                    refY="3"
-                    orient="auto"
-                  >
-                    <path d="M0.5 0.5 5 3 0.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
-                      className="text-muted-foreground/60" />
-                  </marker>
-                </defs>
                 {links.map((link) => {
                   const g = linkGeometry(link);
                   if (!g) return null;
                   return (
                     <g key={`link-${link.from}-${link.to}`}>
-                      <path d={g.d} fill="none" stroke={g.stroke} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 5" />
+                      <path d={g.d} fill="none" stroke={g.stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       <circle cx={g.sx} cy={g.sy} r="2.5" fill={g.stroke} />
                       <circle cx={g.tx} cy={g.ty} r="2.5" fill={g.stroke} />
                     </g>
@@ -1207,43 +1275,13 @@ export function GanttView({
                   const pos = source && getBarPosition(source);
                   const top = layout.tops.get(linking.from);
                   if (!pos || top === undefined) return null;
-                  const sx = pos.left + Math.max(pos.width, 20);
+                  const fromStart = linking.fromEnd === 'start';
+                  const sx = fromStart ? pos.left : pos.left + Math.max(pos.width, 20);
                   const sy = barTopOf(top) + BAR_H / 2;
-                  const reach = Math.min(90, Math.max(36, Math.abs(linking.x - sx) / 2));
-                  return <path d={`M ${sx} ${sy} C ${sx + reach} ${sy}, ${linking.x - reach} ${linking.y}, ${linking.x} ${linking.y}`}
-                    fill="none" stroke="var(--accent-default)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 5" />;
+                  const route = linkRoute(sx, sy, fromStart ? -1 : 1, linking.x, linking.y, 1, ROW_H, LINK_OUT);
+                  return <path d={roundedPath(route.points, LINK_RADIUS)}
+                    fill="none" stroke="var(--accent-default)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3 3" />;
                 })()}
-                {elements.map(element => {
-                  const deps = getDependencies(element);
-                  const targetPos = getBarPosition(element);
-                  const targetTop = layout.tops.get(element.id);
-                  if (!targetPos || targetTop === undefined || deps.length === 0) return null;
-
-                  return deps.map(dep => {
-                    const sourcePos = getBarPosition(dep);
-                    const sourceTop = layout.tops.get(dep.id);
-                    if (!sourcePos || sourceTop === undefined) return null;
-
-                    const sourceX = sourcePos.left + sourcePos.width;
-                    const sourceY = sourceTop + ROW_H / 2;
-                    const targetX = targetPos.left;
-                    const targetY = targetTop + ROW_H / 2;
-
-                    return (
-                      <g key={`${dep.id}-${element.id}`}>
-                        <path
-                          d={elbowPath(sourceX, sourceY, targetX, targetY, ROW_H)}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.25"
-                          strokeLinejoin="round"
-                          className="text-muted-foreground/45"
-                          markerEnd="url(#arrowhead)"
-                        />
-                      </g>
-                    );
-                  });
-                })}
               </svg>
 
               {/* Each dependency's mark, at the middle of its line: what waits
@@ -1258,7 +1296,7 @@ export function GanttView({
                     <DropdownMenuTrigger asChild>
                       <button type="button" aria-label={`${source?.title ?? ''} → ${target?.title ?? ''}`}
                         className="absolute z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card transition-transform hover:scale-125"
-                        style={{ left: (g.sx + g.tx) / 2, top: (g.sy + g.ty) / 2, borderColor: g.stroke }}>
+                        style={{ left: g.markX, top: g.markY, borderColor: g.stroke }}>
                         <span className="h-px w-1.5" style={{ backgroundColor: g.stroke }} />
                       </button>
                     </DropdownMenuTrigger>
@@ -1273,6 +1311,15 @@ export function GanttView({
                         <span className="min-w-0 truncate">{target?.title}</span>
                       </div>
                       {link.conflict && <div className="px-2 py-1 text-[12px] text-[var(--status-danger)]">{t('Dates overlap')}</div>}
+                      <DropdownMenuSeparator />
+                      {DEPENDENCY_KINDS.map((kind) => (
+                        <DropdownMenuItem key={kind} className="gap-2 text-[13px]" disabled={!onLinkKindChange}
+                          onSelect={() => { if ((link.kind ?? 'fs') !== kind) onLinkKindChange?.(link, kind); }}>
+                          <span className="w-6 shrink-0 font-mono text-[11px] text-muted-foreground">{kind.toUpperCase()}</span>
+                          <span className="flex-1">{t(DEPENDENCY_KIND_LABEL[kind])}</span>
+                          {(link.kind ?? 'fs') === kind && <MenuCheck />}
+                        </DropdownMenuItem>
+                      ))}
                       {onLinkRemove && (
                         <>
                           <DropdownMenuSeparator />
@@ -1322,26 +1369,18 @@ export function GanttView({
 /** A dependency drawn as an elbow with rounded corners: out of the source's
  *  end, down (or up) to the target's row, into its start. A target that
  *  starts before the source ends is reached by going round, between rows. */
-function elbowPath(sx: number, sy: number, tx: number, ty: number, rowH: number): string {
-  const out = 10;
-  const pts: [number, number][] = tx - out >= sx + out
-    ? [[sx, sy], [Math.round((sx + tx) / 2), sy], [Math.round((sx + tx) / 2), ty], [tx, ty]]
-    : (() => {
-        const midY = sy + Math.sign(ty - sy || 1) * rowH / 2;
-        return [[sx, sy], [sx + out, sy], [sx + out, midY], [tx - out, midY], [tx - out, ty], [tx, ty]];
-      })();
-  const radius = 6;
-  let d = `M ${pts[0][0]} ${pts[0][1]}`;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const [px, py] = pts[i - 1];
-    const [cx, cy] = pts[i];
-    const [nx, ny] = pts[i + 1];
-    const r1 = Math.min(radius, Math.hypot(cx - px, cy - py) / 2, Math.hypot(nx - cx, ny - cy) / 2);
-    const ax = cx - Math.sign(cx - px) * r1, ay = cy - Math.sign(cy - py) * r1;
-    const bx = cx + Math.sign(nx - cx) * r1, by = cy + Math.sign(ny - cy) * r1;
-    d += ` L ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
-  }
-  const [ex, ey] = pts[pts.length - 1];
-  return `${d} L ${ex} ${ey}`;
-}
+/** How far a dependency line runs straight out of a bar, and back in. */
+const LINK_OUT = 22;
+/** The rounding at a dependency line's turns: enough to soften them, little
+ *  enough that the runs between stay straight. */
+const LINK_RADIUS = 14;
+
+/** What each kind of dependency says, in words. */
+const DEPENDENCY_KIND_LABEL: Record<DependencyKind, string> = {
+  fs: 'Finish to start',
+  ss: 'Start to start',
+  ff: 'Finish to finish',
+  sf: 'Start to finish',
+};
+
 

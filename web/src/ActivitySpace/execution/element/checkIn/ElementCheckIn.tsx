@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
-import { Check, ChevronDown, Loader2 } from '@/ui/icons';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { ChevronDown, Loader2 } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import type { ElementWithDetails } from '@/types/database';
@@ -266,7 +266,7 @@ function CheckInSession({ element, onSaved, onCancel, userId }: ElementCheckInPr
                 onSelect={() => edit({ status: status as NonNullable<CheckInDraft['status']> })}>
                 <ElementProgressMark status={status} size={14} />
                 <span className="flex-1">{t(STATUS[status].label)}</span>
-                {selectedStatus === status && <Check size={13} className="text-muted-foreground" />}
+                {selectedStatus === status && <MenuCheck />}
               </DropdownMenuItem>
             ))}
           </MenuShell>

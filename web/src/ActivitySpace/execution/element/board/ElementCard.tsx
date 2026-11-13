@@ -6,11 +6,11 @@ import type { ElementPriority } from '@/types/database';
 import { updateElement, useAssignableWorkers, addElementAssignee, removeElementAssignee, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
-import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
+import { WorkerAvatarStack } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { Calendar, User, Check } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
+import { Calendar, User } from '@/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
@@ -26,7 +26,7 @@ import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { Chip } from './BoardColumn';
+import { BOARD_CARD, CardDescription, Chip } from './BoardColumn';
 
 // The Element card: every Execution Chain draws the same one.
 // Top to bottom: the headline — the title on one line, and the priority
@@ -224,9 +224,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      // Hover tints the card as a list row is tinted (the foreground at 6%,
-      // laid over the card's own ground as an image so the ground stays).
-      className="group/card relative overflow-hidden rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-card)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
+      className={`group/card relative cursor-grab overflow-hidden active:cursor-grabbing ${BOARD_CARD}`}
     >
       {/* The track: the card's content in a full-width cell, the execute
           rail in a 112px cell after it, clipped by the root. Revealed,
@@ -239,7 +237,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         railRevealed ? '-translate-x-28' : 'translate-x-0',
         canExecute && 'group-focus-within/card:-translate-x-28',
       )}>
-      <div className="w-full shrink-0 px-3.5 py-3.5">
+      <div className="w-full shrink-0 p-3">
         {/* The headline: the title on one line, and the priority at the
             row's right end. No Status on the card — the column it stands
             in says where the work stands. */}
@@ -265,7 +263,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 />
               ) : (
                 <p
-                  className="min-w-0 flex-1 truncate text-[14px] font-normal text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
+                  className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
                   title={element.title}
                   onPointerDown={stop}
                   onClick={(e) => { stop(e); setEditingTitle(true); }}
@@ -290,7 +288,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                     <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
                       <PriorityMark priority={p} />
                       <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>
-                      {priority === p && <Check size={12} className="text-muted-foreground" />}
+                      {priority === p && <MenuCheck />}
                     </DropdownMenuItem>
                   ))}
                   {priority && (
@@ -304,20 +302,22 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <CardDescription html={element.description} />
             {/* Where it belongs: a chip in the Label chips' own form —
                 the Object's icon and name inside the pill, never a bare
                 text line. */}
-            {object && (
-              <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+            {(object || element.type) && (
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1">
+                {element.type && <Chip className="max-w-full"><span className="truncate">{element.type}</span></Chip>}
                 {/* On a board that spans a Strategy's subtree: the
                     Strategy under it that this work came by. */}
-                {object.via && (
+                {object?.via && (
                   <Chip title={object.via} className="max-w-full">
                     <NavStrategyIcon size={11} className="shrink-0" />
                     <span className="truncate">{object.via}</span>
                   </Chip>
                 )}
-                <Chip title={object.name} className="max-w-full">
+                {object && <Chip title={object.name} className="max-w-full">
                   <ItemIcon icon={object.icon ?? null} color={object.color ?? null} size={11} fallback={<ObjectIcon size={11} />} />
                   <span className="truncate">{object.name}</span>
                   {object.isNew && <span className="shrink-0 text-muted-foreground/70">· {t('new')}</span>}
@@ -338,7 +338,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                       <ThickArrowRight size={11} />
                     </button>
                   )}
-                </Chip>
+                </Chip>}
               </div>
             )}
           </div>
@@ -360,8 +360,8 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         )}
         {extra}
 
-        <div className="mt-5 flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
-          <div className="flex min-w-0 items-center gap-1">
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
+          <div className="flex min-w-0 items-center gap-1.5">
             {/* Assignee — click to assign / change. */}
             <DropdownMenu open={assigneeMenuOpen} onOpenChange={setAssigneeMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -374,7 +374,8 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                   className="inline-flex items-center justify-center rounded-full transition-shadow hover:ring-2 hover:ring-border/60"
                 >
                   {assignee ? (
-                    <WorkerAvatar worker={assignee} size={20} />
+                    // Everyone it is assigned to, overlapping; past three, a count.
+                    <WorkerAvatarStack workers={(element.assignees ?? []).map((a) => a.worker)} size={20} />
                   ) : (
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
                       <User className="h-3 w-3" />
@@ -394,12 +395,6 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 onRemove={removeAssignee}
               />
             </DropdownMenu>
-            {/* A closed Element has nothing left for an AI to do. */}
-            {element.status !== 'done' && element.status !== 'cancelled' && (
-              <CardAgentControl elementId={element.id} onFinished={onRefresh} />
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-2.5 text-[12px] text-muted-foreground">
             {/* Due date — click to pick / change. Unset, it appears only while
                 the card is hovered or has keyboard focus inside it. */}
             <Popover open={dateOpen} onOpenChange={setDateOpen}>
@@ -409,7 +404,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                   onPointerDown={stop}
                   onClick={stop}
                   className={cn(
-                    'items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    'items-center gap-1 px-1 rounded text-[12px] text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors',
                     dueDate ? 'flex' : 'hidden opacity-60 group-hover/card:flex group-focus-within/card:flex data-[state=open]:flex',
                   )}
                   style={overdueDays > 0 ? { color: 'var(--status-danger)' } : undefined}
@@ -418,7 +413,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                   {dueDate ? formatElementDate(dueDate) : t('Date')}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 rounded-lg" align="end" onPointerDown={stop}>
+              <PopoverContent className="w-auto p-0 rounded-lg" align="start" onPointerDown={stop}>
                 <CalendarPicker
                   mode="single"
                   selected={dueDate ?? undefined}
@@ -428,6 +423,12 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                 />
               </PopoverContent>
             </Popover>
+            {/* A closed Element has nothing left for an AI to do. */}
+            {element.status !== 'done' && element.status !== 'cancelled' && (
+              <CardAgentControl elementId={element.id} onFinished={onRefresh} />
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2.5 text-[12px] text-muted-foreground">
             {/* Same signal the list rows and the Activity column show. */}
             <ActivitySignal activity={element.activity} />
           </div>

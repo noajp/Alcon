@@ -39,7 +39,7 @@ interface CalendarViewProps {
   onCreateEvent?: (slot: { date: string; startMinutes: number | null; endMinutes?: number }) => void;
 }
 
-export type CalendarMode = 'day' | 'week' | 'month';
+export type CalendarMode = 'week' | 'month';
 // off the STATUS table so a calendar card and a list-row mark agree.
 // A bar's ground: its color mixed into the card strongly enough to stand
 // off the grid in both themes (the status "subtle" tints vanish on a dark card).
@@ -216,13 +216,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       if (mode === 'month') {
         return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
       }
-      if (mode === 'week') {
-        const d = new Date(prev);
-        d.setDate(d.getDate() - 7);
-        return d;
-      }
       const d = new Date(prev);
-      d.setDate(d.getDate() - 1);
+      d.setDate(d.getDate() - 7);
       return d;
     });
   };
@@ -232,13 +227,8 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       if (mode === 'month') {
         return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
       }
-      if (mode === 'week') {
-        const d = new Date(prev);
-        d.setDate(d.getDate() + 7);
-        return d;
-      }
       const d = new Date(prev);
-      d.setDate(d.getDate() + 1);
+      d.setDate(d.getDate() + 7);
       return d;
     });
   };
@@ -333,14 +323,6 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
     if (mode === 'month') {
       return currentDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     }
-    if (mode === 'day') {
-      return currentDate.toLocaleDateString(locale, {
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    }
     // week — formatRange collapses the shared parts the way each language
     // does it ("Sep 13 – 19, 2026" / "2026年9月13日～19日").
     return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -370,10 +352,9 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           </Button>
         )}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ day: 'Day', week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{t({ week: 'Week', month: 'Month' }[mode])}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
           <MenuShell as="dropdown" align="end">
             <DropdownMenuRadioGroup value={mode} onValueChange={value => setMode(value as CalendarMode)}>
-              <DropdownMenuRadioItem value="day">{t('Day')}</DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="week">{t('Week')}</DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="month">{t('Month')}</DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
@@ -633,7 +614,7 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
       ) : (
         <div className="flex-1 min-h-0 overflow-x-auto flex">
         <TimeGridView
-          days={mode === 'day' ? [currentDate] : weekDays}
+          days={weekDays}
           elements={elements}
           today={today}
           getCardStyle={getCardStyle}

@@ -1,6 +1,6 @@
 'use client';
-import { Check, ChevronDown } from '@/ui/icons';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { ChevronDown } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { MENU_SEPARATOR, MenuSectionLabel, MenuShell } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { ATHENA_EFFORTS, ATHENA_MODELS, setAthenaSettings, useAthenaSettings } from './athenaSettings';
@@ -27,14 +27,14 @@ export function AthenaControls({ disabled }: { disabled?: boolean }) {
         <MenuSectionLabel>{t('Model')}</MenuSectionLabel>
         {ATHENA_MODELS.map((m) => (
           <DropdownMenuItem key={m.id} onSelect={() => setAthenaSettings({ model: m.id })}>
-            <span className="flex-1">{m.label}</span>{m.id === settings.model && <Check size={13} />}
+            <span className="flex-1">{m.label}</span>{m.id === settings.model && <MenuCheck />}
           </DropdownMenuItem>
         ))}
         <div className={MENU_SEPARATOR} />
         <MenuSectionLabel>{t('Effort')}</MenuSectionLabel>
         {ATHENA_EFFORTS.map((e) => (
           <DropdownMenuItem key={e.id} onSelect={() => setAthenaSettings({ effort: e.id })}>
-            <span className="flex-1">{t(e.label)}</span>{e.id === settings.effort && <Check size={13} />}
+            <span className="flex-1">{t(e.label)}</span>{e.id === settings.effort && <MenuCheck />}
           </DropdownMenuItem>
         ))}
       </MenuShell>

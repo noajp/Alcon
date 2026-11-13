@@ -12,7 +12,7 @@ import { EmptyArt, type EmptyArtKind } from './EmptyArt';
 // starts the list, as the accent-blue primary button (with its key, when it
 // has one). One fixed-width, left-aligned column in the middle of the pane,
 // so two empty views side by side line up.
-export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
+export function EmptyState({ art, title, description, cta, shortcut, onCta, secondary }: {
   art: EmptyArtKind;
   title: string;
   description: ReactNode;
@@ -21,6 +21,8 @@ export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
   /** The key that does the same as the button, shown inside it. */
   shortcut?: string;
   onCta?: () => void;
+  /** A second action beside the first (a destructive one, say). */
+  secondary?: { label: string; onClick: () => void; variant?: 'secondary' | 'danger' };
 }) {
   // Callers pass English; plain strings are translated here so every empty
   // state follows the viewer's language without wiring `t` at each call site.
@@ -39,8 +41,8 @@ export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
           <p className="text-[14px] leading-[22px] text-muted-foreground">{tr(description)}</p>
         </div>
         {cta && onCta && (
-          <div>
-            <Button variant="primary" onClick={onCta} className="mt-6 gap-1.5">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <Button variant="primary" onClick={onCta} className="gap-1.5">
               {t(cta)}
               {shortcut && (
                 <kbd className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-white/40 px-1 font-sans text-[11px] font-medium leading-none">
@@ -48,6 +50,7 @@ export function EmptyState({ art, title, description, cta, shortcut, onCta }: {
                 </kbd>
               )}
             </Button>
+            {secondary && <Button variant={secondary.variant ?? 'secondary'} onClick={secondary.onClick}>{t(secondary.label)}</Button>}
           </div>
         )}
       </div>

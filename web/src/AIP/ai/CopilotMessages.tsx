@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Check, CheckCheck, Code, Copy, FileText, Globe, Loader2, Pencil, Plus, RotateCcw, Search, Trash2, Wrench } from '@/ui/icons';
+import { Check, CheckCheck, Code, Copy, FileText, Globe, Pencil, Plus, RotateCcw, Search, Trash2, Wrench } from '@/ui/icons';
 import { formatAge } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { MarkdownLite } from '@/Function/shared/MarkdownLite';
@@ -10,7 +10,8 @@ import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
 import type { AgentAction } from '@/types/database';
 import type { CopilotApproval, CopilotAttachment, CopilotConnectionProposal, CopilotCredentialAsk, CopilotMessage, ToolEvent } from './useClaywareCopilot';
 import { toolCardOf, type ToolCardKind } from './copilotToolCards';
-import { ToolCallCard, ToolCallGroup } from '@/Function/shared/ToolCallCard';
+import { ToolCallCard } from '@/Function/shared/ToolCallCard';
+import { ThinkingTrace } from '@/Function/shared/ThinkingTrace';
 import { splitAnswer } from './chartSpec';
 import { ChatElementList } from './ChatElementList';
 import { CHART_CARD_CLASS } from './chartColors';
@@ -54,7 +55,7 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
       <div className="group flex flex-col items-end gap-1 animate-fade-in">
         {message.attachments?.length ? <AttachmentChips files={message.attachments} /> : null}
         {message.content && (
-          <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg border border-primary/20 bg-primary/15 px-2.5 py-1.5 text-foreground">
+          <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-foreground/[0.05] px-3 py-1.5 text-foreground">
             {message.content}
           </div>
         )}
@@ -72,11 +73,11 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   const settled = message.done && !streaming;
   return (
     <div className="group space-y-1.5">
-      {events.length > 0 && <ToolSteps events={events} live={streaming} answered={!!message.content} />}
-      {message.content
-        ? <Answer content={message.content} chartColors={message.chartColors} settled={settled}
-            onChartColors={settled ? onChartColors : undefined} />
-        : streaming && events.length === 0 && <Working label="Thinking" />}
+      <ToolSteps events={events} live={streaming} answered={!!message.content} />
+      {message.content && (
+        <Answer content={message.content} chartColors={message.chartColors} settled={settled}
+          writing={streaming && !message.done} onChartColors={settled ? onChartColors : undefined} />
+      )}
       {message.approvals?.map((a) => (
         <ApprovalCard key={a.inputHash} approval={a} canRemember={canRememberApproval}
           onDecide={onDecideApproval ? (approve, opts) => onDecideApproval(a, approve, opts) : undefined} />
@@ -227,8 +228,10 @@ function CopyButton({ text }: { text: string }) {
  *  Charts are counted as they are met: a chart's ordinal in the message
  *  keys the person's colors on it (chartColors), the same index the
  *  message is rendered by. */
-function Answer({ content, chartColors, settled, onChartColors }: {
+function Answer({ content, chartColors, settled, writing, onChartColors }: {
   content: string;
+  /** The answer is still arriving: a caret stands after its last word. */
+  writing?: boolean;
   chartColors?: Record<number, Record<string, string>>;
   /** The message is settled: its charts show their toolbars. */
   settled?: boolean;
@@ -244,7 +247,7 @@ function Answer({ content, chartColors, settled, onChartColors }: {
   return (
     <div className="space-y-2">
       {parts.map((p, i) => p.kind === 'text'
-        ? <MarkdownLite key={i} text={p.text} className="break-words text-foreground/95" />
+        ? <MarkdownLite key={i} text={p.text} reveal={writing} className={`break-words text-foreground/95 ${writing && i === parts.length - 1 ? 'writing-caret' : ''}`} />
         : p.kind === 'chart'
           ? <ChatChart key={i} spec={p.spec} colors={chartColors?.[ordinals[i]]} interactive={settled}
               onColorsChange={onChartColors ? (next) => onChartColors(ordinals[i], next) : undefined} />
@@ -273,56 +276,35 @@ export function AttachmentChips({ files, onRemove }: { files: CopilotAttachment[
   );
 }
 
-/** A still-running step: its label with light sweeping across, and how long
- *  it has been going. */
-function Working({ label, since }: { label: string; since?: number }) {
-  const { t } = useI18n();
-  return (
-    <div className="flex items-center gap-1.5 text-[12px] animate-fade-in">
-      <Loader2 size={12} className="shrink-0 animate-spin text-muted-foreground" />
-      <span className="animate-shimmer">{t(label)}…</span>
-      {since != null && <Elapsed since={since} />}
-    </div>
-  );
-}
-
-function Elapsed({ since }: { since: number }) {
-  const [now, setNow] = useState(since);
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-  const s = Math.max(0, Math.floor((now - since) / 1000));
-  if (s < 2) return null;
-  return <span className="tabular-nums text-muted-foreground/70">{s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`}</span>;
-}
-
 /**
- * The AI's work, as tool call cards folded into one line ("Used 3 tools").
- * While a call runs the line reads "Using tools…" with its timer; once the
- * answer is in, the line stays folded so the answer is the thing to read,
- * and opens to show each call with its arguments and what came back.
+ * The AI's work, as the trace under one line: "Thinking…" while the turn
+ * runs, with each call appearing as it starts; once the answer begins the
+ * line folds ("Thought for 6s"), so the answer is the thing to read. A step
+ * opens to its card, with the arguments and what came back.
  */
 function ToolSteps({ events, live, answered }: { events: ToolEvent[]; live: boolean; answered: boolean }) {
   const { t } = useI18n();
-  // A running card times itself from when it appears; a kept turn has no
-  // timings, so its cards show none.
   const cards = events.map(toolCardOf);
-  const running = live && cards.some((c) => c.status === 'running');
   return (
-    <div>
-      <ToolCallGroup>
-        {cards.map((c, i) => (
-          <ToolCallCard key={i} name={c.name} icon={<ToolKindIcon kind={c.kind} />}
-            summary={<ToolSummary verb={c.verb} subject={c.subject} />}
-            // A kept turn's call that never answered was stopped, not running.
-            status={live || c.status !== 'running' ? c.status : 'error'}
-            error={!live && c.status === 'running' ? t('Stopped') : c.error}
-            args={c.args} result={c.result} />
-        ))}
-      </ToolCallGroup>
-      {live && !running && !answered && <div className="mt-1"><Working label="Thinking" /></div>}
-    </div>
+    <ThinkingTrace
+      working={live && !answered}
+      steps={cards.map((c, i) => {
+        // A kept turn's call that never answered was stopped, not running.
+        const status = live || c.status !== 'running' ? c.status : 'error';
+        return {
+          key: String(i),
+          primary: c.verb ? t(c.verb) : c.name,
+          secondary: c.subject,
+          status,
+          detail: (
+            <ToolCallCard name={c.name} icon={<ToolKindIcon kind={c.kind} />}
+              summary={<ToolSummary verb={c.verb} subject={c.subject} />}
+              status={status} error={!live && c.status === 'running' ? t('Stopped') : c.error}
+              args={c.args} result={c.result} defaultOpen openOnError={false} />
+          ),
+        };
+      })}
+    />
   );
 }
 

@@ -20,6 +20,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
@@ -1356,7 +1357,7 @@ function TypePicker({
             >
               <TypeMark type={opt} icons={typeIcons} size={14} />
               <span className="flex-1 truncate">{opt}</span>
-              {value === opt && <Check size={12} className="text-muted-foreground shrink-0" />}
+              {value === opt && <MenuCheck />}
             </button>
           ))}
           {canCreate && (
@@ -1576,7 +1577,7 @@ function LabelAddButton({
                 >
                   <Tag size={12} className="shrink-0" style={{ color: labelColor(l) }} />
                   <span className="truncate flex-1">{l}</span>
-                  {isAssigned(l) && <Check size={12} className="text-foreground/70 shrink-0" />}
+                  {isAssigned(l) && <MenuCheck />}
                 </button>
               ))}
               {q && !exactExists && (

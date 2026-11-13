@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ChevronsUpDown } from '@/ui/icons';
+import { ChevronsUpDown } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/ui/command';
@@ -9,6 +9,7 @@ import { MenuShell } from '@/Function/shared/menu';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
 import type { Domain, ClaywareObject } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { MenuCheck } from '@/ui/dropdown-menu';
 
 export interface CalendarSelection {
   mine: boolean;
@@ -52,7 +53,7 @@ export function CalendarScopePicker({ domains, objects, selection, onChange }: P
             <CommandEmpty>{t('No matches.')}</CommandEmpty>
             {tab === 'mine' ? (
               <CommandItem onSelect={() => onChange({ ...selection, mine: true })}>
-                <ElementIcon size={16} /><span className="flex-1">{t('My Elements')}</span>{selection.mine && <Check size={12} />}
+                <ElementIcon size={16} /><span className="flex-1">{t('My Elements')}</span>{selection.mine && <MenuCheck />}
               </CommandItem>
             ) : (tab === 'domains' ? domains : objects).map(item => {
               const checked = !selection.mine && (tab === 'domains' ? selection.domainIds : selection.objectIds).includes(item.id);
@@ -61,7 +62,7 @@ export function CalendarScopePicker({ domains, objects, selection, onChange }: P
                 <CommandItem key={item.id} value={`${item.name} ${item.id}`} keywords={[item.name]} onSelect={() => onChange(tab === 'domains'
                   ? { mine: false, domainIds: toggle(selection.domainIds, item.id), objectIds: [] }
                   : { ...selection, mine: false, objectIds: toggle(selection.objectIds, item.id) })}>
-                  <RowIcon size={16} /><span className="flex-1 truncate">{item.name}</span>{checked && <Check size={12} />}
+                  <RowIcon size={16} /><span className="flex-1 truncate">{item.name}</span>{checked && <MenuCheck />}
                 </CommandItem>
               );
             })}

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { RailRow } from '@/Function/shared/RailRow';
-import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
+import { ProgressBelt } from '@/Function/shared/ProgressBelt';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { completionOf } from '@/Function/shared/completion';
@@ -35,7 +35,7 @@ export function StrategyPropertiesWidget({ host }: { host: WidgetHost }) {
         label={owner?.name ?? t('Unknown')} />
       <RailRow name={t('Progress')} label={
         <span className="flex w-full items-center gap-2">
-          <SegmentedProgress value={progress.pct} className="flex-1" />
+          <ProgressBelt value={progress.pct} className="flex-1" />
           <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{progress.pct}%</span>
         </span>
       } />

@@ -1,9 +1,10 @@
 'use client';
 
-import { Check } from '@/ui/icons';
+
 import { LABEL_PALETTE } from './labelColor';
 import { MENU_ROW } from './menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { MenuCheck } from '@/ui/dropdown-menu';
 
 // The rows of every "pick a colour for this label" menu. Three surfaces open
 // one — the label chip, the label picker's create step, and Settings › Labels
@@ -33,7 +34,7 @@ export function LabelPaletteRows({
             <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.hex }} />
             <span className="truncate">{t(p.label)}</span>
           </span>
-          {selected === p.key && <Check size={13} className="shrink-0 text-muted-foreground" />}
+          {selected === p.key && <MenuCheck />}
         </button>
       ))}
     </>
