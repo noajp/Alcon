@@ -56,7 +56,7 @@
   --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
   --element-status-in-progress: #2f9e44;
-  --element-status-review:      #06b6d4;
+  --element-status-review:      var(--accent-default);
   --element-status-done:        var(--accent-default);
   --element-status-blocked:     #eea21f;
   --element-status-cancelled:   var(--status-danger);
