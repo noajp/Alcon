@@ -7,8 +7,12 @@
 // is red. What is still to come is left clear. Only the colour of the bar
 // changes; its place and size are the schedule's.
 
-const BLUE = 'var(--accent-default)';
-const RED = 'var(--status-danger)';
+// The key blue and the danger red, lifted and made a little more vivid: laid
+// over the bar's dark ground at their own values they go muddy. They stay the
+// theme's hues; only their lightness and chroma move.
+const lift = (token: string) => `oklch(from ${token} calc(l + 0.12) calc(c * 1.25) h)`;
+const BLUE = lift('var(--accent-default)');
+const RED = lift('var(--status-danger)');
 
 /**
  * How far ahead or behind the schedule the work stands, in points of progress,
@@ -18,7 +22,7 @@ const RED = 'var(--status-danger)';
 const CERTAIN = 0.3;
 
 /** Share of red held once a milestone has gone by. */
-const PAST_MILESTONE = 40;
+const PAST_MILESTONE = 50;
 
 /** Pure. Finished and set-aside work is not painted. */
 export function warnsAboutTime(status: string | null | undefined): boolean {
@@ -56,7 +60,7 @@ export function warmthGradient(width: number, nowX: number, outlookValue: number
   if (!(now > 0) || !(width > 0)) return null;
   const tone = outlookValue >= 0 ? BLUE : RED;
   const k = Math.abs(Math.max(-1, Math.min(1, outlookValue)));
-  const strongest = 14 + 26 * k; // wash at today: 14% when unsure, 40% when sure
+  const strongest = 20 + 32 * k; // wash at today: 20% when unsure, 52% when sure
   const mix = (color: string, pct: number) => `color-mix(in oklab, ${color} ${pct.toFixed(1)}%, transparent)`;
   const px = (n: number) => `${n.toFixed(1)}px`;
 

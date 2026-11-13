@@ -40,7 +40,7 @@ describe('Gantt colour', () => {
   it('opens clear and deepens to today in blue when sure of it, in red when not', () => {
     const sure = warmthGradient(400, 200, 1)!;
     const unsure = warmthGradient(400, 200, -1)!;
-    expect(sure.startsWith('linear-gradient(in oklab to right, color-mix(in oklab, var(--accent-default) 0.0%, transparent) 0.0px')).toBe(true);
+    expect(sure.startsWith('linear-gradient(in oklab to right, color-mix(in oklab, oklch(from var(--accent-default) calc(l + 0.12) calc(c * 1.25) h) 0.0%, transparent) 0.0px')).toBe(true);
     expect(sure).toContain('200.0px');
     expect(sure).not.toContain('var(--status-danger)');
     expect(unsure).toContain('var(--status-danger)');
