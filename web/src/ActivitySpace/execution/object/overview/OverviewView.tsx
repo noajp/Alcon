@@ -39,9 +39,9 @@ import {
   type Zone,
 } from '@/Function/widget';
 
-/** The band above (how it is going) and the rail beside; the document
- *  column between them is fixed, as on an Element's page. */
-const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
+/** The rail beside; the document column is fixed, as on an Element's page.
+ *  Nothing sits under the name, so there is no band. */
+const SURFACE_ZONES: Zone[] = ['main', 'rail'];
 const CANVAS_ONLY = ['generated-app'];
 
 // =============================================================
@@ -50,8 +50,8 @@ const CANVAS_ONLY = ['generated-app'];
 // The document column is fixed: the Object's icon and name, its
 // description, one quiet row (reactions, attaching a file) with the
 // attached files right under it, its Milestones, then its Updates — the
-// thread people and agents leave on it. The band under the name and the
-// rail beside (Properties, Strategy intent, …) stay a widget board.
+// thread people and agents leave on it. The rail beside (Properties,
+// Strategy intent, …) stays a widget board.
 // =============================================================
 
 interface OverviewViewProps {
@@ -220,9 +220,6 @@ export function OverviewView({
                   style={PAGE_TITLE_WEIGHT}
                   placeholder={t('Object name')}
                 />
-                {/* Band — how it is going, right under the name (a progress
-                    line by default), before anything is read. */}
-                <WidgetZone zone="band" className="mt-3" />
               </div>
 
               <section>
