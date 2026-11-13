@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { firstDeadline, outlook, warmthGradient, warnsAboutTime } from '@/ActivitySpace/execution/element/gantt/ganttUrgency';
+import { outlook, warmthGradient, warnsAboutTime } from '@/ActivitySpace/execution/element/gantt/ganttUrgency';
+
+const alphas = (g: string) => [...g.matchAll(/ ([\d.]+)%, transparent\)/g)].map((m) => Number(m[1]));
 
 describe('Gantt colour', () => {
-  it('measures a bar against the soonest of its dates, none when it has none', () => {
-    expect(firstDeadline(['2026-12-01', '2026-11-20', null])).toBe('2026-11-20');
-    expect(firstDeadline([null, undefined])).toBeNull();
-  });
-
   it('leaves finished and set-aside work alone', () => {
     expect(warnsAboutTime('done')).toBe(false);
     expect(warnsAboutTime('cancelled')).toBe(false);
@@ -35,27 +32,39 @@ describe('Gantt colour', () => {
     expect(outlook(100, '2026-11-01', '2026-11-10', '2026-11-14')).toBe(0);
   });
 
-  it('opens clear and ends in blue when sure of it, in red when not', () => {
-    const sure = warmthGradient(400, 400, 1);
-    const unsure = warmthGradient(400, 400, -1);
-    expect(sure.startsWith('linear-gradient(to right, color-mix(in oklab, var(--accent-default) 0.0%, transparent) 0.0px')).toBe(true);
-    expect(sure).not.toContain('var(--status-success)');
+  it('paints nothing for a bar that has not started', () => {
+    expect(warmthGradient(400, 0, 1)).toBeNull();
+    expect(warmthGradient(400, -40, 1)).toBeNull();
+  });
+
+  it('opens clear and deepens to today in blue when sure of it, in red when not', () => {
+    const sure = warmthGradient(400, 200, 1)!;
+    const unsure = warmthGradient(400, 200, -1)!;
+    expect(sure.startsWith('linear-gradient(in oklab to right, color-mix(in oklab, var(--accent-default) 0.0%, transparent) 0.0px')).toBe(true);
+    expect(sure).toContain('200.0px');
     expect(sure).not.toContain('var(--status-danger)');
     expect(unsure).toContain('var(--status-danger)');
     expect(unsure).not.toContain('var(--accent-default)');
   });
 
-  it('deepens smoothly: every stop is at least as strong as the one before', () => {
-    const alphas = [...warmthGradient(300, 300, 0.5).matchAll(/ ([\d.]+)%, transparent\)/g)].map((m) => Number(m[1]));
-    expect(alphas.length).toBeGreaterThan(6);
-    expect(alphas.every((a, i) => i === 0 || a >= alphas[i - 1])).toBe(true);
+  it('deepens smoothly up to today, then fades back to clear', () => {
+    const g = warmthGradient(400, 200, 0.5)!;
+    const a = alphas(g);
+    expect(a.length).toBeGreaterThan(6);
+    expect(a.every((v, i) => i === 0 || v >= a[i - 1])).toBe(true);
+    expect(g.endsWith('transparent 226.0px)') || g.includes(', transparent 2')).toBe(true);
   });
 
-  it('steps to red beyond the date, only when the date is inside the bar', () => {
-    const inside = warmthGradient(200, 400, 1);
-    expect(inside).toContain('var(--status-danger)');
-    expect(inside.match(/200\.0px/g)?.length).toBe(2);
-    expect(warmthGradient(400, 400, 1).match(/400\.0px/g)?.length).toBe(1);
-    expect(warmthGradient(900, 400, 1).match(/400\.0px/g)?.length).toBe(1);
+  it('has no fade when today is at the bar\'s end or beyond it', () => {
+    expect(warmthGradient(400, 400, 1)).not.toContain(', transparent ');
+    expect(warmthGradient(400, 900, 1)).not.toContain(', transparent ');
+  });
+
+  it('moves over to red from a milestone that has gone by, not from one still ahead', () => {
+    const gone = warmthGradient(400, 300, 1, 150)!;
+    expect(gone).toContain('var(--status-danger)');
+    expect(gone).toContain('var(--accent-default)');
+    const ahead = warmthGradient(400, 300, 1, 350)!;
+    expect(ahead).not.toContain('var(--status-danger)');
   });
 });

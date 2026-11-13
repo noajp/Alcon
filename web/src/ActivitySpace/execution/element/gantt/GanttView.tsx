@@ -16,7 +16,7 @@ import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { dragRange } from './ganttRange';
-import { firstDeadline, outlook, warmthGradient, warnsAboutTime } from './ganttUrgency';
+import { outlook, warmthGradient, warnsAboutTime } from './ganttUrgency';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
@@ -1017,21 +1017,21 @@ export function GanttView({
                   const showDueDate = barPos.width > 100 && element.due_date;
                   const barWidth = Math.max(barPos.width, 20);
                   const progress = getElementProgress(element);
-                  // Unfinished work is clear where it starts and reddens along
-                  // its length toward its deadline — or the first milestone of
-                  // its Object — a pale blue when the work looks likely to make
-                  // it, a pale red when not; beyond that date it is red.
-                  const deadline = warnsAboutTime(element.status)
-                    ? firstDeadline([element.due_date, ...(objectRows ? milestones.filter((m) => m.object_id === element.id).map((m) => m.date) : [])])
-                    : null;
-                  const deadlineDay = deadline ? parseDateOnly(deadline, null) : null;
-                  const warmth = deadlineDay
+                  // An Object's unfinished work takes on colour as the schedule
+                  // really runs: clear at its start, a pale blue or red from there
+                  // to today by whether it keeps pace, red from its first
+                  // milestone on. Elements are not painted.
+                  const startIdx = Math.round(barPos.left / pxPerDay);
+                  const firstMilestone = objectRows
+                    ? milestones.filter((m) => m.object_id === element.id).map((m) => m.date).sort()[0]
+                    : undefined;
+                  const milestoneDay = firstMilestone ? parseDateOnly(firstMilestone, null) : null;
+                  const warmth = objectRows && warnsAboutTime(element.status)
                     ? warmthGradient(
-                        deadline === element.due_date
-                          ? barWidth
-                          : (daysBetween(dateRange.start, deadlineDay) - Math.round(barPos.left / pxPerDay) + 0.5) * pxPerDay,
                         barWidth,
-                        outlook(progress, element.start_date, element.due_date, todayKey))
+                        (daysBetween(dateRange.start, startOfDay(new Date())) - startIdx + 1) * pxPerDay,
+                        outlook(progress, element.start_date, element.due_date, todayKey),
+                        milestoneDay ? (daysBetween(dateRange.start, milestoneDay) - startIdx + 0.5) * pxPerDay : null)
                     : null;
                   const assignedWorkers = (element.assignees ?? [])
                     .map((a) => a.worker)

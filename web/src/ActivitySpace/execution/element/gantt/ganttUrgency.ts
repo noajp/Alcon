@@ -1,9 +1,11 @@
-// The colour a Timeline bar takes on while its work is unfinished. A bar is
-// clear where it starts and, along its length toward the date it is measured
-// against — the soonest of its deadline and its Object's milestones — takes
-// on a pale blue when the work looks likely to make it and a pale red when it
-// does not, the deeper the surer. What lies beyond that date is red. Only the
-// colour of the bar changes; its place and size are the schedule's.
+// The colour an Object's bar on the Timeline takes on while its work is
+// unfinished, worked out from the schedule as it actually stands. The bar is
+// clear where it starts. Along the stretch that has really gone by — from its
+// start to today — it takes on a pale blue when the work is keeping pace with
+// the schedule and a pale red when it is falling behind, deepening toward
+// today, the deeper the surer. From the first milestone on, what has gone by
+// is red. What is still to come is left clear. Only the colour of the bar
+// changes; its place and size are the schedule's.
 
 const BLUE = 'var(--accent-default)';
 const RED = 'var(--status-danger)';
@@ -14,6 +16,14 @@ const RED = 'var(--status-danger)';
  * as fully red.
  */
 const CERTAIN = 0.3;
+
+/** Share of red held once a milestone has gone by. */
+const PAST_MILESTONE = 40;
+
+/** Pure. Finished and set-aside work is not painted. */
+export function warnsAboutTime(status: string | null | undefined): boolean {
+  return status !== 'done' && status !== 'cancelled';
+}
 
 /**
  * Pure. How likely the work is to make its date, from -1 (surely not) through
@@ -32,41 +42,40 @@ export function outlook(progress: number, start: string | null | undefined, due:
   return Math.max(-1, Math.min(1, (Math.max(0, Math.min(100, progress)) / 100 - elapsed) / CERTAIN));
 }
 
-/** Pure. A finished or set-aside bar is not painted. */
-export function warnsAboutTime(status: string | null | undefined): boolean {
-  return status !== 'done' && status !== 'cancelled';
-}
-
-/** Pure. The date a bar is measured against: the soonest of those given.
- *  Null when it has none. Dates are 'YYYY-MM-DD', so they order as text. */
-export function firstDeadline(dates: readonly (string | null | undefined)[]): string | null {
-  const set = dates.filter((d): d is string => !!d).sort();
-  return set[0] ?? null;
-}
-
-/** Share of red held beyond the date. */
-const BEYOND = 45;
-
 /**
- * Pure. The CSS gradient for a bar `width` px wide whose date falls `at` px
- * from its left edge, for an `outlook` of -1…1. Clear at the start, it deepens
- * smoothly toward the date in blue (outlook above 0) or red (below), the wash
- * at the date following how sure the outlook is; the ramp is eased, so the
- * start of the bar stays clear a good while. At `at` the red steps up and
- * holds to the bar's end; when `at` is the bar's end there is no beyond, only
- * the ramp.
+ * Pure. The CSS gradient for a bar `width` px wide, or null when there is
+ * nothing to paint. `nowX` is how far along it today falls (px from its left
+ * edge); `milestoneX` where its first milestone falls, if it has one inside
+ * the bar. Clear at the start, it deepens smoothly (an eased ramp, so the
+ * start stays clear a good while) to today in blue or red by `outlookValue`
+ * (-1…1); once a milestone has gone by, the colour moves over to red from it
+ * to today. Beyond today it fades back to clear.
  */
-export function warmthGradient(at: number, width: number, outlookValue = 0): string {
-  const x = Math.max(0, Math.min(width, at));
+export function warmthGradient(width: number, nowX: number, outlookValue: number, milestoneX: number | null = null): string | null {
+  const now = Math.max(0, Math.min(width, nowX));
+  if (!(now > 0) || !(width > 0)) return null;
   const tone = outlookValue >= 0 ? BLUE : RED;
   const k = Math.abs(Math.max(-1, Math.min(1, outlookValue)));
-  const strongest = 8 + 27 * k; // wash at the date: faint when unsure, 35% when sure
+  const strongest = 14 + 26 * k; // wash at today: 14% when unsure, 40% when sure
+  const mix = (color: string, pct: number) => `color-mix(in oklab, ${color} ${pct.toFixed(1)}%, transparent)`;
+  const px = (n: number) => `${n.toFixed(1)}px`;
+
+  // The milestone counts once it has gone by: it falls before today.
+  const passedAt = milestoneX !== null && milestoneX > 0 && milestoneX < now ? milestoneX : null;
+  const rampEnd = passedAt ?? now;
   const STEPS = 8;
-  const stops = Array.from({ length: STEPS + 1 }, (_, i) => {
+  const stops: string[] = [];
+  for (let i = 0; i <= STEPS; i++) {
     const f = i / STEPS;
-    const alpha = strongest * Math.pow(f, 2.2);
-    return `color-mix(in oklab, ${tone} ${alpha.toFixed(1)}%, transparent) ${(x * f).toFixed(1)}px`;
-  });
-  if (x < width) stops.push(`color-mix(in oklab, ${RED} ${BEYOND}%, transparent) ${x.toFixed(1)}px`);
-  return `linear-gradient(to right, ${stops.join(', ')})`;
+    stops.push(`${mix(tone, strongest * Math.pow(f, 2.2))} ${px(rampEnd * f)}`);
+  }
+  let last = mix(tone, strongest);
+  if (passedAt !== null) {
+    // Over to red across a short stretch past the milestone, held to today.
+    const over = Math.min(now - passedAt, Math.max(24, width * 0.08));
+    last = mix(RED, PAST_MILESTONE);
+    stops.push(`${last} ${px(passedAt + over)}`, `${last} ${px(now)}`);
+  }
+  if (now < width) stops.push(`transparent ${px(Math.min(width, now + Math.max(20, width * 0.06)))}`);
+  return `linear-gradient(in oklab to right, ${stops.join(', ')})`;
 }
