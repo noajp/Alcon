@@ -5,7 +5,7 @@
 
 /* =============================================
    Clayware Design System
-   Accent: Matte blue (#426fac) — muted, single accent
+   Accent: Blue (#4261a9) — single accent
    Danger: Matte red (#d05249) — muted, warm red
    Surfaces: neutral dark-first ramp
    Typography: Inter Variable, 13px base
@@ -16,9 +16,9 @@
   --control-tab-radius: 6px;
   --control-field-radius: 6px;
   /* ---- Accent (Blue — single accent) ---- */
-  --accent-default: #426fac;
-  --accent-hover:   #365d94;
-  --accent-subtle:  rgba(66, 111, 172, 0.15);
+  --accent-default: #4261a9;
+  --accent-hover:   #37518d;
+  --accent-subtle:  rgba(66, 97, 169, 0.15);
   --selection-background: var(--accent-default);
   --selection-foreground: var(--primary-foreground);
 
