@@ -9,14 +9,15 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import type { Asset, AssetEvent } from '@/types/database';
-import { CopyButton } from './CopyField';
+import { FONT, SETTINGS_ISLAND } from '@/shared/designTokens';
+import { CopyField } from './CopyField';
 import { useIsSpaceOwner } from './data';
 import { useAssetActions, useAssetEvents, useAssets } from './assetData';
 import {
   ASSET_KIND_LABELS, ASSET_RELAY_URL, ASSET_STATUS_LABELS, describeManifest, describeObserved, isLive, relayEnvLines, sortAssets,
 } from './assetModel';
 
-// Settings › API & access › Connected assets (ADR 0036): the apps and AIs
+// Settings › Connected assets (ADR 0036): the apps and AIs
 // that joined this Space by adding one line. The relay address and the Space
 // id are what that line needs; the list shows what announced itself, what it
 // says about itself (unverified) and what the relay saw of it, and lets an
@@ -49,31 +50,28 @@ export function AssetRelayPanel() {
   const waiting = sorted.filter(a => a.status === 'unclaimed').length;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-[15px] font-semibold text-foreground">{t('Connected assets')}</h2>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          {t('A local app or AI adds one line to its backend and announces itself here. It is recognized when an owner accepts it; from then on what it does is recorded in this Space.')}
-        </p>
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-medium text-foreground">{t('The one line')}</h3>
-        <p className="text-[12px] text-muted-foreground">{t("Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
-        {spaceId && <CopyButton value={relayEnvLines(ASSET_RELAY_URL, spaceId)} label={t('Copy settings')} />}
+    <div className="space-y-10">
+      <section className="space-y-3">
+        <div>
+          <h2 className={`${FONT.lg} text-foreground`}>{t('Connect an app')}</h2>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">{t("Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
+        </div>
+        {spaceId && (
+          <div className={`${SETTINGS_ISLAND} p-2`}>
+            <CopyField value={relayEnvLines(ASSET_RELAY_URL, spaceId)} multiline label={t('Settings')} />
+          </div>
+        )}
         <p className="text-[12px] text-muted-foreground">
           {t('No key to issue: the app receives its own token on first contact and keeps it. What it reports about itself is unverified until you accept it.')}
         </p>
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="text-[13px] font-medium text-foreground">
-              {t('Assets')}{waiting > 0 && <span className="ml-2 text-[12px] font-normal text-muted-foreground">{t('{n} waiting for acceptance', { n: waiting })}</span>}
-            </h3>
-            {!isOwner && <p className="mt-1 text-[12px] text-muted-foreground">{t('Only Space owners can accept or revoke assets. You can see what is connected.')}</p>}
-          </div>
+        <div className="min-w-0">
+          <h2 className={`${FONT.lg} text-foreground`}>
+            {t('Assets')}{waiting > 0 && <span className="ml-2 text-[12px] font-normal text-muted-foreground">{t('{n} waiting for acceptance', { n: waiting })}</span>}
+          </h2>
+          {!isOwner && <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Only Space owners can accept or revoke assets. You can see what is connected.')}</p>}
         </div>
 
         {error ? (
@@ -81,9 +79,11 @@ export function AssetRelayPanel() {
         ) : loading ? (
           <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p>
         ) : sorted.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">{t('Nothing has announced itself yet. Start an app with the line and it appears here.')}</p>
+          <div className={`${SETTINGS_ISLAND} px-5 py-3`}>
+            <p className="text-[13px] text-muted-foreground">{t('Nothing has announced itself yet. Start an app with these settings and it appears here.')}</p>
+          </div>
         ) : (
-          <div className="divide-y divide-border/40 rounded-lg border border-border/60">
+          <div className={`${SETTINGS_ISLAND} divide-y divide-[var(--border-subtle)]`}>
             {sorted.map(asset => (
               <AssetRow
                 key={asset.id} asset={asset} now={now} open={openId === asset.id} isOwner={isOwner}

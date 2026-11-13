@@ -30,7 +30,7 @@ export function RegistrySection({ connectedEndpoints, canAdd, onAdd, initialQuer
   return (
     <section className="space-y-3">
       <div>
-        <h3 className={FONT.label}>{t('From the MCP Registry')}</h3>
+        <h2 className={`${FONT.lg} text-foreground`}>{t('From the MCP Registry')}</h2>
         <p className="mt-1 text-[12px] text-muted-foreground">{t('Servers listed in the public MCP Registry that run remotely. Anyone can list a server there, so add only ones you trust.')}</p>
       </div>
       <div className="relative">

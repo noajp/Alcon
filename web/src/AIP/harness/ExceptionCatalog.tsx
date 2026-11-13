@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/ui/button';
-import { CARD_FLAT } from '@/shared/designTokens';
+import { CARD_FLAT, FONT } from '@/shared/designTokens';
 import { formatError } from '@/Function/shared/formatError';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useCatalog } from '@/hooks/customizeData';
@@ -12,7 +12,7 @@ import {
 import { exceptionInstallState, parseExceptionPayload, type ExceptionRowSummary } from './exceptionCatalogModel';
 import type { EscalateTarget } from './harnessDefinition';
 
-// Settings › Customize › Discover, below the harness catalog: the
+// Settings › AI › Harnesses, below the harness catalog: the
 // exception catalog (B13). An installed entry speaks for the whole
 // Space's failures — retries, rollbacks, who is told — wherever a
 // definition's own failure section is silent, so installing one is
@@ -59,8 +59,8 @@ export function ExceptionCatalogSection({ spaceId, isOwner }: { spaceId: string 
 
   return (
     <div>
-      <h3 className="text-[13px] font-semibold text-foreground">{t('Exception catalog')}</h3>
-      <p className="mt-1 text-[12px] text-muted-foreground">
+      <h2 className={`${FONT.lg} text-foreground`}>{t('Exception catalog')}</h2>
+      <p className="mt-0.5 text-[12px] text-muted-foreground">
         {t('Shared rules for what happens when work fails — retries, rollbacks, and who is told — where a definition’s own failure section is silent.')}
       </p>
       {error && <p className="mt-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
