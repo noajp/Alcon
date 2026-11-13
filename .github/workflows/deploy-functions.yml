@@ -110,7 +110,7 @@ jobs:
             flag=""
             case " $NO_VERIFY_JWT " in *" $fn "*) flag="--no-verify-jwt" ;; esac
             echo "::group::$fn $flag"
-            if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api $flag; then
+            if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api --yes $flag; then
               failed="$failed $fn"
             fi
             echo "::endgroup::"
