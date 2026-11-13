@@ -1,7 +1,7 @@
 /**
  * Clayware Design Tokens
  *
- * Accent: Blue (#4261a9) — single accent
+ * Accent: Blue (#3d5fae) — single accent
  * Danger: Matte red (#d05249) — muted, warm red
  * Surfaces: neutral light / dark ramp
  * Typography: Inter Variable, 13px base
