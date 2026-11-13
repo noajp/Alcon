@@ -52,7 +52,7 @@ import type { DirectoryEntry } from '@/hooks/customizeData';
 //                their backend (AssetRelayPanel, ADR 0036).
 // Members see everything read-only; only owners can connect or change.
 
-const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
+const DOCS_URL = 'https://github.com/noajp/clayware/blob/main/docs/mcp.md';
 
 export function IntegrationsSettings({ tab }: { tab: string | null }) {
   return tab === 'clayware' ? <ClaywareConnectPanel />

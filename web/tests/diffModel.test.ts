@@ -11,17 +11,17 @@ const pullUrlsIn = server.pullUrlsIn as (text: string) => { repo: string; number
 
 describe('parsePullUrl', () => {
   const cases = [
-    'https://github.com/noajp/Alcon/pull/554',
-    '  https://github.com/noajp/Alcon/pull/554/files  ',
+    'https://github.com/noajp/clayware/pull/554',
+    '  https://github.com/noajp/clayware/pull/554/files  ',
     'https://github.com/a.b/c_d-e/pull/7#discussion',
-    'https://github.com/noajp/Alcon/issues/554',
-    'http://github.com/noajp/Alcon/pull/1',
-    'https://github.com/noajp/Alcon/pull/0',
+    'https://github.com/noajp/clayware/issues/554',
+    'http://github.com/noajp/clayware/pull/1',
+    'https://github.com/noajp/clayware/pull/0',
     'not a url',
   ];
   it('reads owner/repo and number', () => {
-    expect(parsePullUrl(cases[0])).toEqual({ repo: 'noajp/Alcon', number: 554 });
-    expect(parsePullUrl(cases[1])).toEqual({ repo: 'noajp/Alcon', number: 554 });
+    expect(parsePullUrl(cases[0])).toEqual({ repo: 'noajp/clayware', number: 554 });
+    expect(parsePullUrl(cases[1])).toEqual({ repo: 'noajp/clayware', number: 554 });
     expect(parsePullUrl(cases[2])).toEqual({ repo: 'a.b/c_d-e', number: 7 });
     expect(parsePullUrl(cases[3])).toBeNull();
     expect(parsePullUrl(cases[4])).toBeNull();

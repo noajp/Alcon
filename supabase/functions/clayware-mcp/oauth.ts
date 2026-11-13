@@ -35,7 +35,7 @@ export function protectedResourceMetadata(supabaseUrl: string): Record<string, u
     // tokens only with asymmetric keys.
     scopes_supported: ["email", "profile"],
     resource_name: "Clayware",
-    resource_documentation: "https://github.com/noajp/Alcon/blob/main/docs/mcp.md",
+    resource_documentation: "https://github.com/noajp/clayware/blob/main/docs/mcp.md",
   };
 }
 
