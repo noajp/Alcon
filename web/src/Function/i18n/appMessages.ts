@@ -122,6 +122,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Effort': ['思考の深さ', '사고 깊이', 'Effort', 'Esfuerzo'],
   'Athena settings': ['Athena の設定', 'Athena 설정', 'Réglages d’Athena', 'Ajustes de Athena'],
   'Edit with Athena': ['Athena で編集', 'Athena로 편집', 'Modifier avec Athena', 'Editar con Athena'],
+  'Compact rows': ['行を詰める', '행 간격 좁게', 'Lignes compactes', 'Filas compactas'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

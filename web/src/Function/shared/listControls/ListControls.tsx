@@ -1,5 +1,6 @@
 'use client';
 
+import { Switch } from '@/Function/settings/SettingsControls';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Check,
@@ -541,7 +542,7 @@ function DisplayPanel({
       {/* Grouping and Ordering: a quiet label, a select box on the right —
           Linear's Display panel. Ordering carries its direction as the
           arrow button beside the select instead of a row of its own. */}
-      <div className="space-y-1 px-1 pb-2">
+      <div className="space-y-0.5 px-1 pb-1.5">
         <LabeledSelect
           label="Grouping"
           value={groupByValue}
@@ -555,12 +556,11 @@ function DisplayPanel({
         {showClosedWindow && (
           <ClosedWindowSelect value={display.closed ?? 'all'} onSelect={(closed) => setDisplay({ closed })} />
         )}
-        <LabeledSelect
-          label="Row height"
-          value={display.density ?? 'comfortable'}
-          options={[{ id: 'comfortable' as const, label: t('Comfortable') }, { id: 'compact' as const, label: t('Compact') }]}
-          onSelect={(density) => setDisplay({ density })}
-        />
+        {/* A yes-or-no reads as a switch, not a list of two. */}
+        <div className="flex min-h-7 items-center justify-between gap-3 px-1">
+          <span className="truncate text-[12px] text-muted-foreground">{t('Compact rows')}</span>
+          <Switch label={t('Compact rows')} value={display.density === 'compact'} onChange={(on) => setDisplay({ density: on ? 'compact' : 'comfortable' })} />
+        </div>
       </div>
 
       {/* Which properties show — the same store the list header's "+"
@@ -574,9 +574,9 @@ function DisplayPanel({
       ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
           <div className={MENU_SEPARATOR} />
-          <div className="px-2 pt-2 pb-1">
-            <div className="pb-2 text-[13px] text-muted-foreground">{t('Display properties')}</div>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="px-2 pt-1.5 pb-1">
+            <div className="pb-1.5 text-[12px] text-muted-foreground">{t('Display properties')}</div>
+            <div className="flex flex-wrap gap-1">
               {displayProperties.options.map((opt) => (
                 <PropertyPill key={opt.id} active={displayProperties.active.has(opt.id)} onClick={() => displayProperties.onToggle(opt.id)}>
                   {t(opt.label)}
@@ -593,9 +593,9 @@ function DisplayPanel({
           <button
             type="button"
             onClick={() => { orderingColumns.setSort(null); onReset(); }}
-            className={`${MENU_ROW} text-muted-foreground hover:text-foreground`}
+            className={`${MENU_ROW} !min-h-7 !text-[12px] text-muted-foreground hover:text-foreground`}
           >
-            <RotateCcw size={13} />{t('Reset to defaults')}
+            <RotateCcw size={12} />{t('Reset to defaults')}
           </button>
         </>
       )}
@@ -641,8 +641,8 @@ function LabeledSelect<T extends string>({
   const { t } = useI18n();
   const current = options.find((o) => o.id === value);
   return (
-    <div className="flex min-h-8 items-center justify-between gap-3 px-1">
-      <span className="truncate text-[13px] text-muted-foreground">{t(label)}</span>
+    <div className="flex min-h-7 items-center justify-between gap-3 px-1">
+      <span className="truncate text-[12px] text-muted-foreground">{t(label)}</span>
       <div className="flex shrink-0 items-center gap-1">
         {leading}
         <DropdownMenu>
@@ -650,10 +650,10 @@ function LabeledSelect<T extends string>({
             <button
               type="button"
               aria-label={t(label)}
-              className="inline-flex h-7 w-36 items-center justify-between gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-strong)] px-2.5 text-[13px] text-foreground transition-colors hover:border-[var(--border-strong)] data-[state=open]:border-[var(--border-strong)]"
+              className="inline-flex h-6 w-32 items-center justify-between gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-strong)] px-2 text-[12px] text-foreground transition-colors hover:border-[var(--border-strong)] data-[state=open]:border-[var(--border-strong)]"
             >
               <span className="truncate">{current?.label ?? value}</span>
-              <ChevronDown size={13} className="shrink-0 text-muted-foreground" />
+              <ChevronDown size={12} className="shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <MenuShell as="dropdown" align="end">
@@ -680,9 +680,9 @@ function DirectionToggle({ direction, onChange }: { direction: 'asc' | 'desc'; o
       onClick={() => onChange(direction === 'asc' ? 'desc' : 'asc')}
       title={t(direction === 'asc' ? 'Ascending' : 'Descending')}
       aria-label={t(direction === 'asc' ? 'Ascending' : 'Descending')}
-      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--surface-strong)] hover:text-foreground"
+      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--surface-strong)] hover:text-foreground"
     >
-      <Icon size={15} />
+      <Icon size={14} />
     </button>
   );
 }
@@ -699,7 +699,7 @@ function PropertyPill({ active, onClick, disabled, children, title }: {
       disabled={disabled}
       aria-pressed={active}
       title={title}
-      className={`inline-flex h-7 max-w-full items-center rounded-full border px-3 text-[13px] transition-colors disabled:opacity-50 ${
+      className={`inline-flex h-6 max-w-full items-center rounded-full border px-2.5 text-[12px] transition-colors disabled:opacity-50 ${
         active
           ? 'border-[var(--border-default)] bg-[var(--surface-strong)] text-foreground hover:border-[var(--border-strong)]'
           : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -725,9 +725,9 @@ function PropertiesSection({
   return (
     <>
       <div className={MENU_SEPARATOR} />
-      <div className="px-2 pt-2 pb-1">
-        <div className="pb-2 text-[13px] text-muted-foreground">{t('Display properties')}</div>
-        <div className="flex flex-wrap gap-1.5">
+      <div className="px-2 pt-1.5 pb-1">
+        <div className="pb-1.5 text-[12px] text-muted-foreground">{t('Display properties')}</div>
+        <div className="flex flex-wrap gap-1">
           {cols.allColumns.map((c) => (
             <PropertyPill key={c.id} active={cols.isVisible(c.id)} disabled={!c.toggleable} onClick={() => cols.toggleVisible(c.id)} title={fieldDisplayLabel(t, c)}>
               {fieldDisplayLabel(t, c)}
@@ -735,7 +735,7 @@ function PropertiesSection({
           ))}
           {onAddColumn && (
             <button type="button" onClick={onAddColumn}
-              className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-[var(--border-default)] px-3 text-[13px] text-muted-foreground transition-colors hover:border-[var(--border-strong)] hover:text-foreground">
+              className="inline-flex h-6 items-center gap-1 rounded-full border border-dashed border-[var(--border-default)] px-2.5 text-[12px] text-muted-foreground transition-colors hover:border-[var(--border-strong)] hover:text-foreground">
               <Plus size={13} />{t('Add field')}
             </button>
           )}
