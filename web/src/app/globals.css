@@ -156,8 +156,9 @@
   --gloss-rim-top: rgba(20, 22, 26, 0.06);     /* …and its top edge */
   --gloss-sheen:   none;
   /* Menus, popovers, dialogs and toasts are glass: the page shows through, blurred. */
-  --overlay-glass: color-mix(in srgb, var(--surface-overlay) 80%, transparent);
-  --overlay-blur:  blur(20px) saturate(170%);
+  /* Menus and popovers are solid: what lies under them never shows through. */
+  --overlay-glass: var(--surface-overlay);
+  --overlay-blur:  none;
 
   --shadow-1: 0 1px 1px rgba(15, 17, 22, 0.04), 0 2px 4px -1px rgba(15, 17, 22, 0.05), 0 12px 24px -14px rgba(15, 17, 22, 0.12);
   --shadow-island: var(--shadow-1);
@@ -270,7 +271,7 @@
   --gloss-rim:     rgba(255, 255, 255, 0.06);
   --gloss-rim-top: rgba(255, 255, 255, 0.06);
   --gloss-sheen:   none;
-  --overlay-glass: color-mix(in srgb, var(--surface-overlay) 74%, transparent);
+  --overlay-glass: var(--surface-overlay);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.36), 0 14px 28px -16px rgba(0, 0, 0, 0.7);
   --shadow-card: 0 1px 1px rgba(0, 0, 0, 0.1), 0 6px 14px -12px rgba(0, 0, 0, 0.18);
   --surface-well: color-mix(in srgb, var(--surface-rail) 45%, transparent);
