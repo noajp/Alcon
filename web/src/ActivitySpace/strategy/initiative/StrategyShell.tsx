@@ -620,7 +620,8 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id));
   }, [allObjects, strategy.objectIds]);
   const embedChanged = useCallback(() => { void refetchObjects(); onSaved(); }, [refetchObjects, onSaved]);
-  const embeds = useStrategyEmbeds({ elements: initiativeElements, objects: strategyObjects, onOpenObject, onChanged: embedChanged });
+  const embeds = useStrategyEmbeds({ elements: initiativeElements, objects: strategyObjects, onOpenObject, onChanged: embedChanged,
+    timelineZoom: strategy.parentIds.length === 0 ? 'quarter' : 'month' });
 
   // The conversation opens on request; another Strategy opens without it,
   // on its Overview.

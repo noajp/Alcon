@@ -654,7 +654,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
             elements={objectsAsBars}
             leftHeaderLabel="Objects"
             rowScale="object"
-            defaultZoom="month"
+            defaultZoom="week"
             onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
             onRefresh={onRefresh}
             phases={domainPhases}

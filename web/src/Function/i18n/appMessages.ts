@@ -134,6 +134,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'Start to start': ['開始→開始', '시작→시작', 'Début → début', 'Inicio → inicio'],
   'Finish to finish': ['完了→完了', '완료→완료', 'Fin → fin', 'Fin → fin'],
   'Start to finish': ['開始→完了', '시작→완료', 'Début → fin', 'Inicio → fin'],
+  'Scale': ['表示単位', '표시 단위', 'Échelle', 'Escala'],
   'Could not load the calendar.': ['カレンダーを読み込めませんでした。', '캘린더를 불러오지 못했습니다.', 'Impossible de charger le calendrier.', 'No se pudo cargar el calendario.'],
   'Loading schedules…': ['スケジュールを読み込み中…', '일정 불러오는 중…', 'Chargement des plannings…', 'Cargando calendarios…'],
   'AI': ['AI', 'AI', 'IA', 'IA'],

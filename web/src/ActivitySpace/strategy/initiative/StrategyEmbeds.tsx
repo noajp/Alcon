@@ -17,6 +17,8 @@ import { objectToGanttBar } from '@/ActivitySpace/execution/domain/DomainView';
 // its Elements, and its Objects on a Gantt. Each reads the Strategy's own
 // Objects and Elements, so a block written once stays current.
 
+import type { ZoomLevel } from '@/ActivitySpace/execution/element/gantt';
+
 const GanttView = dynamic(() => import('@/ActivitySpace/execution/element/gantt').then((m) => m.GanttView), { ssr: false });
 
 function Progress({ elements }: { elements: ElementWithDetails[] }) {
@@ -50,24 +52,26 @@ function ElementList({ elements, onOpen }: { elements: ElementWithDetails[]; onO
   );
 }
 
-function ObjectsGantt({ objects, onChanged }: { objects: ClaywareObjectWithChildren[]; onChanged: () => void }) {
+function ObjectsGantt({ objects, onChanged, zoom }: { objects: ClaywareObjectWithChildren[]; onChanged: () => void; zoom: ZoomLevel }) {
   const { t } = useI18n();
   const bars = useMemo(() => objects.map(objectToGanttBar), [objects]);
   if (!objects.length) return <p className="rounded-md border border-border/60 px-3 py-2.5 text-[13px] text-muted-foreground">{t('No Objects yet.')}</p>;
   return (
     <div className="h-[320px] overflow-hidden rounded-md border border-border/60">
-      <GanttView defaultZoom="quarter" rowScale="object" elements={bars} leftHeaderLabel="Objects" onRefresh={onChanged}
+      <GanttView defaultZoom={zoom} rowScale="object" elements={bars} leftHeaderLabel="Objects" onRefresh={onChanged}
         onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })} />
     </div>
   );
 }
 
 /** What "/" offers in a Strategy's description, and how each block draws. */
-export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged }: {
+export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged, timelineZoom = 'quarter' }: {
   elements: ElementWithDetails[];
   objects: ClaywareObjectWithChildren[];
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onChanged: () => void;
+  /** The scale its Timeline block opens at: a top Strategy's by quarter, one under another by month. */
+  timelineZoom?: ZoomLevel;
 }): EmbedHost {
   const { t } = useI18n();
   return useMemo<EmbedHost>(() => {
@@ -80,7 +84,7 @@ export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged }
       switch (spec.view) {
         case 'progress': return <Progress elements={elements} />;
         case 'elements': return <ElementList elements={elements} onOpen={openElement} />;
-        case 'gantt': return <ObjectsGantt objects={objects} onChanged={onChanged} />;
+        case 'gantt': return <ObjectsGantt objects={objects} onChanged={onChanged} zoom={timelineZoom} />;
         default: return <p className="px-3 py-2 text-[12px] text-muted-foreground">{t('This block is not offered here.')}</p>;
       }
     };
@@ -92,5 +96,5 @@ export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged }
       ],
       render,
     };
-  }, [elements, objects, onOpenObject, onChanged, t]);
+  }, [elements, objects, onOpenObject, onChanged, timelineZoom, t]);
 }

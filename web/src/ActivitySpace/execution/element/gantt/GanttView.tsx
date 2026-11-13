@@ -6,7 +6,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNod
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ClaywareObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { CalendarDays, X, ZoomIn, ZoomOut } from '@/ui/icons';
+import { CalendarDays, ChevronDown, X, ZoomIn, ZoomOut } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { ObjectIcon } from '@/Frame/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
@@ -53,7 +53,8 @@ interface GanttViewProps {
   /** Opens an Element's detail from its row or bar. A drag on the bar never
    *  opens it. Omit and a click only selects the row. */
   onElementOpen?: (element: ElementWithDetails) => void;
-  /** The zoom it opens at. A Strategy's Gantt opens by quarter. */
+  /** The scale it opens at: Elements by day, a Domain's Objects by week, a
+   *  Strategy under another by month, a top Strategy by quarter. */
   defaultZoom?: ZoomLevel;
   /** What a row stands for. 'object' rows are roomier with a thicker bar
    *  and carry no Status mark (an Object has no Status of its own). */
@@ -83,11 +84,13 @@ export interface GanttLink {
   quiet?: boolean;
 }
 
-type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
+export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 
 // One shared horizontal scale: pixels per day. Headers, grid, bars, the
 // today-line and drag math all derive from this so every zoom level stays
 // aligned (the old per-zoom "column = 1 unit" header drifted off the bars).
+const ZOOM_LABEL: Record<ZoomLevel, string> = { day: 'Day', week: 'Week', month: 'Month', quarter: 'Quarter' };
+
 const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, quarter: 2 };
 
 // Stable empty-array default so an omitted `phases` prop doesn't hand the
@@ -640,65 +643,49 @@ export function GanttView({
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Sticky Toolbar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-foreground">{t('Timeline')}</span>
-          {object?.name && (
-            <span className="text-xs text-muted-foreground">{object.name}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Magnifier zoom — continuous in/out on top of the preset scale. */}
-          <div className="flex items-center bg-muted/50 rounded-md p-0.5">
-            <button
-              onClick={() => zoomBy(1 / ZOOM_STEP)}
-              disabled={zoomScale <= ZOOM_MIN + 1e-6}
-              title={t('Zoom out')}
-              aria-label={t('Zoom out')}
-              className="w-7 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              <ZoomOut size={14} />
-            </button>
-            <button
-              onClick={() => setZoomScale(1)}
-              title={t('Reset zoom')}
-              aria-label={t('Reset zoom')}
-              className="px-1.5 h-6 inline-flex items-center justify-center text-[10px] font-medium tabular-nums text-muted-foreground hover:text-foreground rounded transition-colors min-w-[34px]"
-            >
-              {Math.round(zoomScale * 100)}%
-            </button>
-            <button
-              onClick={() => zoomBy(ZOOM_STEP)}
-              disabled={zoomScale >= ZOOM_MAX - 1e-6}
-              title={t('Zoom in')}
-              aria-label={t('Zoom in')}
-              className="w-7 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              <ZoomIn size={14} />
-            </button>
-          </div>
-          {/* Segmented zoom presets */}
-          <div className="flex items-center bg-muted/50 rounded-md p-0.5">
-            {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map(z => (
-              <button
-                key={z}
-                onClick={() => setZoom(z)}
-                className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
-                  zoom === z
-                    ? 'bg-foreground text-background shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {z === 'day' ? t('Day') : z === 'week' ? t('Week') : z === 'month' ? t('Month') : t('Quarter')}
+      {/* Toolbar: one quiet control at the right — out, the scale, in, and
+          back to today. The pane's own header already names the view. */}
+      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card px-4 py-2">
+        {object?.name && <span className="min-w-0 truncate text-xs text-muted-foreground">{object.name}</span>}
+        <div className="ml-auto flex h-7 items-center rounded-md bg-muted/50 p-0.5">
+          <button type="button" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={zoomScale <= ZOOM_MIN + 1e-6}
+            title={t('Zoom out')} aria-label={t('Zoom out')}
+            className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40">
+            <ZoomOut size={14} />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" title={t('Scale')}
+                className="inline-flex h-6 min-w-[72px] items-center justify-center gap-1 rounded px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted">
+                {t(ZOOM_LABEL[zoom])}
+                {Math.abs(zoomScale - 1) > 1e-6 && <span className="tabular-nums text-muted-foreground">{Math.round(zoomScale * 100)}%</span>}
+                <ChevronDown size={12} className="text-muted-foreground" />
               </button>
-            ))}
-          </div>
-          <button
-            onClick={() => scrollToToday(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
-          >
-            <CalendarDays size={13} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[160px]">
+              {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map((z) => (
+                <DropdownMenuItem key={z} className="gap-2 text-[13px]" onSelect={() => { setZoom(z); setZoomScale(1); }}>
+                  <span className="flex-1">{t(ZOOM_LABEL[z])}</span>
+                  {zoom === z && <MenuCheck />}
+                </DropdownMenuItem>
+              ))}
+              {Math.abs(zoomScale - 1) > 1e-6 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-[13px]" onSelect={() => setZoomScale(1)}>{t('Reset zoom')}</DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button type="button" onClick={() => zoomBy(ZOOM_STEP)} disabled={zoomScale >= ZOOM_MAX - 1e-6}
+            title={t('Zoom in')} aria-label={t('Zoom in')}
+            className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40">
+            <ZoomIn size={14} />
+          </button>
+          <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+          <button type="button" onClick={() => scrollToToday(true)} title={t('Today')}
+            className="inline-flex h-6 items-center gap-1.5 rounded px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted">
+            <CalendarDays size={13} className="text-muted-foreground" />
             {t('Today')}
           </button>
         </div>
