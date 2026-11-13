@@ -79,6 +79,7 @@ const SYSTEM_PROMPT = `あなたは組織の参謀です。Strategy（戦略の�
 - weight は AI がやるときの重さ。転記・整形・短い要約・決まった手順の作業は light、調べて書く普通の仕事は standard、設計・難しい判断・長い推論が要るものは heavy。迷ったら standard。重いほど費用が高いので、light にできるものは light にする。
 - 入力の「定義」に、タスクの仕事に合うもの（その仕事の進め方や成果物の型を決めたもの）があれば、そのタスクの definitionId にその id を入れる。
 - 前提（assumption）が崩れていないかを確かめるタスクが要るなら入れる。
+- 各タスクの basisIds には、そのタスクが確かめる前提（assumption）や、実行する意思決定（decision）の id を入れる。入力の「前提」「意思決定」の id からだけ選ぶ。当てはまるものがなければ空の配列。Strategy が変わったとき、影響を受けるタスクを見つけるのに使う。
 - 推測で固有名詞や数値をでっち上げない。分からないことは、それを確かめるタスクにする。
 - assignee が human のタスクは、入力に「担当の決め方」があれば、それに従って入力の「人」から一人を選び、assigneeWorkerId にその id を入れる。「担当の決め方」がないとき、ルールに合う人がいないとき、ai のタスクでは assigneeWorkerId を省く。「人」にない id を作らない。
 - 入力に「分け方」があれば、Object の分け方・タスクの粒度・人と AI の割り当ては、それに従う。この原則と食い違うときは「分け方」を優先する。ただし答えの形（submit_plan の項目）は変えない。
@@ -145,13 +146,14 @@ const PLAN_TOOL = {
             objective: { type: "string", description: "効く目標の key" },
             object: { type: "string", description: "入れる Object の key" },
             dependsOn: { type: "array", items: { type: "string" }, description: "先に終わっている必要があるタスクの key。なければ空の配列" },
+            basisIds: { type: "array", items: { type: "string" }, description: "このタスクが確かめる前提・実行する意思決定の id。なければ空の配列" },
             assignee: { type: "string", enum: ["ai", "human"] },
             action: { type: "string", enum: ["judge", "decide", "approve", "answer", "plan", "research", "create", "execute", "verify", "report", "send", "delegate", "monitor"], description: "そのタスクが求める行動" },
             weight: { type: "string", enum: ["light", "standard", "heavy"], description: "AI がやるときの重さ。費用の安いモデルから順に light / standard / heavy" },
             definitionId: { type: "string", description: "このタスクが従う定義の id（入力の「定義」から合うものがあれば）。なければ省略" },
             assigneeWorkerId: { type: "string", description: "human のタスクを任せる人の id（入力の「人」から「担当の決め方」に従って選ぶ）。ルールがない・合う人がいない・ai のタスクなら省略" },
           },
-          required: ["key", "title", "description", "objective", "object", "dependsOn", "assignee", "weight", "action"],
+          required: ["key", "title", "description", "objective", "object", "dependsOn", "basisIds", "assignee", "weight", "action"],
           additionalProperties: false,
         },
       },
@@ -192,9 +194,10 @@ type Row = Record<string, unknown>;
 
 /** Pure. The model's draft as it may go back: dependencies only on tasks in
  *  the draft (no self, no repeats), no dependency cycles (the edge that
- *  closes one is dropped), and a person's id only on a person's task and
- *  only one of the people the model was shown. */
-function checkPlan(plan: Row, humanIds: ReadonlySet<string>): Row {
+ *  closes one is dropped), a person's id only on a person's task and
+ *  only one of the people the model was shown, and reasons only among the
+ *  premises and decisions it was shown. */
+function checkPlan(plan: Row, humanIds: ReadonlySet<string>, reasonIds: ReadonlySet<string>): Row {
   const tasks = (plan.tasks as unknown[]).map((t) => (t && typeof t === "object" ? { ...(t as Row) } : {})) as Row[];
   const keys = new Set(tasks.map((t) => String(t.key ?? "")).filter(Boolean));
   const deps = new Map<string, string[]>();
@@ -219,6 +222,7 @@ function checkPlan(plan: Row, humanIds: ReadonlySet<string>): Row {
     t.dependsOn = deps.get(String(t.key ?? "")) ?? [];
     const id = typeof t.assigneeWorkerId === "string" ? t.assigneeWorkerId : "";
     if (t.assignee !== "human" || !humanIds.has(id)) delete t.assigneeWorkerId;
+    t.basisIds = [...new Set((Array.isArray(t.basisIds) ? t.basisIds : []).filter((b): b is string => typeof b === "string" && reasonIds.has(b)))];
   }
   return { ...plan, tasks };
 }
@@ -332,8 +336,9 @@ Deno.serve(async (req: Request) => {
   const line = (r: Row) => String(r.title ?? "").replace(/\s+/g, " ").slice(0, 300);
   const measures = intents.filter((i) => i.kind === "measure").map((m) =>
     `- id: ${m.id} / ${line(m)}${m.target_value != null ? `（目標 ${m.direction === "at_most" ? "≦" : "≧"} ${m.target_value}${m.unit ?? ""}${m.actual_value != null ? `、現在 ${m.actual_value}${m.unit ?? ""}` : ""}）` : ""}`);
-  const assumptions = intents.filter((i) => i.kind === "assumption").map((a) => `- ${line(a)}`);
-  const decisions = intents.filter((i) => i.kind === "decision").map((d) => `- ${line(d)}`);
+  const assumptions = intents.filter((i) => i.kind === "assumption").map((a) => `- id: ${a.id} / ${line(a)}`);
+  const decisions = intents.filter((i) => i.kind === "decision").map((d) => `- id: ${d.id} / ${line(d)}`);
+  const reasonIds = new Set(intents.filter((i) => i.kind === "assumption" || i.kind === "decision").map((i) => String(i.id)));
   const objectName = new Map(objects.map((o) => [String(o.id), String(o.name ?? "")]));
   const existing = elements.map((e) => `- ${line(e)}（${e.status ?? "todo"}、Object: ${objectName.get(String(e.object_id)) ?? "?"}）`);
   const objectLines = objects.map((o) =>
@@ -478,7 +483,7 @@ ${mayAsk ? "この Strategy を達成するための作戦を submit_plan で提
     }
     const plan = out.content?.find((b) => b.type === "tool_use" && b.name === PLAN_TOOL.name)?.input as Row | undefined;
     if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0 && Array.isArray(plan.objects) && Array.isArray(plan.objectives)) {
-      return json({ plan: checkPlan(plan, humanIds), sources: report, usage: out.usage ?? null });
+      return json({ plan: checkPlan(plan, humanIds, reasonIds), sources: report, usage: out.usage ?? null });
     }
     console.error("plan-initiative: unusable plan", out.stop_reason, JSON.stringify(plan ?? null).slice(0, 300));
     failure = out.stop_reason === "max_tokens" ? "作戦案が長すぎて途中で切れました。補足で範囲を絞ってください。" : failure;

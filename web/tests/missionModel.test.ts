@@ -128,6 +128,17 @@ describe('normalizePlan', () => {
     expect(cards.map((c) => c.assigneeName)).toEqual(['Hanako', null]);
   });
 
+  it('keeps a task\'s reasons as ids, once each, at most ten', () => {
+    const plan = normalizePlan({
+      tasks: [
+        { key: 't1', title: 'Interview', basisIds: ['a1', 'a1', 'd1', 7, ''] },
+        { key: 't2', title: 'Draft' },
+        { key: 't3', title: 'Wide', basisIds: Array.from({ length: 12 }, (_, i) => `x${i}`) },
+      ],
+    }, new Set());
+    expect(plan.tasks.map((t) => t.basisIds)).toEqual([['a1', 'd1'], [], Array.from({ length: 10 }, (_, i) => `x${i}`)]);
+  });
+
   it('survives a malformed answer', () => {
     expect(normalizePlan(null, new Set())).toEqual({ summary: '', objectives: [], objects: [], tasks: [] });
   });

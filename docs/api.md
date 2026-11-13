@@ -21,7 +21,7 @@
 | GET | `/workers` | 担当にできる Worker | `elementId` `objectId` `domainId` |
 | GET | `/initiatives` | 見える Strategy | `parentId` `status` |
 | GET | `/initiatives/{id}` | Strategy の意図と、実行する Object | — |
-| POST | `/elements` | Element を作る（201） | `objectId` `title`（必須） `description` `status` `priority` `type` `due_date` `labels` `assigneeWorkerIds` |
+| POST | `/elements` | Element を作る（201） | `objectId` `title`（必須） `description` `status` `priority` `type` `due_date` `labels` `assigneeWorkerIds` `basisIntentIds` |
 | PATCH | `/elements/{id}` | Element を更新する | `title` `description` `status` `priority` `type` `due_date`（`null` で解除） `estimated_hours` `labels` |
 | POST | `/elements/{id}/comments` | コメントする（201） | `body`（必須） |
 | POST | `/elements/{id}/assignees` | Worker を担当にする | `workerId`（必須） |

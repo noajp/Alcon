@@ -648,6 +648,9 @@ export interface PlanTask {
   /** The key of the Object it goes into; null when the Planner placed it nowhere. */
   object: string | null;
   dependsOn: string[];
+  /** The premises it tests and the decisions it carries out — why it exists,
+   *  bound on approval so a change to them finds this work. */
+  basisIds: string[];
   assignee: 'ai' | 'human';
   /** The Space's definition the task follows, when the Planner found one that fits. */
   definitionId?: string | null;
@@ -718,9 +721,10 @@ export function normalizePlan(
     const objective = typeof x.objective === 'string' && objectiveKeys.has(x.objective) ? x.objective : null;
     const object = typeof x.object === 'string' ? objectKey.get(x.object) ?? null : null;
     const dependsOn = (Array.isArray(x.dependsOn) ? x.dependsOn : []).filter((d): d is string => typeof d === 'string');
+    const basisIds = [...new Set((Array.isArray(x.basisIds) ? x.basisIds : []).filter((b): b is string => typeof b === 'string' && b.length > 0))].slice(0, 10);
     const assignee = x.assignee === 'human' ? 'human' : 'ai';
     tasks.push({
-      key, title, description: text(x.description, 4000), objective, object, dependsOn,
+      key, title, description: text(x.description, 4000), objective, object, dependsOn, basisIds,
       assignee,
       assigneeWorkerId: assignee === 'human' && typeof x.assigneeWorkerId === 'string' && known.workerIds?.has(x.assigneeWorkerId) ? x.assigneeWorkerId : null,
       definitionId: typeof x.definitionId === 'string' && known.definitionIds?.has(x.definitionId) ? x.definitionId : null,
