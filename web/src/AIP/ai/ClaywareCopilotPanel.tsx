@@ -2,9 +2,10 @@
 import { formatError } from '@/Function/shared/formatError';
 import dynamic from 'next/dynamic';
 import { Button } from '@/ui/button';
+import { SendIcon } from '@/Function/shared/SendIcon';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, CornerDownRight, X, Maximize2, Minimize2, Paperclip, Square } from '@/ui/icons';
+import { CornerDownRight, X, Maximize2, Minimize2, Paperclip, Square } from '@/ui/icons';
 import { buildCopilotContext, type CopilotAttachment, type CopilotContext, type CopilotSubject } from './useClaywareCopilot';
 import { useStrategies } from '@/hooks/strategyData';
 import { CopilotMessageView, AttachmentChips } from './CopilotMessages';
@@ -413,7 +414,7 @@ export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, varia
               </Button>
             ) : (
               <Button size="icon-sm" type="submit" shape="tab" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary">
-                <ArrowUp size={15} />
+                <SendIcon size={13} />
               </Button>
             )}
           </div>
