@@ -22,7 +22,7 @@ export function EmptyState({ art, title, description, cta, shortcut, onCta, seco
   shortcut?: string;
   onCta?: () => void;
   /** A second action beside the first (a destructive one, say). */
-  secondary?: { label: string; onClick: () => void; variant?: 'secondary' | 'danger' | 'destructive' };
+  secondary?: { label: string; onClick: () => void; variant?: 'secondary' | 'danger' };
 }) {
   // Callers pass English; plain strings are translated here so every empty
   // state follows the viewer's language without wiring `t` at each call site.

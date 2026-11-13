@@ -161,7 +161,7 @@ function ObjectsEmptyState() {
       description="Objects are mid-level structural units — projects, departments, or any container you want to organise."
       cta="Create Object"
       onCta={() => openCreate('object')}
-      secondary={role.data === 'owner' && domain ? { label: 'Delete', variant: 'destructive', onClick: () => { void remove(); } } : undefined}
+      secondary={role.data === 'owner' && domain ? { label: 'Delete', variant: 'danger', onClick: () => { void remove(); } } : undefined}
     />
   );
 }

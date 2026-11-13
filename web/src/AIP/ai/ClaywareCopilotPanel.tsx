@@ -409,11 +409,11 @@ export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, varia
               // One Stop face on every chat surface: the Square — an X
               // here read as "close the panel", which has its own X in
               // the header.
-              <Button size="icon-sm" type="button" shape="tab" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="secondary">
-                <Square size={11} fill="currentColor" />
+              <Button size="xs" type="button" onClick={cancel} title={t('Stop')} aria-label={t('Stop')} variant="secondary" className="rounded-md px-2">
+                <Square size={13} />
               </Button>
             ) : (
-              <Button size="icon-sm" type="submit" shape="tab" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary">
+              <Button size="xs" type="submit" disabled={!input.trim() && files.length === 0} title={t('Send (Enter)')} aria-label={t('Send')} variant="primary" className="rounded-md px-2">
                 <SendIcon size={13} />
               </Button>
             )}
