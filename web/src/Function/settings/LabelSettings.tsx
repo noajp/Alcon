@@ -223,7 +223,7 @@ function LabelRow({
               cancel();
             }
           }}
-          className="h-7 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] text-foreground transition-[background-color] focus:bg-[var(--accent-subtle)]"
+          className="h-7 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] text-foreground transition-[background-color] focus:bg-[var(--surface-strong)]"
         />
       ) : (
         <span className="min-w-0 flex-1 truncate px-2 text-[13px] text-foreground">{entry.name}</span>
@@ -320,7 +320,7 @@ function NewLabelRow({
             else onCancel();
           }
         }}
-        className="h-7 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] text-foreground transition-[background-color] placeholder:text-muted-foreground focus:bg-[var(--accent-subtle)]"
+        className="h-7 min-w-0 flex-1 rounded-md bg-transparent px-2 text-[13px] text-foreground transition-[background-color] placeholder:text-muted-foreground focus:bg-[var(--surface-strong)]"
       />
       {trimmed && problem && (
         <span className="shrink-0 text-[12px] text-[var(--status-danger)]">{problem}</span>

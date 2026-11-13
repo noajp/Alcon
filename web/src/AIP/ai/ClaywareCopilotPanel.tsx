@@ -366,7 +366,7 @@ export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, varia
           onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); void addFiles(e.dataTransfer.files); } }}
-          className={`flex flex-col gap-2 rounded-2xl border bg-[var(--surface-rail)] px-3 pb-2 pt-3 shadow-[var(--shadow-island)] transition-colors focus-within:border-[var(--accent-default)]/40 ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/40'} ${column}`}
+          className={`flex flex-col gap-2 rounded-2xl border bg-[var(--surface-rail)] px-3 pb-2 pt-3 shadow-[var(--shadow-card)] transition-colors focus-within:border-border ${dragging ? 'border-[var(--accent-default)] bg-[var(--accent-subtle)]' : 'border-border/40'} ${column}`}
         >
           {files.length > 0 && <div className="flex"><AttachmentChips files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, k) => k !== i))} /></div>}
           {/* The request on top, on its own line; what acts on it underneath. */}

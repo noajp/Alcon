@@ -105,7 +105,7 @@ export const CONTROL = {
 } as const;
 
 export const FIELD = {
-  base: `${CONTROL.border} rounded-[var(--control-field-radius)] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:bg-[var(--accent-subtle)]`,
+  base: `${CONTROL.border} rounded-[var(--control-field-radius)] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 focus:bg-[var(--surface-strong)]`,
 } as const;
 
 export type ControlSize = keyof typeof CONTROL.height;

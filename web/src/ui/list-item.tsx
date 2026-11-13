@@ -82,7 +82,7 @@ export function ListItem({
     <div data-hover-item="" aria-disabled={disabled || undefined} aria-current={selected || undefined}
       className={cn(
         'relative flex min-w-0 items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-[13px] leading-5',
-        selected && 'bg-[var(--accent-subtle)]',
+        selected && 'bg-[var(--surface-strong)]',
         disabled && 'text-muted-foreground',
         className,
       )}>

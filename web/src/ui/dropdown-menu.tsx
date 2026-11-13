@@ -83,11 +83,10 @@ function DropdownMenuItem({
   )
 }
 
-/** The mark of the chosen row in any menu: one check, at the row's end, in
- *  the key color. Radio and checkbox rows draw it themselves; a plain row
+/** The mark of the chosen row in any menu: one check, at the row's end. Radio and checkbox rows draw it themselves; a plain row
  *  that marks a choice places it after its label. */
 function MenuCheck({ className }: { className?: string }) {
-  return <CheckIcon aria-hidden="true" className={cn("ml-auto size-3.5 shrink-0 !text-[var(--accent-default)]", className)} />
+  return <CheckIcon aria-hidden="true" className={cn("ml-auto size-3.5 shrink-0 !text-foreground", className)} />
 }
 
 const CHOICE_ITEM =

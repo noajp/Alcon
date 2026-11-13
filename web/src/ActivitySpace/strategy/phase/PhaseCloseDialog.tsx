@@ -144,7 +144,7 @@ export function PhaseCloseDialog({
             rows={3}
             autoFocus
             placeholder={t('Achieved what it was for — or out of time. Say which, and why.')}
-            className="w-full resize-none rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--accent-subtle)]"
+            className="w-full resize-none rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--surface-strong)]"
           />
         </div>
 
@@ -199,7 +199,7 @@ export function PhaseCloseDialog({
                     value={reasons[el.id] ?? ''}
                     onChange={(e) => setReasons((prev) => ({ ...prev, [el.id]: e.target.value }))}
                     placeholder={t('Reason (optional)')}
-                    className="w-[55%] shrink-0 rounded-md px-2 py-1 text-[12px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--accent-subtle)]"
+                    className="w-[55%] shrink-0 rounded-md px-2 py-1 text-[12px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--surface-strong)]"
                   />
                 </div>
               ))}
