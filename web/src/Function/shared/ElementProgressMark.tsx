@@ -72,14 +72,18 @@ export function ElementProgressMark({
   status,
   progress = 0,
   size = 16,
+  muted = false,
 }: {
   status?: ElementStatus | null;
   progress?: number;
   size?: number;
+  /** Draw it in the quiet text color, not the Status color — for a mark that
+   *  stands for the idea of progress (a menu entry), not for one Element. */
+  muted?: boolean;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
   const key = (status ?? 'todo') as string;
-  const colorClass = STATUS_TEXT[key] ?? STATUS_TEXT.todo;
+  const colorClass = muted ? 'text-muted-foreground' : (STATUS_TEXT[key] ?? STATUS_TEXT.todo);
 
   const center = size / 2;
   const R = (size - 2) / 2;          // rendered ring radius (matches the old mark)
