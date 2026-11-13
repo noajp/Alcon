@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState,
-  type ReactElement, type ReactNode,
-} from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, ChevronDown, Copy, Loader2, RotateCcw, Wrench } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
@@ -14,8 +11,7 @@ import { formatToolDuration, toolCallText, highlightTokens } from './toolCallFor
 // the time it took, or Failed). Opened, it shows the arguments and the
 // result as highlighted JSON, each with a copy button; a long block is
 // capped with a fade and "Show all". A failed call shows its message and,
-// when the host can redo it, Retry. ToolCallGroup folds several cards into
-// one quiet line: "Used 3 tools · 2.4s".
+// when the host can redo it, Retry.
 //
 // Colors, radii and shadows are the app's tokens, so every theme carries it.
 
@@ -140,66 +136,6 @@ export function ToolCallCard({
               <p className="text-[12px] leading-4 text-muted-foreground">{t('No arguments or result.')}</p>
             )}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export type ToolCallGroupProps = {
-  /** ToolCallCard elements: the group reads their name, icon, status and duration. */
-  children: ReactNode;
-  /** Label once every call is done; defaults to "Used 3 tools". */
-  label?: string;
-  defaultOpen?: boolean;
-  className?: string;
-};
-
-export function ToolCallGroup({ children, label, defaultOpen = false, className }: ToolCallGroupProps) {
-  const { t } = useI18n();
-  const id = useId();
-  const [open, setOpen] = useState(defaultOpen);
-  const calls = Children.toArray(children).filter(isValidElement)
-    .map((c) => (c as ReactElement<Partial<ToolCallCardProps>>).props);
-  const running = calls.some((c) => c.status === 'running');
-  const failed = calls.filter((c) => c.status === 'error').length;
-  const since = calls.reduce<number | undefined>((min, c) =>
-    c.status === 'running' && c.startedAt != null && (min == null || c.startedAt < min) ? c.startedAt : min, undefined);
-  const measured = useStopwatch(running, since, true);
-  const sum = calls.length && calls.every((c) => c.duration != null) ? calls.reduce((s, c) => s + (c.duration ?? 0), 0) : null;
-  const ms = running ? measured : (sum ?? measured);
-  const count = calls.length === 1 ? t('Used 1 tool') : t('Used {n} tools', { n: calls.length });
-  const title = running ? t('Using tools…') : (label ?? count);
-  const icons = calls.slice(-3);
-
-  return (
-    <div className={cn('grid text-[13px] leading-5', className)}>
-      <span className="sr-only" role="status" aria-live="polite">
-        {running ? title : failed ? `${count}, ${t('{n} failed', { n: failed })}` : count}
-      </span>
-      <button type="button" aria-expanded={open} aria-controls={`${id}-list`} onClick={() => setOpen(!open)}
-        className="-ml-1.5 flex min-h-8 max-w-full items-center gap-2 justify-self-start rounded-[var(--radius-sm)] py-1 pl-1.5 pr-2.5 text-foreground transition-colors hover:bg-muted/50 focus-visible:bg-muted/60">
-        <span className="flex shrink-0 p-px" aria-hidden="true">
-          {icons.map((c, i) => (
-            <span key={calls.length - icons.length + i}
-              className="grid size-[22px] place-items-center rounded-[6px] bg-card text-muted-foreground shadow-[0_0_0_0.5px_var(--border-subtle),var(--shadow-1)] animate-fade-in [&>svg]:size-3"
-              style={i > 0 ? { marginLeft: -4 } : undefined}>
-              {c.icon ?? <Wrench strokeWidth={1.6} />}
-            </span>
-          ))}
-        </span>
-        <span key={running ? 'busy' : 'done'} className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap animate-fade-in">
-          <span className={cn('min-w-0 truncate font-medium', running && 'animate-shimmer text-muted-foreground')}>{title}</span>
-          {!running && failed > 0 && <span className="shrink-0 text-[var(--status-danger)]">· {t('{n} failed', { n: failed })}</span>}
-          {ms != null && <span className="shrink-0 tabular-nums text-muted-foreground/70">· {formatToolDuration(ms, running)}</span>}
-        </span>
-        <ChevronDown size={12} aria-hidden="true"
-          className={cn('shrink-0 text-muted-foreground transition-transform duration-300', open && 'rotate-180')} />
-      </button>
-      <div id={`${id}-list`} inert={!open}
-        className={cn('grid transition-[grid-template-rows,opacity] duration-300', open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')}>
-        <div className="min-h-0 overflow-hidden">
-          <div className="grid gap-2 pb-0.5 pt-1.5">{children}</div>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo } from 'react';
+import { createContext, Fragment, useContext, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { parseMarkdown, type Block, type Inline, type ListBlock } from './markdownParse';
 import { MermaidDiagram } from './MermaidDiagram';
@@ -8,12 +8,33 @@ import { MermaidDiagram } from './MermaidDiagram';
 // Renders agent-written Markdown (reports, deliverables) as React elements.
 // The parser never produces HTML, so nothing in the text can inject markup.
 
+/** True while the text is still arriving: each word resolves out of blur as
+ *  it lands (the `.word-in` rule). Off for settled text, which renders plain. */
+const RevealContext = createContext(false);
+
+/** Words and the gaps between them, in order. Languages written without
+ *  spaces are split by the platform's word segmenter. */
+function wordsOf(text: string): string[] {
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    return Array.from(new Intl.Segmenter(undefined, { granularity: 'word' }).segment(text), (s) => s.segment);
+  }
+  return text.split(/(\s+)/);
+}
+
+/** Text whose words fade in as they are added. A word keeps its place in the
+ *  list while the text grows, so only the new ones animate. */
+function RevealedText({ text }: { text: string }) {
+  const words = useMemo(() => wordsOf(text), [text]);
+  return <>{words.map((w, i) => (w.trim() ? <span key={i} className="word-in">{w}</span> : <Fragment key={i}>{w}</Fragment>))}</>;
+}
+
 function InlineNodes({ nodes }: { nodes: Inline[] }) {
+  const reveal = useContext(RevealContext);
   return (
     <>
       {nodes.map((n, i) => {
         switch (n.t) {
-          case 'text': return <Fragment key={i}>{n.v}</Fragment>;
+          case 'text': return reveal ? <RevealedText key={i} text={n.v} /> : <Fragment key={i}>{n.v}</Fragment>;
           case 'strong': return <strong key={i} className="font-semibold text-foreground"><InlineNodes nodes={n.c} /></strong>;
           case 'em': return <em key={i}><InlineNodes nodes={n.c} /></em>;
           case 'del': return <s key={i}><InlineNodes nodes={n.c} /></s>;
@@ -68,11 +89,18 @@ function BlockNode({ b }: { b: Block }) {
   }
 }
 
-export function MarkdownLite({ text, className }: { text: string; className?: string }) {
+export function MarkdownLite({ text, className, reveal = false }: {
+  text: string;
+  className?: string;
+  /** The text is still arriving: new words resolve out of blur. */
+  reveal?: boolean;
+}) {
   const blocks = useMemo(() => parseMarkdown(text), [text]);
   return (
-    <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
-      {blocks.map((b, i) => <BlockNode key={i} b={b} />)}
-    </div>
+    <RevealContext.Provider value={reveal}>
+      <div className={cn('space-y-2 text-[13px] leading-relaxed text-foreground', className)}>
+        {blocks.map((b, i) => <BlockNode key={i} b={b} />)}
+      </div>
+    </RevealContext.Provider>
   );
 }
