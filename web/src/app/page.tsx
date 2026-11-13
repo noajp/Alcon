@@ -656,11 +656,11 @@ function WorkspaceContent({
     [activeDomainId, domains],
   );
 
-  // Narrow windows: auto-collapse the sidebar so list/board content keeps a
-  // usable width; wide windows: pin it back. Only acts when the window
-  // CROSSES the breakpoint, so a manual toggle still sticks within a given
-  // size band — and once a choice is stored, crossing no longer overrides
-  // it at all: the band only ever decides for someone who has not chosen.
+  // Narrow windows: the sidebar steps aside so the page keeps its width —
+  // always, whatever was chosen; it can still be peeked at as a drawer. Wide
+  // windows: it comes back as the person last left it (shown, if they never
+  // chose). Only acts when the window CROSSES the breakpoint, so a manual
+  // toggle still sticks within a given size band.
   // `wasNarrow` lives in a ref (not a closure local) so it can't
   // go stale across re-renders / HMR, and we sync once on mount so the
   // sidebar always matches the current width band on load.
@@ -670,8 +670,7 @@ function WorkspaceContent({
       const narrow = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
       if (wasNarrowRef.current === narrow) return;
       wasNarrowRef.current = narrow;
-      if (readSidebarCollapsedChoice() !== null) return;
-      setSidebarCollapsed(narrow);
+      setSidebarCollapsed(narrow ? true : readSidebarCollapsedChoice() ?? false);
       setSidebarOverlay(false);
     };
     apply(); // sync to the current width band immediately

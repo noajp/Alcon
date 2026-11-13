@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { warmthGradient, warnsAboutTime } from '@/ActivitySpace/execution/element/gantt/ganttUrgency';
-import { beltGradient, outlook } from '@/Function/shared/pace';
+import { beltGradient, elapsedShare, outlook, warmthGradient, warnsAboutTime } from '@/Function/shared/pace';
 
 const alphas = (g: string) => [...g.matchAll(/ ([\d.]+)%, transparent\)/g)].map((m) => Number(m[1]));
 
-describe('Gantt colour', () => {
+describe('Pace colour', () => {
   it('leaves finished and set-aside work alone', () => {
     expect(warnsAboutTime('done')).toBe(false);
     expect(warnsAboutTime('cancelled')).toBe(false);
@@ -78,5 +77,13 @@ describe('Gantt colour', () => {
     expect(beltGradient(0)).toContain('var(--accent-default)');
     const a = alphas(blue);
     expect(a.every((v, i) => i === 0 || v >= a[i - 1])).toBe(true);
+  });
+
+  it('measures the share of a span gone by, null without one', () => {
+    expect(elapsedShare('2026-11-10', '2026-11-19', '2026-11-14')).toBe(0.5);
+    expect(elapsedShare('2026-11-10', '2026-11-19', '2026-11-01')).toBe(0);
+    expect(elapsedShare('2026-11-10', '2026-11-19', '2026-12-01')).toBe(1);
+    expect(elapsedShare(null, '2026-11-19', '2026-11-14')).toBeNull();
+    expect(elapsedShare('2026-11-20', '2026-11-19', '2026-11-14')).toBeNull();
   });
 });

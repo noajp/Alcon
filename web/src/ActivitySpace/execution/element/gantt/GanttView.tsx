@@ -16,8 +16,7 @@ import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { dragRange } from './ganttRange';
-import { warmthGradient, warnsAboutTime } from './ganttUrgency';
-import { outlook } from '@/Function/shared/pace';
+import { outlook, warmthGradient, warnsAboutTime } from '@/Function/shared/pace';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object

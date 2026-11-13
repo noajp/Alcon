@@ -81,8 +81,9 @@ import type { InitiativeHealth } from './initiativeHealthModel';
 import { useInitiativeMeasureTallies } from './useInitiativeMeasureTallies';
 import { MeasureStatus } from './MeasureStatus';
 import type { MeasureTally } from './initiativeMeasureModel';
-import { formatDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
-import { outlook } from '@/Function/shared/pace';
+import { formatDateOnly } from '@/Function/shared/dateUtils';
+import { HealthBelt } from '@/Function/shared/HealthBelt';
+import { extractPlainText } from '@/Function/notebook/contentUtils';
 import { strategyFacts } from '@/Function/strategy/strategyFacts';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { useWorkersByIds } from '@/hooks/teamData';
@@ -272,7 +273,7 @@ export function StrategyShell({
 // the same predicates the Strategy page uses (initiativeRiskModel), so the
 // row never disagrees with the page it opens. Quiet register throughout — a
 // row is not the place to shout; the number is the signal.
-function InitiativeHealthCell({ health, measures, outlookValue }: { health: InitiativeHealth | undefined; measures: MeasureTally | undefined; outlookValue: number }) {
+function InitiativeHealthCell({ health, measures, start, due }: { health: InitiativeHealth | undefined; measures: MeasureTally | undefined; start: string | null; due: string | null }) {
   const { t } = useI18n();
   if (!health) {
     return <span className="text-[11px] text-muted-foreground/50">…</span>;
@@ -283,23 +284,29 @@ function InitiativeHealthCell({ health, measures, outlookValue }: { health: Init
   if (risk.stalled > 0) alerts.push(t('{n} stalled', { n: risk.stalled }));
   if (risk.blocked > 0) alerts.push(t('{n} blocked', { n: risk.blocked }));
   return (
-    <div className="flex min-w-0 items-center justify-end gap-3 text-[11px] tabular-nums text-muted-foreground">
-      {/* Outcome before effort: the success conditions lead, the Element
-          completion that follows is only how much work has been done. */}
+    <div className="flex min-w-0 items-center gap-3 text-[11px] tabular-nums text-muted-foreground">
+      {health.progressPct === null ? (
+        <span className="shrink-0 text-muted-foreground/60">{t('No Elements')}</span>
+      ) : (
+        <span className="flex shrink-0 items-center gap-1.5">
+          <HealthBelt progress={health.progressPct} start={start} due={due} />
+          <span className="w-7 text-right">{health.progressPct}%</span>
+        </span>
+      )}
+      {/* What it is measured by, then what is on fire — after the belt, so
+          the belt stands at the column's start under its heading. */}
       <MeasureStatus tally={measures} />
       {alerts.length > 0 && (
         <span className="min-w-0 truncate text-foreground/80" title={alerts.join(' · ')}>{alerts.join(' · ')}</span>
       )}
-      {health.progressPct === null ? (
-        <span className="shrink-0 text-muted-foreground/60">{t('No Elements')}</span>
-      ) : (
-        <span className="flex w-28 shrink-0 items-center gap-1.5">
-          <ProgressBelt value={health.progressPct} outlook={outlookValue} className="flex-1" />
-          <span className="w-7 text-right">{health.progressPct}%</span>
-        </span>
-      )}
     </div>
   );
+}
+
+/** A description as one plain line, for a list row; null when there is none. */
+function plainLine(text: string | null | undefined): string | null {
+  const line = text ? extractPlainText(text).replace(/\s+/g, ' ').trim() : '';
+  return line || null;
 }
 
 /** Who leads a Strategy's Objects: their avatar and name; nothing when no Object has a lead. */
@@ -404,10 +411,11 @@ function StrategyListView({
                   <DisclosureTriangle open={!folded.has(key)} />
                 </button>
               ) : undefined}
-              health={<InitiativeHealthCell health={health.get(s.id)} measures={tallies.get(s.id)} outlookValue={facts.get(s.id) ? outlook(health.get(s.id)?.progressPct ?? 0, facts.get(s.id)!.start, facts.get(s.id)!.due, toDateOnlyString(new Date())) : 0} />}
+              health={<InitiativeHealthCell health={health.get(s.id)} measures={tallies.get(s.id)} start={facts.get(s.id)?.start ?? null} due={facts.get(s.id)?.due ?? null} />}
+              description={plainLine(s.description)}
               due={facts.get(s.id)?.due ? formatDateOnly(facts.get(s.id)!.due!, locale) : undefined}
               person={<StrategyLead worker={facts.get(s.id)?.leadId ? leadsById.get(facts.get(s.id)!.leadId!) : undefined} />}
-              count={countObjects(s.objectIds)}
+              count={<span className="inline-flex items-center gap-1" title={t('Objects')}><ObjectIcon size={13} className="text-muted-foreground/70" />{countObjects(s.objectIds)}</span>}
               onOpen={() => onSelectStrategy(s)}
               actions={<InitiativeActionsButton initiative={s} />} />
           </div>
