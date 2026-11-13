@@ -3,7 +3,7 @@ import { elapsedShare, outlook, warmthGradient } from '@/Function/shared/pace';
 import { ProgressBelt } from '@/Function/shared/ProgressBelt';
 
 // A belt's width, px. The gradient is drawn in px, so the belt is that wide.
-const WIDTH = 112;
+const WIDTH = 80;
 
 /**
  * Health as the Timeline's belt: the schedule from its start to its due date,
@@ -21,7 +21,7 @@ export function HealthBelt({ progress, start, due, className = '' }: {
   const today = toDateOnlyString(new Date());
   const elapsed = elapsedShare(start, due, today);
   if (elapsed === null || progress >= 100) {
-    return <ProgressBelt value={progress} outlook={outlook(progress, start, due, today)} className={className} />;
+    return <ProgressBelt value={progress} outlook={outlook(progress, start, due, today)} className={`shrink-0 ${className}`} style={{ width: WIDTH }} />;
   }
   const gradient = warmthGradient(WIDTH, elapsed * WIDTH, outlook(progress, start, due, today));
   return (

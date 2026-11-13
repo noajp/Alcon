@@ -20,9 +20,9 @@ import type { ReactNode } from 'react';
 // so the title keeps its width; the count stays.
 const COLUMNS = [
   'grid-cols-[minmax(0,1fr)_56px]',
-  '@[30rem]:grid-cols-[minmax(0,1fr)_150px_56px]',
-  '@[38rem]:grid-cols-[minmax(0,1fr)_150px_64px_56px]',
-  '@[46rem]:grid-cols-[minmax(0,1fr)_150px_64px_88px_56px]',
+  '@[30rem]:grid-cols-[minmax(0,1fr)_118px_56px]',
+  '@[38rem]:grid-cols-[minmax(0,1fr)_118px_64px_56px]',
+  '@[46rem]:grid-cols-[minmax(0,1fr)_118px_64px_88px_56px]',
 ].join(' ');
 const SHOW_HEALTH = 'hidden @[30rem]:flex';
 const SHOW_DUE = 'hidden @[38rem]:block';
