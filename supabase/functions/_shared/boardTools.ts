@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { basisIds, bindBasis } from "./elementBasis.ts";
 
 // Board tools — Domain / Object / Element / Sub-element reads and writes that
 // run with the caller's JWT, so RLS decides what each call can see and touch.
@@ -144,6 +145,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
         labels: { type: "array", items: { type: "string" } },
         assigneeWorkerIds: { type: "array", items: { type: "string" }, description: "初期アサインの worker id 群" },
+        basisIntentIds: { type: "array", items: { type: "string" }, description: "この Element が何のためにあるか：根拠にする Strategy の成功条件・前提・意思決定の intent id（getInitiative で読んだもの）。Strategy が変わったとき、影響を受ける Element を見つけるのに使う" },
       },
       required: ["objectId", "title"],
       additionalProperties: false,
@@ -809,7 +811,14 @@ export async function runBoardTool(
           }
           if (problems.length > 0) assigneeError = problems.join("; ");
         }
-        return { ok: true, data: assigneeError ? { ...data, assigneeError } : data, meta: { rows: 1 } };
+        // The reason it exists — like a refused assignee, an intent that did not
+        // bind is reported; the Element stands either way.
+        const basis = await bindBasis(supabase, [data.id], basisIds(input.basisIntentIds));
+        const basisError = basis.refused.length > 0
+          ? `Not bound as the reason: ${basis.refused.join(", ")}${basis.error ? ` (${basis.error})` : " (not a live intent of a Strategy)"}`
+          : undefined;
+        const extra = { ...(assigneeError ? { assigneeError } : {}), ...(basisError ? { basisError } : {}) };
+        return { ok: true, data: { ...data, ...extra }, meta: { rows: 1 } };
       }
 
       case "updateElement": {

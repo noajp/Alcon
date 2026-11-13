@@ -178,7 +178,7 @@ export interface ApplyPlanInput {
   dispatch?: boolean;
   objectives: { key: string; title: string; measureId: string | null }[];
   objects: { key: string; objectId: string | null; name: string; domainId: string | null }[];
-  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; assignee: 'ai' | 'human'; definitionId?: string | null; weight?: AiWeight | null; action?: string | null; assigneeWorkerId?: string | null }[];
+  tasks: { key: string; title: string; description: string; objective: string | null; object: string | null; dependsOn: string[]; basisIds?: string[]; assignee: 'ai' | 'human'; definitionId?: string | null; weight?: AiWeight | null; action?: string | null; assigneeWorkerId?: string | null }[];
 }
 
 export interface ApplyPlanResult {
@@ -201,6 +201,21 @@ async function approverWorkerId(): Promise<string | null> {
   if (!user) return null;
   const { data } = await supabase.from('workers').select('id').eq('user_id', user.id).eq('type', 'human').limit(1).maybeSingle();
   return (data as { id: string } | null)?.id ?? null;
+}
+
+/** The draft's reasons as this Strategy holds them now: a premise is tested,
+ *  a decision carried out. One the Strategy no longer holds as it was (removed,
+ *  replaced since the draft) is left out. */
+async function liveReasons(initiativeId: string, ids: readonly string[]): Promise<Map<string, 'tests' | 'delivers'>> {
+  const out = new Map<string, 'tests' | 'delivers'>();
+  if (ids.length === 0) return out;
+  const { data } = await supabase.from('intents').select('id, kind')
+    .eq('strategy_id', initiativeId).in('id', [...new Set(ids)]).is('superseded_by_intent_id', null);
+  for (const r of (data ?? []) as { id: string; kind: string }[]) {
+    if (r.kind === 'assumption') out.set(r.id, 'tests');
+    else if (r.kind === 'decision') out.set(r.id, 'delivers');
+  }
+  return out;
 }
 
 export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyPlanResult> {
@@ -232,6 +247,7 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
     }
   }
   const approverId = input.tasks.some((t) => t.assignee === 'human' && !t.assigneeWorkerId) ? await approverWorkerId() : null;
+  const reasonOf = await liveReasons(input.initiativeId, input.tasks.flatMap((t) => t.basisIds ?? []));
   const elementFor = new Map<string, string>();
   for (const t of input.tasks) {
     const objectId = t.object ? objectFor.get(t.object) : input.fallbackObjectId;
@@ -253,6 +269,11 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
       const measureId = t.objective ? measureFor.get(t.objective) : undefined;
       if (measureId) {
         await addIntentBinding({ intent_id: measureId, target_type: 'element', target_id: el.id, relationship_type: 'delivers' });
+      }
+      // The premises it tests and the decisions it carries out.
+      for (const id of t.basisIds ?? []) {
+        const relationship = reasonOf.get(id);
+        if (relationship) await addIntentBinding({ intent_id: id, target_type: 'element', target_id: el.id, relationship_type: relationship });
       }
       const workerId = t.assignee === 'ai' ? input.aiWorkerId : t.assigneeWorkerId || approverId;
       if (workerId) {

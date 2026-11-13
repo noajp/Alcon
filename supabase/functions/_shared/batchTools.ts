@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
+import { basisIds, bindBasis } from "./elementBasis.ts";
 
 // Several Elements under one Object in one write. Filing a list one
 // createElement at a time spent a tool call, an insert and an audit insert per
@@ -33,6 +34,7 @@ export const BATCH_TOOLS: ToolDef[] = [{
             type: { type: "string" },
             due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
             labels: { type: "array", items: { type: "string" } },
+            basisIntentIds: { type: "array", items: { type: "string" }, description: "根拠にする Strategy の成功条件・前提・意思決定の intent id（createElement と同じ）" },
           },
           required: ["title"],
           additionalProperties: false,
@@ -52,10 +54,16 @@ export async function runBatchTool(db: SupabaseClient, input: Record<string, unk
   if (items.length > MAX_ROWS) return { ok: false, error: `at most ${MAX_ROWS} Elements per call` };
 
   const rows: Record<string, unknown>[] = [];
+  // Ids chosen here, so each row's reasons find their Element without
+  // relying on the order the insert returns rows in.
+  const reasons = new Map<string, string[]>();
   for (const [i, item] of items.entries()) {
     const title = String(item?.title ?? "").trim();
     if (!title) return { ok: false, error: `elements[${i}].title is required` };
-    const row: Record<string, unknown> = { object_id: objectId, title };
+    const id = crypto.randomUUID();
+    const basis = basisIds(item.basisIntentIds);
+    if (basis.length > 0) reasons.set(id, basis);
+    const row: Record<string, unknown> = { id, object_id: objectId, title };
     for (const k of FIELDS) if (item[k] !== undefined) row[k] = item[k];
     if (Array.isArray(item.labels)) row.labels = item.labels;
     rows.push(normalizeStatusPatch(row));
@@ -73,5 +81,22 @@ export async function runBatchTool(db: SupabaseClient, input: Record<string, unk
   })));
   if (auditError) console.error("element_activity audit failed:", auditError.message);
 
-  return { ok: true, data: { created }, meta: { rows: created.length } };
+  // One lookup per distinct set of reasons; a refused one is reported, the rows stand.
+  const bySet = new Map<string, string[]>();
+  for (const [id, basis] of reasons) {
+    const key = basis.join(",");
+    bySet.set(key, [...(bySet.get(key) ?? []), id]);
+  }
+  const refused = new Set<string>();
+  let basisFailure: string | undefined;
+  for (const [key, ids] of bySet) {
+    const result = await bindBasis(db, ids, key.split(","));
+    for (const r of result.refused) refused.add(r);
+    basisFailure ??= result.error;
+  }
+  const basisError = refused.size > 0
+    ? `Not bound as the reason: ${[...refused].join(", ")}${basisFailure ? ` (${basisFailure})` : " (not a live intent of a Strategy)"}`
+    : undefined;
+
+  return { ok: true, data: basisError ? { created, basisError } : { created }, meta: { rows: created.length } };
 }
