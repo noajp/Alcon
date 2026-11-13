@@ -1,11 +1,11 @@
 // =============================================================
 // The return leg of the round trip — what a piece of work is standing on.
 //
-// The Strategy already binds decisions and assumptions to the Elements,
-// Objects and Phases they touch (`intent_bindings`). Until now that edge could
-// only be read from the Strategy's side: an Element existed because of a
-// decision and had no way to say so, and the person holding it never saw the
-// assumption that would fall over if they stopped. the product names this as
+// The Strategy binds its decisions, premises and success conditions to the
+// Elements, Objects and Phases they touch (`intent_bindings`). Read only from
+// the Strategy's side, an Element existed because of a decision and had no way
+// to say so, and the person holding it never saw the premise that would fall
+// over if they stopped. the product names this as
 // the founding pain — "タスクはそもそもの意図を失っている" — and this model
 // is the reading in the other direction.
 //
@@ -39,9 +39,9 @@ export interface TrailScope {
 export interface TrailRow {
   intentId: string;
   kind: 'decision' | 'assumption' | 'measure';
-  /** The Strategy has since rewritten this part (a newer version replaced it):
-   *  the reason this work stood on is no longer the one in force. */
-  replaced: boolean;
+  /** Another decision has reversed this one (`superseded_by_intent_id`): the
+   *  reason this work stood on is no longer in force. */
+  reversed: boolean;
   title: string;
   status: DecisionStatus;
   statusLabel: string;
@@ -65,9 +65,9 @@ function isTrailKind(kind: Intent['kind']): kind is 'decision' | 'assumption' | 
 }
 
 function urgency(row: TrailRow): number {
-  // A reason rewritten under the work is the first thing to look at: the work
+  // A reason reversed under the work is the first thing to look at: the work
   // may no longer be needed, or needed differently.
-  if (row.replaced) return 4;
+  if (row.reversed) return 4;
   if (row.review?.due) return 3;
   if (row.status === 'off_track' || row.status === 'at_risk') return 2;
   if (row.status === 'done') return 0;
@@ -142,7 +142,7 @@ export function intentTrailRows(
     out.push({
       intentId,
       kind,
-      replaced: intent.superseded_by_intent_id != null,
+      reversed: intent.superseded_by_intent_id != null,
       title: intent.title,
       status: decision.status,
       statusLabel: decisionStatusLabel(decision.status),

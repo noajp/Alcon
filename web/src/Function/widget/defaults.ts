@@ -22,8 +22,8 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
     { id: 'ov-approaches', type: 'approach-references' },
     { id: 'ov-intent', type: 'campaign-intent' },
     // The return leg. The Strategy's written intent says why this Object
-    // exists in prose; this says which decisions and assumptions actually
-    // reach it, and whether any of them needs somebody today.
+    // exists in prose; this says which decisions, premises and success
+    // conditions actually reach it, and whether any of them needs somebody today.
     { id: 'ov-trail', type: 'intent-trail' },
     { id: 'ov-properties', type: 'object-properties' },
   ],
@@ -31,9 +31,9 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
 
 /**
  * Element detail. The rail's Properties / Labels / Activity islands are still
- * hand-placed — this board holds only what was missing: the decisions and
- * assumptions this Element is standing on, which is the reading an Element
- * could never give before.
+ * hand-placed — this board holds only what was missing: why this Element
+ * exists — the decisions, premises and success conditions it stands on, or
+ * else the Strategies its Objects belong to.
  */
 export const ELEMENT_DETAIL_BOARD: BoardLayout = {
   band: [],

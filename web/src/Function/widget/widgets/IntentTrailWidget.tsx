@@ -22,8 +22,8 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 // The Strategy's decisions, premises and success conditions read from the
 // other end: not "what did we bind this to" but "which of them reach me". For
 // an Element that is the answer to "why does this exist"; for an Object it is
-// every reason riding on its Elements. A reason the Strategy has rewritten
-// since is marked first: the work may no longer be needed as it was.
+// every reason riding on its Elements. A decision another one has reversed is
+// marked first: the work may no longer be needed as it was.
 //
 // An Element nothing names a reason for still serves the Strategies its
 // Object belongs to, and says so. Hidden only when there is neither.
@@ -53,7 +53,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   );
 
   const { bindings, intents, lineage, loading, error } = useIntentBindingsForTargets(targetIds);
-  const { data: strategies } = useStrategies();
+  const { data: strategies, loading: strategiesLoading, error: strategiesError } = useStrategies();
 
   // Sampled once per mount, above the early return, so the hook order cannot
   // depend on data — and so every row's review chip is judged against one
@@ -90,7 +90,8 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   const objectIds = useMemo(() => {
     if (subjectType !== 'element') return [];
     const el = host.elements.find((e) => e.id === subjectId);
-    return el?.object_id ? [el.object_id] : [];
+    // Every Object it is filed in (element_objects), not only the primary one.
+    return el?.objectIds ?? (el?.object_id ? [el.object_id] : []);
   }, [subjectType, subjectId, host.elements]);
   const served = useMemo(
     () => (rows.length === 0 ? strategiesOfObjects(strategies, objectIds) : []),
@@ -100,10 +101,12 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   // An error is not emptiness. Hiding on a failed read would tell the reader
   // that nothing is bound here, which is a different and worse claim than
   // saying the read failed.
-  useWidgetEmpty(!error && (loading || (rows.length === 0 && served.length === 0)));
+  // The fallback is read from the Strategies, so their read counts too.
+  const failed = error ?? (rows.length === 0 ? strategiesError : null);
+  useWidgetEmpty(!failed && (loading || (rows.length === 0 && (strategiesLoading || served.length === 0))));
   useWidgetMeta(rows.length > 0 ? String(rows.length) : null);
 
-  if (error) {
+  if (failed) {
     return (
       <p className="py-1 text-[12px] text-[var(--status-danger)]">
         {t('Could not read what this is standing on.')}
@@ -176,8 +179,8 @@ function TrailRowView({
           · {row.relationships.map((r) => t(RELATIONSHIP_LABEL[r])).join(' · ')}
         </span>
         <span className="flex-1" />
-        {row.replaced ? (
-          <span className="shrink-0 text-[var(--status-warning)]" title={t('The Strategy has rewritten this since the work was made.')}>{t('Rewritten')}</span>
+        {row.reversed ? (
+          <span className="shrink-0 text-[var(--status-danger)]" title={t('Another decision reversed this. The work may no longer be needed as it was.')}>{t('Reversed')}</span>
         ) : row.review ? (
           <span className={`shrink-0 tabular-nums ${reviewTone}`}>{row.review.label}</span>
         ) : tone ? (

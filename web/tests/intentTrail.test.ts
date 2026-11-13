@@ -9,7 +9,7 @@
 //     and "via" is dropped because the direct binding is the stronger claim
 //   - the root Intent never appears — it is scope, not a reason; a measure
 //     does, because the Planner binds work to the success condition it serves
-//   - a reason the Strategy has rewritten since floats above everything
+//   - a decision another one has reversed floats above everything
 //   - with no reason named, an Element still serves its Objects' Strategies
 //   - a binding on something outside the scope is not ours, even when its
 //     intent is
@@ -123,7 +123,7 @@ describe('intentTrailRows', () => {
     expect(rows.map((r) => [r.intentId, r.kind, r.review])).toEqual([['m1', 'measure', null], ['a1', 'assumption', null]]);
   });
 
-  it('puts a reason the Strategy has rewritten above a review that is due', () => {
+  it('puts a decision another one reversed above a review that is due', () => {
     const rows = intentTrailRows(
       [
         binding({ intent_id: 'late', target_id: 'el-1' }),
@@ -137,7 +137,7 @@ describe('intentTrailRows', () => {
       names,
       NOW,
     );
-    expect(rows.map((r) => [r.intentId, r.replaced])).toEqual([['old', true], ['late', false]]);
+    expect(rows.map((r) => [r.intentId, r.reversed])).toEqual([['old', true], ['late', false]]);
   });
 
   it('ignores an edge that lands outside the scope, even for an intent it knows', () => {
