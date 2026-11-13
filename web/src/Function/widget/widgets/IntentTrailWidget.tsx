@@ -10,23 +10,23 @@ import type { WidgetHost } from '../types';
 import {
   intentTrailRows,
   RELATIONSHIP_LABEL,
+  strategiesOfObjects,
   type TrailRow,
   type TrailScope,
 } from './intentTrailModel';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // =============================================================
-// Decisions & assumptions — what this piece of work is standing on.
+// Why this exists — what this piece of work is standing on.
 //
-// The mirror of the Strategy's own Decisions and Assumptions sections, read
-// from the other end: not "what did we bind this decision to" but "which
-// decisions and assumptions reach me". For an Element that is the answer to
-// "why does this exist"; for an Object it is every decision riding on its
-// Elements; for a Phase it is the decision that moved its dates.
+// The Strategy's decisions, premises and success conditions read from the
+// other end: not "what did we bind this to" but "which of them reach me". For
+// an Element that is the answer to "why does this exist"; for an Object it is
+// every reason riding on its Elements. A decision another one has reversed is
+// marked first: the work may no longer be needed as it was.
 //
-// Hidden when nothing reaches here. An Element nobody has bound anything to
-// is the common case and an empty box would say "nobody wrote the strategy
-// down", which is the Strategy's problem to show, not this Element's.
+// An Element nothing names a reason for still serves the Strategies its
+// Object belongs to, and says so. Hidden only when there is neither.
 // =============================================================
 
 export function IntentTrailWidget({ host }: { host: WidgetHost }) {
@@ -53,7 +53,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   );
 
   const { bindings, intents, lineage, loading, error } = useIntentBindingsForTargets(targetIds);
-  const { data: strategies } = useStrategies();
+  const { data: strategies, loading: strategiesLoading, error: strategiesError } = useStrategies();
 
   // Sampled once per mount, above the early return, so the hook order cannot
   // depend on data — and so every row's review chip is judged against one
@@ -86,20 +86,51 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
     return intentTrailRows(bindings, intents, scope, names, now, lastReviewedAt);
   }, [bindings, intents, scope, strategies, now, lastReviewedAt]);
 
+  // No named reason: an Element still serves the Strategies its Objects are in.
+  const objectIds = useMemo(() => {
+    if (subjectType !== 'element') return [];
+    const el = host.elements.find((e) => e.id === subjectId);
+    // Every Object it is filed in (element_objects), not only the primary one.
+    return el?.objectIds ?? (el?.object_id ? [el.object_id] : []);
+  }, [subjectType, subjectId, host.elements]);
+  const served = useMemo(
+    () => (rows.length === 0 ? strategiesOfObjects(strategies, objectIds) : []),
+    [rows.length, strategies, objectIds],
+  );
+
   // An error is not emptiness. Hiding on a failed read would tell the reader
   // that nothing is bound here, which is a different and worse claim than
   // saying the read failed.
-  useWidgetEmpty(!error && (loading || rows.length === 0));
+  // The fallback is read from the Strategies, so their read counts too.
+  const failed = error ?? (rows.length === 0 && objectIds.length > 0 ? strategiesError : null);
+  useWidgetEmpty(!failed && (loading || (rows.length === 0 && (strategiesLoading || served.length === 0))));
   useWidgetMeta(rows.length > 0 ? String(rows.length) : null);
 
-  if (error) {
+  if (failed) {
     return (
       <p className="py-1 text-[12px] text-[var(--status-danger)]">
         {t('Could not read what this is standing on.')}
       </p>
     );
   }
-  if (rows.length === 0) return null;
+  const openStrategy = (strategyId: string) => {
+    host.onNavigate?.({ strategyId });
+    host.onViewChange?.('strategy');
+  };
+
+  if (rows.length === 0) {
+    if (served.length === 0) return null;
+    return (
+      <div className="py-2 space-y-1">
+        <p className="text-[11px] text-muted-foreground">
+          {t(served.length === 1 ? 'Its Object belongs to this Strategy' : 'Its Object belongs to these Strategies')}
+        </p>
+        {served.map((s) => (
+          <StrategyLink key={s.id} name={s.name} onOpen={() => openStrategy(s.id)} canOpen={Boolean(host.onNavigate)} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
@@ -107,10 +138,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
         <TrailRowView
           key={row.intentId}
           row={row}
-          onOpenInitiative={() => {
-            host.onNavigate?.({ strategyId: row.initiativeId });
-            host.onViewChange?.('strategy');
-          }}
+          onOpenInitiative={() => openStrategy(row.initiativeId)}
           canOpen={Boolean(host.onNavigate)}
         />
       ))}
@@ -145,13 +173,15 @@ function TrailRowView({
           "could falsify" and "delivers" are different reasons to care. */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="font-semibold text-muted-foreground">
-          {row.kind === 'decision' ? t('Decision') : t('Assumption')}
+          {row.kind === 'decision' ? t('Decision') : row.kind === 'measure' ? t('Success condition') : t('Assumption')}
         </span>
         <span className="text-muted-foreground/70 truncate">
           · {row.relationships.map((r) => t(RELATIONSHIP_LABEL[r])).join(' · ')}
         </span>
         <span className="flex-1" />
-        {row.review ? (
+        {row.reversed ? (
+          <span className="shrink-0 text-[var(--status-danger)]" title={t('Another decision reversed this. The work may no longer be needed as it was.')}>{t('Reversed')}</span>
+        ) : row.review ? (
           <span className={`shrink-0 tabular-nums ${reviewTone}`}>{row.review.label}</span>
         ) : tone ? (
           <span className={`shrink-0 ${tone}`}>{t(row.statusLabel)}</span>
@@ -166,20 +196,26 @@ function TrailRowView({
         <p className="text-[11px] text-muted-foreground truncate">{t('via {name}', { name: row.via })}</p>
       )}
 
-      <button
-        type="button"
-        onClick={onOpenInitiative}
-        disabled={!canOpen}
-        className="group w-full flex items-center gap-1.5 -mx-1 px-1 py-0.5 rounded-sm text-left hover:bg-muted/40 focus-visible:bg-muted/40 transition-colors disabled:pointer-events-none"
-      >
-        <NavStrategyIcon size={12} className="shrink-0 text-muted-foreground" />
-        <span className="flex-1 min-w-0 truncate text-[11px] text-muted-foreground group-hover:text-foreground">
-          {row.initiativeName ?? t('Strategy')}
-        </span>
-        {canOpen && (
-          <ChevronRight size={12} className="shrink-0 text-muted-foreground/40 group-hover:text-foreground transition-colors" />
-        )}
-      </button>
+      <StrategyLink name={row.initiativeName ?? t('Strategy')} onOpen={onOpenInitiative} canOpen={canOpen} />
     </div>
+  );
+}
+
+function StrategyLink({ name, onOpen, canOpen }: { name: string; onOpen: () => void; canOpen: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={!canOpen}
+      className="group w-full flex items-center gap-1.5 -mx-1 px-1 py-0.5 rounded-sm text-left hover:bg-muted/40 focus-visible:bg-muted/40 transition-colors disabled:pointer-events-none"
+    >
+      <NavStrategyIcon size={12} className="shrink-0 text-muted-foreground" />
+      <span className="flex-1 min-w-0 truncate text-[11px] text-muted-foreground group-hover:text-foreground">
+        {name}
+      </span>
+      {canOpen && (
+        <ChevronRight size={12} className="shrink-0 text-muted-foreground/40 group-hover:text-foreground transition-colors" />
+      )}
+    </button>
   );
 }

@@ -204,8 +204,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
 
   'intent-trail': {
     type: 'intent-trail',
-    label: 'Decisions & assumptions',
-    description: 'What this is standing on, and the Strategy it belongs to',
+    label: 'Why this exists',
+    description: 'The Strategy, decisions, premises and success conditions this work stands on',
     group: 'strategy',
     // Not `phase` yet: PhaseView hand-renders the decisions that moved its
     // dates (`usePhaseReschedules`), and accepting the subject before that
