@@ -416,8 +416,8 @@ export function GanttView({
     const forward = tx - LINK_OUT >= sx + LINK_OUT;
     return {
       sx, sy, tx, ty,
-      markX: (sx + tx) / 2,
-      markY: forward ? (sy + ty) / 2 : sy + Math.sign(ty - sy || 1) * ROW_H / 2,
+      markX: forward ? (sx + tx) / 2 : tx - LINK_OUT,
+      markY: forward ? (sy + ty) / 2 : (sy + Math.sign(ty - sy || 1) * ROW_H / 2 + ty) / 2,
       d: elbowPath(sx, sy, tx, ty, ROW_H, LINK_RADIUS),
       stroke: link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 80%, transparent)',
     };
@@ -1347,10 +1347,10 @@ export function GanttView({
  *  end, down (or up) to the target's row, into its start. A target that
  *  starts before the source ends is reached by going round, between rows. */
 /** How far a dependency line runs straight out of a bar, and back in. */
-const LINK_OUT = 10;
+const LINK_OUT = 22;
 /** The rounding at a dependency line's turns: enough to soften them, little
  *  enough that the runs between stay straight. */
-const LINK_RADIUS = 10;
+const LINK_RADIUS = 14;
 
 function elbowPath(sx: number, sy: number, tx: number, ty: number, rowH: number, radius = 6): string {
   const out = LINK_OUT;
