@@ -10,6 +10,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
 import { ensureArtifactRoot } from '@/hooks/artifactData';
+import { toggleReaction, useDomainReactions } from '@/hooks/commentData';
+import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { NavSlidesIcon } from '@/Frame/sidebar/NavIcons';
 import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
@@ -39,6 +42,12 @@ export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote 
   const query = useDomainOverview(domainId);
   const role = useDomainRole(domainId);
   const board = useBoard('domain-overview', DOMAIN_OVERVIEW_BOARD, domainId ?? 'none');
+  const userId = useAuthContext().user?.id ?? null;
+  const { reactions, refresh: refreshReactions } = useDomainReactions(domainId);
+  const reactWith = async (emoji: string) => {
+    if (!userId || !domainId) return;
+    try { await toggleReaction({ userId, emoji, domainId }); } finally { void refreshReactions(); }
+  };
   // A Domain's files live at the top of its place in Artifacts.
   const spaceOfDomain = useActiveSpaceId();
   const canAttach = !!role.data && role.data !== 'viewer';
@@ -94,6 +103,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote 
             "…" of other things to attach, then the attached files. */}
         <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
           <div className="flex items-center gap-0.5">
+            <ReactionPicker onToggle={(e) => void reactWith(e)} />
             {filesRoot.data && <AttachButton owner={{ kind: 'folder', id: filesRoot.data }}
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />}
             <DropdownMenu>
@@ -114,6 +124,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote 
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <ReactionChips reactions={reactions} userId={userId} onToggle={(e) => void reactWith(e)} />
           </div>
           {filesRoot.data && <AttachmentList owner={{ kind: 'folder', id: filesRoot.data }} />}
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { GitCompare, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from '@/ui/icons';
+import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from '@/ui/icons';
 import type { CodeChange } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import type { CriterionVerdict, IntentVerdict, ReviewState } from '@/Function/codeReview/diffModel';
@@ -8,9 +8,6 @@ import type { CriterionVerdict, IntentVerdict, ReviewState } from '@/Function/co
 // The words and tones a code change is shown with — in the Element's list, on
 // the Strategy, and in the review screen. Labels are English source strings
 // for t().
-
-/** The mark for code review as a whole (the rail, the Reviews page). */
-export const CodeChangeIcon = GitCompare;
 
 const STATE_ICON: Record<CodeChange['state'], { icon: typeof GitPullRequest; color: string }> = {
   open: { icon: GitPullRequest, color: 'text-[var(--status-success)]' },

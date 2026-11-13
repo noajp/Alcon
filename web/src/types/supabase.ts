@@ -3146,6 +3146,7 @@ export type Database = {
         Row: {
           comment_id: string | null
           created_at: string
+          domain_id: string | null
           element_id: string | null
           emoji: string
           id: string
@@ -3156,6 +3157,7 @@ export type Database = {
         Insert: {
           comment_id?: string | null
           created_at?: string
+          domain_id?: string | null
           element_id?: string | null
           emoji: string
           id?: string
@@ -3166,6 +3168,7 @@ export type Database = {
         Update: {
           comment_id?: string | null
           created_at?: string
+          domain_id?: string | null
           element_id?: string | null
           emoji?: string
           id?: string

@@ -1135,12 +1135,14 @@ export interface ElementReaction {
   comment_id: string | null
   strategy_id: string | null
   object_id: string | null
+  domain_id?: string | null
   user_id: string
   emoji: string
   created_at: string
 }
 
 export interface ElementReactionInsert {
+  domain_id?: string | null
   element_id?: string | null
   comment_id?: string | null
   strategy_id?: string | null

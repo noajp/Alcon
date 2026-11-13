@@ -1,87 +1,37 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Plus, X } from '@/ui/icons';
+import { Bot, X } from '@/ui/icons';
 import { PageSection } from '@/Function/shared/PageHead';
-import { Button, ButtonAppearanceProvider } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { isCancelKey, isCommitEnter } from '@/Function/shared/keyboard';
-import { parsePullUrl, readIntentCheck } from '@/Function/codeReview/diffModel';
+import { readIntentCheck } from '@/Function/codeReview/diffModel';
 import { useCodeChangeActions, useCodeChanges } from '@/hooks/codeChangeData';
 import type { CodeChange } from '@/types/database';
-import { CodeChangeIcon, CodeChangeStateIcon, INTENT_META, LineCounts, Pill, StatePill } from './codeChangeLabels';
+import { CodeChangeStateIcon, INTENT_META, LineCounts, Pill, StatePill } from './codeChangeLabels';
 import { CodeReviewDialog } from './CodeReviewDialog';
 
-// An Element's code changes: the pull requests that carry it out. An agent
-// working the Element through the Space's GitHub integration links the PRs it
-// opens; anyone can link one by its URL. Opening one shows its diff beside the
-// intent it was built for.
+// An Element's code changes: the pull requests that carry it out, linked by
+// the agent working the Element through the Space's GitHub integration.
+// Opening one shows its diff beside the intent it was built for.
 
-export function CodeChangesSection({ elementId, openSignal = 0 }: {
-  elementId: string;
-  /** Bumped by the Element's row "…" menu (Link pull request) to open the URL field. */
-  openSignal?: number;
-}) {
+export function CodeChangesSection({ elementId }: { elementId: string }) {
   const { t } = useI18n();
   const { data: changes } = useCodeChanges(elementId);
-  const { link, unlink } = useCodeChangeActions(elementId);
-  const [adding, setAdding] = useState(false);
-  const [seenSignal, setSeenSignal] = useState(openSignal);
-  if (openSignal !== seenSignal) {
-    setSeenSignal(openSignal);
-    setAdding(true);
-  }
-  const [url, setUrl] = useState('');
+  const { unlink } = useCodeChangeActions(elementId);
   const [openId, setOpenId] = useState<string | null>(null);
   const open = changes.find((c) => c.id === openId) ?? null;
 
-  const submit = () => {
-    if (!parsePullUrl(url)) return;
-    link.mutate(url.trim(), { onSuccess: () => { setUrl(''); setAdding(false); } });
-  };
-
-  const composer = adding && (
-    <div className="mt-1">
-      <div className="flex items-center gap-2 rounded-md bg-[var(--surface-strong)] px-2">
-        <CodeChangeIcon size={12} className="shrink-0 text-muted-foreground" />
-        <input
-          autoFocus
-          value={url}
-          onChange={(e) => { setUrl(e.target.value); link.reset(); }}
-          onKeyDown={(e) => {
-            if (isCommitEnter(e)) { e.preventDefault(); submit(); }
-            else if (isCancelKey(e)) { e.preventDefault(); e.stopPropagation(); setAdding(false); setUrl(''); }
-          }}
-          placeholder="https://github.com/owner/repo/pull/123"
-          className="h-8 flex-1 bg-transparent text-[13px] outline-none"
-        />
-        <Button variant="primary" size="xs" onClick={submit} disabled={!parsePullUrl(url) || link.isPending}>
-          {link.isPending ? t('Linking…') : t('Link')}
-        </Button>
-      </div>
-      {link.error && <p className="mt-1 text-[12px] text-[var(--status-danger)]">{t((link.error as Error).message)}</p>}
-    </div>
-  );
-
-  // None linked: nothing on the page until "Link pull request" is chosen
-  // from the row's "…" menu, which opens the URL field here.
-  if (changes.length === 0) return adding ? <div>{composer}</div> : null;
+  // None linked: nothing on the page.
+  if (changes.length === 0) return null;
 
   return (
-    <PageSection title={t('Code changes')} action={
-      <ButtonAppearanceProvider appearance="navigation">
-        <Button variant="ghost" size="icon-xs" aria-label={t('Link pull request')} title={t('Link pull request')} className="text-muted-foreground" onClick={() => setAdding(true)}>
-          <Plus size={13} />
-        </Button>
-      </ButtonAppearanceProvider>
-    }>
+    <PageSection title={t('Code changes')}>
       <div>
         {changes.map((c) => (
           <CodeChangeRow key={c.id} change={c} onOpen={() => setOpenId(c.id)}
             onUnlink={() => unlink.mutate(c.id)} />
         ))}
       </div>
-      {composer}
       {open && <CodeReviewDialog change={open} open onOpenChange={(v) => { if (!v) setOpenId(null); }} />}
     </PageSection>
   );

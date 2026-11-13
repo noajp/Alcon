@@ -273,11 +273,12 @@ export async function toggleReaction(params: {
   commentId?: string | null;
   strategyId?: string | null;
   objectId?: string | null;
+  domainId?: string | null;
 }): Promise<'added' | 'removed'> {
-  const { userId, emoji, elementId, commentId, strategyId, objectId } = params;
+  const { userId, emoji, elementId, commentId, strategyId, objectId, domainId } = params;
   let q = supabase.from('element_reactions').select('id').eq('user_id', userId).eq('emoji', emoji);
   q = elementId ? q.eq('element_id', elementId) : strategyId ? q.eq('strategy_id', strategyId)
-    : objectId ? q.eq('object_id', objectId) : q.eq('comment_id', commentId!);
+    : objectId ? q.eq('object_id', objectId) : domainId ? q.eq('domain_id', domainId) : q.eq('comment_id', commentId!);
   const { data: existing } = await q.maybeSingle();
   if (existing) {
     await removeReaction(existing.id);
@@ -290,6 +291,7 @@ export async function toggleReaction(params: {
     comment_id: commentId ?? null,
     strategy_id: strategyId ?? null,
     object_id: objectId ?? null,
+    domain_id: domainId ?? null,
   });
   return 'added';
 }
@@ -319,6 +321,23 @@ export function useObjectReactions(objectId: string) {
     queryKey: key,
     queryFn: async (): Promise<ElementReaction[]> => {
       const { data, error } = await supabase.from('element_reactions').select('*').eq('object_id', objectId);
+      if (error) throw error;
+      return (data ?? []) as ElementReaction[];
+    },
+  });
+  const refresh = useCallback(() => qc.invalidateQueries({ queryKey: key }), [qc, key]);
+  return { reactions: query.data ?? NO_STRATEGY_REACTIONS, refresh };
+}
+
+/** A Domain's own reactions (element_reactions.domain_id). */
+export function useDomainReactions(domainId: string | null) {
+  const qc = useQueryClient();
+  const key = useMemo(() => ['domain-reactions', domainId] as const, [domainId]);
+  const query = useQuery({
+    queryKey: key,
+    enabled: !!domainId,
+    queryFn: async (): Promise<ElementReaction[]> => {
+      const { data, error } = await supabase.from('element_reactions').select('*').eq('domain_id', domainId!);
       if (error) throw error;
       return (data ?? []) as ElementReaction[];
     },
