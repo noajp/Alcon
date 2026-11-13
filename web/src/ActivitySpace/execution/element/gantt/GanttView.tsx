@@ -419,7 +419,8 @@ export function GanttView({
       markX: forward ? (sx + tx) / 2 : tx - LINK_OUT,
       markY: forward ? (sy + ty) / 2 : (sy + Math.sign(ty - sy || 1) * ROW_H / 2 + ty) / 2,
       d: elbowPath(sx, sy, tx, ty, ROW_H, LINK_RADIUS),
-      stroke: link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 80%, transparent)',
+      // The key blue for an order kept, the key red for one the dates break.
+      stroke: link.conflict ? 'var(--status-danger)' : 'var(--accent-default)',
     };
   };
 
