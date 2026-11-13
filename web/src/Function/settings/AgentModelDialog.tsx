@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Check, ChevronDown } from '@/ui/icons';
+import { ChevronDown } from '@/ui/icons';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useIntegrations } from '@/AIP/connectors/data';
 import { agentModelDraft, agentModelPatch } from '@/Function/team/agentModel';
@@ -86,12 +86,12 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
                 <DropdownMenuContent align="start" className="min-w-[200px]">
                   <DropdownMenuItem onSelect={() => setDraft({ ...draft, providerId: null })} className="gap-2 text-[12px]">
                     <span className="flex-1">{t('Anthropic (Clayware default)')}</span>
-                    {!draft.providerId && <Check size={12} />}
+                    {!draft.providerId && <MenuCheck />}
                   </DropdownMenuItem>
                   {providers.map((p) => (
                     <DropdownMenuItem key={p.id} onSelect={() => setDraft({ ...draft, providerId: p.id })} className="gap-2 text-[12px]">
                       <span className="flex-1">{p.name}{p.enabled ? '' : ` (${t('Off')})`}</span>
-                      {draft.providerId === p.id && <Check size={12} />}
+                      {draft.providerId === p.id && <MenuCheck />}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { MoreHorizontal, Copy, Trash2, ArrowRightLeft, GitBranch, Check } from '@/ui/icons';
+import { MoreHorizontal, Copy, Trash2, ArrowRightLeft, GitBranch } from '@/ui/icons';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -11,6 +11,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
@@ -128,7 +129,7 @@ export function EntityActionsMenu({
                     className="gap-2.5 py-1.5 text-[13px]"
                   >
                     <span className="w-3.5 shrink-0 flex items-center justify-center">
-                      {isMember && <Check size={13} />}
+                      {isMember && <MenuCheck />}
                     </span>
                     <span className="truncate flex-1">{t.name}</span>
                     {isPrimary && <span className="text-[10px] text-muted-foreground/70 shrink-0">{tr('primary')}</span>}

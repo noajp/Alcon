@@ -1,13 +1,13 @@
 'use client';
 
-import { Calendar as CalendarIcon, Check, UserRound } from '@/ui/icons';
+import { Calendar as CalendarIcon, UserRound } from '@/ui/icons';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { DatePopover } from '@/Function/shared/date';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { formatDateShort } from '@/Function/shared/listTable/shared';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import {
   addElementAssignee, createSubElement, noticeElementSaveFailed, removeElementAssignee, updateElement,
@@ -90,7 +90,7 @@ function SubElementRow({ sub, workers, onOpen, onChanged }: {
             <DropdownMenuItem key={s} onSelect={() => { if (s !== status) void save({ status: s }); }} className="gap-2.5 py-1.5 text-[13px]">
               <ElementProgressMark status={s} size={15} />
               <span className="flex-1">{t(STATUS[s].label)}</span>
-              {s === status && <Check size={13} />}
+              {s === status && <MenuCheck />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -124,7 +124,7 @@ function SubElementRow({ sub, workers, onOpen, onChanged }: {
             <DropdownMenuItem key={w.id} onSelect={() => { if (w.id !== assignee?.id) void assign(w); }} className="gap-2.5 py-1.5 text-[13px]">
               <WorkerAvatar worker={w} size={18} />
               <span className="flex-1 truncate">{w.name}</span>
-              {w.id === assignee?.id && <Check size={13} />}
+              {w.id === assignee?.id && <MenuCheck />}
             </DropdownMenuItem>
           ))}
           {lead && (

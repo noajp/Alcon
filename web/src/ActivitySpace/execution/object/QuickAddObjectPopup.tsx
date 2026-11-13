@@ -6,13 +6,9 @@ import { Button } from '@/ui/button';
 
 import { useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import {
-  CalendarIcon,
-  Check,
-  ChevronDown,
-  User as UserIcon,
-  X,
-} from '@/ui/icons';
+import { CalendarIcon, ChevronDown, User as UserIcon, X } from '@/ui/icons';
+import { DomainMark } from '@/Function/shared/DomainMark';
+import { WorkerAvatar, type WorkerAvatarSubject } from '@/Function/shared/WorkerAvatar';
 import { ObjectIcon as BoxIcon, DomainIcon } from '@/Function/shared/conceptIcons';
 import { DatePopover } from '@/Function/shared/date';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -24,6 +20,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 
 // One Object, including its initial fields and Domain memberships.
@@ -44,9 +41,9 @@ interface QuickAddObjectPopupProps {
   onClose: () => void;
   onSubmit: (input: NewObjectInput) => void | Promise<void>;
   /** Workers for the Lead pill picker. */
-  workers?: { id: string; name: string }[];
+  workers?: (WorkerAvatarSubject & { id: string; name: string })[];
   /** Available Domains for the Domain pill (hidden when ≤1). */
-  domains?: { id: string; name: string }[];
+  domains?: { id: string; name: string; icon?: string | null; color?: string | null }[];
   /** Object-type catalog (domain.object_types) for the Type pill. */
   types?: string[];
   /** Pre-selected Domain (typically the active one). */
@@ -223,7 +220,7 @@ export function QuickAddObjectPopup({
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
                     <span className="flex-1 truncate">{t}</span>
-                    {type === t && <Check size={12} />}
+                    {type === t && <MenuCheck />}
                   </DropdownMenuItem>
                 ))}
                 {type && (
@@ -241,7 +238,7 @@ export function QuickAddObjectPopup({
             <DropdownMenu {...menuProps('lead')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!leadWorker)}>
-                  <UserIcon size={12} className="text-muted-foreground" />
+                  {leadWorker ? <WorkerAvatar worker={leadWorker} size={14} /> : <UserIcon size={12} className="text-muted-foreground" />}
                   <span>{leadWorker?.name ?? t('Object lead')}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
@@ -250,9 +247,9 @@ export function QuickAddObjectPopup({
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">{t('Object lead')}</DropdownMenuLabel>
                 {workers.map((w) => (
                   <DropdownMenuItem key={w.id} onSelect={() => setLeadId(w.id)} className="gap-2 text-[12px]">
-                    <UserIcon size={12} className="text-muted-foreground" />
+                    <WorkerAvatar worker={w} size={16} />
                     <span className="flex-1 truncate">{w.name}</span>
-                    {leadId === w.id && <Check size={12} />}
+                    {leadId === w.id && <MenuCheck />}
                   </DropdownMenuItem>
                 ))}
                 {leadWorker && (
@@ -282,7 +279,7 @@ export function QuickAddObjectPopup({
             <DropdownMenu {...menuProps('domain')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!domainPick)}>
-                  <DomainIcon size={12} className="text-muted-foreground" />
+                  {domainPick ? <DomainMark domain={domainPick} size={12} /> : <DomainIcon size={12} className="text-muted-foreground" />}
                   <span>{domainPick?.name ?? t('Domain')}{domainIds.length > 1 ? ` +${domainIds.length - 1}` : ''}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
@@ -299,7 +296,7 @@ export function QuickAddObjectPopup({
                       : [...ids, d.id])}
                     className="gap-2 text-[12px]"
                   >
-                    <DomainIcon size={12} className="text-muted-foreground" />
+                    <DomainMark domain={d} size={14} />
                     <span className="flex-1 truncate">{d.name}</span>
                   </DropdownMenuCheckboxItem>
                 ))}

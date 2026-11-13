@@ -2,12 +2,13 @@
 
 import { PRIORITY_OPTIONS } from '@/shared/designTokens';
 import type { ReactNode } from 'react';
-import { Check } from '@/ui/icons';
+
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { cn } from '@/lib/utils';
@@ -55,7 +56,7 @@ export function PriorityPicker({
               <PriorityMark priority={opt.value} />
             </span>
             <span className="flex-1">{t(opt.label)}</span>
-            {value === opt.value && <Check size={12} className="text-muted-foreground" />}
+            {value === opt.value && <MenuCheck />}
           </DropdownMenuItem>
         ))}
         <DropdownMenuItem
@@ -66,7 +67,7 @@ export function PriorityPicker({
             <PriorityMark priority={null} />
           </span>
           <span className="flex-1 text-muted-foreground">{t('No priority')}</span>
-          {value === null && <Check size={12} className="text-muted-foreground" />}
+          {value === null && <MenuCheck />}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

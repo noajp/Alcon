@@ -5,7 +5,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { Check, ChevronLeft, Download, Palette } from '@/ui/icons';
+import { ChevronLeft, Download, Palette } from '@/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { LABEL_PALETTE } from '@/Function/shared/labelColor';
@@ -15,6 +15,7 @@ import type { ChartSpec } from './chartSpec';
 import { chartPaletteColors } from '@/Function/shared/chartPalette';
 import { getCachedChartPalette, usePreference } from '@/Function/settings/preferencesStore';
 import { CHART_CARD_CLASS, chartFileName, chartSlots, effectiveColor, withSlotColor, type ChartColorSlot } from './chartColors';
+import { MenuCheck } from '@/ui/dropdown-menu';
 
 // A chart the AI drew inside its answer, on a floating card (the
 // Execution Chain cards' surface). The spec is data only (chartSpec.ts
@@ -218,13 +219,13 @@ function SlotPalette({ slot, override, onBack, onPick }: {
             <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.hex }} />
             <span className="truncate">{t(p.label)}</span>
           </span>
-          {override === p.hex && <Check size={13} className="shrink-0 text-muted-foreground" />}
+          {override === p.hex && <MenuCheck />}
         </button>
       ))}
       <label className={`${MENU_ROW} cursor-pointer justify-between`}>
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate">{t('Custom color')}</span>
-          {custom && <Check size={13} className="shrink-0 text-muted-foreground" />}
+          {custom && <MenuCheck />}
         </span>
         <input type="color" aria-label={t('Custom color')}
           // design-lint-ignore — <input type="color"> takes only #rrggbb; black is its empty value

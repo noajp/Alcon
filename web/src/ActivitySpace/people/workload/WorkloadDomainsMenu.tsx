@@ -1,8 +1,8 @@
 'use client';
 
-import { Check, Layers } from '@/ui/icons';
+import { Layers } from '@/ui/icons';
 import { Button } from '@/ui/button';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -37,12 +37,12 @@ export function WorkloadDomainsMenu() {
       </DropdownMenuTrigger>
       <MenuShell as="dropdown" align="end">
         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setWorkloadDomainChoice(contextKey, null); }}>
-          <span className="flex-1">{t('All Domains')}</span>{all && <Check size={13} />}
+          <span className="flex-1">{t('All Domains')}</span>{all && <MenuCheck />}
         </DropdownMenuItem>
         <div className={MENU_SEPARATOR} />
         {sorted.map((d) => (
           <DropdownMenuItem key={d.id} onSelect={(e) => { e.preventDefault(); toggle(d.id); }}>
-            <span className="flex-1 truncate">{d.name}</span>{selected.includes(d.id) && <Check size={13} />}
+            <span className="flex-1 truncate">{d.name}</span>{selected.includes(d.id) && <MenuCheck />}
           </DropdownMenuItem>
         ))}
       </MenuShell>

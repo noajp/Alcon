@@ -10,7 +10,7 @@ import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/b
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, FileText, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
+import { ChevronDown, ChevronRight, FileText, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
 import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
@@ -99,6 +99,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { completionOf } from '@/Function/shared/completion';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -1397,7 +1398,7 @@ function StrategyCreateDialog({
                 <CommandGroup key={did} heading={domainName}>
                   {objects.map((o) => (
                     <CommandItem key={o.id} value={`${o.name} ${o.id}`} onSelect={() => toggleObject(o.id)}>
-                      <ObjectIcon size={12} /><span className="flex-1 truncate">{o.name}</span>{selectedIds.has(o.id) && <Check size={12} />}
+                      <ObjectIcon size={12} /><span className="flex-1 truncate">{o.name}</span>{selectedIds.has(o.id) && <MenuCheck />}
                     </CommandItem>
                   ))}
                 </CommandGroup>

@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { Check, Diff, History, Loader2, RotateCcw, Trash2 } from '@/ui/icons';
+import { Diff, History, Loader2, RotateCcw, Trash2 } from '@/ui/icons';
 import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { FilePreview, type FileEditor } from '@/Function/office/FilePreview';
 import { FileTypeIcon } from '@/Function/office/fileTypeIcon';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { officeKindOf } from '@/Function/office/officePreview';
 import { formatAge } from '@/Function/shared/dateUtils';
@@ -122,13 +122,13 @@ export function AttachmentPreview({ file, owner, actions, height }: { file: Atta
             <span className="w-7 shrink-0 tabular-nums text-muted-foreground">v{number(v)}</span>
             <span className="min-w-0 flex-1 truncate">{who(v)}</span>
             <span className="shrink-0 text-[11.5px] text-muted-foreground">{formatAge(v.created_at, true)}</span>
-            {v.id === shown.id && <Check size={13} />}
+            {v.id === shown.id && <MenuCheck />}
           </DropdownMenuItem>
         ))}
         {['xlsx', 'docx', 'pptx'].includes(officeKindOf(file.name) ?? '') && <>
           <div className={MENU_SEPARATOR} />
           <DropdownMenuItem disabled={!before} onSelect={() => setComparing((c) => !c)}>
-            <Diff size={13} /><span className="flex-1">{t('Show changes from the version before')}</span>{comparing && canCompare && <Check size={13} />}
+            <Diff size={13} /><span className="flex-1">{t('Show changes from the version before')}</span>{comparing && canCompare && <MenuCheck />}
           </DropdownMenuItem>
         </>}
       </MenuShell>

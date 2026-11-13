@@ -923,8 +923,8 @@ function WorkspaceContent({
       <QuickAddObjectPopup
         open={objectPopupOpen}
         onClose={() => setObjectPopupOpen(false)}
-        workers={objectPopupWorkers.map((w) => ({ id: w.id, name: w.name }))}
-        domains={domains.map((d) => ({ id: d.id, name: d.name }))}
+        workers={objectPopupWorkers}
+        domains={domains}
         types={activeDomainObjectTypes}
         defaultDomainId={objectPopupContext?.domainId ?? (activeDomainId || null)}
         contextLabel={objectPopupContext?.strategy?.name}

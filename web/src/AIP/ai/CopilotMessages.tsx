@@ -55,7 +55,7 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
       <div className="group flex flex-col items-end gap-1 animate-fade-in">
         {message.attachments?.length ? <AttachmentChips files={message.attachments} /> : null}
         {message.content && (
-          <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg border border-primary/20 bg-primary/15 px-2.5 py-1.5 text-foreground">
+          <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-foreground/[0.05] px-3 py-1.5 text-foreground">
             {message.content}
           </div>
         )}

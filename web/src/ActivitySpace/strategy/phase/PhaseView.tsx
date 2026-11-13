@@ -2,7 +2,7 @@
 
 import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from '@/ui/icons';
+import { ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from '@/ui/icons';
 import { isCommitEnter, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NavPhaseIcon } from '@/Frame/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
@@ -15,7 +15,7 @@ import { PhaseBurnup } from '@/Function/shared/PhaseBurnup';
 import { DateField as SharedDateField } from '@/Function/shared/date';
 import { MenuShell } from '@/Function/shared/menu';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import {
   createPhase,
   deletePhase,
@@ -813,7 +813,7 @@ function PhaseStatusMenu({
         {PHASE_STATUS_ORDER.map((s) => (
           <DropdownMenuItem key={s} onSelect={() => onSelect(s)} className="justify-between">
             {t(PHASE_STATUS_LABEL[s])}
-            {s === status && <Check size={13} className="text-muted-foreground" />}
+            {s === status && <MenuCheck />}
           </DropdownMenuItem>
         ))}
       </MenuShell>

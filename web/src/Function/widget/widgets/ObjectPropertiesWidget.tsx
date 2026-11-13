@@ -2,7 +2,7 @@
 import { Button } from '@/ui/button';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Check, User as UserIcon, X } from '@/ui/icons';
+import { Calendar, User as UserIcon, X } from '@/ui/icons';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import {
   fetchDomainCustomColumnsWithValues,
@@ -29,6 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  MenuCheck,
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
@@ -281,7 +282,7 @@ function TypePickerRow({
           <DropdownMenuItem key={option} onClick={() => onChange(option)} className="gap-2">
             <ElementTypeIcon size={12} />
             <span className="flex-1 truncate">{option}</span>
-            {currentType === option && <Check size={13} className="shrink-0" />}
+            {currentType === option && <MenuCheck />}
           </DropdownMenuItem>
         ))}
         {currentType && (
@@ -398,7 +399,7 @@ function LeadPickerRow({
             <WorkerAvatar worker={w} size={16} />
             <span className="flex-1 truncate">{w.name}</span>
             <ReachHint worker={w} />
-            {lead?.id === w.id && <Check size={13} className="shrink-0" />}
+            {lead?.id === w.id && <MenuCheck />}
           </DropdownMenuItem>
         ))}
         {lead && (

@@ -9,7 +9,7 @@ import { ActivitySignal } from '@/Function/shared/element/ActivitySignal';
 import { Button } from '@/ui/button';
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { Plus, Check, ChevronLeft, ChevronRight, Tag, X } from '@/ui/icons';
+import { Plus, ChevronLeft, ChevronRight, Tag, X } from '@/ui/icons';
 import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
 import type { ClaywareObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
@@ -21,7 +21,7 @@ import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/Function/shared/Wo
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { SegmentedProgress } from '@/Function/shared/SegmentedProgress';
 import { labelColor, useLabelColors } from '@/Function/shared/labelColor';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell } from '@/Function/shared/menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -196,14 +196,14 @@ export function TypeCell({
             <span className="min-w-0 truncate">{kind === 'object' ? 'Object' : 'Element'}</span>
             <span className="shrink-0 text-[12px] text-muted-foreground">{tr('(default)')}</span>
             <span className="flex-1" />
-            {!current && <Check size={13} className="shrink-0 text-muted-foreground" />}
+            {!current && <MenuCheck />}
           </button>
           {types.map((name) => (
             <div key={name} className="flex min-w-0 items-center">
               <button type="button" className={ROW} onClick={() => { if (!editing) pick(name); }}>
                 <TypeMark type={name} icons={icons} kind={kind} />
                 <span className="min-w-0 flex-1 truncate">{name}</span>
-                {!editing && name === current && <Check size={13} className="shrink-0 text-muted-foreground" />}
+                {!editing && name === current && <MenuCheck />}
               </button>
               {editing && (
                 <button type="button" onClick={() => void onRemoveType?.(name)}
@@ -259,7 +259,7 @@ export function TypeCell({
                 <button key={name} type="button" className={`${ROW} !py-1.5 !text-[13px]`} onClick={() => pickPreset(name)}>
                   <TypeMark type={name} icons={icons} kind={kind} size={13} />
                   <span className="min-w-0 flex-1 truncate">{name}</span>
-                  {name === current && <Check size={12} className="shrink-0 text-muted-foreground" />}
+                  {name === current && <MenuCheck />}
                 </button>
               ))}
             </div>
@@ -832,7 +832,7 @@ export function LeadCell({
             <WorkerAvatar worker={w} size={16} />
             <span className="flex-1 truncate">{w.name}</span>
             <ReachHint worker={w} />
-            {obj.lead_id === w.id && <Check size={13} className="shrink-0" />}
+            {obj.lead_id === w.id && <MenuCheck />}
           </DropdownMenuItem>
         ))}
         {!empty && (

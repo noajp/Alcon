@@ -2,7 +2,7 @@
 
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { memo, useState } from 'react';
-import { Grip, Lock, Check, Trash2 } from '@/ui/icons';
+import { Grip, Lock, Trash2 } from '@/ui/icons';
 import { BUILTIN_COLUMN_ICONS } from '@/Function/property/columnTypes';
 import type { CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/hooks/elementDetailQueries';
@@ -28,6 +28,7 @@ import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { statusLabel } from '@/shared/designTokens';
 import { isOverdue } from '@/Function/shared/dateUtils';
+import { MenuCheck } from '@/ui/dropdown-menu';
 
 // Memoised element row. All props are reference-stable across the common
 // re-render trigger (an element field edit changes only that element's `el`
@@ -274,7 +275,7 @@ export const ElementRow = memo(function ElementRow({
               >
                 <ElementProgressMark status={o.value} size={14} />
                 <span className="flex-1">{t(o.label)}</span>
-                {el.status === o.value && <Check className="size-3.5" />}
+                {el.status === o.value && <MenuCheck />}
               </ContextMenuItem>
             ))}
           </ContextMenuSubContent>
@@ -293,7 +294,7 @@ export const ElementRow = memo(function ElementRow({
               >
                 <PriorityMark priority={o.value} />
                 <span className="flex-1">{t(o.label)}</span>
-                {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
+                {(el.priority ?? 'medium') === o.value && <MenuCheck />}
               </ContextMenuItem>
             ))}
           </ContextMenuSubContent>
@@ -451,7 +452,7 @@ function AssigneeContextSub({
             >
               <WorkerAvatar worker={w} size={16} />
               <span className="flex-1 truncate">{w.name}</span>
-              {assignees.some((a) => a.worker_id === w.id) && <Check className="size-3.5" />}
+              {assignees.some((a) => a.worker_id === w.id) && <MenuCheck />}
             </ContextMenuItem>
           ))
         )}
@@ -493,7 +494,7 @@ function PropertyContextSub({
               onClick={() => void onChange(opt.value)}
             >
               <span className="flex-1">{opt.value}</span>
-              {current === opt.value && <Check className="size-3.5" />}
+              {current === opt.value && <MenuCheck />}
             </ContextMenuItem>
           ))}
           {current && (
@@ -522,7 +523,7 @@ function PropertyContextSub({
               onSelect={(e) => { e.preventDefault(); void toggle(opt.value); }}
             >
               <span className="flex-1">{opt.value}</span>
-              {current.includes(opt.value) && <Check className="size-3.5" />}
+              {current.includes(opt.value) && <MenuCheck />}
             </ContextMenuItem>
           ))}
         </ContextMenuSubContent>
@@ -539,7 +540,7 @@ function PropertyContextSub({
         onSelect={(e) => { e.preventDefault(); void onChange(!checked); }}
       >
         <span className="flex-1">{col.name}</span>
-        {checked && <Check className="size-3.5" />}
+        {checked && <MenuCheck />}
       </ContextMenuItem>
     );
   }

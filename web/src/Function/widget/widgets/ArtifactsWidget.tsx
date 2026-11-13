@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, FileUp, Files, Loader2, Settings2 } from '@/ui/icons';
+import { FileUp, Files, Loader2, Settings2 } from '@/ui/icons';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { MenuShell, MenuSectionLabel, MENU_SEPARATOR } from '@/Function/shared/menu';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { FilePreview, readStoredFile } from '@/Function/office/FilePreview';
@@ -168,7 +168,7 @@ function FileWidgetMenu({ file, show, params, candidates, listsAll, onChange }: 
   const [cell, setCell] = useState(typeof params.cell === 'string' ? params.cell : 'A1');
   const [label, setLabel] = useState(typeof params.label === 'string' ? params.label : '');
   const item = (active: boolean, text: string, onSelect: () => void, key?: string) => (
-    <DropdownMenuItem key={key ?? text} onSelect={onSelect}><span className="flex-1 truncate">{text}</span>{active && <Check size={13} />}</DropdownMenuItem>
+    <DropdownMenuItem key={key ?? text} onSelect={onSelect}><span className="flex-1 truncate">{text}</span>{active && <MenuCheck />}</DropdownMenuItem>
   );
   return (
     <DropdownMenu>

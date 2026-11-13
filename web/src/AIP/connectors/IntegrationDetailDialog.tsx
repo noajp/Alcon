@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronDown, Check } from '@/ui/icons';
+import { ChevronDown } from '@/ui/icons';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { formatError } from '@/Function/shared/formatError';
@@ -357,7 +357,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                     {(Object.keys(CUSTOM_AUTH_LABELS) as (keyof typeof CUSTOM_AUTH_LABELS)[]).map((k) => (
                       <DropdownMenuItem key={k} onSelect={() => setAuth(k)} className="gap-2 text-[12px]">
                         <span className="flex-1">{t(CUSTOM_AUTH_LABELS[k])}</span>
-                        {auth === k && <Check size={12} />}
+                        {auth === k && <MenuCheck />}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -463,7 +463,7 @@ export function IntegrationDetailDialog({ spaceId, preset, integration, canEdit,
                     {(['approve_each', 'full_delegation'] as const).map((v) => (
                       <DropdownMenuItem key={v} onSelect={() => setDelegation(v)} className="gap-2 text-[12px]">
                         <span className="flex-1">{t(DELEGATION_LABELS[v])}</span>
-                        {delegation === v && <Check size={12} />}
+                        {delegation === v && <MenuCheck />}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>

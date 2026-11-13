@@ -9,8 +9,8 @@ import { PriorityMark } from '@/Function/shared/PriorityMark';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/Function/shared/workerReach';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
-import { Calendar, User, Check } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MenuCheck } from '@/ui/dropdown-menu';
+import { Calendar, User } from '@/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/Function/settings/preferencesStore';
@@ -290,7 +290,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                     <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
                       <PriorityMark priority={p} />
                       <span className="flex-1">{t(PRIORITY[p as keyof typeof PRIORITY]?.label ?? p)}</span>
-                      {priority === p && <Check size={12} className="text-muted-foreground" />}
+                      {priority === p && <MenuCheck />}
                     </DropdownMenuItem>
                   ))}
                   {priority && (
