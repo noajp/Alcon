@@ -397,9 +397,9 @@ export function GanttView({
     };
   }, [dateRange.start, pxPerDay, dragging, dragDaysDelta]);
 
-  /** A dependency's line: out of the blocker's end in a straight run, a sharp
-   *  turn down (or up), straight to the waiting bar's row, a sharp turn and
-   *  straight into its start; when the waiting bar starts early it doubles
+  /** A dependency's line: out of the blocker's end in a straight run, a
+   *  rounded turn down (or up), straight to the waiting bar's row, a rounded
+   *  turn and straight into its start; when the waiting bar starts early it doubles
    *  back between the rows. The mark sits on the line's middle stretch. */
   const linkGeometry = (link: GanttLink) => {
     const source = elements.find((el) => el.id === link.from);
@@ -1348,8 +1348,9 @@ export function GanttView({
  *  starts before the source ends is reached by going round, between rows. */
 /** How far a dependency line runs straight out of a bar, and back in. */
 const LINK_OUT = 10;
-/** The rounding at a dependency line's turns: small, so the turns read sharp. */
-const LINK_RADIUS = 2;
+/** The rounding at a dependency line's turns: enough to soften them, little
+ *  enough that the runs between stay straight. */
+const LINK_RADIUS = 10;
 
 function elbowPath(sx: number, sy: number, tx: number, ty: number, rowH: number, radius = 6): string {
   const out = LINK_OUT;
