@@ -26,7 +26,7 @@ import { isElementAction } from '@/Function/shared/elementActionKinds';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { NavStrategyIcon } from '@/Frame/sidebar/NavIcons';
-import { Chip } from './BoardColumn';
+import { BOARD_CARD, Chip } from './BoardColumn';
 
 // The Element card: every Execution Chain draws the same one.
 // Top to bottom: the headline — the title on one line, and the priority
@@ -224,9 +224,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
         onOpen?.(element);
       }}
-      // Hover tints the card as a list row is tinted (the foreground at 6%,
-      // laid over the card's own ground as an image so the ground stays).
-      className="group/card relative overflow-hidden rounded-lg border border-border bg-card dark:bg-[var(--surface-rail)] shadow-[var(--shadow-card)] hover:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))] transition-colors cursor-grab active:cursor-grabbing"
+      className={`group/card relative cursor-grab overflow-hidden active:cursor-grabbing ${BOARD_CARD}`}
     >
       {/* The track: the card's content in a full-width cell, the execute
           rail in a 112px cell after it, clipped by the root. Revealed,
@@ -239,7 +237,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
         railRevealed ? '-translate-x-28' : 'translate-x-0',
         canExecute && 'group-focus-within/card:-translate-x-28',
       )}>
-      <div className="w-full shrink-0 px-3.5 py-3.5">
+      <div className="w-full shrink-0 p-3">
         {/* The headline: the title on one line, and the priority at the
             row's right end. No Status on the card — the column it stands
             in says where the work stands. */}
