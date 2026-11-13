@@ -394,7 +394,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const handleInput = useCallback(() => {
     // Let the IME finish; compositionend re-runs this work once committed.
-    if (composingRef.current) return;
+    // The placeholder still goes now: the text being composed is on the line.
+    if (composingRef.current) {
+      ref.current?.setAttribute('data-empty', 'false');
+      return;
+    }
     openSlashFromText();
     normalizeAlignment(ref.current);
     emit();
@@ -420,6 +424,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       normalizeAlignment(ref.current);
       emit();
     }
+    // A cancelled composition leaves the line as it was — empty again, maybe.
+    if (ref.current) ref.current.setAttribute('data-empty', isEditorEmpty(ref.current) ? 'true' : 'false');
     applyElementStatuses();
   }, [applyElementStatuses, emit, replaceBody, openSlashFromText]);
 
