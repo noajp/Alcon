@@ -2558,6 +2558,8 @@ export interface ObjectDependency {
   id: string
   blocker_object_id: string
   blocked_object_id: string
+  /** Which ends it ties: 'fs' | 'ss' | 'ff' | 'sf' (Function/shared/objectDependencyModel). */
+  kind: string
   created_by: string | null
   created_at: string
 }

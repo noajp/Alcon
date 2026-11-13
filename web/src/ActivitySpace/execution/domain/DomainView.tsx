@@ -9,8 +9,8 @@ import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ObjectSidePanel } from '@/ActivitySpace/execution/object/ObjectSidePanel';
-import { addObjectDependency, removeObjectDependency, useObjectDependencies } from '@/hooks/objectDependencyData';
-import { linkConflicts, linkWouldLoop } from '@/Function/shared/objectDependencyModel';
+import { addObjectDependency, removeObjectDependency, useObjectDependencies, setObjectDependencyKind } from '@/hooks/objectDependencyData';
+import { asDependencyKind, dependencyConflicts, linkWouldLoop } from '@/Function/shared/objectDependencyModel';
 import { Plus } from '@/ui/icons';
 import { TabBar } from '@/Frame/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
@@ -637,10 +637,15 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
     // route persistence through updateObject.
     const objectsAsBars: ElementWithDetails[] = explorerData.objects.map((o) => objectToGanttBar(o));
     const dueOf = new Map(explorerData.objects.map((o) => [o.id, o]));
-    const ganttLinks = objectLinks.map((l) => ({
-      id: l.id, from: l.blocker_object_id, to: l.blocked_object_id,
-      conflict: linkConflicts(dueOf.get(l.blocker_object_id)?.due_date, dueOf.get(l.blocked_object_id)?.start_date),
-    }));
+    const ganttLinks = objectLinks.map((l) => {
+      const kind = asDependencyKind(l.kind);
+      const blocker = dueOf.get(l.blocker_object_id);
+      const blocked = dueOf.get(l.blocked_object_id);
+      return {
+        id: l.id, from: l.blocker_object_id, to: l.blocked_object_id, kind,
+        conflict: dependencyConflicts(kind, { start: blocker?.start_date, due: blocker?.due_date }, { start: blocked?.start_date, due: blocked?.due_date }),
+      };
+    });
     const picked = ganttObjectId ? explorerData.objects.find((o) => o.id === ganttObjectId) ?? null : null;
     return (
       <div className="flex flex-1 overflow-hidden">
@@ -657,11 +662,12 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
             links={ganttLinks}
             // Dragged from one bar's end onto another: the second waits for
             // the first — unless that would close a loop.
-            onLinkCreate={(from, to) => {
+            onLinkCreate={(from, to, kind) => {
               const pairs = objectLinks.map((l) => ({ blocker: l.blocker_object_id, blocked: l.blocked_object_id }));
               if (pairs.some((p) => p.blocker === from && p.blocked === to) || linkWouldLoop(pairs, from, to)) return;
-              void addObjectDependency(from, to).catch((e) => console.error('Failed to add dependency', e));
+              void addObjectDependency(from, to, kind).catch((e) => console.error('Failed to add dependency', e));
             }}
+            onLinkKindChange={(link, kind) => { if (link.id) void setObjectDependencyKind(link.id, kind).catch((e) => console.error('Failed to change dependency', e)); }}
             onLinkRemove={(link) => { if (link.id) void removeObjectDependency(link.id).catch((e) => console.error('Failed to remove dependency', e)); }}
             // A click on a bar opens the Object beside the timeline; again closes it.
             onElementOpen={(bar) => setGanttObjectId((cur) => (cur === bar.id ? null : bar.id))}

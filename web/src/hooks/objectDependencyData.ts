@@ -1,5 +1,7 @@
 'use client';
 
+import type { DependencyKind } from '@/Function/shared/objectDependencyModel';
+
 import { useQuery } from '@tanstack/react-query';
 import { selectIn } from '@/hooks/chunkedIn';
 import { translate } from '@/Function/i18n/I18nProvider';
@@ -38,12 +40,20 @@ function invalidate() {
   void getQueryClient().invalidateQueries({ queryKey: PREFIX });
 }
 
-/** Records that `blockedId` waits for `blockerId`. */
-export async function addObjectDependency(blockerId: string, blockedId: string): Promise<void> {
+/** Records that `blockedId` waits for `blockerId`, tying the ends `kind` names. */
+export async function addObjectDependency(blockerId: string, blockedId: string, kind: DependencyKind = 'fs'): Promise<void> {
   const { data, error } = await supabase.from('object_dependencies')
-    .insert({ blocker_object_id: blockerId, blocked_object_id: blockedId }).select('id');
+    .insert({ blocker_object_id: blockerId, blocked_object_id: blockedId, kind }).select('id');
   if (error) throw new Error(error.message);
   // RLS refuses by returning nothing: say so instead of pretending it landed.
+  if (!data || data.length === 0) throw new Error(translate('You do not have permission to change this Object.'));
+  invalidate();
+}
+
+/** Changes which ends a dependency ties. */
+export async function setObjectDependencyKind(id: string, kind: DependencyKind): Promise<void> {
+  const { data, error } = await supabase.from('object_dependencies').update({ kind }).eq('id', id).select('id');
+  if (error) throw new Error(error.message);
   if (!data || data.length === 0) throw new Error(translate('You do not have permission to change this Object.'));
   invalidate();
 }
