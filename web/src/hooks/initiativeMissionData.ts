@@ -222,6 +222,9 @@ async function liveReasons(initiativeId: string, ids: readonly string[]): Promis
 }
 
 export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyPlanResult> {
+  // Read before anything is written: if it fails, nothing was made and the
+  // approval can simply be pressed again.
+  const reasonOf = await liveReasons(input.initiativeId, input.tasks.flatMap((t) => t.basisIds ?? []));
   const failed: string[] = [];
   const objectFor = new Map<string, string>();
   for (const o of input.objects) {
@@ -250,7 +253,6 @@ export async function applyInitiativePlan(input: ApplyPlanInput): Promise<ApplyP
     }
   }
   const approverId = input.tasks.some((t) => t.assignee === 'human' && !t.assigneeWorkerId) ? await approverWorkerId() : null;
-  const reasonOf = await liveReasons(input.initiativeId, input.tasks.flatMap((t) => t.basisIds ?? []));
   const elementFor = new Map<string, string>();
   for (const t of input.tasks) {
     const objectId = t.object ? objectFor.get(t.object) : input.fallbackObjectId;
