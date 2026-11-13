@@ -143,6 +143,8 @@ export interface WidgetDefinition {
    * board deletes those contents for everyone, so removing it asks first.
    */
   holdsContents?: boolean;
+  /** Its heading can be renamed in place (kept in the instance's `title`). */
+  renamable?: boolean;
   /** No longer offered in the picker; boards that placed it still draw it. */
   retired?: boolean;
   /**

@@ -38,7 +38,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'generated-app': {
     type: 'generated-app', label: 'Canvas',
     description: 'A blank part AI draws into: a dashboard, a whiteboard, a calculator, a tracker',
-    group: 'content', accepts: ['object'], zones: ['main'], defaultSize: 'full', holdsContents: true,
+    group: 'content', accepts: ['object'], zones: ['main'], defaultSize: 'full', holdsContents: true, renamable: true,
     load: async () => (await import('./widgets/GeneratedAppWidget')).GeneratedAppWidget,
   },
   'design': {

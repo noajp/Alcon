@@ -103,7 +103,6 @@ import { FileImportActions, canImport } from './FileImportActions';
 import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
 import { openInApp } from '@/Function/shared/appNavigation';
 import { NavSlidesIcon } from '@/Frame/sidebar/NavIcons';
-import { CodeChangeIcon } from '@/ActivitySpace/execution/codeChanges/codeChangeLabels';
 import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/Function/shared/keyboard';
 import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
 import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';
@@ -638,7 +637,6 @@ function ElementDetailBody({
   // The "…" menu opens these on the page: each bump opens its editor/picker.
   const [dependencySignal, setDependencySignal] = useState(0);
   const [approvalSignal, setApprovalSignal] = useState(0);
-  const [linkPrSignal, setLinkPrSignal] = useState(0);
   // Files attached from this computer.
   const handlePickNote = async (
     noteId: string,
@@ -837,7 +835,7 @@ function ElementDetailBody({
               className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50" />
 
             {/* More to attach, kept off the page until chosen: a Note
-                (Document), a new deck (Slide), a pull request. */}
+                (Document), a new deck (Slide). */}
             <div className="relative">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -858,9 +856,6 @@ function ElementDetailBody({
                   )}
                   <DropdownMenuItem onSelect={() => { requestNewDeck(element.title); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
                     <NavSlidesIcon size={15} />{t('Slide')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setTimeout(() => setLinkPrSignal((n) => n + 1), 0)} className="gap-2.5 py-1.5 text-[13px]">
-                    <CodeChangeIcon size={15} className="text-muted-foreground" />{t('Link pull request')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -890,7 +885,7 @@ function ElementDetailBody({
 
           </div>
 
-          <CodeChangesSection elementId={element.id} openSignal={linkPrSignal} />
+          <CodeChangesSection elementId={element.id} />
 
           <AgentRunPanel
             agent={agent}

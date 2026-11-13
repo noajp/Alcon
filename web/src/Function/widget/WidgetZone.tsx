@@ -38,15 +38,19 @@ export function WidgetZone({
   zone,
   columns = 1,
   className = '',
+  only,
 }: {
   zone: Zone;
+  /** Show just these widget types (an Object's page shows canvases only;
+   *  what an older board placed here stays stored, unshown). */
+  only?: string[];
   /** `main` is two columns on the surfaces that want a dashboard; 1 elsewhere. */
   columns?: 1 | 2;
   className?: string;
 }) {
   const { board, arranging } = useBoardContext();
   const { t } = useI18n();
-  const items = board.layout[zone];
+  const items = only ? board.layout[zone].filter((w) => only.includes(w.type)) : board.layout[zone];
 
   const { setNodeRef, isOver } = useDroppable({ id: zoneDroppableId(zone), data: { zone } });
 
@@ -179,6 +183,7 @@ function SortableWidget({
         isDragging={isDragging}
         onLongPress={() => setArranging(true)}
         onRemove={remove}
+        onRename={def.renamable && !host.readOnly ? (next) => board.setParams(instance.id, { ...params, title: next }) : undefined}
         // New params or a new subject are a new attempt: a caught error clears on its own.
         resetKey={`${bodyKey}|${JSON.stringify(params)}`}
         onRetry={() => setRetriedBody(() => reloadWidgetComponent(instance.type))}

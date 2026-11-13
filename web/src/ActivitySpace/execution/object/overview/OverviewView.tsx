@@ -1,6 +1,8 @@
 'use client';
 
 import { DescriptionEditor } from '@/Function/shared/DescriptionEditor';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { formatError } from '@/Function/shared/formatError';
 import { setActiveDomainId } from '@/Function/space/domainsStore';
 
 import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
@@ -11,7 +13,13 @@ import { toggleReaction, updateObject, useWorkers } from '@/hooks/useSupabase';
 import { useObjectReactions } from '@/hooks/commentData';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
-import { Plus } from '@/ui/icons';
+import { FileText, MoreHorizontal, Plus } from '@/ui/icons';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { NavSlidesIcon } from '@/Frame/sidebar/NavIcons';
+import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
+import { openInApp } from '@/Function/shared/appNavigation';
+import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
+import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';
 import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
@@ -34,6 +42,7 @@ import {
 /** The band above (how it is going) and the rail beside; the document
  *  column between them is fixed, as on an Element's page. */
 const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
+const CANVAS_ONLY = ['generated-app'];
 
 // =============================================================
 // Object Overview — read like an Element's page.
@@ -171,6 +180,12 @@ export function OverviewView({
     [object, elements, explorerData, onRefresh, onNavigate, onViewChange],
   );
 
+  const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const linkNote = async (noteId: string | null) => {
+    try { await updateObject(object.id, { note_id: noteId }); onRefresh?.(); }
+    catch (e) { await appDialog.alert(formatError(e)); }
+  };
+
   return (
     <div className="h-full overflow-y-auto bg-card">
       <div className={PAGE_FRAME}>
@@ -223,14 +238,41 @@ export function OverviewView({
                     <ReactionPicker onToggle={(e) => void reactWith(e)} />
                     <AttachButton owner={{ kind: 'object', id: object.id }}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+                    {/* More to attach, as on an Element: a Note (Document), a new deck (Slide). */}
+                    <div className="relative">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" title={t('More')} aria-label={t('More')}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground">
+                            <MoreHorizontal size={15} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-[200px]">
+                          {!object.note_id && (
+                            <DropdownMenuItem onSelect={() => setTimeout(() => setNotePickerOpen(true), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                              <FileText size={15} className="text-muted-foreground" />{t('Document')}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onSelect={() => { requestNewDeck(object.name); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
+                            <NavSlidesIcon size={15} />{t('Slide')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <NotePicker open={notePickerOpen} onClose={() => setNotePickerOpen(false)}
+                        onPick={(noteId) => { setNotePickerOpen(false); void linkNote(noteId); }}
+                        anchorClassName="absolute top-full left-0 mt-1" />
+                    </div>
                     <ReactionChips reactions={reactions} userId={userId} onToggle={(e) => void reactWith(e)} />
                   </div>
                 </ButtonAppearanceProvider>
                 <AttachmentList owner={{ kind: 'object', id: object.id }} />
               </div>
 
+              {/* The Note pinned to this Object, shown in place. */}
+              {object.note_id && <LinkedNoteEmbed noteId={object.note_id} onUnlink={() => void linkNote(null)} />}
+
               {/* Canvases: what was asked to be drawn for this Object. */}
-              {board.layout.main.length > 0 && <WidgetZone zone="main" />}
+              {board.layout.main.some((w) => w.type === 'generated-app') && <WidgetZone zone="main" only={CANVAS_ONLY} />}
 
               <PageSection title={t('Milestones')} action={
                 <Button variant="ghost" size="icon-xs" aria-label={t('Add milestone')} onClick={() => setAddingMilestone(true)}>

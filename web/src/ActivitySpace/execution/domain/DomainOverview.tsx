@@ -4,7 +4,19 @@ import { useDomainOverview } from '@/hooks/useDomainOverview';
 import { useBoard, WidgetSurface, WidgetZone, type WidgetHost } from '@/Function/widget';
 import { DOMAIN_OVERVIEW_BOARD } from '@/Function/widget/defaults';
 import { DomainIcon, ElementIcon, ObjectIcon } from '@/Function/shared/conceptIcons';
-import { Hash, Lock, Users } from '@/ui/icons';
+import { FileText, Hash, Lock, MoreHorizontal, Users } from '@/ui/icons';
+import { useQuery } from '@tanstack/react-query';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { AttachButton } from '@/Function/shared/attachments/AttachButton';
+import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
+import { ensureArtifactRoot } from '@/hooks/artifactData';
+import { toggleReaction, useDomainReactions } from '@/hooks/commentData';
+import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { NavSlidesIcon } from '@/Frame/sidebar/NavIcons';
+import { requestNewDeck } from '@/ActivitySpace/artifacts/slides/newDeckRequest';
+import { openInApp } from '@/Function/shared/appNavigation';
 import { Button } from '@/ui/button';
 import { PageHead, PageLayout } from '@/Function/shared/PageHead';
 import { RailCard } from '@/Function/shared/RailCard';
@@ -19,8 +31,10 @@ import type { Domain } from '@/types/database';
 
 /** The Domain's Overview tab, under the Domain page's header and tabs
  *  (DomainView): no header of its own, and "Add widget" goes to the tab bar. */
-export function DomainOverview({ domainId, onNavigate, onViewChange }: {
+export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote }: {
   domainId: string | null;
+  /** Opens the Domain's Note tab (its Document). */
+  onOpenNote?: () => void;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }) {
@@ -28,6 +42,19 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   const query = useDomainOverview(domainId);
   const role = useDomainRole(domainId);
   const board = useBoard('domain-overview', DOMAIN_OVERVIEW_BOARD, domainId ?? 'none');
+  const userId = useAuthContext().user?.id ?? null;
+  const { reactions, refresh: refreshReactions } = useDomainReactions(domainId);
+  const reactWith = async (emoji: string) => {
+    if (!userId || !domainId) return;
+    try { await toggleReaction({ userId, emoji, domainId }); } finally { void refreshReactions(); }
+  };
+  // A Domain's files live at the top of its place in Artifacts.
+  const spaceOfDomain = useActiveSpaceId();
+  const canAttach = !!role.data && role.data !== 'viewer';
+  const filesRoot = useQuery({
+    queryKey: ['domain-files-root', domainId], enabled: !!domainId && !!spaceOfDomain && canAttach, staleTime: Infinity, retry: false,
+    queryFn: () => ensureArtifactRoot(spaceOfDomain!, { scope: 'domain', domainId: domainId! }),
+  });
   if (!domainId) return <p className="p-8 text-sm text-muted-foreground">{t('Choose a Domain from the sidebar.')}</p>;
   if (query.isPending) return <p role="status" className="p-8 text-sm text-muted-foreground">{t('Loading Domain…')}</p>;
   if (!query.data) return <div role="alert" className="space-y-3 p-8 text-sm"><p>{t('Unable to load this Domain.')}</p><Button onClick={() => void query.refetch()}>{t('Retry')}</Button></div>;
@@ -72,6 +99,35 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
           emptyDescription={t('No description yet.')}
           onSaveTitle={async (name) => { await updateDomain(domain.id, { name }); await query.refetch(); }}
           onSaveDescription={async (description) => { await updateDomain(domain.id, { description: description || null }); await query.refetch(); }} />
+        {/* Under the description, as on an Element: attaching a file and the
+            "…" of other things to attach, then the attached files. */}
+        <div className="relative -ml-2.5 flex flex-wrap items-start gap-x-0.5 gap-y-5 [&>*.w-full]:pl-2.5">
+          <div className="flex items-center gap-0.5">
+            <ReactionPicker onToggle={(e) => void reactWith(e)} />
+            {filesRoot.data && <AttachButton owner={{ kind: 'folder', id: filesRoot.data }}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" title={t('More')} aria-label={t('More')}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground">
+                  <MoreHorizontal size={15} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[200px]">
+                {onOpenNote && (
+                  <DropdownMenuItem onSelect={onOpenNote} className="gap-2.5 py-1.5 text-[13px]">
+                    <FileText size={15} className="text-muted-foreground" />{t('Document')}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => { requestNewDeck(domain.name); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
+                  <NavSlidesIcon size={15} />{t('Slide')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <ReactionChips reactions={reactions} userId={userId} onToggle={(e) => void reactWith(e)} />
+          </div>
+          {filesRoot.data && <AttachmentList owner={{ kind: 'folder', id: filesRoot.data }} />}
+        </div>
         <WidgetSurface key={`board-${domain.id}`} board={board} host={host} zones={['main']}>
           <WidgetZone zone="main" columns={1} />
         </WidgetSurface>

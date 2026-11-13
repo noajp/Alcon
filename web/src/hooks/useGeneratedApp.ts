@@ -1,10 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { readGeneratedAppContext } from './generatedAppContext';
+import { readGeneratedAppContext, readSpaceContext } from './generatedAppContext';
+import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { getAthenaSettings } from '@/Function/shared/athenaSettings';
 import { useSessionUserId, useWidgetDocument, useWidgetViewerState } from './useWidgetDocument';
 import { supabase } from '@/lib/supabase';
 import { parseAppSource, parseAppState, sourceDigest, stableJson, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
-import { summaryApp } from '@/Function/widget/generated/summaryApp';
+import { CANVAS_TEMPLATES } from '@/Function/widget/generated/templates';
 
 /** The app everyone on the widget sees. */
 type SharedApp = { current: AppSource | null; previous: AppSource | null };
@@ -68,7 +70,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     return () => { alive = false; };
   }, [current]);
   const currentDigest = current && digest?.of === current ? digest.value : null;
-  const known = !!current && stableJson(current) === stableJson(summaryApp);
+  const known = !!current && CANVAS_TEMPLATES.some((tpl) => stableJson(current) === stableJson(tpl.source));
   const dataConnected = known || (!!currentDigest && own.value?.dataApproved === currentDigest);
   // Until the digest is known the answer is not "not connected" but "not yet known".
   const identifying = !!current && !known && digest?.of !== current;
@@ -82,6 +84,8 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
 
   return {
     app, state: data.value ?? {}, loading: loading || identifying, dataConnected,
+    /** The shared app is one of the built-in templates, unchanged. */
+    knownTemplate: known,
     connectData: () => serial(async () => {
       if (!currentDigest) throw new Error('Object data cannot be connected in this browser context.');
       await saveOwn({ dataApproved: currentDigest });
@@ -95,6 +99,11 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
       if (!userId) throw new Error('Sign in before reading Object data.');
       return readGeneratedAppContext(objectId, userId);
     },
+    readSpace: async () => {
+      const spaceId = getActiveSpaceId();
+      if (!userId || !spaceId) throw new Error('Sign in before reading Space data.');
+      return readSpaceContext(spaceId, userId);
+    },
     /** A built-in template is known code: it becomes the shared app at once, no preview. */
     useTemplate: (source: AppSource) => serial(async () => {
       await setShared({ current: parseAppSource(source), previous: latest.current.shared?.current ?? null });
@@ -103,7 +112,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     savePrompt: (prompt: string) => serial(() => saveOwn({ prompt })),
     generate: (prompt: string) => serial(async () => {
       await saveOwn({ prompt });
-      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3 } });
+      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3, spaceId: getActiveSpaceId(), ...getAthenaSettings() } });
       if (error) {
         let message = error.message;
         if ('context' in error && error.context instanceof Response) { try { message = (await error.context.json()).error ?? message; } catch { /* Keep transport error. */ } }

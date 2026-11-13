@@ -8,19 +8,20 @@ const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
 // no child frames allowed there is no fresh window to fetch them back from.
 const NO_WEBRTC = `(()=>{for(const k of ['RTCPeerConnection','webkitRTCPeerConnection','RTCDataChannel','RTCSessionDescription','RTCIceCandidate','RTCRtpSender','RTCRtpReceiver','RTCRtpTransceiver']){try{Object.defineProperty(window,k,{value:undefined,writable:false,configurable:false});}catch{}}})();`;
 
-export function appDocument(source: AppSource, state: AppState, context: { objectId: string; objectName: string }, channel: string, theme: Record<string, string>) {
+export function appDocument(source: AppSource, state: AppState, context: { objectId: string; objectName: string }, channel: string, theme: Record<string, string>, libraryCode: string[] = []) {
   const app = parseAppSource(source);
   const bootstrap = `
 const channel=${json(channel)};
 const send=(type,payload={})=>parent.postMessage({channel,type,...payload},'*');
 const pending=new Map(); let sequence=0;
-const requestContext=()=>new Promise((resolve,reject)=>{
+const requestRead=type=>()=>new Promise((resolve,reject)=>{
  const id=++sequence;
- const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Object data request timed out. Retry.'));},30000);
- pending.set(id,{resolve,reject,timer});send('read-context',{id});
+ const timer=setTimeout(()=>{pending.delete(id);reject(new Error('The data request timed out. Retry.'));},45000);
+ pending.set(id,{resolve,reject,timer});send(type,{id});
 });
+const requestContext=requestRead('read-context');
 const watchers=[];
-const alcon={readContext:requestContext,context:${json(context)},state:${json(state)},save(value){
+const alcon={readContext:requestContext,readSpace:requestRead('read-space'),context:${json(context)},state:${json(state)},save(value){
   return new Promise((resolve,reject)=>{
     const id=++sequence;
     const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Save timed out. Check your connection.'));},20000);
@@ -126,5 +127,5 @@ button:hover,[role=tab]:hover{border-color:var(--border-strong,var(--border))!im
 [role=tab][aria-selected=true]{background:var(--muted);border-color:var(--border-strong,var(--border))!important;font-weight:600}
 button:disabled{opacity:.5;cursor:default}
 button:focus-visible,[role=tab]:focus-visible{background:var(--muted);border-color:var(--border-strong,var(--border))!important}
-</style></head><body>${app.html}<script>${(NO_WEBRTC + bootstrap).replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
+</style></head><body>${app.html}${libraryCode.map(code => `<script>${NO_WEBRTC}\n${code.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--')}\n</script>`).join('')}<script>${(NO_WEBRTC + bootstrap).replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
 }
