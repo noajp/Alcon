@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useObjects } from '@/Function/sync/explorerData';
 import { countActiveObjects } from '@/Function/shared/objectArchive';
+import { deleteObject } from './objectData';
 
 // Archive / restore an Object, and the reads that still reach an archived
 // one: the Domain's "Archived" list and the Object opened by id. Rules live
@@ -44,6 +45,12 @@ export async function restoreObject(objectId: string): Promise<void> {
   const { error } = await supabase.rpc('restore_object', { p_object: objectId });
   if (error?.code === '42501') throw new Error(translate(ARCHIVE_REFUSED));
   if (error) throw new Error(translate(RESTORE_FAILED));
+  refreshAfterArchive();
+}
+
+/** Deletes an archived Object for good, from the Archived list. */
+export async function deleteArchivedObject(objectId: string): Promise<void> {
+  await deleteObject(objectId);
   refreshAfterArchive();
 }
 

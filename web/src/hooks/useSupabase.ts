@@ -58,6 +58,7 @@ export {
   createSubElement,
   decideApproval,
   deleteElement,
+  deleteElements,
   fetchElementApprovals,
   fetchElementWithDetails,
   getElementEdges,
