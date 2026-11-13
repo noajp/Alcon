@@ -5,18 +5,17 @@ import { useInitiativeMission } from '@/hooks/initiativeMissionData';
 import { useDomains, useWorkers } from '@/hooks/useSupabase';
 import { useNowMinute } from '@/Function/shared/useNow';
 import { useInitiativeIntentContext } from '../InitiativeIntent';
-import { MissionEvaluatePanel, type MissionContext } from './MissionPanels';
+import type { MissionContext } from './MissionPanels';
 import { MissionExecutionPanel } from './MissionExecution';
 import type { BoardOrientation } from '@/Function/shared/boardOrientation';
 import type { ElementWithDetails, StrategyDelegation } from '@/types/database';
 import { missionElementRow, type MissionElementRow, type MissionMeasureRow } from './missionModel';
 
-// The mission part of one Strategy tab (Execution or Evaluate). Reads the Strategy's intents from
+// The mission part of a Strategy's Execution tab. Reads the Strategy's intents from
 // the page's InitiativeIntentProvider and the runs, artifacts, approvals and
 // dependencies of the Elements under its Objects, once per tab.
 
-export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, orientation, via }: {
-  tab: 'execution' | 'audit';
+export function InitiativeMission({ initiativeId, initiativeName, spaceId, objects, delegation, onDelegationChange, definitionId, onDefinitionChange, onChanged, onOpenObject, orientation, via }: {
   initiativeId: string;
   initiativeName: string;
   delegation: StrategyDelegation;
@@ -73,8 +72,7 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
     },
   };
 
-  if (tab === 'execution') {
-    return (
+  return (
       <MissionExecutionPanel ctx={ctx} details={details} orientation={orientation} via={via}
         onOpenObject={(id, domainId) => onOpenObject?.(id, domainId ?? objects.find((o) => o.id === id)?.domain_id ?? null)}
         objects={objects.map((o) => ({ id: o.id, name: o.name, domain_id: o.domain_id, icon: o.icon ?? null, color: o.color ?? null }))}
@@ -82,7 +80,5 @@ export function InitiativeMission({ tab, initiativeId, initiativeName, spaceId, 
         aiWorkers={workers.filter((w) => w.type === 'ai_agent' && w.status !== 'inactive')}
         people={workers.filter((w) => w.type === 'human' && w.status !== 'inactive')}
         ensureRoot={intent?.ensureRoot ?? (() => Promise.reject(new Error('no intent')))} />
-    );
-  }
-  return <MissionEvaluatePanel ctx={ctx} />;
+  );
 }

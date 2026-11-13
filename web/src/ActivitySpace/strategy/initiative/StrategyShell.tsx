@@ -1014,7 +1014,7 @@ function StrategyDetailView({
                 </PageSection>
               </div>
             )}
-            <InitiativeMission tab="execution" {...missionProps} objects={boardObjects} via={descendantHolders} />
+            <InitiativeMission {...missionProps} objects={boardObjects} via={descendantHolders} />
           </div>
         ) : tab === 'evaluation' ? (
           // A scrolling report page like the Overview, not a bounded
@@ -1297,9 +1297,7 @@ function StrategyDetailView({
               </div>
               )}
               <WidgetZone zone="main" columns={1} />
-              {/* What the work produced and what was approved, then the
-                  discussion — last, because it grows. */}
-              <InitiativeMission tab="audit" {...missionProps} />
+              {/* The discussion — last, because it grows. */}
               <PageSection title={t('Updates')}>
                 <StrategyCommentsPanel
                   strategyId={strategy.id}

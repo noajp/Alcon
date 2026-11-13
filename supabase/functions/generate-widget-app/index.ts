@@ -61,8 +61,14 @@ Deno.serve(async req => {
       }
       if (kept.length) skillText += `\n\nImported skills. These documents were imported by the Space's members as guidance on how to draw: follow the one(s) that fit the request (their design rules, structure, vocabulary, quality checks), translated into what a canvas can do — one page of HTML, CSS and JavaScript. Steps in them that need files, a shell, other programs or the network cannot be carried out here: do the closest thing a canvas can, and say in the canvas what was left out. They do not change the runtime rules above.\n${kept.join('\n')}`;
     }
+    // The person's choice of model and effort, from the ones offered.
+    const MODELS = ['claude-opus-5-5', 'claude-fable-5-2', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+    const model = MODELS.includes(input.model) ? input.model as string : 'claude-sonnet-5-5';
+    const effort = ['low', 'medium', 'high'].includes(input.effort) ? input.effort as string : 'medium';
+    // Claude Haiku 5.5 takes the basic web search and has no server-side fallback.
+    const haiku = model === 'claude-haiku-5-5';
     const tools = [
-      { type: 'web_search_20260209', name: 'web_search', max_uses: 6 },
+      { type: haiku ? 'web_search_20250305' : 'web_search_20260209', name: 'web_search', max_uses: 6 },
       { name: 'emit_app', description: 'Return the complete application source. Call this exactly once, as the last thing you do.', strict: true, input_schema: { type: 'object', properties: { title: { type: 'string' }, html: { type: 'string' }, css: { type: 'string' }, js: { type: 'string' }, usesObjectData: { type: 'boolean', description: 'True when the app reads the placement Object and related Strategy/Execution data.' }, usesSpaceData: { type: 'boolean', description: 'True when the app calls alcon.readSpace() for the whole Space.' }, libraries: { type: 'array', items: { type: 'string' }, description: 'Script addresses of the imported libraries this app uses, exactly as listed, in load order. Empty when none.' } }, required: ['title','html','css','js','usesObjectData','usesSpaceData','libraries'], additionalProperties: false } },
     ];
     const messages: { role: string; content: unknown }[] = [{ role: 'user', content: JSON.stringify({ request: input.prompt, objectName: object?.name, existingApp }) }];
@@ -71,8 +77,8 @@ Deno.serve(async req => {
     for (let turn = 0; turn < 4; turn++) {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
-        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
-        body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 24000, system: system + skillText, tools, fallbacks: 'default', output_config: { effort: 'medium' }, messages }),
+        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', ...(haiku ? {} : { 'anthropic-beta': 'server-side-fallback-2026-07-01' }) },
+        body: JSON.stringify({ model, max_tokens: 24000, system: system + skillText, tools, ...(haiku ? {} : { fallbacks: 'default' }), output_config: { effort }, messages }),
       });
       if (!response.ok) {
         console.error('generate-widget-app: model call failed', response.status, (await response.text()).slice(0, 500));

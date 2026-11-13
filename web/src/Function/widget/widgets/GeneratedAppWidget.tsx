@@ -8,6 +8,7 @@ import { TextComposer } from '@/ui/text-composer';
 import { useGeneratedApp } from '@/hooks/useGeneratedApp';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import { CANVAS_TEMPLATES } from '../generated/templates';
+import { AthenaControls } from '@/Function/shared/AthenaControls';
 import { CanvasSkillsDialog } from '../generated/CanvasSkills';
 import { libraryCode } from '../generated/skills';
 import { AppRuntime } from '../generated/AppRuntime';
@@ -61,11 +62,12 @@ export function GeneratedAppWidget({ host, instanceId }: WidgetProps) {
   return <div className="space-y-3">
     <WidgetHeaderAction>
       {!host.readOnly && <Button variant="ghost" size="sm" onClick={() => setSkillsOpen(true)}>{t('Skills')}</Button>}
-      {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}>{showEditor ? t('Close editor') : t('Edit with AI')}</Button>}
+      {app?.current_app && <Button variant="ghost" size="sm" disabled={locked} onClick={() => setEditing(v => !v)}>{showEditor ? t('Close editor') : t('Edit with Athena')}</Button>}
     </WidgetHeaderAction>
     {showEditor && <div className="space-y-3">
       <form className="space-y-2" onSubmit={e => { e.preventDefault(); void run(() => store.generate(prompt)); }}>
         <TextComposer aria-label={t('Describe your canvas')} placeholder={t('Example: Compare social security spending across countries as a chart. Or: a dashboard of this Object’s progress.')} rows={3} maxLength={8000} value={prompt} disabled={locked} onChange={e => setPrompt(e.target.value)}
+          hint={<AthenaControls disabled={locked} />}
           action={<Button type="submit" variant="primary" size="xs" className="rounded-md px-2" title={t('Send')} aria-label={t('Send')} disabled={locked || !prompt.trim()}><SendIcon size={13} /></Button>}
           secondaryAction={app?.previous_app && <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={() => void run(async () => { await store.restore(); setEpoch(n => n + 1); })}><RotateCcw size={13} />{t('Previous version')}</Button>}
         />

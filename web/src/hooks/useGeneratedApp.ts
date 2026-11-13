@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { readGeneratedAppContext, readSpaceContext } from './generatedAppContext';
 import { getActiveSpaceId } from '@/Function/space/activeSpaceStore';
+import { getAthenaSettings } from '@/Function/shared/athenaSettings';
 import { useSessionUserId, useWidgetDocument, useWidgetViewerState } from './useWidgetDocument';
 import { supabase } from '@/lib/supabase';
 import { parseAppSource, parseAppState, sourceDigest, stableJson, statePatch, type AppSource, type AppState } from '@/Function/widget/generated/model';
@@ -111,7 +112,7 @@ export function useGeneratedApp(objectId: string, widgetId: string) {
     savePrompt: (prompt: string) => serial(() => saveOwn({ prompt })),
     generate: (prompt: string) => serial(async () => {
       await saveOwn({ prompt });
-      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3, spaceId: getActiveSpaceId() } });
+      const { data: reply, error } = await supabase.functions.invoke('generate-widget-app', { body: { widgetId, prompt, runtimeVersion: 3, spaceId: getActiveSpaceId(), ...getAthenaSettings() } });
       if (error) {
         let message = error.message;
         if ('context' in error && error.context instanceof Response) { try { message = (await error.context.json()).error ?? message; } catch { /* Keep transport error. */ } }
