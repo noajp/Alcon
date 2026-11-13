@@ -14,7 +14,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export type BoardOrientation = 'vertical' | 'horizontal';
 
-const STORAGE_KEY = 'alcon-board-orientation';
+const STORAGE_KEY = 'clayware-board-orientation';
 
 function readOrientation(): BoardOrientation {
   try {

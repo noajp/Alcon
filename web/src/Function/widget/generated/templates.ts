@@ -46,7 +46,7 @@ const dashboardApp: AppSource = {
 async function load(){
  refresh.disabled=true;
  try{
-  const data=await alcon.readContext();const all=data.elements;const t=today();
+  const data=await clayware.readContext();const all=data.elements;const t=today();
   const done=all.filter(e=>e.status==='done');const open=all.filter(e=>e.status!=='done'&&e.status!=='cancelled');
   const late=open.filter(e=>e.due_date&&e.due_date<t);
   root.replaceChildren();
@@ -83,7 +83,7 @@ const SHAPES=[['bar',L('Bars','棒')],['donut',L('Donut','ドーナツ')],['line
 for(const [v,l] of AXES){const o=el('option','',l);o.value=v;by.append(o);}
 for(const [v,l] of SHAPES){const o=el('option','',l);o.value=v;shape.append(o);}
 let data=null;
-const pick=()=>{by.value=AXES.some(a=>a[0]===alcon.state.chartBy)?alcon.state.chartBy:'status';shape.value=SHAPES.some(a=>a[0]===alcon.state.chartShape)?alcon.state.chartShape:'bar';};
+const pick=()=>{by.value=AXES.some(a=>a[0]===clayware.state.chartBy)?clayware.state.chartBy:'status';shape.value=SHAPES.some(a=>a[0]===clayware.state.chartShape)?clayware.state.chartShape:'bar';};
 function lineChart(rows,width){
  const h=200;const max=Math.max(1,...rows.map(r=>r[1]));const s=svg('svg',{viewBox:'0 0 '+width+' '+h,width:'100%'});
  const step=rows.length>1?(width-40)/(rows.length-1):0;const pts=rows.map((r,i)=>[20+i*step,h-30-(h-50)*r[1]/max]);
@@ -103,10 +103,10 @@ function draw(){
  else if(shape.value==='line')root.append(lineChart(rows,640));
  else root.append(bars(rows,640));
 }
-async function load(){refresh.disabled=true;try{data=await alcon.readContext();stamp.textContent=new Date(data.fetchedAt).toLocaleString();draw();}catch(e){data=null;root.replaceChildren(el('p','empty',String(e.message||e)));stamp.textContent='';}finally{refresh.disabled=false;}}
-const changed=async()=>{draw();try{await alcon.save({...alcon.state,chartBy:by.value,chartShape:shape.value});}catch(e){stamp.textContent=String(e.message||e);}};
+async function load(){refresh.disabled=true;try{data=await clayware.readContext();stamp.textContent=new Date(data.fetchedAt).toLocaleString();draw();}catch(e){data=null;root.replaceChildren(el('p','empty',String(e.message||e)));stamp.textContent='';}finally{refresh.disabled=false;}}
+const changed=async()=>{draw();try{await clayware.save({...clayware.state,chartBy:by.value,chartShape:shape.value});}catch(e){stamp.textContent=String(e.message||e);}};
 by.addEventListener('change',changed);shape.addEventListener('change',changed);
-alcon.onChange(()=>{pick();draw();});
+clayware.onChange(()=>{pick();draw();});
 refresh.addEventListener('click',load);pick();await load();`,
 };
 
@@ -124,10 +124,10 @@ const HUES=[null,48,140,205,275,350];
 const fill=h=>h===null||h===undefined?'var(--background)':'color-mix(in oklab,hsl('+h+' 85% 60%) 34%,var(--background))';
 const SIZE={note:[150,110],rect:[150,70],ellipse:[140,80],diamond:[130,130]};
 let selected=null;let from=null;let linking=false;let drag=null;let editing=null;
-const nodes=()=>Object.entries(alcon.state).filter(([k,v])=>k.startsWith('n_')&&v&&typeof v==='object');
-const edges=()=>Object.entries(alcon.state).filter(([k,v])=>k.startsWith('e_')&&v&&typeof v==='object');
+const nodes=()=>Object.entries(clayware.state).filter(([k,v])=>k.startsWith('n_')&&v&&typeof v==='object');
+const edges=()=>Object.entries(clayware.state).filter(([k,v])=>k.startsWith('e_')&&v&&typeof v==='object');
 const say=text=>{hint.textContent=text||'';};
-async function commit(next){try{await alcon.save(next);say('');}catch(e){say(L('Could not save: ','保存できませんでした：')+(e.message||e));}render();}
+async function commit(next){try{await clayware.save(next);say('');}catch(e){say(L('Could not save: ','保存できませんでした：')+(e.message||e));}render();}
 function edgePoint(a,b){
  const cx=a.x+a.w/2,cy=a.y+a.h/2,dx=b.x+b.w/2-cx,dy=b.y+b.h/2-cy;if(!dx&&!dy)return [cx,cy];
  const s=a.kind==='ellipse'?1/Math.hypot(dx/(a.w/2),dy/(a.h/2)):a.kind==='diamond'?1/(Math.abs(dx)/(a.w/2)+Math.abs(dy)/(a.h/2)):Math.min(Math.abs(a.w/2/(dx||1e-9)),Math.abs(a.h/2/(dy||1e-9)));
@@ -155,18 +155,18 @@ function render(){
  }
  drawWires();
  swatches.replaceChildren();
- if(selected&&selected.startsWith('n_')&&alcon.state[selected])for(const h of HUES){const s=el('span','sw');s.style.background=fill(h);s.addEventListener('click',()=>commit({...alcon.state,[selected]:{...alcon.state[selected],hue:h}}));swatches.append(s);}
+ if(selected&&selected.startsWith('n_')&&clayware.state[selected])for(const h of HUES){const s=el('span','sw');s.style.background=fill(h);s.addEventListener('click',()=>commit({...clayware.state,[selected]:{...clayware.state[selected],hue:h}}));swatches.append(s);}
 }
 function add(kind){
  const id='n_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);const [w,h]=SIZE[kind];const count=nodes().length;
  const x=Math.min(board.clientWidth-w-10,24+(count%6)*28),y=Math.min(board.clientHeight-h-10,24+(count%6)*28);
  selected=id;removeBtn.disabled=false;
- commit({...alcon.state,[id]:{kind,x,y,w,h,text:'',hue:kind==='note'?48:null}});
+ commit({...clayware.state,[id]:{kind,x,y,w,h,text:'',hue:kind==='note'?48:null}});
 }
 for(const kind of ['note','rect','ellipse','diamond'])document.getElementById('add-'+kind).addEventListener('click',()=>add(kind));
 link.addEventListener('click',()=>{linking=!linking;from=null;link.setAttribute('aria-pressed',String(linking));say(linking?L('Click one shape, then another.','つなぐ図形を順に2つクリックします。'):'');});
 removeBtn.addEventListener('click',()=>{
- if(!selected)return;const next={...alcon.state};delete next[selected];
+ if(!selected)return;const next={...clayware.state};delete next[selected];
  if(selected.startsWith('n_'))for(const [id,e] of edges())if(e.a===selected||e.b===selected)delete next[id];
  selected=null;removeBtn.disabled=true;commit(next);
 });
@@ -177,31 +177,31 @@ board.addEventListener('pointerdown',ev=>{
  const id=box.dataset.id;
  if(linking){
   if(!from){from=id;select(id);say(L('Now click the shape it points to.','つなぐ先の図形をクリックします。'));}
-  else if(from!==id){const key='e_'+from.slice(2)+'_'+id.slice(2);const a=from;from=null;linking=false;link.setAttribute('aria-pressed','false');commit({...alcon.state,[key]:{a,b:id}});}
+  else if(from!==id){const key='e_'+from.slice(2)+'_'+id.slice(2);const a=from;from=null;linking=false;link.setAttribute('aria-pressed','false');commit({...clayware.state,[key]:{a,b:id}});}
   return;
  }
- const n=alcon.state[id];selected=id;removeBtn.disabled=false;
+ const n=clayware.state[id];selected=id;removeBtn.disabled=false;
  for(const other of board.querySelectorAll('.node'))other.classList.toggle('sel',other===box);
  drag={id,box,dx:ev.clientX-n.x,dy:ev.clientY-n.y,x:n.x,y:n.y,moved:false};box.setPointerCapture(ev.pointerId);
 });
 board.addEventListener('pointermove',ev=>{
- if(!drag)return;const n=alcon.state[drag.id];
+ if(!drag)return;const n=clayware.state[drag.id];
  drag.x=Math.max(0,Math.min(board.clientWidth-n.w,ev.clientX-drag.dx));drag.y=Math.max(0,Math.min(board.clientHeight-n.h,ev.clientY-drag.dy));
  if(Math.abs(drag.x-n.x)+Math.abs(drag.y-n.y)>2)drag.moved=true;
  drag.box.style.left=drag.x+'px';drag.box.style.top=drag.y+'px';
 });
 const drop=()=>{
  if(!drag)return;const d=drag;drag=null;
- if(d.moved)commit({...alcon.state,[d.id]:{...alcon.state[d.id],x:Math.round(d.x),y:Math.round(d.y)}});else render();
+ if(d.moved)commit({...clayware.state,[d.id]:{...clayware.state[d.id],x:Math.round(d.x),y:Math.round(d.y)}});else render();
 };
 board.addEventListener('pointerup',drop);board.addEventListener('pointercancel',drop);
 board.addEventListener('dblclick',ev=>{
  const box=ev.target.closest('.node');if(!box||linking)return;const id=box.dataset.id;const text=box.querySelector('span');
  editing=id;text.contentEditable='true';text.focus();document.getSelection().selectAllChildren(text);
- text.addEventListener('blur',()=>{editing=null;const value=text.textContent.slice(0,400);if(alcon.state[id]&&value!==(alcon.state[id].text||''))commit({...alcon.state,[id]:{...alcon.state[id],text:value}});else render();},{once:true});
+ text.addEventListener('blur',()=>{editing=null;const value=text.textContent.slice(0,400);if(clayware.state[id]&&value!==(clayware.state[id].text||''))commit({...clayware.state,[id]:{...clayware.state[id],text:value}});else render();},{once:true});
  text.addEventListener('keydown',e=>{if(e.key==='Escape'||(e.key==='Enter'&&!e.shiftKey&&!e.isComposing)){e.preventDefault();text.blur();}});
 });
-alcon.onChange(()=>{if(selected&&!alcon.state[selected]){selected=null;removeBtn.disabled=true;}render();});
+clayware.onChange(()=>{if(selected&&!clayware.state[selected]){selected=null;removeBtn.disabled=true;}render();});
 if(!nodes().length)say(L('Add a note or a shape. Double-click to write in it.','付箋や図形を追加します。ダブルクリックで文字を書けます。'));
 render();`,
 };

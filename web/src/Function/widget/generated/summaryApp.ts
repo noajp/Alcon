@@ -9,16 +9,16 @@ export const summaryApp: AppSource = {
 const status=document.getElementById('context-status');
 const refresh=document.getElementById('refresh');
 const memo=document.getElementById('memo');
-memo.value=typeof alcon.state.memo==='string'?alcon.state.memo:'';
-alcon.onChange(state=>{if(document.activeElement!==memo)memo.value=typeof state.memo==='string'?state.memo:'';});
+memo.value=typeof clayware.state.memo==='string'?clayware.state.memo:'';
+clayware.onChange(state=>{if(document.activeElement!==memo)memo.value=typeof state.memo==='string'?state.memo:'';});
 let timer;
-memo.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(async()=>{const output=document.getElementById('save-status');try{await alcon.save({...alcon.state,memo:memo.value});output.textContent='Notes saved';}catch(e){output.textContent='Could not save: '+e.message;}},400);});
+memo.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(async()=>{const output=document.getElementById('save-status');try{await clayware.save({...clayware.state,memo:memo.value});output.textContent='Notes saved';}catch(e){output.textContent='Could not save: '+e.message;}},400);});
 function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;}
 function section(title,lines){root.append(node('h3',title));const list=node('ul');for(const line of lines)list.append(node('li',line));root.append(list);}
 async function load(){
  refresh.disabled=true;root.replaceChildren();status.textContent='Loading data…';
  try{
-  const data=await alcon.readContext();
+  const data=await clayware.readContext();
   const now=new Date();const today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   const done=data.elements.filter(e=>e.status==='done');
   const open=data.elements.filter(e=>!['done','cancelled'].includes(e.status));

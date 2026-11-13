@@ -31,7 +31,7 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null);
   const chosen = providers.find((p) => p.id === draft.providerId) ?? null;
   // A connection removed since it was chosen still shows, so the change is visible.
-  const providerLabel = draft.providerId ? chosen?.name ?? t('Removed connection') : t('Anthropic (Alcon default)');
+  const providerLabel = draft.providerId ? chosen?.name ?? t('Removed connection') : t('Anthropic (Clayware default)');
 
   const save = async () => {
     const built = agentModelPatch(worker.ai_config, draft);
@@ -59,10 +59,10 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
         <div className="space-y-4">
           <Field label={t('Runs on')}>
             <div className="flex gap-1" role="radiogroup" aria-label={t('Runs on')}>
-              {(['alcon', 'claude-code'] as const).map((r) => (
+              {(['clayware', 'claude-code'] as const).map((r) => (
                 <Button key={r} shape="tab" role="radio" aria-checked={draft.runner === r}
                   variant={draft.runner === r ? 'secondary' : 'ghost'} onClick={() => setDraft({ ...draft, runner: r })}>
-                  {r === 'alcon' ? t('Alcon (AI platform)') : t('Claude Code')}
+                  {r === 'clayware' ? t('Clayware (AI platform)') : t('Claude Code')}
                 </Button>
               ))}
             </div>
@@ -73,7 +73,7 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
             )}
           </Field>
 
-          {draft.runner === 'alcon' && (
+          {draft.runner === 'clayware' && (
             <>
             <Field label={t('Provider')}>
               <DropdownMenu>
@@ -85,7 +85,7 @@ export function AgentModelDialog({ worker, spaceId, onClose, onSaved }: {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-[200px]">
                   <DropdownMenuItem onSelect={() => setDraft({ ...draft, providerId: null })} className="gap-2 text-[12px]">
-                    <span className="flex-1">{t('Anthropic (Alcon default)')}</span>
+                    <span className="flex-1">{t('Anthropic (Clayware default)')}</span>
                     {!draft.providerId && <Check size={12} />}
                   </DropdownMenuItem>
                   {providers.map((p) => (

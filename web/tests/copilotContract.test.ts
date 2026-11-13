@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copilotTitleOf, type CopilotMessage } from '@/AIP/ai/useAlconCopilot';
+import { copilotTitleOf, type CopilotMessage } from '@/AIP/ai/useClaywareCopilot';
 
 // The Copilot panel's display contract, pinned before the engine
 // unification moves the turns onto run-agent (Athena): the title a kept

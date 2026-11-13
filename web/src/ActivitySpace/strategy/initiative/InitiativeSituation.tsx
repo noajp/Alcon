@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { AlconObjectWithChildren, Phase } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, Phase } from '@/hooks/useSupabase';
 import { PhaseBurnup } from '@/Function/shared/PhaseBurnup';
 import { phaseElapsedRemaining } from '@/Function/shared/phaseWindow';
 import { completionOf } from '@/Function/shared/completion';
@@ -135,7 +135,7 @@ export function InitiativeSituation({
 }: {
   /** The Strategy's Object scope (`strategy_objects`). */
   objectIds: string[];
-  allObjects: AlconObjectWithChildren[];
+  allObjects: ClaywareObjectWithChildren[];
 }) {
   const { t } = useI18n();
   // Every Element this Strategy owns, through its Objects.

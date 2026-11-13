@@ -1,8 +1,8 @@
-# Alcon
+# Clayware
 
-**Alcon が完成するまで諦めない。** あなた（わたし Claude）は Alcon を世界最強の Super AI 実行基盤にするために、あらゆる努力をして能力を限界まで拡張させる。広い視野を持ち、設計者の立場で、ユーザーに何を届ける必要があるかという視点に立って開発する。
+**Clayware が完成するまで諦めない。** あなた（わたし Claude）は Clayware を世界最強の Super AI 実行基盤にするために、あらゆる努力をして能力を限界まで拡張させる。広い視野を持ち、設計者の立場で、ユーザーに何を届ける必要があるかという視点に立って開発する。
 
-Alcon は、組織の仕事を人と AI が一緒に進める運用基盤を目指します。チームの誰かに頼むように AI に伝えるだけで、AI が計画を立て、作業を進めます。クリエイティブな作業ではなく、現実の課題を解決するために使います。製品の設計と、次に作るものは [PRODUCT.md](./PRODUCT.md)、紹介は [docs/about.md](../docs/about.md)。
+Clayware は、組織の仕事を人と AI が一緒に進める運用基盤を目指します。チームの誰かに頼むように AI に伝えるだけで、AI が計画を立て、作業を進めます。クリエイティブな作業ではなく、現実の課題を解決するために使います。製品の設計と、次に作るものは [PRODUCT.md](./PRODUCT.md)、紹介は [docs/about.md](../docs/about.md)。
 
 ## 実現すること
 
@@ -18,7 +18,7 @@ Alcon は、組織の仕事を人と AI が一緒に進める運用基盤を目�
 
 ## あなたの目的
 
-Alcon を、課題を解決できる道具にすること。そのために、Alcon の AI がどんな仕事でもこなせる基盤を作る。Alcon の中の仕事は Alcon の AI に指示してやらせ、DB を直接書き換えたり、人が中身を書き写して渡したりして済ませない。Alcon の AI にできないことが見つかったら、その一件のための機能を足すのではなく、なぜ基盤でできないのか（道具・権限・文脈・入口のどれが欠けているか）を直す。
+Clayware を、課題を解決できる道具にすること。そのために、Clayware の AI がどんな仕事でもこなせる基盤を作る。Clayware の中の仕事は Clayware の AI に指示してやらせ、DB を直接書き換えたり、人が中身を書き写して渡したりして済ませない。Clayware の AI にできないことが見つかったら、その一件のための機能を足すのではなく、なぜ基盤でできないのか（道具・権限・文脈・入口のどれが欠けているか）を直す。
 
 ## 作りの三層
 
@@ -47,7 +47,7 @@ cd web && npm test           # Vitest（変更後に必ず）
 cd web && npm run build      # 本番ビルド
 cd web && npm run lint:changed && npm run unwired-lint && npm run design-lint
 cd web && npm run sync       # ブランチ・worktree の掃除
-cd web && npm run dispatch   # Element を Claude Code に渡す常駐（alcon スキル）
+cd web && npm run dispatch   # Element を Claude Code に渡す常駐（clayware スキル）
 ```
 
 テストは `web/tests/`（Vitest / node）。対象は不具合の影響が大きい純粋ロジックに絞り、UI のレンダリングテストは持たない。
@@ -81,8 +81,8 @@ root 直下は `supabase/`（migrations と functions。ここにだけ置く）
 ## Supabase
 
 - Project ID: `rkugtcqztkkacvoylupw`。閲覧範囲は RLS で制御する
-- AI は Edge Functions 経由（`run-agent` `plan-initiative` `alcon-copilot` など）
-- **既存テーブルに触る migration は `to_regclass` ガード必須**（PR の preview branch は空 DB に流すため。書式は alcon スキル）
+- AI は Edge Functions 経由（`run-agent` `plan-initiative` `clayware-copilot` など）
+- **既存テーブルに触る migration は `to_regclass` ガード必須**（PR の preview branch は空 DB に流すため。書式は clayware スキル）
 
 ## リポジトリ直下を「旧版」として消さない
 
@@ -94,4 +94,4 @@ root の `vercel.json` は本番デプロイ設定、root の `package.json` は
 
 ## 完了したら
 
-確認まで済んだらコミットして Push し、PR の CI が通ってからマージする。作業と無関係な変更は含めない。Alcon の Element を取って開発するとき、架空の案件で試すとき、PR をレビューするときは [alcon スキル](./skills/alcon/SKILL.md) を読む。
+確認まで済んだらコミットして Push し、PR の CI が通ってからマージする。作業と無関係な変更は含めない。Clayware の Element を取って開発するとき、架空の案件で試すとき、PR をレビューするときは [clayware スキル](./skills/clayware/SKILL.md) を読む。

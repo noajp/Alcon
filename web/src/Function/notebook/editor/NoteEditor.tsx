@@ -1108,7 +1108,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         />
         {/* ```mermaid blocks drawn over their source. */}
         <MermaidLayer root={ref} frame={frameRef} />
-        {/* ```alcon blocks drawn live over their source. */}
+        {/* ```clayware blocks drawn live over their source. */}
         <EmbedLayer root={ref} frame={frameRef} editable={editable} />
         {slash && createPortal(
           <>

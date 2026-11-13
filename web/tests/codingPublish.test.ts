@@ -204,7 +204,7 @@ describe('composePublish', () => {
   ]);
   const compose = (over: Partial<Parameters<typeof cp.composePublish>[0]> = {}) => cp.composePublish({
     target: { repo: 'acme/widgets', baseBranch: 'main' },
-    branch: 'alcon/run-abcdef123456',
+    branch: 'clayware/run-abcdef123456',
     changeSet: FULL_SET,
     patchFiles: cp.parsePatchFiles(FULL_PATCH),
     baseFiles,
@@ -218,13 +218,13 @@ describe('composePublish', () => {
     const r = compose();
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.plan.branch).toBe('alcon/run-abcdef123456');
+    expect(r.plan.branch).toBe('clayware/run-abcdef123456');
     expect(r.plan.writes).toEqual([
       { path: 'src/a.ts', content: 'a\nB\nc\n' },
       { path: 'src/new.ts', content: 'one\ntwo\n' },
     ]);
     expect(r.plan.deletes).toEqual([{ path: 'src/old.ts', sha: 'sha-old' }]);
-    expect(r.plan.pr).toEqual({ title: '直す', body: '本文', head: 'alcon/run-abcdef123456', base: 'main' });
+    expect(r.plan.pr).toEqual({ title: '直す', body: '本文', head: 'clayware/run-abcdef123456', base: 'main' });
   });
 
   it('refuses when a base file could not be read — a partial tree is never composed', () => {
@@ -325,7 +325,7 @@ describe('composeAmend (PR4: the iteration’s added commit)', () => {
 
 describe('the publish plan’s small laws', () => {
   it('branchNameForRun is deterministic per run and safe as a ref', () => {
-    expect(cp.branchNameForRun('12345678-9abc-def0-1234-56789abcdef0')).toBe('alcon/run-123456789abc');
+    expect(cp.branchNameForRun('12345678-9abc-def0-1234-56789abcdef0')).toBe('clayware/run-123456789abc');
     expect(cp.branchNameForRun('12345678-9abc-def0-1234-56789abcdef0'))
       .toBe(cp.branchNameForRun('12345678-9abc-def0-1234-56789abcdef0'));
   });

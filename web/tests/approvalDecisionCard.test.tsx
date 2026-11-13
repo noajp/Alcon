@@ -21,12 +21,12 @@ function action(over: Partial<AgentAction> = {}): AgentAction {
     element_id: null,
     tool: '',
     input: {
-      calls: [{ id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.' } }],
+      calls: [{ id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', title: 'Add the card', base: 'main', head: 'claude/card', body: 'The body.' } }],
       display: [{
         id: 'a', integration: 'GitHub', operation: 'create_pull_request', destination: 'https://api.github.com',
         detail: null, effect: 'write', critical: null, rememberable: true,
         title: 'Create a pull request',
-        fields: [{ label: 'Repository', value: 'Alcon' }, { label: 'Title', value: 'Add the card' }],
+        fields: [{ label: 'Repository', value: 'Clayware' }, { label: 'Title', value: 'Add the card' }],
         preview: 'The body.', askReason: 'command',
       }],
     } as AgentAction['input'],

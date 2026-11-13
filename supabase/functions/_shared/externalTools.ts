@@ -4,8 +4,8 @@ import { STRATEGY_TOOLS, runStrategyTool } from "./strategyTools.ts";
 import { AGENT_REPORT_TOOLS, isAgentReportTool, runAgentReportTool, type CallerNotifier, type ReportBinding } from "./agentReportTools.ts";
 import type { CallerAccess } from "./callerAuth.ts";
 
-// What a caller outside the app may do — through MCP (alcon-mcp) or REST
-// (alcon-api); both read this one list. Reads, plus the writes a person
+// What a caller outside the app may do — through MCP (clayware-mcp) or REST
+// (clayware-api); both read this one list. Reads, plus the writes a person
 // delegates day to day: create and update Elements, comment, assign, label,
 // and add or complete Sub-elements — and how an agent reports on the Element it works:
 // take and return the lease, log progress, close with an outcome

@@ -15,10 +15,10 @@
 //               carries the role alcon_oauth_client, which PostgREST grants
 //               nothing (ADR 0034), so it works only through this exchange.
 //   other       a Supabase session JWT, verified with auth.getUser and used
-//               as is (the path alcon-mcp has always had).
+//               as is (the path clayware-mcp has always had).
 //
 // The service role never reaches board data here. Without
-// ALCON_JWT_SIGNING_KEY a PAT or an OAuth token is refused with 500 "server
+// CLAYWARE_JWT_SIGNING_KEY a PAT or an OAuth token is refused with 500 "server
 // not configured" before any lookup; session JWTs keep working.
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -90,11 +90,14 @@ async function viaSession(token: string, url: string, anonKey: string): Promise<
   return { ok: true, caller: { userId: user.id, label: null, via: "session", access: "read_write", db } };
 }
 
+/** The signing key secret; a deployment that has not renamed it yet still holds it as ALCON_JWT_SIGNING_KEY. */
+const signingKeyFromEnv = () => Deno.env.get("CLAYWARE_JWT_SIGNING_KEY") ?? Deno.env.get("ALCON_JWT_SIGNING_KEY");
+
 async function viaPersonalAccessToken(token: string, url: string, anonKey: string, client: string | null): Promise<CallerAuthResult> {
   if (!isWellFormedPersonalAccessToken(token)) return unauthorized(INVALID_PAT);
   // Fail closed before the lookup, so a misconfigured function neither
   // accepts tokens nor marks them used.
-  const rawKey = Deno.env.get("ALCON_JWT_SIGNING_KEY");
+  const rawKey = signingKeyFromEnv();
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!parseSigningKey(rawKey) || !serviceKey) return notConfigured();
 
@@ -135,7 +138,7 @@ async function viaPersonalAccessToken(token: string, url: string, anonKey: strin
 }
 
 async function viaOAuth(token: string, clientId: string, url: string, anonKey: string): Promise<CallerAuthResult> {
-  const rawKey = Deno.env.get("ALCON_JWT_SIGNING_KEY");
+  const rawKey = signingKeyFromEnv();
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!parseSigningKey(rawKey) || !serviceKey) return notConfigured();
 

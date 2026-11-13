@@ -30,7 +30,7 @@ export async function openFoundFile(f: FoundFile): Promise<void> {
   else openAttachmentOwner(f);
 }
 
-/** Opens what a file is attached to, where it lives in Alcon: an Element's
+/** Opens what a file is attached to, where it lives in Clayware: an Element's
  *  file opens that Element's page (through its Object's). */
 export function openAttachmentOwner(f: FileOwnerRef): void {
   if (f.element_id) {

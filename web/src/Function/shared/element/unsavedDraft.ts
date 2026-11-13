@@ -22,7 +22,7 @@ export type UnsavedElementDraft = {
  *  edit that putting the draft back would overwrite). */
 export type OfferedDraft = { title?: string; description?: string; changedSince: boolean };
 
-const PREFIX = 'alcon:element-unsaved-draft:';
+const PREFIX = 'clayware:element-unsaved-draft:';
 
 const unsavedDraftKey = (userId: string, elementId: string) => `${PREFIX}${userId}:${elementId}`;
 

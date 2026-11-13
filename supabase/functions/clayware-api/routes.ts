@@ -64,10 +64,10 @@ function err(status: ApiError["status"], code: string, message: string, allow?: 
 
 /**
  * Pure. The function's own path: Supabase hands the handler
- * `/alcon-api/elements` (and, behind some proxies, `/functions/v1/alcon-api/…`).
+ * `/clayware-api/elements` (and, behind some proxies, `/functions/v1/clayware-api/…`).
  */
 export function apiPath(pathname: string): string {
-  let p = pathname.replace(/^\/functions\/v1(?=\/|$)/, "").replace(/^\/alcon-api(?=\/|$)/, "");
+  let p = pathname.replace(/^\/functions\/v1(?=\/|$)/, "").replace(/^\/clayware-api(?=\/|$)/, "");
   p = p.replace(/\/+$/, "");
   return p === "" ? "/" : p;
 }
@@ -292,7 +292,7 @@ export function toResponse(result: ToolResult, successStatus: 200 | 201): { stat
 
 /**
  * Pure. The name a write is recorded under: "API", with the caller's own
- * name (X-Alcon-Client) in front when it gave one, and how it signed in —
+ * name (X-Clayware-Client) in front when it gave one, and how it signed in —
  * "n8n (API · token: ops)", "API · token: ops", "Claude (API · OAuth)".
  */
 export function apiActorLabel(client: string | null, token: string | null, oauthClient: string | null = null): string {
@@ -375,9 +375,9 @@ export function openApiDocument(serverUrl: string): Record<string, unknown> {
   return {
     openapi: "3.1.0",
     info: {
-      title: "Alcon API",
+      title: "Clayware API",
       version: "0.1.0",
-      description: "Read and write the Alcon board as the person who issued the token. Reads: " +
+      description: "Read and write the Clayware board as the person who issued the token. Reads: " +
         `${EXTERNAL_READ_TOOLS.length} routes; writes: ${EXTERNAL_WRITE_TOOLS.length} routes. ` +
         "Deletes and bulk changes are not offered.",
     },

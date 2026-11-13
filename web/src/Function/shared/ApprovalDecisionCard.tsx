@@ -30,7 +30,7 @@ const WHY_ASKED: Record<Exclude<ApprovalAskReason, 'critical'>, string> = {
   rule: 'A condition on this command asks for approval.',
   mode: 'This Space asks every time.',
   http: 'This call is a raw HTTP request, which always asks.',
-  catalog: 'This operation in Alcon asks for approval first.',
+  catalog: 'This operation in Clayware asks for approval first.',
 };
 
 export function ApprovalDecisionCard({ action, canDecide, deciding, onDecide, surface, results, canRemember }: {

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement, type React
 import type { DateRange } from 'react-day-picker';
 import { Plus, Check, ChevronLeft, ChevronRight, Tag, X } from '@/ui/icons';
 import { TypeMark, useTypeIcons } from '@/Function/shared/elementTypeIcon';
-import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { addElementAssignee, removeElementAssignee, fetchAssignableWorkers, useWorkerById, noticeAssignmentFailed } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/Function/shared/AssigneeMenu';
 import type { Json } from '@/types/database';
@@ -636,7 +636,7 @@ export function ObjectCell({
   column, obj, elementTypes, onObjectUpdate, objectWorkers, onAddType, onRemoveType, onObjectCustomColumnValueChange,
 }: {
   column: DataColumn;
-  obj: AlconObjectWithChildren;
+  obj: ClaywareObjectWithChildren;
   elementTypes: string[];
   onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
   objectWorkers: Worker[];
@@ -740,7 +740,7 @@ export function ObjectCell({
 export function DueDateCell({
   obj, onObjectUpdate,
 }: {
-  obj: Pick<AlconObjectWithChildren, 'id' | 'due_date'>;
+  obj: Pick<ClaywareObjectWithChildren, 'id' | 'due_date'>;
   onObjectUpdate?: (objectId: string, updates: { due_date?: string | null }) => void | Promise<void>;
 }) {
   const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
@@ -794,7 +794,7 @@ export function DueDateCell({
 export function LeadCell({
   obj, workers, onObjectUpdate,
 }: {
-  obj: AlconObjectWithChildren;
+  obj: ClaywareObjectWithChildren;
   workers: Worker[];
   onObjectUpdate?: (objectId: string, updates: { lead_id?: string | null }) => void | Promise<void>;
 }) {

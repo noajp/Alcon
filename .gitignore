@@ -45,7 +45,7 @@ supabase/.temp
 next-env.d.ts
 
 # Asset relay token kept by a local app that imported sdk/
-.alcon/
+.clayware/
 
 # python
 __pycache__/

@@ -12,7 +12,7 @@ import { tx } from "@/ActivitySpace/artifacts/slides/kata/i18n";
 type AiSlide = { title: string; layout: LayoutId; source: string | null } & Record<string, unknown>;
 type AiReply = { reply?: string; storyline?: StorylineId; slides?: AiSlide[]; current?: number; error?: string };
 
-/** Claude through Alcon's slides-chat function; null when it is unavailable, so the local planner answers. */
+/** Claude through Clayware's slides-chat function; null when it is unavailable, so the local planner answers. */
 async function askClaude(body: Record<string, unknown>): Promise<AiReply | null> {
   try {
     const { data, error } = await supabase.functions.invoke('slides-chat', { body });

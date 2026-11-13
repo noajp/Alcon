@@ -22,7 +22,7 @@ export interface ApprovalRow {
   operation: string;
   /** The action as a person reads it: "Create a pull request". */
   title: string;
-  /** Where the call goes: the connection's base URL (or "Alcon"). */
+  /** Where the call goes: the connection's base URL (or "Clayware"). */
   destination: string;
   /** A manifest HTTP command's resolved request line, when it has one. */
   detail: string | null;

@@ -22,7 +22,7 @@ import { liveTurnFromSteps } from './copilotSteps';
 //     the whole point of an explainable Copilot.
 // ──────────────────────────────────────────────────────────────────────────
 
-/** One entity a turn created in Alcon, as the server recorded it
+/** One entity a turn created in Clayware, as the server recorded it
  *  (createdEntities.ts): a snapshot as created — title, and for an
  *  Element its display_id and status at birth. The card reads the row
  *  live by id; this is its fallback while that read loads, and its
@@ -49,7 +49,7 @@ export interface ToolEvent {
   input?: Record<string, unknown>;
   /** Filled in when the matching tool_result event arrives. */
   result?: { ok: boolean; rows?: number; error?: string };
-  /** What this call created in Alcon (creation tools only), drawn as
+  /** What this call created in Clayware (creation tools only), drawn as
    *  cards under the answer. Kept inside toolEvents, so the kept
    *  conversation carries it whole with no extra whitelist entry. */
   created?: CreatedEntity[];
@@ -199,7 +199,7 @@ export interface CopilotContext {
 }
 
 /** What the panel is speaking to, when it speaks to something rather than
- *  to Alcon at large: the open deck (a body swap — the deck's own
+ *  to Clayware at large: the open deck (a body swap — the deck's own
  *  assistant), or the open Strategy (context only; the conversation and
  *  its bounds are unchanged). */
 export type CopilotSubject = { kind: 'slides' } | { kind: 'strategy'; id: string } | null;
@@ -217,7 +217,7 @@ export function buildCopilotContext(input: {
   today: string;
 }): CopilotContext {
   const base: CopilotContext = {
-    viewLabel: 'Alcon',
+    viewLabel: 'Clayware',
     domainId: input.domainId ?? undefined,
     spaceId: input.spaceId ?? undefined,
     today: input.today,
@@ -326,7 +326,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * conversation (ai_sessions.messages) for the settled one. The
  * conversation lives here while it is open; CopilotProvider keeps it.
  */
-export function useAlconCopilot(options: CopilotHookOptions = {}) {
+export function useClaywareCopilot(options: CopilotHookOptions = {}) {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);

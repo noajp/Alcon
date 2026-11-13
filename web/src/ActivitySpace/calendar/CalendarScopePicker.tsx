@@ -7,7 +7,7 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/ui/command';
 import { MenuShell } from '@/Function/shared/menu';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
-import type { Domain, AlconObject } from '@/types/database';
+import type { Domain, ClaywareObject } from '@/types/database';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 
 export interface CalendarSelection {
@@ -18,7 +18,7 @@ export interface CalendarSelection {
 
 interface Props {
   domains: Domain[];
-  objects: AlconObject[];
+  objects: ClaywareObject[];
   selection: CalendarSelection;
   onChange: (selection: CalendarSelection) => void;
 }

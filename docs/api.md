@@ -1,10 +1,10 @@
-# Alcon REST API
+# Clayware REST API
 
-スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で Alcon のデータを読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。
+スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で Clayware のデータを読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。
 
-- ベース URL: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-api`
+- ベース URL: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-api`
 - 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`。Settings › API で発行）
-- 名乗り（任意）: `X-Alcon-Client: n8n` を送ると、書き込みの記録が「n8n (API · token: ops)」になる。送らなければ「API · token: ops」
+- 名乗り（任意）: `X-Clayware-Client: n8n` を送ると、書き込みの記録が「n8n (API · token: ops)」になる。送らなければ「API · token: ops」
 - 機械可読の仕様: `GET /openapi.json`（OpenAPI 3.1。トークンなしで読める）
 
 ## 経路
@@ -50,7 +50,7 @@ Sub-element は、親の Element（`parent_id`）を持つ普通の Element で�
 | 403 | `forbidden` | 読み取りのみのトークンで書き込んだ。書き込みを権限（RLS）が拒んだ。見えない Object・存在しない Object への Element の作成もここに入る |
 | 404 | `not_found` | 経路がない。対象がない、または本人に見えない |
 | 405 | `method_not_allowed` | そのパスにないメソッド（`Allow` ヘッダーに使えるもの） |
-| 422 | `invalid_request` / `rejected` | 未知のフィールド、必須の欠落、型・選択肢の不一致。Alcon が受け付けなかった |
+| 422 | `invalid_request` / `rejected` | 未知のフィールド、必須の欠落、型・選択肢の不一致。Clayware が受け付けなかった |
 | 500 | `server_error` | サーバーの設定がない、または照会に失敗した |
 
 見えない Element は 403 ではなく 404 になる。境界の外に何があるかは返さない。
@@ -58,36 +58,36 @@ Sub-element は、親の Element（`parent_id`）を持つ普通の Element で�
 ## 例
 
 ```bash
-export ALCON_TOKEN=alc_pat_…
-export ALCON_API=https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/alcon-api
+export CLAYWARE_TOKEN=alc_pat_…
+export CLAYWARE_API=https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-api
 ```
 
 Object の未完了の Element を読む:
 
 ```bash
-curl -s "$ALCON_API/elements?objectId=<Object の UUID>&status=todo" -H "Authorization: Bearer $ALCON_TOKEN"
+curl -s "$CLAYWARE_API/elements?objectId=<Object の UUID>&status=todo" -H "Authorization: Bearer $CLAYWARE_TOKEN"
 ```
 
 Element を作る:
 
 ```bash
-curl -s -X POST "$ALCON_API/elements" -H "Authorization: Bearer $ALCON_TOKEN" -H "Content-Type: application/json" -d '{"objectId":"<Object の UUID>","title":"週次レポートを送る","due_date":"2026-10-10"}'
+curl -s -X POST "$CLAYWARE_API/elements" -H "Authorization: Bearer $CLAYWARE_TOKEN" -H "Content-Type: application/json" -d '{"objectId":"<Object の UUID>","title":"週次レポートを送る","due_date":"2026-10-10"}'
 ```
 
 ステータスを変えてコメントする:
 
 ```bash
-curl -s -X PATCH "$ALCON_API/elements/ELE_PLT-006" -H "Authorization: Bearer $ALCON_TOKEN" -H "Content-Type: application/json" -d '{"status":"in_progress"}'
+curl -s -X PATCH "$CLAYWARE_API/elements/ELE_PLT-006" -H "Authorization: Bearer $CLAYWARE_TOKEN" -H "Content-Type: application/json" -d '{"status":"in_progress"}'
 ```
 
 ```bash
-curl -s -X POST "$ALCON_API/elements/ELE_PLT-006/comments" -H "Authorization: Bearer $ALCON_TOKEN" -H "Content-Type: application/json" -d '{"body":"着手しました"}'
+curl -s -X POST "$CLAYWARE_API/elements/ELE_PLT-006/comments" -H "Authorization: Bearer $CLAYWARE_TOKEN" -H "Content-Type: application/json" -d '{"body":"着手しました"}'
 ```
 
 ## デプロイ
 
 ```bash
-env -u SUPABASE_ACCESS_TOKEN supabase functions deploy alcon-api --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
+env -u SUPABASE_ACCESS_TOKEN supabase functions deploy clayware-api --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない・無効な場合に、関数自身がこの API の形式の 401 を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `alcon-mcp` も、`_shared/boardTools.ts` を変更したら `alcon-mcp` も再デプロイする。`alcon-copilot` はツールなし JSON 応答だけの関数で、`_shared/attachments.ts` と `_shared/models.ts` にのみ依存する（チャットは run-agent が担う）。PAT を受け付けるには、Edge Function のシークレット `ALCON_JWT_SIGNING_KEY` が要る（[mcp.md](mcp.md) のデプロイを参照）。
+`--no-verify-jwt` を付けるのは、トークンがない・無効な場合に、関数自身がこの API の形式の 401 を返すため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `clayware-mcp` も、`_shared/boardTools.ts` を変更したら `clayware-mcp` も再デプロイする。`clayware-copilot` はツールなし JSON 応答だけの関数で、`_shared/attachments.ts` と `_shared/models.ts` にのみ依存する（チャットは run-agent が担う）。PAT を受け付けるには、Edge Function のシークレット `CLAYWARE_JWT_SIGNING_KEY` が要る（[mcp.md](mcp.md) のデプロイを参照）。

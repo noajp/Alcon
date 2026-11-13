@@ -1,7 +1,7 @@
 // The Gmail connection's manifest: the read pair (gmail_search /
 // gmail_read), translated from Sim's gmail tools into the manifest
 // declarations the engine enforces (Sim prototype P1; design
-// ~/workspace/dev/alcon-sim-prototype-design.md §3), and the two
+// ~/workspace/dev/clayware-sim-prototype-design.md §3), and the two
 // writes P2 adds beside them (design §4): gmail_send — Sim's
 // gmail_send v2, its body assembled by the named gmail_mime builder,
 // its approval presentation translated from Sim's

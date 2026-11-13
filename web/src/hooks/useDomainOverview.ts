@@ -9,7 +9,7 @@ import { useCurrentUserId } from '@/providers/authContext';
 import { fetchExplorerData } from '@/Function/sync/explorerData';
 import { initiativesForObjects, domainsForObjects, type InitiativeRelation } from '@/Function/domain/domainRelations';
 import { readAllIn, readAllPages } from './readAllPages';
-import type { AlconObject, Domain } from '@/types/database';
+import type { ClaywareObject, Domain } from '@/types/database';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
 
 export async function fetchDomainOverview(domainId: string) {
@@ -51,7 +51,7 @@ export async function fetchInitiativeDomains(initiativeId: string, viewableDomai
   if (error) throw error;
   const links = await readAllPages<{ object_id: string }>('Strategy Object links', (from, to) => supabase.from('strategy_objects')
     .select('object_id', { count: 'exact' }).eq('strategy_id', initiativeId).order('object_id').range(from, to), link => link.object_id);
-  const objects = await readAllIn<Pick<AlconObject, 'id' | 'name' | 'domain_id'>>('Strategy Objects', links.map(link => link.object_id),
+  const objects = await readAllIn<Pick<ClaywareObject, 'id' | 'name' | 'domain_id'>>('Strategy Objects', links.map(link => link.object_id),
     (ids, from, to) => onlyActiveObjects(supabase.from('objects').select('id,name,domain_id', { count: 'exact' }).in('id', ids)).order('id').range(from, to), object => object.id);
   const homes = await readAllIn<{ object_id: string; domain_id: string }>('Object Domains', objects.map(object => object.id),
     (ids, from, to) => supabase.from('object_domains').select('object_id,domain_id', { count: 'exact' }).in('object_id', ids).order('object_id').order('domain_id').range(from, to), link => `${link.object_id}:${link.domain_id}`);

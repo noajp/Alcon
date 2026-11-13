@@ -1,4 +1,4 @@
-// The icons every screen uses. Lucide's whole set, with Alcon's own drawings
+// The icons every screen uses. Lucide's whole set, with Clayware's own drawings
 // taking the place of the ones they replace (same names, same props): a
 // screen imports from here, never from lucide-react, so a newly drawn glyph
 // shows everywhere its name is used. Drawings: glyphs.tsx.

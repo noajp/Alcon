@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { copilotTitleOf, toKeptMessages, useAlconCopilot, type CopilotMessage } from './useAlconCopilot';
+import { copilotTitleOf, toKeptMessages, useClaywareCopilot, type CopilotMessage } from './useClaywareCopilot';
 import { shouldResetOnArrival, type CopilotArrivalTransition } from './copilotArrival';
 import { useAiConversations } from '@/hooks/useAiConversations';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
@@ -13,7 +13,7 @@ import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 // the engine (Athena) writes its messages as its turns run, and this
 // provider only files it — a title once it has one, and the folder it was
 // started in.
-type Conversation = ReturnType<typeof useAlconCopilot> & {
+type Conversation = ReturnType<typeof useClaywareCopilot> & {
   library: ReturnType<typeof useAiConversations>;
   /** The kept session on screen; null for one not yet answered. */
   sessionId: string | null;
@@ -45,7 +45,7 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     sessionIdRef.current = id;
     setSessionId(id);
   }, []);
-  const conversation = useAlconCopilot({
+  const conversation = useClaywareCopilot({
     getSessionId: () => sessionIdRef.current,
     // A first send makes the kept conversation's row through the
     // library's insert — in the folder the conversation was started

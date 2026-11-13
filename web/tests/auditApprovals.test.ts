@@ -44,7 +44,7 @@ describe('the proof', () => {
     const proof = approvals.buildApprovalProof(redeemed, 'key');
     expect(proof.issued_at).toBe('2026-10-28T09:05:00.123Z');
     expect(Date.parse(proof.expires_at) - Date.parse(proof.issued_at)).toBe(approvals.APPROVAL_PROOF_TTL_SECONDS * 1000);
-    expect(proof).toMatchObject({ kind: 'alcon.approval', approval_id: APPROVAL, input_hash: HASH, deployment_id: DEP });
+    expect(proof).toMatchObject({ kind: 'clayware.approval', approval_id: APPROVAL, input_hash: HASH, deployment_id: DEP });
   });
 
   it('reads only for that approval, that content, under the pinned key, before it expires', async () => {
@@ -65,7 +65,7 @@ describe('the proof', () => {
     const swapped = new TextEncoder().encode(new TextDecoder().decode(body).replace(HASH, 'b'.repeat(64)));
     expect(await approvals.readApprovalProof(pinned, signature, swapped, { ...expect_, inputHash: 'b'.repeat(64) })).toBeNull();
     // A grants table signed by the same key is not a proof.
-    const table = new TextEncoder().encode(JSON.stringify({ kind: 'alcon.grants', approval_id: APPROVAL, input_hash: HASH, expires_at: '2099-01-01T00:00:00Z' }));
+    const table = new TextEncoder().encode(JSON.stringify({ kind: 'clayware.grants', approval_id: APPROVAL, input_hash: HASH, expires_at: '2099-01-01T00:00:00Z' }));
     const tableSig = grants.base64UrlEncode(await crypto.subtle.sign({ name: 'Ed25519' }, pair.privateKey, table));
     expect(await approvals.readApprovalProof(pinned, tableSig, table, expect_)).toBeNull();
   });

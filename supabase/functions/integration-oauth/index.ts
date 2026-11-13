@@ -70,7 +70,7 @@ const corsHeaders = {
 };
 
 const ROW_COLUMNS = "id, activity_space_id, preset, kind, name, description, endpoint, auth_type, auth_header, delegation";
-const NO_APP_ORIGIN = "Sign-in cannot finish because APP_ORIGIN is not set on the server. Ask an administrator to set APP_ORIGIN, then try again from Alcon.";
+const NO_APP_ORIGIN = "Sign-in cannot finish because APP_ORIGIN is not set on the server. Ask an administrator to set APP_ORIGIN, then try again from Clayware.";
 
 type Row = IntegrationRow & { activity_space_id: string };
 
@@ -104,7 +104,7 @@ function route(pathname: string): string {
  *  as plain text, so without an origin the answer is text. */
 function backToApp(result: "finish" | "error", integrationId: string | null, handle?: string, origin?: string | null): Response {
   const target = appReturnUrl(origin ?? Deno.env.get("APP_ORIGIN"), result, integrationId, handle);
-  if (!target) return text(result === "error" ? "The connection could not be completed. You can close this tab and try again from Alcon." : NO_APP_ORIGIN, 400);
+  if (!target) return text(result === "error" ? "The connection could not be completed. You can close this tab and try again from Clayware." : NO_APP_ORIGIN, 400);
   return new Response(null, { status: 302, headers: { "set-cookie": clearNonceCookie(), "cache-control": "no-store", location: target } });
 }
 
@@ -204,7 +204,7 @@ async function revokeAtGoogle(token: string): Promise<boolean> {
   return res?.status === 200;
 }
 
-/** Revokes the person's whole grant to Alcon's GitHub OAuth App. True when GitHub confirmed it. */
+/** Revokes the person's whole grant to Clayware's GitHub OAuth App. True when GitHub confirmed it. */
 async function revokeAtGithub(client: GithubClientConfig, token: string): Promise<boolean> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 20_000);
@@ -215,7 +215,7 @@ async function revokeAtGithub(client: GithubClientConfig, token: string): Promis
         authorization: `Basic ${btoa(`${client.clientId}:${client.clientSecret}`)}`,
         accept: "application/vnd.github+json",
         "content-type": "application/json",
-        "user-agent": "alcon-integration-oauth",
+        "user-agent": "clayware-integration-oauth",
       },
       body: JSON.stringify({ access_token: token }),
       signal: ctl.signal,
@@ -234,7 +234,7 @@ async function githubLogin(accessToken: string): Promise<string | null> {
   const t = setTimeout(() => ctl.abort(), 20_000);
   try {
     const res = await fetch(GITHUB_USER_URL, {
-      headers: { authorization: `Bearer ${accessToken}`, accept: "application/vnd.github+json", "user-agent": "alcon-integration-oauth" },
+      headers: { authorization: `Bearer ${accessToken}`, accept: "application/vnd.github+json", "user-agent": "clayware-integration-oauth" },
       signal: ctl.signal, redirect: "manual",
     });
     if (!res.ok) return null;
@@ -447,7 +447,7 @@ Deno.serve(async (req: Request) => {
     const github = google ? null : parseGithubSecret(pending.token_set);
     const provider: Provider | null = google ? "google" : github ? "github" : null;
     const integrationId = pending.flow_integration_id;
-    // Discarded, not revoked: a revoke ends Alcon's whole grant for that
+    // Discarded, not revoked: a revoke ends Clayware's whole grant for that
     // account, which would also cut the connections that person already has
     // in their own Spaces. The held tokens are gone once taken, so nobody
     // holds a usable token for this sign-in.
@@ -479,7 +479,7 @@ Deno.serve(async (req: Request) => {
   if (owned.row.auth_type !== "oauth") return json({ error: "this integration does not sign in with OAuth", code: "not_oauth" }, 400);
 
   const { data: raw } = await admin.rpc("get_integration_secret", { p_integration_id: integrationId });
-  // Revoking ends Alcon's whole grant for that account, including in other
+  // Revoking ends Clayware's whole grant for that account, including in other
   // Spaces that connected the same account.
   let revoked = false;
   if (providerOf(owned.row) === "github") {

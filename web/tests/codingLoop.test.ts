@@ -42,7 +42,7 @@ describe('tree delivery', () => {
   const cmd = cl.deliveryCommand({ url: "https://x.example/snap?tok=a&b=c'd", target: { repo: 'acme/widgets', baseBranch: 'main' }, baseSha: 'abc1234' });
 
   it('the command unpacks, initialises git at the base, and reports the file count', () => {
-    expect(cmd).toContain('tar -xzf alcon-tree.tar.gz -C alcon-repo --strip-components=1');
+    expect(cmd).toContain('tar -xzf clayware-tree.tar.gz -C alcon-repo --strip-components=1');
     expect(cmd).toContain('git init -q -b \'main\'');
     expect(cmd).toContain('commit -qm \'base: acme/widgets@abc1234\'');
     expect(cmd).toContain('echo FILES $(git ls-files | wc -l)');
@@ -86,12 +86,12 @@ describe('test evidence', () => {
 describe('the change set', () => {
   const output = [
     'staged',
-    '__ALCON_STATUS__',
+    '__CLAYWARE_STATUS__',
     'M  src/a.ts',
     'A  src/b.ts',
     'D  src/c.ts',
     'R  src/old.ts -> src/new.ts',
-    '__ALCON_DIFF__',
+    '__CLAYWARE_DIFF__',
     'diff --git a/src/a.ts b/src/a.ts',
     '--- a/src/a.ts',
     '+++ b/src/a.ts',
@@ -128,7 +128,7 @@ describe('the change set', () => {
   });
 
   it('an output without a change is an empty set; without markers it is no evidence', () => {
-    const empty = cl.parseChangeSet('__ALCON_STATUS__\n__ALCON_DIFF__\n');
+    const empty = cl.parseChangeSet('__CLAYWARE_STATUS__\n__CLAYWARE_DIFF__\n');
     expect(empty?.empty).toBe(true);
     expect(empty?.files).toEqual([]);
     expect(cl.parseChangeSet('random shell noise')).toBeNull();

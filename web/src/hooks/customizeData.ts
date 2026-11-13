@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
-// Settings › AI: the catalog of harnesses Alcon offers (catalog_items, read
+// Settings › AI: the catalog of harnesses Clayware offers (catalog_items, read
 // by everyone, seeded by migration), and the public MCP registry searched
 // through the connector-directory function.
 //

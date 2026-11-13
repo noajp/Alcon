@@ -6,7 +6,7 @@
 // sign-out in another tab, a different account), every other user's blob is
 // dropped — on a shared machine nobody inherits the previous person's data.
 
-const PREFIX = 'alcon-query-cache';
+const PREFIX = 'clayware-query-cache';
 
 /** The IndexedDB key that holds `userId`'s persisted query cache. */
 export function queryCacheKey(userId: string): string {

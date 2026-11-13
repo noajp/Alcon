@@ -11,17 +11,17 @@ const pullUrlsIn = server.pullUrlsIn as (text: string) => { repo: string; number
 
 describe('parsePullUrl', () => {
   const cases = [
-    'https://github.com/noajp/Alcon/pull/554',
-    '  https://github.com/noajp/Alcon/pull/554/files  ',
+    'https://github.com/noajp/clayware/pull/554',
+    '  https://github.com/noajp/clayware/pull/554/files  ',
     'https://github.com/a.b/c_d-e/pull/7#discussion',
-    'https://github.com/noajp/Alcon/issues/554',
-    'http://github.com/noajp/Alcon/pull/1',
-    'https://github.com/noajp/Alcon/pull/0',
+    'https://github.com/noajp/clayware/issues/554',
+    'http://github.com/noajp/clayware/pull/1',
+    'https://github.com/noajp/clayware/pull/0',
     'not a url',
   ];
   it('reads owner/repo and number', () => {
-    expect(parsePullUrl(cases[0])).toEqual({ repo: 'noajp/Alcon', number: 554 });
-    expect(parsePullUrl(cases[1])).toEqual({ repo: 'noajp/Alcon', number: 554 });
+    expect(parsePullUrl(cases[0])).toEqual({ repo: 'noajp/clayware', number: 554 });
+    expect(parsePullUrl(cases[1])).toEqual({ repo: 'noajp/clayware', number: 554 });
     expect(parsePullUrl(cases[2])).toEqual({ repo: 'a.b/c_d-e', number: 7 });
     expect(parsePullUrl(cases[3])).toBeNull();
     expect(parsePullUrl(cases[4])).toBeNull();
@@ -204,7 +204,7 @@ describe('readGuide', () => {
 });
 
 describe('iteratePrompt', () => {
-  const base = { repo: 'o/r', number: 7, url: 'https://github.com/o/r/pull/7', headRef: 'alcon/el-1' };
+  const base = { repo: 'o/r', number: 7, url: 'https://github.com/o/r/pull/7', headRef: 'clayware/el-1' };
   it('asks for the open points on the same branch', () => {
     const p = iteratePrompt({
       ...base,
@@ -218,7 +218,7 @@ describe('iteratePrompt', () => {
         { verdict: 'matches', body: 'lgtm', reviewer: 'Cy', stale: false },
       ],
     })!;
-    expect(p).toContain('alcon/el-1');
+    expect(p).toContain('clayware/el-1');
     expect(p).toContain('`a.ts:3`');
     expect(p).toContain('missing the empty state');
     expect(p).not.toContain('done already');

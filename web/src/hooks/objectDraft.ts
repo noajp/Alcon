@@ -16,7 +16,7 @@ export interface ObjectDraft {
   elements: ObjectDraftElement[];
 }
 
-// Calls the draft-object Edge Function and returns an Alcon Object +
+// Calls the draft-object Edge Function and returns an Clayware Object +
 // Elements proposal derived from the Brief's structured content.
 export async function draftObjectFromBrief(brief: Brief): Promise<ObjectDraft> {
   const body = {

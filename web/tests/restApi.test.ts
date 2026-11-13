@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-// The REST API (alcon-api, ELE_PLT-006): the pure routing layer.
-const routes = await import(new URL('../../supabase/functions/alcon-api/routes.ts', import.meta.url).pathname);
+// The REST API (clayware-api, ELE_PLT-006): the pure routing layer.
+const routes = await import(new URL('../../supabase/functions/clayware-api/routes.ts', import.meta.url).pathname);
 const external = await import(new URL('../../supabase/functions/_shared/externalTools.ts', import.meta.url).pathname);
-const { MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/alcon-mcp/tools.ts', import.meta.url).pathname);
+const { MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
 
 const {
   ROUTES, apiPath, matchRoute, planRequest, validateArgs, queryArgs, errorForToolFailure, toResponse,
@@ -60,10 +60,10 @@ describe('the allowlist', () => {
 
 describe('paths', () => {
   it('strips the function prefix', () => {
-    expect(apiPath('/alcon-api/elements')).toBe('/elements');
-    expect(apiPath('/functions/v1/alcon-api/elements/ELE_PLT-006/')).toBe('/elements/ELE_PLT-006');
-    expect(apiPath('/alcon-api')).toBe('/');
-    expect(apiPath('/alcon-apiary/elements')).toBe('/alcon-apiary/elements');
+    expect(apiPath('/clayware-api/elements')).toBe('/elements');
+    expect(apiPath('/functions/v1/clayware-api/elements/ELE_PLT-006/')).toBe('/elements/ELE_PLT-006');
+    expect(apiPath('/clayware-api')).toBe('/');
+    expect(apiPath('/clayware-apiary/elements')).toBe('/clayware-apiary/elements');
   });
 
   it('matches a route and reads its id', () => {
@@ -189,7 +189,7 @@ describe('validateArgs and queryArgs', () => {
 
 describe('openApiDocument', () => {
   it('describes every route from the tool schemas', () => {
-    const doc = openApiDocument('https://example.test/functions/v1/alcon-api') as {
+    const doc = openApiDocument('https://example.test/functions/v1/clayware-api') as {
       paths: Record<string, Record<string, { operationId: string; requestBody?: { content: Record<string, { schema: { properties: Record<string, unknown>; required?: string[] } }> } }>>;
     };
     const ops = Object.values(doc.paths).flatMap((p) => Object.values(p).map((o) => o.operationId)).sort();

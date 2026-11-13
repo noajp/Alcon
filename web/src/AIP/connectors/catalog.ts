@@ -66,7 +66,7 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
   },
   {
     id: 'google-drive', name: 'Google Drive', icon: '/integrations/google-drive.svg', kind: 'http', endpoint: 'https://www.googleapis.com/drive/v3', auth: 'oauth',
-    description: 'Search, read, create and update Google Drive files. Agents see only files Alcon created or that you chose.',
+    description: 'Search, read, create and update Google Drive files. Agents see only files Clayware created or that you chose.',
     credentialLabel: 'Google account', category: 'files', source: 'official', builtBy: 'Google', featured: true, custom: false,
   },
   {
@@ -77,7 +77,7 @@ export const INTEGRATION_PRESETS: readonly IntegrationPreset[] = [
   },
   {
     id: 'github', name: 'GitHub', icon: '/integrations/github.svg', kind: 'mcp', endpoint: 'https://api.githubcopilot.com/mcp/', auth: 'oauth',
-    description: "Review and merge pull requests in Alcon, and let agents work with repositories, issues and pull requests through GitHub's MCP server.",
+    description: "Review and merge pull requests in Clayware, and let agents work with repositories, issues and pull requests through GitHub's MCP server.",
     credentialLabel: 'GitHub account', category: 'development', source: 'official', builtBy: 'GitHub', featured: false, custom: false,
   },
   {

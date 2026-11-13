@@ -1,4 +1,4 @@
-// Apps connected to Alcon over OAuth (ELE_PLT-004, ADR 0034): pure helpers
+// Apps connected to Clayware over OAuth (ELE_PLT-004, ADR 0034): pure helpers
 // shared by the consent screen and Settings › API & access.
 
 export type OAuthAccess = 'read' | 'read_write';
@@ -12,7 +12,7 @@ export interface OAuthGrantLike {
 export interface ConnectedApp {
   clientId: string;
   name: string;
-  /** The client's own website, as it registered itself; shown, never followed by Alcon. */
+  /** The client's own website, as it registered itself; shown, never followed by Clayware. */
   uri: string;
   grantedAt: string;
   access: OAuthAccess;
@@ -20,7 +20,7 @@ export interface ConnectedApp {
 
 /**
  * Pure. Supabase's grants joined with what the person allowed each client.
- * A client with no access row is read-only, as alcon-mcp treats it. Newest first.
+ * A client with no access row is read-only, as clayware-mcp treats it. Newest first.
  */
 export function mergeConnectedApps(
   grants: readonly OAuthGrantLike[],

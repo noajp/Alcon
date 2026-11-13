@@ -5,13 +5,13 @@
 // when the caller doesn't pass option lists for them, so the same UI
 // shell works without exposing dead controls.
 
-import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren } from '@/hooks/useSupabase';
 import type { ListDisplay, ListFilter, ListOrderBy } from './types';
 
 export function applyObjectFilter(
-  objects: AlconObjectWithChildren[],
+  objects: ClaywareObjectWithChildren[],
   filter: ListFilter,
-): AlconObjectWithChildren[] {
+): ClaywareObjectWithChildren[] {
   const q = filter.query?.trim().toLowerCase() ?? '';
   return objects.filter((o) => {
     if (filter.types && filter.types.length > 0) {
@@ -25,9 +25,9 @@ export function applyObjectFilter(
 const SUPPORTED_OBJECT_ORDERS: ListOrderBy[] = ['manual', 'title', 'created', 'updated'];
 
 export function orderObjects(
-  objects: AlconObjectWithChildren[],
+  objects: ClaywareObjectWithChildren[],
   display: ListDisplay,
-): AlconObjectWithChildren[] {
+): ClaywareObjectWithChildren[] {
   const dir = display.orderDir === 'desc' ? -1 : 1;
   // Anything not in SUPPORTED_OBJECT_ORDERS falls back to manual.
   const ordering: ListOrderBy = SUPPORTED_OBJECT_ORDERS.includes(display.orderBy)

@@ -344,7 +344,7 @@ export interface PublishPlan {
  *  for its run so a re-drive of the same finish composes the same
  *  plan (and a different run never collides with it). */
 export function branchNameForRun(runId: string): string {
-  return `alcon/run-${runId.replace(/[^A-Za-z0-9]/g, "").slice(0, 12) || "run"}`;
+  return `clayware/run-${runId.replace(/[^A-Za-z0-9]/g, "").slice(0, 12) || "run"}`;
 }
 
 /** One base file, resolved for the composition: its text and its
@@ -524,7 +524,7 @@ export function pullRequestTitle(elementTitle: string | null, finishSummary: str
  *  summary — what was done and how it was tested, then the record. */
 export function pullRequestBody(input: { finishSummary: string; finishMessage: string; changeSummary: string }): string {
   const head = [input.finishSummary.trim(), input.finishMessage.trim()].filter(Boolean).join("\n\n");
-  return [head, "---", input.changeSummary, "", "Alcon のコーディング実行が、検証済みのパッチを接続経由で適用して開いた PR です。"]
+  return [head, "---", input.changeSummary, "", "Clayware のコーディング実行が、検証済みのパッチを接続経由で適用して開いた PR です。"]
     .filter((s) => s !== "")
     .join("\n")
     .slice(0, 20_000);

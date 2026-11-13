@@ -18,7 +18,7 @@ import type { EscalateTarget } from './harnessDefinition';
 // definition's own failure section is silent, so installing one is
 // the owner's act (the RPCs re-check it), and the panel only offers
 // the buttons to owners. Nothing here edits an entry: the catalog is
-// Alcon's, a Space chooses which entries govern it.
+// Clayware's, a Space chooses which entries govern it.
 
 const ESCALATE_LABEL: Record<EscalateTarget, string> = {
   owner: 'Space owners',

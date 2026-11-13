@@ -4,7 +4,7 @@ import { ChatComposer, ChatPanel } from './kata/components/panels/ChatPanel';
 import { useKataLocale } from './useKataLocale';
 
 /**
- * The open deck's conversation, shown in Alcon's AI panel while Slides is the
+ * The open deck's conversation, shown in Clayware's AI panel while Slides is the
  * active view — one AI panel across the app, whose subject follows the screen.
  * Paste notes or ask for a change here; the deck on the canvas updates.
  */

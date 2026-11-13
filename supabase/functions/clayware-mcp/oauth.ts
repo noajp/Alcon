@@ -1,6 +1,6 @@
 // How an MCP client finds out where to sign in (ELE_PLT-004, ADR 0034).
 //
-// alcon-mcp is an OAuth protected resource; Supabase Auth's OAuth 2.1 server
+// clayware-mcp is an OAuth protected resource; Supabase Auth's OAuth 2.1 server
 // is its authorization server. A client that calls without a token gets a 401
 // whose WWW-Authenticate names the resource metadata (RFC 9728); the metadata
 // names the authorization server, whose own metadata Supabase serves at
@@ -17,7 +17,7 @@ function base(supabaseUrl: string): string {
 
 /** Pure. The MCP endpoint, as clients address it. */
 export function resourceUrl(supabaseUrl: string): string {
-  return `${base(supabaseUrl)}/functions/v1/alcon-mcp`;
+  return `${base(supabaseUrl)}/functions/v1/clayware-mcp`;
 }
 
 /** Pure. Where the protected resource metadata is served. */
@@ -25,7 +25,7 @@ export function resourceMetadataUrl(supabaseUrl: string): string {
   return `${resourceUrl(supabaseUrl)}${PROTECTED_RESOURCE_PATH}`;
 }
 
-/** Pure. RFC 9728 metadata for alcon-mcp. */
+/** Pure. RFC 9728 metadata for clayware-mcp. */
 export function protectedResourceMetadata(supabaseUrl: string): Record<string, unknown> {
   return {
     resource: resourceUrl(supabaseUrl),
@@ -34,14 +34,14 @@ export function protectedResourceMetadata(supabaseUrl: string): Record<string, u
     // No openid: the project signs with HS256 only, and Supabase issues ID
     // tokens only with asymmetric keys.
     scopes_supported: ["email", "profile"],
-    resource_name: "Alcon",
-    resource_documentation: "https://github.com/noajp/Alcon/blob/main/docs/mcp.md",
+    resource_name: "Clayware",
+    resource_documentation: "https://github.com/noajp/clayware/blob/main/docs/mcp.md",
   };
 }
 
 /** Pure. True when the function's path asks for the protected resource metadata. */
 export function isProtectedResourcePath(pathname: string): boolean {
-  return pathname.replace(/\/+$/, "").endsWith(`/alcon-mcp${PROTECTED_RESOURCE_PATH}`);
+  return pathname.replace(/\/+$/, "").endsWith(`/clayware-mcp${PROTECTED_RESOURCE_PATH}`);
 }
 
 function quoted(value: string): string {
@@ -53,7 +53,7 @@ function quoted(value: string): string {
  * error (RFC 6750 §3.1); with a bad one, invalid_token and why.
  */
 export function wwwAuthenticate(supabaseUrl: string, detail: string | null): string {
-  const parts = [`realm="alcon"`, `resource_metadata="${quoted(resourceMetadataUrl(supabaseUrl))}"`];
+  const parts = [`realm="clayware"`, `resource_metadata="${quoted(resourceMetadataUrl(supabaseUrl))}"`];
   if (detail) parts.push(`error="invalid_token"`, `error_description="${quoted(detail)}"`);
   return `Bearer ${parts.join(", ")}`;
 }

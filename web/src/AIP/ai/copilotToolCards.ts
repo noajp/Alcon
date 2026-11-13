@@ -1,4 +1,4 @@
-import type { ToolEvent } from './useAlconCopilot';
+import type { ToolEvent } from './useClaywareCopilot';
 import { toolVerb } from './copilotFiles';
 
 // Pure. A panel tool event as a tool call card reads it: the tool's name,

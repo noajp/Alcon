@@ -33,7 +33,7 @@ export interface DistillMaterial {
   personSaid?: string | null;
 }
 
-export const DISTILL_SYSTEM = `あなたは Alcon の仕事の記録から「次の仕事で再利用できる知見」だけを蒸留する役です。入力は1つの仕事の要約・手順の見出し・検証の指摘です。
+export const DISTILL_SYSTEM = `あなたは Clayware の仕事の記録から「次の仕事で再利用できる知見」だけを蒸留する役です。入力は1つの仕事の要約・手順の見出し・検証の指摘です。
 
 # 残すもの（0〜2件。「残す価値なし」が正しい答えのことも多い）
 - procedure: どうやればうまくいくか。連携や API の癖、引数の組み合わせ、手順のコツ、失敗する条件。

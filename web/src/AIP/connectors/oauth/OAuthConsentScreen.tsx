@@ -50,7 +50,7 @@ export function OAuthConsentScreen() {
           setState({ kind: 'leaving' });
           window.location.assign(target);
         } else {
-          setState({ kind: 'error', message: t('The app returned an address Alcon cannot open.') });
+          setState({ kind: 'error', message: t('The app returned an address Clayware cannot open.') });
         }
         return;
       }
@@ -87,14 +87,14 @@ export function OAuthConsentScreen() {
           <p className="text-[13px] text-muted-foreground">{state.kind === 'leaving' ? t('Returning to the app…') : t('Loading…')}</p>
         ) : state.kind === 'error' ? (
           <div className="space-y-2">
-            <h1 className="text-[15px] font-semibold text-foreground">{t('Connect to Alcon')}</h1>
+            <h1 className="text-[15px] font-semibold text-foreground">{t('Connect to Clayware')}</h1>
             <p role="alert" className="text-[13px] text-muted-foreground">{state.message}</p>
           </div>
         ) : (
           <>
             <div className="space-y-1">
               <h1 className="text-[15px] font-semibold text-foreground">
-                {t('{client} wants to connect to Alcon', { client: state.details.client.name || t('An app') })}
+                {t('{client} wants to connect to Clayware', { client: state.details.client.name || t('An app') })}
               </h1>
               <p className="text-[12px] text-muted-foreground">
                 {t('After you decide, you return to {host}.', { host: redirectHost(state.details.redirect_uri) })}

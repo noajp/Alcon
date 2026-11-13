@@ -9,7 +9,7 @@ import { ElementProgressMark, getElementProgress } from '@/Function/shared/Eleme
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { requestElementDetail } from '@/Function/shared/element/elementDetailRequest';
 import { GanttChart } from '@/ui/icons';
-import { updateObject, type AlconObjectWithChildren, type ElementWithDetails } from '@/hooks/useSupabase';
+import { updateObject, type ClaywareObjectWithChildren, type ElementWithDetails } from '@/hooks/useSupabase';
 import type { EmbedHost, EmbedSpec } from '@/Function/notebook/editor/embedBlocks';
 import { objectToGanttBar } from '@/ActivitySpace/execution/domain/DomainView';
 
@@ -50,7 +50,7 @@ function ElementList({ elements, onOpen }: { elements: ElementWithDetails[]; onO
   );
 }
 
-function ObjectsGantt({ objects, onChanged }: { objects: AlconObjectWithChildren[]; onChanged: () => void }) {
+function ObjectsGantt({ objects, onChanged }: { objects: ClaywareObjectWithChildren[]; onChanged: () => void }) {
   const { t } = useI18n();
   const bars = useMemo(() => objects.map(objectToGanttBar), [objects]);
   if (!objects.length) return <p className="rounded-md border border-border/60 px-3 py-2.5 text-[13px] text-muted-foreground">{t('No Objects yet.')}</p>;
@@ -65,7 +65,7 @@ function ObjectsGantt({ objects, onChanged }: { objects: AlconObjectWithChildren
 /** What "/" offers in a Strategy's description, and how each block draws. */
 export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged }: {
   elements: ElementWithDetails[];
-  objects: AlconObjectWithChildren[];
+  objects: ClaywareObjectWithChildren[];
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   onChanged: () => void;
 }): EmbedHost {

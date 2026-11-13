@@ -1,6 +1,6 @@
 // Files sent with a person's message, turned into model content. Every
 // entry that takes a message with files — Athena's chat driver in
-// run-agent, and alcon-copilot's tool-free json mode — builds the turn's
+// run-agent, and clayware-copilot's tool-free json mode — builds the turn's
 // content here, so the limits and the block shapes mean the same thing
 // however the message arrived. Pure: a bad file is an Error with the
 // reason, and the caller decides how the conversation hears it.

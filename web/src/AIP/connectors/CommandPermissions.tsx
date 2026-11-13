@@ -19,7 +19,7 @@ import type { AutonomyGrant, CommandTrackRecord } from '@/types/database';
 // commands come from the server's own tool list (the connection test writes
 // them into the integration's manifest); a person only chooses, per command,
 // whether agents may use it freely, must ask first, or may not use it at all.
-// A command can also carry conditions on its arguments ("repo is Alcon →
+// A command can also carry conditions on its arguments ("repo is Clayware →
 // allowed", "to is *@example.com → allowed, otherwise not allowed"): the
 // first that matches decides, under any delegation. Approving with "Don’t ask
 // again" adds one. The engine enforces exactly this (run-agent,

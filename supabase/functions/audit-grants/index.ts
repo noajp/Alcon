@@ -1,18 +1,18 @@
 // The grants a gateway enforces, handed out signed (ADR 0046).
 //
-// Alcon holds the grants (deployment_grants, edited by the Space's owner in
+// Clayware holds the grants (deployment_grants, edited by the Space's owner in
 // the Audit app); the gateway enforces them. The gateway asks with its
 // Ed25519 key — the same key it sends records with (audit-intake) — and gets
 // back the latest version of every deployment in that key's Space, signed
-// with Alcon's own key. The gateway pins Alcon's public key at setup, so a
-// table that did not come from Alcon is never enforced. Each table expires
+// with Clayware's own key. The gateway pins Clayware's public key at setup, so a
+// table that did not come from Clayware is never enforced. Each table expires
 // (GRANTS_TTL_SECONDS); past it the gateway stops send and money.
 //
 // Request:  POST (no body)
-//           x-alcon-gateway-key: <workflow_gateway_keys.id>
-//           x-alcon-timestamp:   <Unix seconds>
-//           x-alcon-signature:   <base64url Ed25519 signature of grantsRequestText(key, timestamp)>
-// Response: 200 <GrantsTable JSON>, x-alcon-signature: <base64url Ed25519 signature of the raw body>
+//           x-clayware-gateway-key: <workflow_gateway_keys.id>
+//           x-clayware-timestamp:   <Unix seconds>
+//           x-clayware-signature:   <base64url Ed25519 signature of grantsRequestText(key, timestamp)>
+// Response: 200 <GrantsTable JSON>, x-clayware-signature: <base64url Ed25519 signature of the raw body>
 //           401 no valid key, signature or timestamp
 //           503 nothing decided — ask again
 //
@@ -42,9 +42,9 @@ Deno.serve(async (req) => {
   if (!url || !serviceKey || !signing) return json({ error: "grants signing is not configured" }, 500);
   const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" };
 
-  const keyId = req.headers.get("x-alcon-gateway-key") ?? "";
-  const timestamp = req.headers.get("x-alcon-timestamp") ?? "";
-  const signature = req.headers.get("x-alcon-signature") ?? "";
+  const keyId = req.headers.get("x-clayware-gateway-key") ?? req.headers.get("x-alcon-gateway-key") ?? "";
+  const timestamp = req.headers.get("x-clayware-timestamp") ?? req.headers.get("x-alcon-timestamp") ?? "";
+  const signature = req.headers.get("x-clayware-signature") ?? req.headers.get("x-alcon-signature") ?? "";
   if (!UUID.test(keyId) || !signature || !requestIsFresh(timestamp, Date.now())) return json({ error: "unauthorized" }, 401);
 
   // As at the intake: an unknown key, a revoked one and a bad signature all
@@ -75,6 +75,6 @@ Deno.serve(async (req) => {
   const sealed = await crypto.subtle.sign({ name: "Ed25519" }, signing.key, body as BufferSource);
   return new Response(body, {
     status: 200,
-    headers: { "Content-Type": "application/json", "x-alcon-signature": base64UrlEncode(sealed), "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/json", "x-clayware-signature": base64UrlEncode(sealed), "Cache-Control": "no-store" },
   });
 });

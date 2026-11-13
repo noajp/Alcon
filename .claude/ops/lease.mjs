@@ -44,7 +44,7 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
  * so it can be tested without a filesystem.
  *
  *   LOOP_HOLDER=… wins outright.
- *   Otherwise 'Claude@<worktree basename>' — the primary checkout is 'Alcon',
+ *   Otherwise 'Claude@<worktree basename>' — the primary checkout is 'Clayware',
  *   a session worktree is its directory name, which is what makes two
  *   concurrent sessions distinguishable.
  *

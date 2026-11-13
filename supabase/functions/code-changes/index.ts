@@ -23,7 +23,7 @@
 // credential is the Space's GitHub integration (Settings › Customize); a
 // public repository reads without one, but nothing is written without one —
 // and what is written goes as that token's GitHub account, so each post says
-// who wrote it in Alcon.
+// who wrote it in Clayware.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
       ]));
       const columns = pullColumns(pull);
       await admin.from("code_changes").update(columns).eq("id", row.id);
-      // Comments that were written in Alcon are already shown from Alcon.
+      // Comments that were written in Clayware are already shown from Clayware.
       const { data: ours } = await admin.from("code_change_comments").select("github_comment_id").eq("code_change_id", row.id).not("github_comment_id", "is", null);
       const posted = new Set(((ours ?? []) as { github_comment_id: number }[]).map((c) => Number(c.github_comment_id)));
       return json({ change: { ...row, ...columns }, files, github_comments: remote.filter((c) => !posted.has(c.id)) });
@@ -222,7 +222,7 @@ async function publish(
   const reviewId = typeof body.reviewId === "string" ? body.reviewId : "";
   const commentId = typeof body.commentId === "string" ? body.commentId : "";
   const { data: el } = await userDb.from("elements").select("display_id").eq("id", change.element_id).maybeSingle();
-  const tag = (el as { display_id: string | null } | null)?.display_id ?? "Alcon";
+  const tag = (el as { display_id: string | null } | null)?.display_id ?? "Clayware";
 
   if (reviewId) {
     const { data } = await userDb.from("code_change_reviews")
@@ -230,7 +230,7 @@ async function publish(
     const review = data as { id: string; reviewer_id: string; reviewer_name: string | null; verdict: string; body: string | null; head_sha: string | null; github_review_id: number | null } | null;
     if (!review || review.reviewer_id !== userId) return json({ error: "review not found" }, 404);
     if (review.github_review_id) return json({ github_id: review.github_review_id });
-    const text = `**${review.reviewer_name ?? "Someone"}** reviewed this in Alcon (${tag}): ${VERDICT_WORDS[review.verdict] ?? review.verdict}.${review.body?.trim() ? `\n\n${review.body.trim()}` : ""}`;
+    const text = `**${review.reviewer_name ?? "Someone"}** reviewed this in Clayware (${tag}): ${VERDICT_WORDS[review.verdict] ?? review.verdict}.${review.body?.trim() ? `\n\n${review.body.trim()}` : ""}`;
     try {
       const id = await withWriteToken(tokens, async (token) => {
         const event = VERDICT_EVENT[review.verdict] ?? "COMMENT";
@@ -258,7 +258,7 @@ async function publish(
     const c = data as { id: string; author_id: string; author_name: string | null; path: string; line: number; side: string; body: string; head_sha: string | null; github_comment_id: number | null } | null;
     if (!c || c.author_id !== userId) return json({ error: "comment not found" }, 404);
     if (c.github_comment_id) return json({ github_id: c.github_comment_id });
-    const text = `**${c.author_name ?? "Someone"}** (Alcon): ${c.body}`;
+    const text = `**${c.author_name ?? "Someone"}** (Clayware): ${c.body}`;
     try {
       const id = await withWriteToken(tokens, async (token) => {
         const commitId = c.head_sha ?? change.head_sha;

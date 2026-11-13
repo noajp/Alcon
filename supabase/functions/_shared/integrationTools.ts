@@ -3,7 +3,7 @@
 // (names, descriptions, schemas), how one call is judged for approval, how
 // it is shown on an approval card, and how it runs. run-agent adds its run
 // machinery around these (steps, transcripts, continuations, PR linking);
-// alcon-copilot calls the same pieces directly, so a manifest means the
+// clayware-copilot calls the same pieces directly, so a manifest means the
 // same thing at both entries and there is no second manifest→tool code.
 //
 // Scope of the shared assembly (buildSpaceIntegrationTools): an
@@ -33,7 +33,7 @@ import {
 import { askReasonOf, type ApprovalFacts, type AskReason } from "./approvalPolicy.ts";
 import { overlayPresentation } from "./approvalPresentations.ts";
 import {
-  McpSession, callHttp, httpIsRead, httpPseudoAction, isAuthFailure, isSafeEndpoint, pointsAtAlcon, resolveCredential,
+  McpSession, callHttp, httpIsRead, httpPseudoAction, isAuthFailure, isSafeEndpoint, pointsAtClayware, resolveCredential,
   type IntegrationRow, type RemoteTool,
 } from "./integrationClient.ts";
 import type { ReplayTransport } from "./definitionTests.ts";
@@ -184,7 +184,7 @@ export function lazyBinding(
 /** One call as the approval card shows it, stored with the pending action. */
 export interface ApprovalDisplay {
   id: string; integration: string; operation: string;
-  /** Where the call goes: the connection's base URL, or "Alcon" for its own tools. */
+  /** Where the call goes: the connection's base URL, or "Clayware" for its own tools. */
   destination: string;
   /** A manifest HTTP command's resolved request line (`POST /repos/…`), when it has one. */
   detail: string | null;
@@ -311,7 +311,7 @@ export function approvalDisplayForCall(tools: Map<string, IntegrationTool>, c: T
       });
       const operation = catalogOperation(c.name, c.input);
       return {
-        id: c.id, integration: "Alcon", operation, destination: "Alcon", detail: null, effect: "write", critical: null, rememberable: false,
+        id: c.id, integration: "Clayware", operation, destination: "Clayware", detail: null, effect: "write", critical: null, rememberable: false,
         title: humanizedTitle(c.name), fields: fallbackFields(c.input), preview: null, askReason,
       };
     }
@@ -616,7 +616,7 @@ export function oauthRowOpens(
  * decides), enabled, MCP or HTTP, with the same closings a run applies —
  * an unsafe endpoint is skipped, a manifest that declares nothing usable
  * closes its integration, an untested MCP connection stays closed, a
- * connection pointing at Alcon itself is never used. What cannot be used
+ * connection pointing at Clayware itself is never used. What cannot be used
  * is reported in `down` with the reason, so the agent can tell the person
  * instead of guessing.
  *
@@ -676,10 +676,10 @@ export async function buildSpaceIntegrationTools(args: {
       down.push({ name: row.name, reason: "接続テストが済んでいない（Settings › Customize で接続テストが必要）" });
       continue;
     }
-    // Never Alcon itself: the board tools already act as the person, and a
+    // Never Clayware itself: the board tools already act as the person, and a
     // stored token would act outside their authority.
-    if (pointsAtAlcon(row.endpoint, args.supabaseUrl)) {
-      down.push({ name: row.name, reason: "Alcon 自身を指しているため使いません（Alcon のデータは標準の道具で操作します）" });
+    if (pointsAtClayware(row.endpoint, args.supabaseUrl)) {
+      down.push({ name: row.name, reason: "Clayware 自身を指しているため使いません（Clayware のデータは標準の道具で操作します）" });
       continue;
     }
     // OAuth here is a sign-in this engine can complete (oauthRowOpens):

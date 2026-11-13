@@ -23,7 +23,7 @@ import { Stat } from './mission/MissionPanels';
 import { EvaluationTrend } from './EvaluationTrend';
 
 // The Strategy's Evaluation tab: a scrolling report over the records its
-// finished runs already left (design: alcon-evaluation-tab-design §6).
+// finished runs already left (design: clayware-evaluation-tab-design §6).
 // Aggregation is the pure evaluationModel's, by ELEMENT SET; this panel
 // is presentation only. The surface shows verdicts and evidence — the
 // minimum needed to judge — never raw error objects; a run's full step

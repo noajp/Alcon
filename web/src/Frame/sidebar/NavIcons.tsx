@@ -20,7 +20,7 @@ import {
 import { DomainIcon, ObjectIcon, ElementIcon, FilesIcon } from '@/Function/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
-// Alcon's own glyphs (ui/icons): solid shapes on a 16-unit grid, the same
+// Clayware's own glyphs (ui/icons): solid shapes on a 16-unit grid, the same
 // family as every other icon in the app.
 //
 // The Execution units (Domain / Object / Element) don't redeclare their glyph

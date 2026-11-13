@@ -16,7 +16,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { LabelSettings } from './LabelSettings';
 import { ElementTemplateSettings } from './ElementTemplateSettings';
 import { ConnectorsSettings } from '@/AIP/connectors/IntegrationsSettings';
-import { AlconConnectPanel } from '@/AIP/connectors/AlconConnectPanel';
+import { ClaywareConnectPanel } from '@/AIP/connectors/ClaywareConnectPanel';
 import { AssetRelayPanel } from '@/AIP/connectors/AssetRelayPanel';
 import { HarnessesPanel } from '@/AIP/harness/HarnessesPanel';
 import {
@@ -46,7 +46,7 @@ import { TimelineSettings } from './TimelineSettings';
 /** One-line descriptions for the pages whose panels don't open with one
  *  of their own. */
 const AREA_DESCRIPTIONS: Record<string, string> = {
-  preferences: 'Language, appearance, and defaults for how Alcon works for you.',
+  preferences: 'Language, appearance, and defaults for how Clayware works for you.',
   timeline: 'How the Timeline is drawn',
   harnesses: 'How AI carries out a kind of work: the goal, the steps, where it stops and asks, the shape of the result and the connectors it uses.',
   connectors: 'The outside services AI can use when it works in this Space.',
@@ -83,7 +83,7 @@ export function SettingsView() {
       case 'workspace': return <ActivitySpaceSettings />;
       case 'members': return <MemberSettings />;
       case 'domain': return <TeamSettings />;
-      case 'api': return <AlconConnectPanel />;
+      case 'api': return <ClaywareConnectPanel />;
       case 'assets': return <AssetRelayPanel />;
       default: return null;
     }
@@ -174,12 +174,12 @@ function PreferencesPanel() {
       )}
 
       <SettingsIsland title={t('General')}>
-        <SettingRow label={t('Language')} desc={t('Choose the language used across Alcon')}>
+        <SettingRow label={t('Language')} desc={t('Choose the language used across Clayware')}>
           <LanguageSelect />
         </SettingRow>
         <SegmentedRow
           label={t('Default home view')}
-          desc={t('Select which view to open when launching Alcon')}
+          desc={t('Select which view to open when launching Clayware')}
           value={preferences.home_view}
           options={['My Elements', 'Inbox', 'Calendar']}
           onChange={(v) => savePreference('home_view', v as UserPreferences['home_view'])}

@@ -46,7 +46,7 @@ export function stripOAuthReturn(href: string): string {
 }
 
 /** sessionStorage: the Settings page a sign-in was started from, when it is not Connectors (a harness install returns to Harnesses). */
-const OAUTH_RETURN_SETTINGS_PAGE_KEY = 'alcon.integrationOAuth.returnPage';
+const OAUTH_RETURN_SETTINGS_PAGE_KEY = 'clayware.integrationOAuth.returnPage';
 const RETURN_PAGES = new Set(['harnesses', 'connectors']);
 
 export function saveOAuthReturnSettingsPage(page: string): void {

@@ -4,7 +4,7 @@ import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '@/shared/designTokens';
 import { useEffect, useRef, useState } from 'react';
 import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed, UserRound } from '@/ui/icons';
 import { useEscapeLayer } from '@/Function/shared/keyboard';
-import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
 import { ObjectIcon } from '@/Frame/icons';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/ui/tooltip';
@@ -23,7 +23,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 interface BulkActionBarProps {
   count: number;
   /** Objects offered in the move / multi-home picker (current Domain). */
-  pickerObjects: AlconObjectWithChildren[];
+  pickerObjects: ClaywareObjectWithChildren[];
   /** Optionally exclude an Object from the picker (the current Object). */
   excludeObjectId?: string | null;
   onDelete: () => void | Promise<void>;

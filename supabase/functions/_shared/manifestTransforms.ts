@@ -1,5 +1,5 @@
 // Named response transforms (Sim prototype P1T; design
-// ~/workspace/dev/alcon-sim-prototype-design.md §3.4) and named
+// ~/workspace/dev/clayware-sim-prototype-design.md §3.4) and named
 // request-body builders (P2; design §4.2) — the registry's two
 // halves, one for each direction a call crosses.
 //

@@ -44,7 +44,7 @@ export interface PanelToolEvent {
   name: string;
   input?: Record<string, unknown>;
   result?: { ok: boolean; rows?: number; error?: string };
-  /** What this call created in Alcon (the create family only), as card
+  /** What this call created in Clayware (the create family only), as card
    *  records — the turn's creations are part of its record, so what a
    *  stopped turn made before the stop stands as cards, not prose. */
   created?: CreatedEntity[];

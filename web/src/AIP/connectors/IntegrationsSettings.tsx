@@ -41,7 +41,7 @@ import type { DirectoryEntry } from '@/hooks/customizeData';
 // service neither has. Members see everything read-only; only owners can
 // connect or change.
 
-const DOCS_URL = 'https://github.com/noajp/Alcon/blob/main/docs/mcp.md';
+const DOCS_URL = 'https://github.com/noajp/clayware/blob/main/docs/mcp.md';
 
 export function ConnectorsSettings() {
 

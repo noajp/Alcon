@@ -24,7 +24,7 @@ vi.mock('@/Function/settings/SlaSettings', () => ({ SlaSettings: () => 'SLA pane
 vi.mock('@/Function/settings/TimelineSettings', () => ({ TimelineSettings: () => 'Timeline panel' }));
 vi.mock('@/AIP/connectors/IntegrationsSettings', () => ({ ConnectorsSettings: () => 'Connectors panel' }));
 vi.mock('@/AIP/harness/HarnessesPanel', () => ({ HarnessesPanel: () => 'Harnesses panel' }));
-vi.mock('@/AIP/connectors/AlconConnectPanel', () => ({ AlconConnectPanel: () => 'API panel' }));
+vi.mock('@/AIP/connectors/ClaywareConnectPanel', () => ({ ClaywareConnectPanel: () => 'API panel' }));
 vi.mock('@/AIP/connectors/AssetRelayPanel', () => ({ AssetRelayPanel: () => 'Assets panel' }));
 vi.mock('@/Function/settings/useUserPreferences', () => ({
   useUserPreferences: () => ({

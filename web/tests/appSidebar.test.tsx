@@ -78,7 +78,7 @@ vi.mock('@/ActivitySpace/artifacts/slides/SlidesSidebar', () => ({
   createFolderHere: vi.fn(),
   pickDeckFile: vi.fn(),
 }));
-vi.mock('@/Frame/QuickAddElementLauncher', () => ({ CREATE_ELEMENT_EVENT: 'alcon:create-element' }));
+vi.mock('@/Frame/QuickAddElementLauncher', () => ({ CREATE_ELEMENT_EVENT: 'clayware:create-element' }));
 
 import { AppSidebar } from '@/Frame/AppSidebar';
 

@@ -13,7 +13,7 @@ import { sha256Hex } from "./googleOAuth.ts";
 import { copilotApprovalExpiresAt, type PanelMessage } from "./copilotSession.ts";
 
 /** How the Copilot signs its steps, comments and notifications. */
-export const COPILOT_AGENT_NAME = "Alcon Copilot";
+export const COPILOT_AGENT_NAME = "Clayware Copilot";
 
 export interface PersistedApproval { actionId: string; inputHash: string; summary: string }
 

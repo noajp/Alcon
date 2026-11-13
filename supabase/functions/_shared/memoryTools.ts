@@ -5,7 +5,7 @@
 // standing from a conversation). All run with the caller's JWT — RLS decides
 // whose memories a call may see or write, exactly as for every other
 // catalog tool, and neither is governed by the approval modes (memory
-// is Alcon's internal bookkeeping, like writing a step; the person's
+// is Clayware's internal bookkeeping, like writing a step; the person's
 // control is the settings toggle and the settings screen's editing).
 //
 // remember writes durable directly: its origin is the person's own

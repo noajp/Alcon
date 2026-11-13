@@ -19,11 +19,11 @@ const COLUMNS = 'id, user_id, name, token_prefix, access, expires_at, last_used_
 
 /** Derived from the project this build talks to, so preview and local builds show their own addresses. */
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '');
-export const ALCON_MCP_URL = `${SUPABASE_URL}/functions/v1/alcon-mcp`;
+export const CLAYWARE_MCP_URL = `${SUPABASE_URL}/functions/v1/clayware-mcp`;
 
-/** The Claude Code command that connects to Alcon with a token (or a placeholder for one). */
+/** The Claude Code command that connects to Clayware with a token (or a placeholder for one). */
 export function claudeMcpAddCommand(token: string): string {
-  return `claude mcp add --transport http alcon "${ALCON_MCP_URL}?client=Claude%20Code" --header "Authorization: Bearer ${token}"`;
+  return `claude mcp add --transport http clayware "${CLAYWARE_MCP_URL}?client=Claude%20Code" --header "Authorization: Bearer ${token}"`;
 }
 
 export type TokenExpiryDays = 30 | 90 | null;

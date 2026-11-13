@@ -1,7 +1,7 @@
 'use client';
 
 import { parseDateOnly } from '@/Function/shared/dateUtils';
-import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { SectionGroup } from '@/Function/shared/listControls/sectionGroup';
 
 // Stable empty defaults — destructuring `= []` inline would allocate a NEW
@@ -61,7 +61,7 @@ export interface ListSection {
   /** Optional small label rendered after the count, faded out (e.g.
    *  "no parent Object" on the Domain-direct elements band). */
   subtitle?: string;
-  objects: AlconObjectWithChildren[];
+  objects: ClaywareObjectWithChildren[];
   elements?: ElementWithDetails[];
   /** Set when the band is a group bucket rather than an Object — which field
    *  the list is grouped by and which of its values this band holds. The add

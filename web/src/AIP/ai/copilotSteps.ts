@@ -1,11 +1,11 @@
-import type { CopilotConnectionProposal, CopilotCredentialAsk, CreatedEntity, ToolEvent } from './useAlconCopilot';
+import type { CopilotConnectionProposal, CopilotCredentialAsk, CreatedEntity, ToolEvent } from './useClaywareCopilot';
 
 // A Copilot turn in progress, read from its run's steps — the live
 // display while Athena works, before the kept conversation carries the
 // settled turn. The chat driver writes the steps (run-agent): the
 // person's 'message', a step per tool result (its title the tool, its
 // detail a JSON of the call's input, the result's rows or error, and
-// what the call created when it created Alcon entities),
+// what the call created when it created Clayware entities),
 // 'draft' steps holding the answer as it grows, 'reply' steps for
 // each stretch of finished words, a 'connection_request' step per
 // connection proposal, a 'credential_request' step per credential

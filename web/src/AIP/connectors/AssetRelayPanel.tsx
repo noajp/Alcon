@@ -54,7 +54,7 @@ export function AssetRelayPanel() {
       <section className="space-y-3">
         <div>
           <h2 className={`${FONT.lg} text-foreground`}>{t('Connect an app')}</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">{t("Add Alcon's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">{t("Add Clayware's SDK (Node or Python) to the app and import it first, then paste these settings into the app's environment.")}</p>
         </div>
         {spaceId && (
           <div className={`${SETTINGS_ISLAND} p-2`}>

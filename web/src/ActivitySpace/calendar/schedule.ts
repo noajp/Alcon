@@ -1,4 +1,4 @@
-import type { AlconObject, ElementWithDetails } from '@/types/database';
+import type { ClaywareObject, ElementWithDetails } from '@/types/database';
 import type { ExplorerData } from '@/Function/sync/explorerPatch';
 import type { CalendarEvent } from '@/hooks/calendarEventData';
 import { shiftDateOnly } from '@/Function/shared/dateUtils';
@@ -7,7 +7,7 @@ export type CalendarEntry = Pick<ElementWithDetails,
   'id' | 'title' | 'start_date' | 'due_date' | 'start_time' | 'due_time' | 'color' | 'status' | 'priority' | 'estimated_hours'
 > & (
   | { element: ElementWithDetails; object?: never; event?: never }
-  | { object: AlconObject; element?: never; event?: never }
+  | { object: ClaywareObject; element?: never; event?: never }
   | { event: CalendarEvent; element?: never; object?: never }
 );
 
@@ -36,7 +36,7 @@ export function occursOn(entry: { start_date: string | null; due_date: string | 
 
 /** Everything the Calendar draws: Elements, Objects with dates, and the
  *  Space's events (a plan, not work: no status, never overdue). */
-export function calendarEntries(elements: ElementWithDetails[], objects: AlconObject[] = [], events: CalendarEvent[] = []): CalendarEntry[] {
+export function calendarEntries(elements: ElementWithDetails[], objects: ClaywareObject[] = [], events: CalendarEvent[] = []): CalendarEntry[] {
   return [
     ...events.map(event => ({
       id: `event:${event.id}`, title: event.title, start_date: event.start_date, due_date: event.end_date,

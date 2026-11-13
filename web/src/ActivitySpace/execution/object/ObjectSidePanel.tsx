@@ -12,16 +12,16 @@ import { ObjectIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
 import { ObjectPropertiesWidget } from '@/Function/widget/widgets/ObjectPropertiesWidget';
 import type { WidgetHost } from '@/Function/widget/types';
-import type { AlconObjectWithChildren, ObjectDependency } from '@/types/database';
+import type { ClaywareObjectWithChildren, ObjectDependency } from '@/types/database';
 
 // An Object, read beside the timeline it was picked from: its name, what it
 // is for, its properties (edited in place — the same island its own page
 // carries) and its Elements. The name opens the Object itself.
 
 export function ObjectSidePanel({ object, objects, links, onOpen, onOpenElement, onClose, onRefresh }: {
-  object: AlconObjectWithChildren;
+  object: ClaywareObjectWithChildren;
   /** The Objects a dependency can name (the Domain's). */
-  objects: AlconObjectWithChildren[];
+  objects: ClaywareObjectWithChildren[];
   /** Every dependency among them. */
   links: ObjectDependency[];
   /** Opens the Object's own page. */
@@ -91,8 +91,8 @@ export function ObjectSidePanel({ object, objects, links, onOpen, onOpenElement,
  *  removable, with a "+" that offers the Objects a link would not loop on. */
 function DependencyList({ title, object, objects, links, side }: {
   title: string;
-  object: AlconObjectWithChildren;
-  objects: AlconObjectWithChildren[];
+  object: ClaywareObjectWithChildren;
+  objects: ClaywareObjectWithChildren[];
   links: ObjectDependency[];
   side: 'blocker' | 'blocked';
 }) {

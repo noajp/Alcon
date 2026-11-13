@@ -1,13 +1,13 @@
-# Alcon：PMBOK の体系と既存機能の照合
+# Clayware：PMBOK の体系と既存機能の照合
 
-この資料は、Alcon を PMBOK の用語で説明できるかを確かめるための対応表です。PMBOK を Alcon の骨格にするのではなく、**Alcon の概念で運用した結果として PMBOK の成果物と領域が表現できている状態**を目指します。不足している箇所は「読み替え（レンズ）で足りるもの」と「データそのものが足りないもの」に分けます。
+この資料は、Clayware を PMBOK の用語で説明できるかを確かめるための対応表です。PMBOK を Clayware の骨格にするのではなく、**Clayware の概念で運用した結果として PMBOK の成果物と領域が表現できている状態**を目指します。不足している箇所は「読み替え（レンズ）で足りるもの」と「データそのものが足りないもの」に分けます。
 
-調査日は 2026-10-02 です。PMBOK の内容は PMI の公開情報（第7版の FAQ と第8版の刊行告知）と、二次情報（研修会社や解説記事）によるもので、第8版の原本とは照合していません。Alcon 側の情報はリポジトリ（`web/src`、`supabase/migrations`、`web/src/types/database.ts`）を根拠にしています。
+調査日は 2026-10-02 です。PMBOK の内容は PMI の公開情報（第7版の FAQ と第8版の刊行告知）と、二次情報（研修会社や解説記事）によるもので、第8版の原本とは照合していません。Clayware 側の情報はリポジトリ（`web/src`、`supabase/migrations`、`web/src/types/database.ts`）を根拠にしています。
 
 ## 判断に使える結論
 
-1. **第8版（2025）を主な対照軸にする。** 第8版は、第7版の原理・原則とパフォーマンス領域を保ったまま、40 のプロセスを領域に組み込んで一冊に戻した版です。第6版の「成果物の具体性」と、第7版の「成果と価値への重心」を両方持っており、Alcon との照合にいちばん向いています。
-2. **Alcon の骨格は PMBOK の価値実現システムとほぼ重なる。** 第7版・第8版の The Standard は、価値の流れを「戦略 → ポートフォリオ → プログラム／プロジェクト → プロダクト／オペレーション」とし、オペレーションから戦略へ情報が戻るものとして描いています。Alcon の Vision → Initiative（入れ子）→ Domain → Object → Element は、この流れを実装した形です。ポートフォリオは、ほかの Initiative を束ねる親の Initiative として表します。第8版はガバナンス領域に、立ち上げ・計画の統合・変更判断をまとめました。これは「Initiative は意図を持ち、担当や進捗は持たない」という Alcon の分け方と同じ向きです。
+1. **第8版（2025）を主な対照軸にする。** 第8版は、第7版の原理・原則とパフォーマンス領域を保ったまま、40 のプロセスを領域に組み込んで一冊に戻した版です。第6版の「成果物の具体性」と、第7版の「成果と価値への重心」を両方持っており、Clayware との照合にいちばん向いています。
+2. **Clayware の骨格は PMBOK の価値実現システムとほぼ重なる。** 第7版・第8版の The Standard は、価値の流れを「戦略 → ポートフォリオ → プログラム／プロジェクト → プロダクト／オペレーション」とし、オペレーションから戦略へ情報が戻るものとして描いています。Clayware の Vision → Initiative（入れ子）→ Domain → Object → Element は、この流れを実装した形です。ポートフォリオは、ほかの Initiative を束ねる親の Initiative として表します。第8版はガバナンス領域に、立ち上げ・計画の統合・変更判断をまとめました。これは「Initiative は意図を持ち、担当や進捗は持たない」という Clayware の分け方と同じ向きです。
 3. **強いのは Governance・Resources・Schedule、弱いのは Finance・Stakeholders。Risk はその中間。** 前提（assumption）、意思決定、諦めたもの、成功条件（measure）、実現構想（approach）の仮説と見直しは、一般的な PM ツールよりも深く表現できます。一方で、ベースライン、コスト、外部ステークホルダー、リスクの発生確率と影響度は、表現するためのデータがありません。
 4. **不足の大半はレンズで足りる。新たなデータが要るのは 4 つだけ。** その 4 つは、ベースラインのスナップショット、費用（予算と実績）、ステークホルダー（Worker ではない利害関係者）、リスク（脅威と機会、確率と影響）です。課題ログ、変更ログ、教訓登録簿、RACI、状況報告は、既存データの読み替えとして作れます。
 5. **すでにスキーマがあるのに UI のない資産がガバナンス領域に効く。** `intent_escalations`、`intent_audits`、`intent_predictions`、`intent_resources`、`intent_alignments`、`intent_next_actions` は、第8版の Governance（変更の評価と実施、パフォーマンスの監視）と Risk に直結します。新しく作る前に、まずこれらを表に出すかどうかを判断します。
@@ -72,9 +72,9 @@
 - 「モデル・方法・成果物」の章が残っているか
 - 公式日本語訳の有無と訳語
 
-## 2. 価値実現システムと Alcon の階層
+## 2. 価値実現システムと Clayware の階層
 
-| PMI の価値実現システム | Alcon | 備考 |
+| PMI の価値実現システム | Clayware | 備考 |
 |---|---|---|
 | 組織戦略 | Vision | Space に 1 文 |
 | ポートフォリオ | 親の Initiative | 子の Initiative を束ねる（入れ子） |
@@ -85,13 +85,13 @@
 | オペレーション | Sustainment（CRM / SCM / Workload / Calendar） | 継続業務の道具 |
 | オペレーション → 戦略への情報の戻り | measure の実績、approach の検証、Situation 表示 | 成果の自動観測は未提供（PRODUCT.md） |
 
-PMBOK の「プロジェクト」は、Alcon の Initiative（意図）と Object の束（実行）の二つにまたがります。PMBOK のプロジェクト憲章は、この二つを一枚に書く文書です。**Alcon で「プロジェクト」を一つの画面に出すなら、Initiative と、それに紐づく Object の集合を合成したビューになります。** これが第一のレンズの候補です。
+PMBOK の「プロジェクト」は、Clayware の Initiative（意図）と Object の束（実行）の二つにまたがります。PMBOK のプロジェクト憲章は、この二つを一枚に書く文書です。**Clayware で「プロジェクト」を一つの画面に出すなら、Initiative と、それに紐づく Object の集合を合成したビューになります。** これが第一のレンズの候補です。
 
 ## 3. パフォーマンス領域（第8版）× 既存機能
 
 凡例：◎＝十分に表現できる、○＝読み替えれば表現できる、△＝一部だけ、×＝データがない
 
-| 領域 | 評価 | Alcon で表現できているもの | 足りないもの |
+| 領域 | 評価 | Clayware で表現できているもの | 足りないもの |
 |---|---|---|---|
 | ガバナンス | ◎ | Initiative の意図、decision（判断者、日時、諦めたもの、見直し日、`superseded_by`）、`intent_lineage`（判断の改訂履歴）、`domain_approaches`（仮説、前提、見直し条件、改訂、`approach_reviews` での継続・変更・中止）、Element の承認と承認履歴、Space・Domain・Object の境界 RLS、AI の権限（run-agent は review で止まる、MCP は許可リスト方式）、Phase の締め | 変更要求（CR）を起票・審査・承認するワークフロー、PM 計画書を一枚にまとめたビュー。品質保証の計画 |
 | スコープ | ○ | Object（成果物）→ Element（作業）の階層、Element の受け入れ条件（`direction.acceptance`）、review ステータス、`element_templates`、Note からの Object 案生成（draft-object） | 要求事項とそのトレーサビリティ（要求 → Element → 検証）、WBS 辞書としての一覧、スコープのベースライン |
@@ -103,7 +103,7 @@ PMBOK の「プロジェクト」は、Alcon の Initiative（意図）と Objec
 
 ### 原理・原則（第8版）との相性
 
-| 原理・原則 | Alcon での表れ |
+| 原理・原則 | Clayware での表れ |
 |---|---|
 | 全体を見渡す | Strategy と Execution の相互参照。Initiative に配下の Object とリスクを、Object に貢献先の Initiative を常に表示する |
 | 価値に焦点を当てる | measure（成功条件）と approach（期待する変化と仮説）。成果物ではなく成果で確かめる |
@@ -116,7 +116,7 @@ PMBOK の「プロジェクト」は、Alcon の Initiative（意図）と Objec
 
 分類の意味：**A** 既存のまま対応する、**B** データはあり、レンズ（読み替えビュー）で足りる、**C** データそのものが足りない
 
-| 成果物 | 分類 | Alcon での対応・作り方 |
+| 成果物 | 分類 | Clayware での対応・作り方 |
 |---|---|---|
 | プロジェクト憲章 / Project brief | B | Initiative（目的＝master intent と description、前提＝assumption、成功基準＝measure、決定＝decision）と、紐づく Object・Domain・Phase を合成する。「制約」と「権限」は専用の列がないため、intents の新しい種別を作るか、テキストで書く |
 | ビジネスケース | B / C | Initiative の意図で一部書ける。費用対効果は財務データがないため書けない |
@@ -126,7 +126,7 @@ PMBOK の「プロジェクト」は、Alcon の Initiative（意図）と Objec
 | スケジュール / コストのベースライン | C | 計画値のスナップショットがない（PhaseBurnup にも「履歴スナップショットなし」と明記） |
 | 予算 / コスト見積 | C | 工数しかない。`budget` Property は Object 単位の値にとどまる |
 | 前提条件ログ | A | intents の assumption。状態と見直し日を持ち、外部の前提条件ログより強い |
-| 意思決定ログ | A | intents の decision と `intent_lineage`。PMBOK には独立した成果物はないが、Alcon の強み |
+| 意思決定ログ | A | intents の decision と `intent_lineage`。PMBOK には独立した成果物はないが、Clayware の強み |
 | 課題ログ | B | status が blocked の Element、または Type が Issue の Element を一覧にする |
 | 変更ログ | B | `intent_lineage` の revision、`approach_reviews`、`element_activity` を時系列で束ねる |
 | 変更要求 / 変更管理計画 | B | Decisions Object に Element として起票し、承認（`is_approval`）で判断する。審査の型はテンプレートで作れる |
@@ -158,4 +158,4 @@ PMBOK の「プロジェクト」は、Alcon の Initiative（意図）と Objec
 1. **レンズの最初の一本を何にするか。** 候補は、(a) プロジェクト憲章ビュー（Initiative と配下の Object の合成）と、(b) AI が生成する状況報告です。(b) のほうが「Excel とパワポを置き換える」という訴求に直結しますが、元になる状態が古いと価値が出ません。これは 2026-09 の競合調査の結論とも一致します。
 2. **データが足りない 4 つのうち、どれを作るか。** リスクとステークホルダーは、PMO の現場で必ず求められる台帳です。intents の新しい種別（`risk`）として持つ案と、独立したテーブルにする案があります。ベースラインと費用は EVM まで含めると大きな仕事になります。
 3. **スキーマだけある intent 系テーブルを表に出すか、捨てるか。** エスカレーションと監査は、ガバナンス領域の説明材料として強い一方、使われないまま残っています。
-4. **用語の扱い。** PMBOK の用語（憲章、課題ログ、RACI など）をレンズの見出しとして出し、Alcon の概念名は変えない。CLAUDE.md の「フレームワークは永続データの見せ方にする」に従います。
+4. **用語の扱い。** PMBOK の用語（憲章、課題ログ、RACI など）をレンズの見出しとして出し、Clayware の概念名は変えない。CLAUDE.md の「フレームワークは永続データの見せ方にする」に従います。

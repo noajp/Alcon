@@ -3,7 +3,7 @@
 import { forwardRef, useId, type ReactNode, type SVGProps } from 'react';
 
 // =============================================================
-// Alcon's own icons, drawn on a 16-unit grid.
+// Clayware's own icons, drawn on a 16-unit grid.
 //
 // Two kinds of mark, one family:
 //   things   — the concepts and places (a Domain, a Table, the trash): a solid
@@ -54,7 +54,7 @@ export function glyph(displayName: string, drawing: Drawing) {
   ) {
     void _strokeWidth; void _absolute;
     const id = useId();
-    const mask = drawing.cut ? `alcon-icon-${id.replace(/:/g, '')}` : null;
+    const mask = drawing.cut ? `clayware-icon-${id.replace(/:/g, '')}` : null;
     return (
       <svg ref={ref} width={size} height={size} viewBox={VIEW_BOX} overflow="visible" fill="currentColor" aria-hidden="true"
         style={color ? { color, ...style } : style} {...rest}>

@@ -10,7 +10,7 @@ import { base64UrlDecode, verifySignature } from "./auditIntake.ts";
  * one arrives; read and draft go on with the last table held. The intake
  * judges stale sends by the same span (workflow_step_outside_grant). */
 export const GRANTS_TTL_SECONDS = 15 * 60;
-/** How far a request's timestamp may sit from Alcon's clock. */
+/** How far a request's timestamp may sit from Clayware's clock. */
 export const REQUEST_SKEW_SECONDS = 5 * 60;
 
 export type GrantOperation = "read" | "draft" | "send" | "money";
@@ -30,10 +30,10 @@ export interface DeploymentGrants {
 }
 
 export interface GrantsTable {
-  kind: "alcon.grants";
+  kind: "clayware.grants";
   space_id: string;
   key_id: string;
-  /** Alcon's public key the table is signed with (base64url, 43 chars). */
+  /** Clayware's public key the table is signed with (base64url, 43 chars). */
   signing_key: string;
   issued_at: string;
   expires_at: string;
@@ -43,7 +43,7 @@ export interface GrantsTable {
 /** What the gateway signs to ask for its table: no body, so the request is
  * the key and the moment, and an old request cannot be replayed for long. */
 export function grantsRequestText(keyId: string, timestamp: string): string {
-  return `alcon-grants\n${keyId}\n${timestamp}`;
+  return `clayware-grants\n${keyId}\n${timestamp}`;
 }
 
 /** Whether a request timestamp (Unix seconds) is close enough to now. */
@@ -57,7 +57,7 @@ export function base64UrlEncode(bytes: ArrayBuffer | Uint8Array): string {
   return btoa(String.fromCharCode(...view)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Alcon's signing key from its secret (PKCS #8, base64url), with the public
+/** Clayware's signing key from its secret (PKCS #8, base64url), with the public
  * half the table names. */
 export async function loadSigningKey(pkcs8: string): Promise<{ key: CryptoKey; publicKey: string } | null> {
   const bytes = base64UrlDecode(pkcs8);
@@ -79,7 +79,7 @@ export function buildGrantsTable(input: {
 }): GrantsTable {
   const order = (a: Grant, b: Grant) => a.connector < b.connector ? -1 : a.connector > b.connector ? 1 : a.operation < b.operation ? -1 : a.operation > b.operation ? 1 : 0;
   return {
-    kind: "alcon.grants",
+    kind: "clayware.grants",
     space_id: input.spaceId,
     key_id: input.keyId,
     signing_key: input.signingKey,
@@ -92,11 +92,11 @@ export function buildGrantsTable(input: {
 }
 
 /**
- * The table a gateway received, if `signature` is Alcon's signature of
+ * The table a gateway received, if `signature` is Clayware's signature of
  * `body` under the key the gateway pinned, the table is for this gateway's
  * key, and it is not older than the one the gateway already holds — so an
  * old signed table replayed at the gateway cannot roll its grants back. The
- * gateway pins Alcon's public key when it is set up, and never takes it from
+ * gateway pins Clayware's public key when it is set up, and never takes it from
  * the table itself.
  */
 export async function readGrantsTable(
@@ -109,7 +109,7 @@ export async function readGrantsTable(
   } catch {
     return null;
   }
-  if (table?.kind !== "alcon.grants" || !Array.isArray(table.deployments) || table.key_id !== expect.keyId) return null;
+  if (table?.kind !== "clayware.grants" || !Array.isArray(table.deployments) || table.key_id !== expect.keyId) return null;
   const issued = Date.parse(table.issued_at);
   if (Number.isNaN(issued)) return null;
   if (expect.held && (table.space_id !== expect.held.space_id || issued < Date.parse(expect.held.issued_at))) return null;

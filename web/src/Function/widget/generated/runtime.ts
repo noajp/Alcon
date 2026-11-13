@@ -21,20 +21,22 @@ const requestRead=type=>()=>new Promise((resolve,reject)=>{
 });
 const requestContext=requestRead('read-context');
 const watchers=[];
-const alcon={readContext:requestContext,readSpace:requestRead('read-space'),context:${json(context)},state:${json(state)},save(value){
+const clayware={readContext:requestContext,readSpace:requestRead('read-space'),context:${json(context)},state:${json(state)},save(value){
   return new Promise((resolve,reject)=>{
     const id=++sequence;
     const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Save timed out. Check your connection.'));},20000);
     // The host answers with the state everyone now has, which may carry other people's changes.
-    pending.set(id,{resolve:merged=>{alcon.state=merged===undefined?value:merged;resolve();},reject,timer});
+    pending.set(id,{resolve:merged=>{clayware.state=merged===undefined?value:merged;resolve();},reject,timer});
     // The state this save started from goes with it: the host sends only what changed since then.
-    send('save',{id,value,base:alcon.state});
+    send('save',{id,value,base:clayware.state});
   });
 },onChange(fn){if(typeof fn==='function')watchers.push(fn);}};
+// Apps saved earlier call the runtime by its earlier name.
+const alcon=clayware;
 window.addEventListener('message',event=>{
   if(event.source!==parent||event.data?.channel!==channel||event.data?.type!=='state')return;
-  alcon.state=event.data.value;
-  for(const fn of watchers){try{fn(alcon.state);}catch(error){send('error',{message:String(error?.message||error)});}}
+  clayware.state=event.data.value;
+  for(const fn of watchers){try{fn(clayware.state);}catch(error){send('error',{message:String(error?.message||error)});}}
 });
 window.addEventListener('message',event=>{
   if(event.source!==parent||event.data?.channel!==channel||!['saved','context'].includes(event.data?.type))return;
@@ -51,19 +53,19 @@ window.addEventListener('message',event=>{
  for(const [key,value] of Object.entries(event.data.theme||{})){
   if(/^--[a-zA-Z0-9_-]+$/.test(key)&&typeof value==='string')document.documentElement.style.setProperty(key,value);
  }
- if(event.data.type==='start')__alconMeasure();
+ if(event.data.type==='start')__claywareMeasure();
  if(event.data.type!=='start'||started)return;
  started=true;
  // The app's code runs in a function of its own: whatever names it declares cannot
  // replace the ones the host's code below relies on.
- const __alconApp=async()=>{\n${app.js}\n};
- (async()=>{try{await __alconApp();}catch(error){send('error',{message:String(error?.message||error)});return;}send('ready');__alconMeasure();})();
+ const __claywareApp=async()=>{\n${app.js}\n};
+ (async()=>{try{await __claywareApp();}catch(error){send('error',{message:String(error?.message||error)});return;}send('ready');__claywareMeasure();})();
 });
 // The host sizes the frame to the content, so the app never scrolls inside the board.
 // Content is measured as the lowest edge of what the body holds, not the body
 // itself: a body stretched to the frame (height:100%) would otherwise report
 // the frame back and never shrink to its content.
-const __alconContentHeight=()=>{
+const __claywareContentHeight=()=>{
  let bottom=0;
  for(const child of document.body.children){
   const box=child.getBoundingClientRect();
@@ -75,7 +77,7 @@ const __alconContentHeight=()=>{
 // The browser holds back resize callbacks while the frame is off screen, so the
 // app's own start is measured too — its first render is otherwise reported only
 // once someone scrolls to it.
-let __alconMeasure=()=>{};
+let __claywareMeasure=()=>{};
 if(typeof ResizeObserver==='function'&&document.body){
  let last=0;
  let lastViewport=window.innerHeight;
@@ -84,7 +86,7 @@ if(typeof ResizeObserver==='function'&&document.body){
  let sizedToFrame=false;
  let frameOffset=0;
  const report=()=>{
-  let height=__alconContentHeight();
+  let height=__claywareContentHeight();
   const viewport=window.innerHeight;
   // A width change reflows the content. Content sized to the frame keeps the
   // same distance from the frame's bottom at any width; content that only
@@ -103,7 +105,7 @@ if(typeof ResizeObserver==='function'&&document.body){
   if(sizedToFrame)height=Math.min(height,viewport);
   if(Math.abs(height-last)>1){last=height;send('size',{height});}
  };
- __alconMeasure=()=>{last=0;report();};
+ __claywareMeasure=()=>{last=0;report();};
  // The frame itself resizing changes nothing inside it for ordinary content, so
  // no observer fires; reading it here keeps the comparison above against the
  // frame the content was actually laid out in.

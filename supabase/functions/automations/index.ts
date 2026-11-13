@@ -45,7 +45,7 @@
 //                                      review comment or a CI failure
 //                                      starts a bounded follow-up run
 //                                      that amends the PR.
-//   POST ?hook=<id> (x-alcon-token)    an outside event for a webhook
+//   POST ?hook=<id> (x-clayware-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
 //                                      by the automation's owner
@@ -84,7 +84,7 @@ import { deriveScopeFromDefinition, loadDerivationIntegrations, rootChainScope, 
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-alcon-token",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-clayware-token, x-alcon-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (payload: unknown, status = 200) =>
@@ -212,12 +212,12 @@ function stamp(at: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("ja-JP", { timeZone, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(at);
 }
 
-/** The Space's AI Worker that runs in Alcon (not one handed to Claude Code). */
+/** The Space's AI Worker that runs in Clayware (not one handed to Claude Code). */
 async function aiWorkerOf(admin: SupabaseClient, spaceId: string): Promise<string | null> {
   const { data } = await admin.from("workers").select("id, name, ai_config")
     .eq("activity_space_id", spaceId).eq("type", "ai_agent").eq("status", "active");
-  const inAlcon = (data ?? []).filter((w) => (w.ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
-  return (inAlcon.find((w) => w.name === "Claude") ?? inAlcon[0])?.id ?? null;
+  const inClayware = (data ?? []).filter((w) => (w.ai_config as Record<string, unknown> | null)?.runner !== "claude-code");
+  return (inClayware.find((w) => w.name === "Claude") ?? inClayware[0])?.id ?? null;
 }
 
 async function startRun(env: Env, jwt: string, runId: string, extra: Record<string, unknown> = {}): Promise<void> {
@@ -264,7 +264,7 @@ async function fire(env: Env, a: Automation, source: "schedule" | "webhook" | "m
     const { data: obj } = await owner.db.from("objects").select("id, domain_id").eq("id", a.object_id).maybeSingle();
     if (!obj) return await fail("置き場所の Object が見つからないか、作った人が見られません。");
     const workerId = await aiWorkerOf(env.admin, a.activity_space_id);
-    if (!workerId) return await fail("この Space に、Alcon で動く AI Worker がいません。");
+    if (!workerId) return await fail("この Space に、Clayware で動く AI Worker がいません。");
 
     const now = new Date();
     const receivedAs = receivedTitle(payload, a.name);
@@ -412,7 +412,7 @@ async function expireQuestionTickets(env: Env, now: Date): Promise<{ tickets: nu
           element_id: (run.element_id as string | null) ?? null,
           triggered_by: (run.triggered_by as string | null) ?? null,
         },
-        tickets: mine, expectStatus: "awaiting_input", agentName: "Alcon Agent",
+        tickets: mine, expectStatus: "awaiting_input", agentName: "Clayware Agent",
         actorUserId: (run.triggered_by as string | null) ?? null, now,
       });
       if (settled) runs += 1;
@@ -454,7 +454,7 @@ async function fireHeartbeat(env: Env, s: HeartbeatSpace): Promise<"fired" | "di
       .select("user_id").eq("activity_space_id", s.id).eq("role", "owner").neq("user_id", s.heartbeat_owner_id);
     for (const o of owners ?? []) {
       await env.admin.from("notifications").insert({
-        recipient_id: o.user_id as string, actor_name: "Alcon Agent", kind: "status_change",
+        recipient_id: o.user_id as string, actor_name: "Clayware Agent", kind: "status_change",
         title: "ハートビートを止めました",
         body: "有効化したオーナーとして実行できなくなったため、この Space のハートビートを無効化しました。設定から再度有効化できます。",
       }).then(() => {}, () => {});
@@ -818,7 +818,7 @@ async function webhook(env: Env, req: Request, id: string): Promise<Response> {
   const { data } = await env.admin.from("automations").select("*").eq("id", id).maybeSingle();
   const a = data as Automation | null;
   if (!a || a.kind !== "webhook" || !a.token_hash) return json({ error: "not found" }, 404);
-  const token = req.headers.get("x-alcon-token") ?? new URL(req.url).searchParams.get("token") ?? "";
+  const token = req.headers.get("x-clayware-token") ?? req.headers.get("x-alcon-token") ?? new URL(req.url).searchParams.get("token") ?? "";
   if (!token || (await sha256Hex(token)) !== a.token_hash) return json({ error: "invalid token" }, 401);
   if (!a.enabled) return json({ error: "this automation is turned off" }, 409);
   const since = new Date(Date.now() - 60_000).toISOString();

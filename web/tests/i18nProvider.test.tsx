@@ -13,5 +13,5 @@ it('falls back safely when browser storage is unavailable', () => {
     throw new DOMException('Storage is disabled', 'SecurityError');
   });
 
-  expect(() => render(<I18nProvider><div>Alcon</div></I18nProvider>)).not.toThrow();
+  expect(() => render(<I18nProvider><div>Clayware</div></I18nProvider>)).not.toThrow();
 });

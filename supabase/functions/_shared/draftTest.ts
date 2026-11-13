@@ -360,7 +360,7 @@ export async function settleDraftToReview(
     .select("user_id").eq("activity_space_id", draft.activity_space_id).eq("role", "owner");
   for (const owner of (owners ?? []) as { user_id: string }[]) {
     await admin.from("notifications").insert({
-      recipient_id: owner.user_id, actor_name: "Alcon Agent", kind: "approval_requested",
+      recipient_id: owner.user_id, actor_name: "Clayware Agent", kind: "approval_requested",
       integration_draft_id: draft.id,
       title: "接続の審査が待っています",
       body: `「${draft.name}」の接続ドラフトがテストを終えました。有効化する前に内容を確認してください。`,

@@ -1,4 +1,4 @@
-// Which model an AI agent Worker runs on: Anthropic (Alcon's own key), or a
+// Which model an AI agent Worker runs on: Anthropic (Clayware's own key), or a
 // model connection of its Space (Settings › AI, kind 'model') with
 // the model named in ai_model. run-agent reads the same fields
 // (supabase/functions/run-agent/agentConfig.ts): ai_config.provider is the
@@ -11,9 +11,9 @@
 
 import type { Json } from '@/types/database';
 
-/** Where an AI agent's work runs: on Alcon's AI 基盤 (run-agent), or in Claude
+/** Where an AI agent's work runs: on Clayware's AI 基盤 (run-agent), or in Claude
  *  Code on a developer's machine, started by the dev loop's dispatcher. */
-export type AgentRunner = 'alcon' | 'claude-code';
+export type AgentRunner = 'clayware' | 'claude-code';
 const CLAUDE_CODE_RUNNER = 'claude-code';
 
 /** Pure. Whether a Worker's work runs in Claude Code. */
@@ -44,7 +44,7 @@ function priceText(v: unknown): string {
 export function agentModelDraft(worker: { ai_model: string | null; ai_config: Json | null }): AgentModelDraft {
   const c = record(worker.ai_config);
   return {
-    runner: runsInClaudeCode(c) ? 'claude-code' : 'alcon',
+    runner: runsInClaudeCode(c) ? 'claude-code' : 'clayware',
     providerId: typeof c.provider === 'string' && c.provider ? c.provider : null,
     model: worker.ai_model ?? '',
     priceInput: priceText(c.price_input),

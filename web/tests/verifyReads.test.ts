@@ -198,7 +198,7 @@ const sessionWith = (handlers: Record<string, (args: Record<string, unknown>) =>
 };
 
 describe('executeIntegrationTool with a verify declaration', () => {
-  const writeFile = { id: 'c1', name: 'gh__create_or_update_file', input: { owner: 'noajp', repo: 'Alcon', path: 'SMOKE.md', branch: 'claude/smoke', content: '# Smoke\n', message: 'smoke' } };
+  const writeFile = { id: 'c1', name: 'gh__create_or_update_file', input: { owner: 'noajp', repo: 'Clayware', path: 'SMOKE.md', branch: 'claude/smoke', content: '# Smoke\n', message: 'smoke' } };
 
   it('records ok:true and leaves the result untouched when the read-back matches', async () => {
     const { session, calls } = sessionWith({
@@ -210,7 +210,7 @@ describe('executeIntegrationTool with a verify declaration', () => {
     expect(r.text).toBe('{"sha": "f00"}');
     expect(r.verify).toEqual({ ok: true });
     expect(calls.map((c) => c.name)).toEqual(['create_or_update_file', 'get_file_contents']);
-    expect(calls[1].args).toMatchObject({ owner: 'noajp', repo: 'Alcon', path: 'SMOKE.md' });
+    expect(calls[1].args).toMatchObject({ owner: 'noajp', repo: 'Clayware', path: 'SMOKE.md' });
   });
 
   it('answers a mismatch as an error naming the field, with the diff on the record', async () => {
@@ -258,11 +258,11 @@ describe('executeIntegrationTool with a verify declaration', () => {
       create_pull_request: () => ({ text: '{"number": 777, "state": "open"}', isError: false }),
       get_pull_request: () => ({ text: '{"number": 777, "head": "claude/smoke-test", "base": "main", "state": "open"}', isError: false }),
     });
-    const call = { id: 'c2', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', title: 'smoke', head: 'claude/smoke-test', base: 'main' } };
+    const call = { id: 'c2', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', title: 'smoke', head: 'claude/smoke-test', base: 'main' } };
     const r = await it8n.executeIntegrationTool(githubTool(GH_MANIFEST, 'create_pull_request', session), call);
     expect(r.verify).toEqual({ ok: true });
     expect(calls[1].name).toBe('get_pull_request');
-    expect(calls[1].args).toMatchObject({ owner: 'noajp', repo: 'Alcon', number: 777 });
+    expect(calls[1].args).toMatchObject({ owner: 'noajp', repo: 'Clayware', number: 777 });
   });
 
   it('flags a pull request whose read-back branches are not the ones intended', async () => {
@@ -270,7 +270,7 @@ describe('executeIntegrationTool with a verify declaration', () => {
       create_pull_request: () => ({ text: '{"number": 777}', isError: false }),
       get_pull_request: () => ({ text: '{"number": 777, "head": "someone-elses-branch", "base": "main"}', isError: false }),
     });
-    const call = { id: 'c3', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', head: 'claude/smoke-test', base: 'main' } };
+    const call = { id: 'c3', name: 'gh__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', head: 'claude/smoke-test', base: 'main' } };
     const r = await it8n.executeIntegrationTool(githubTool(GH_MANIFEST, 'create_pull_request', session), call);
     expect(r.isError).toBe(true);
     expect(r.verify.diff).toEqual([{ field: 'head', expected: 'claude/smoke-test', actual: 'someone-elses-branch' }]);
@@ -280,7 +280,7 @@ describe('executeIntegrationTool with a verify declaration', () => {
     const manifest = {
       version: 1,
       commands: [
-        { name: 'get_file_contents', effect: 'read', mcp: 'get_file_contents', rules: [{ when: { repo: 'Alcon' }, permission: 'deny' }] },
+        { name: 'get_file_contents', effect: 'read', mcp: 'get_file_contents', rules: [{ when: { repo: 'Clayware' }, permission: 'deny' }] },
         { name: 'create_or_update_file', effect: 'write', mcp: 'create_or_update_file', verify: { command: 'get_file_contents', expect: { content: 'content' } } },
       ],
     };

@@ -30,7 +30,7 @@ export const OPTIONS: ThemeOption[] = [
 // every font-size by it, so text grows/shrinks while layout (px/rem spacing)
 // stays put — unlike a `zoom`, which scales the whole UI. Keep the map in sync
 // with the boot script in app/layout.tsx (applies the level before first paint).
-export const FONT_SIZE_KEY = 'alcon.fontsize';
+export const FONT_SIZE_KEY = 'clayware.fontsize';
 export const DEFAULT_FONT_KEY = 'default';
 export const FONT_SIZES: { key: string; label: string; scale: number }[] = [
   { key: 'smaller', label: 'Smaller', scale: 0.925 },

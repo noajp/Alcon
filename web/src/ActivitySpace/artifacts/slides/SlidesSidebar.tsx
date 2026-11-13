@@ -30,7 +30,7 @@ async function openDeckFile(file: File) {
 }
 
 // The sidebar's "+" makes decks and folders; a new one opens for naming in the list.
-const RENAME_EVENT = 'alcon:slides-rename';
+const RENAME_EVENT = 'clayware:slides-rename';
 const askRename = (id: string) => window.dispatchEvent(new CustomEvent<string>(RENAME_EVENT, { detail: id }));
 
 /** A new deck where the person is: the open deck's folder, else the first, else a new one. */

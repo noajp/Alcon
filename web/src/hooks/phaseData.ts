@@ -6,7 +6,7 @@ import { translate } from '@/Function/i18n/I18nProvider';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
-import type { AlconObject, Element, ElementUpdate, Intent, Phase, PhaseInsert, PhaseStatus, PhaseUpdate, Strategy } from '@/types/database';
+import type { ClaywareObject, Element, ElementUpdate, Intent, Phase, PhaseInsert, PhaseStatus, PhaseUpdate, Strategy } from '@/types/database';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { onlyActiveObjects } from '@/Function/shared/objectArchive';
@@ -248,7 +248,7 @@ export type PhaseCandidateElement = Pick<
 // needs — membership rows for each Phase plus candidates for its "+" pickers.
 // Elements come via their home Object (domain-direct Elements aren't listed).
 export async function fetchPhaseCandidates(domainId: string): Promise<{
-  objects: Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
+  objects: Pick<ClaywareObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
   elements: PhaseCandidateElement[];
 }> {
   const { data: objects, error: oErr } = await onlyActiveObjects(supabase
@@ -272,7 +272,7 @@ export async function fetchPhaseCandidates(domainId: string): Promise<{
     { compare: (a, b) => ascNullsLast(a.order_index, b.order_index) },
   );
   return {
-    objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
+    objects: (objects || []) as Pick<ClaywareObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
     elements: elements as PhaseCandidateElement[],
   };
 }

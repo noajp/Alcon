@@ -3,18 +3,18 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { Pencil, X } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { EMBED_LANG, parseEmbed, useEmbedHost } from './embedBlocks';
+import { EMBED_LANGS, parseEmbed, useEmbedHost } from './embedBlocks';
 import { FILE_VIEW, FileBlock } from './fileBlocks';
 
-// ```alcon blocks drawn live over their source, as MermaidLayer draws
-// diagrams: the block (<pre data-lang="alcon">) stays in the editable text as
+// ```clayware blocks drawn live over their source, as MermaidLayer draws
+// diagrams: the block (<pre data-lang="clayware">) stays in the editable text as
 // its JSON spec — that is what is saved — opened to the drawing's height, its
 // source hidden. The drawing is interactive; its corner offers editing the
 // source and removing the block.
 
 interface Placed { source: string; top: number; left: number; width: number }
 
-const SELECTOR = `pre[data-lang="${EMBED_LANG}"]`;
+const SELECTOR = EMBED_LANGS.map((lang) => `pre[data-lang="${lang}"]`).join(',');
 
 export function EmbedLayer({ root, frame, editable }: { root: RefObject<HTMLDivElement | null>; frame: RefObject<HTMLDivElement | null>; editable: boolean }) {
   const { t } = useI18n();

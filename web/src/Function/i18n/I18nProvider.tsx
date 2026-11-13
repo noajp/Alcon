@@ -10,7 +10,7 @@ import {
   type Locale,
 } from './locales';
 
-const LOCALE_CHANGE_EVENT = 'alcon:locale-change';
+const LOCALE_CHANGE_EVENT = 'clayware:locale-change';
 
 let cachedLocale: Locale | null = null;
 

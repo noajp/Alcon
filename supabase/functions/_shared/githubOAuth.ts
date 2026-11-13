@@ -7,7 +7,7 @@
 // The stored Vault value of a GitHub OAuth integration is JSON:
 //   { v: 1, provider: "github", access_token, scope }
 // An OAuth App's token does not expire; it ends when the grant is revoked
-// (Disconnect, or the person removing Alcon under GitHub › Settings ›
+// (Disconnect, or the person removing Clayware under GitHub › Settings ›
 // Applications).
 
 export const GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize";

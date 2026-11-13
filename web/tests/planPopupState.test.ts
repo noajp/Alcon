@@ -61,7 +61,7 @@ function sealedPlan(over: Partial<AgentAction> = {}): AgentAction {
     tool: 'plan',
     input: {
       calls: [
-        { id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Alcon', title: 'Add the rail' } },
+        { id: 'a', name: 'github__create_pull_request', input: { owner: 'noajp', repo: 'Clayware', title: 'Add the rail' } },
         { id: 'b', name: 'github__delete_file', input: { path: 'old.md' } },
         { id: 'c', name: 'local__write_file', input: { path: 'new.md' } },
       ],
@@ -71,7 +71,7 @@ function sealedPlan(over: Partial<AgentAction> = {}): AgentAction {
           detail: null, effect: 'write', critical: null, rememberable: false,
           title: 'Create a pull request',
           fields: [
-            { label: 'Repository', value: 'Alcon' },
+            { label: 'Repository', value: 'Clayware' },
             { label: '読み戻し確認', value: '「get_pull_request」で title を照合します' },
           ],
           preview: null, askReason: null,
@@ -87,7 +87,7 @@ function sealedPlan(over: Partial<AgentAction> = {}): AgentAction {
           preview: null, askReason: null,
         },
         {
-          id: 'c', integration: 'Alcon', operation: 'write_file', destination: 'Alcon',
+          id: 'c', integration: 'Clayware', operation: 'write_file', destination: 'Clayware',
           detail: null, effect: 'write', critical: null, rememberable: false,
           title: 'Write a file',
           fields: [
@@ -118,7 +118,7 @@ describe('planCallsFromAction', () => {
     expect(calls.map((c) => c.id)).toEqual(['a', 'b', 'c']);
 
     expect(calls[0].title).toBe('Create a pull request');
-    expect(calls[0].fields).toEqual([['Repository', 'Alcon']]);
+    expect(calls[0].fields).toEqual([['Repository', 'Clayware']]);
     expect(calls[0].expectedNote).toBe('「get_pull_request」で title を照合します');
     expect(calls[0].deniedNote).toBeNull();
     expect(calls[0].problem).toBeNull();

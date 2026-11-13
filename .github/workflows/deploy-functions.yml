@@ -39,7 +39,7 @@ jobs:
       # ゲートウェイの JWT 検査を外す関数。どれも自分で認証する（PAT・OAuth の
       # トークン、Webhook のトークン、cron の共有秘密、OAuth の戻り先、PC の
       # 実行役）。ここにない関数は、ゲートウェイが Supabase の JWT を求める。
-      NO_VERIFY_JWT: "alcon-api alcon-mcp asset-relay audit-approvals audit-grants audit-intake automations dev-event integration-oauth"
+      NO_VERIFY_JWT: "clayware-api clayware-mcp asset-relay audit-approvals audit-grants audit-intake automations dev-event integration-oauth"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -120,13 +120,13 @@ jobs:
             exit 1
           fi
 
-      # alcon-api は GET / をトークンなしで答える。ゲートウェイの JWT 検査が
+      # clayware-api は GET / をトークンなしで答える。ゲートウェイの JWT 検査が
       # 残っていると 401 になり、PAT と OAuth での呼び出しがすべて断られる。
       - name: Smoke test
-        if: contains(format(' {0} ', steps.pick.outputs.names), ' alcon-api ')
+        if: contains(format(' {0} ', steps.pick.outputs.names), ' clayware-api ')
         run: |
-          code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT_REF.supabase.co/functions/v1/alcon-api/")
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://$PROJECT_REF.supabase.co/functions/v1/clayware-api/")
           if [ "$code" != "200" ]; then
-            echo "::error::alcon-api の GET / が $code を返しました（200 のはず）"
+            echo "::error::clayware-api の GET / が $code を返しました（200 のはず）"
             exit 1
           fi

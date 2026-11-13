@@ -65,7 +65,7 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   'This paragraph has a picture, note or field, so it cannot be edited here yet.': ['この段落には画像・脚注・フィールドが含まれているため、まだここでは編集できません。', '이 단락에는 그림·각주·필드가 있어 아직 여기서 편집할 수 없습니다.', 'Ce paragraphe contient une image, une note ou un champ : il ne peut pas encore être modifié ici.', 'Este párrafo tiene una imagen, una nota o un campo, así que aún no se puede editar aquí.'],
   'This paragraph has a line break or field, so it cannot be edited here yet.': ['この段落には改行かフィールドが含まれているため、まだここでは編集できません。', '이 단락에는 줄 바꿈이나 필드가 있어 아직 여기서 편집할 수 없습니다.', 'Ce paragraphe contient un saut de ligne ou un champ : il ne peut pas encore être modifié ici.', 'Este párrafo tiene un salto de línea o un campo, así que aún no se puede editar aquí.'],
   'Search names and contents': ['名前と中身を検索', '이름과 내용 검색', 'Rechercher noms et contenus', 'Buscar nombres y contenido'],
-  'Add a file from Alcon': ['Alcon のファイルを添える', 'Alcon의 파일 추가', 'Ajouter un fichier d’Alcon', 'Añadir un archivo de Alcon'],
+  'Add a file from Clayware': ['Clayware のファイルを添える', 'Clayware의 파일 추가', 'Ajouter un fichier d’Clayware', 'Añadir un archivo de Clayware'],
   'This file has no text the AI can read.': ['このファイルには AI が読める文字がありません。', '이 파일에는 AI가 읽을 수 있는 텍스트가 없습니다.', 'Ce fichier ne contient aucun texte lisible par l’IA.', 'Este archivo no tiene texto que la IA pueda leer.'],
   'Folders': ['フォルダ', '폴더', 'Dossiers', 'Carpetas'],
   'Folder name': ['フォルダ名', '폴더 이름', 'Nom du dossier', 'Nombre de la carpeta'],

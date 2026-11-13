@@ -30,7 +30,7 @@ export interface CodeDiffFile {
   patch: string | null;
 }
 
-/** A line comment written on GitHub rather than in Alcon. */
+/** A line comment written on GitHub rather than in Clayware. */
 export interface GithubLineComment {
   id: number;
   path: string;
@@ -200,7 +200,7 @@ export function useCodeDiff(change: CodeChange | null, follow = false) {
 
 /** Posts the caller's own review or line comment to the pull request. A
  *  refusal is kept on the row (github_error), not thrown: the review stands in
- *  Alcon either way. */
+ *  Clayware either way. */
 function publishToGithub(changeId: string, target: { reviewId: string } | { commentId: string }) {
   return invoke<{ github_id?: number; github_error?: string }>({ action: 'publish', changeId, ...target });
 }

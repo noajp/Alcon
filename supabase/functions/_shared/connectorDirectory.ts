@@ -2,7 +2,7 @@
 // of connectors a Space can add: each server that runs remotely over HTTPS
 // becomes an entry with what adding it needs (the endpoint and how it
 // authenticates). Servers that only run on a machine (packages) are left
-// out: Alcon calls its connections from the cloud. Pure, so the
+// out: Clayware calls its connections from the cloud. Pure, so the
 // connector-directory function and the tests read the registry alike.
 
 export const REGISTRY_URL = "https://registry.modelcontextprotocol.io/v0/servers";
@@ -48,7 +48,7 @@ export function entryOf(raw: unknown): DirectoryEntry | null {
   const s = obj(obj(raw)?.server) ?? obj(raw);
   if (!s) return null;
   const remotes = (Array.isArray(s.remotes) ? s.remotes : []).map(obj).filter((r): r is Record<string, unknown> => !!r);
-  // Streamable HTTP first: Alcon's MCP client speaks it.
+  // Streamable HTTP first: Clayware's MCP client speaks it.
   const remote = remotes.find((r) => r.type === "streamable-http" && httpsUrl(r.url)) ?? null;
   if (!remote) return null;
   const id = str(s.name, 200);

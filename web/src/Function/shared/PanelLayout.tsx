@@ -76,7 +76,7 @@ export function PanelGroup({ title, open, onToggle, menu, children }: {
 
 /** The ids a person pinned in one list, kept in this browser. */
 export function usePinned(key: string) {
-  const storageKey = `alcon:pinned:${key}`;
+  const storageKey = `clayware:pinned:${key}`;
   const [pinned, setPinned] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {

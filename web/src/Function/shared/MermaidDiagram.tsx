@@ -33,9 +33,9 @@ function tokenColor(name: string, over?: [number, number, number]): string {
   return `rgb(${mix(r, 0)}, ${mix(g, 1)}, ${mix(b, 2)})`;
 }
 
-/** Alcon's look for a diagram: nodes as raised cards with a quiet edge and
+/** Clayware's look for a diagram: nodes as raised cards with a quiet edge and
  *  rounded corners, muted connectors, labels in the page's font and size. */
-function alconTheme() {
+function claywareTheme() {
   const cardRgb = (tokenColor('--card').match(/\d+/g) ?? ['0', '0', '0']).slice(0, 3).map(Number) as [number, number, number];
   const card = tokenColor('--card');
   const node = tokenColor('--muted', cardRgb);
@@ -79,11 +79,11 @@ export async function renderMermaid(code: string): Promise<{ svg: string } | { e
     // empties), measured in the page's own font.
     const font = getComputedStyle(document.body).fontFamily || 'sans-serif';
     mermaid.initialize({
-      startOnLoad: false, securityLevel: 'strict', fontFamily: font, ...alconTheme(),
+      startOnLoad: false, securityLevel: 'strict', fontFamily: font, ...claywareTheme(),
       htmlLabels: false,
       flowchart: { htmlLabels: false, useMaxWidth: true, curve: 'basis', padding: 14, nodeSpacing: 36, rankSpacing: 44 },
     });
-    const { svg: drawn } = await mermaid.render(`alcon-mermaid-${++seq}`, code);
+    const { svg: drawn } = await mermaid.render(`clayware-mermaid-${++seq}`, code);
     // Laid out once off screen, in the page's font, to fit its frame.
     const holder = document.createElement('div');
     holder.style.cssText = `position:absolute;left:-10000px;top:0;visibility:hidden;font-family:${font}`;

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 //
-// The dispatcher: Alcon hands work to Claude Code.
+// The dispatcher: Clayware hands work to Claude Code.
 //
 // A person hands an Element to Claude Code by labelling it 'dispatch' (the
 // Initiative's Plan tab does it when an approved draft goes to Claude Code,
 // the Execute tab's "Hand to Claude Code" does it for one Element). This
 // script, running on the developer's Mac, finds those Elements and starts one
 // headless Claude Code session per Element, each in a fresh worktree off
-// origin/main, which then follows the alcon skill: claim the lease, branch,
+// origin/main, which then follows the clayware skill: claim the lease, branch,
 // PR, review, merge, report. Only labelled Elements move — the dev Domain
 // carries a long backlog assigned to Claude that nobody has handed over.
 //
@@ -47,7 +47,7 @@ export const DISPATCH_LABEL = 'dispatch'
 export const RUNNER = 'claude-code'
 
 // What a session may do without asking. Edits are accepted; shell commands
-// are limited to the tools the alcon skill's protocol uses. Anything else is
+// are limited to the tools the clayware skill's protocol uses. Anything else is
 // refused in a headless session, and the skill tells it to stop and file a
 // decision instead of working around a refusal.
 export const ALLOWED_TOOLS = [

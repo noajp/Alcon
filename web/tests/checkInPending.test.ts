@@ -7,7 +7,7 @@ const elementId = '00000000-0000-0000-0000-000000000002';
 const requestId = '00000000-0000-0000-0000-000000000003';
 const otherId = '00000000-0000-0000-0000-000000000004';
 const limits = { noteMax: 4000, nextMax: 2000 };
-const key = `alcon:pendingCheckIn:v1:${userId}:${elementId}`;
+const key = `clayware:pendingCheckIn:v1:${userId}:${elementId}`;
 
 function storage() {
   const data = new Map<string, string>();

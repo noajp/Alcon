@@ -1,4 +1,4 @@
-// Draft an Alcon Object proposal + Elements from a Commit's structured content.
+// Draft an Clayware Object proposal + Elements from a Commit's structured content.
 // Request:  {
 //   title: string;
 //   overview?: string;
@@ -21,9 +21,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `あなたは Alcon の Object (構造単位) と Element (実行単位) をドラフト提案するアシスタントです。
+const SYSTEM_PROMPT = `あなたは Clayware の Object (構造単位) と Element (実行単位) をドラフト提案するアシスタントです。
 
-Alcon の概念モデル:
+Clayware の概念モデル:
 - Object = 部門 / プロジェクト / 作戦 / 案件 など業界横断の容れ物
 - Element = その中の最小の実行単位 (タスク / 案件 / 仕訳)
 - Sub-element（Element の下に置く Element）はこの流れでは生成しない。Element までに留める
@@ -69,7 +69,7 @@ interface DraftOutput {
 
 const tool = {
   name: "emit_object_draft",
-  description: "Draft an Alcon Object (+ nested Elements) proposal from the Brief content.",
+  description: "Draft an Clayware Object (+ nested Elements) proposal from the Brief content.",
   input_schema: {
     type: "object",
     properties: {

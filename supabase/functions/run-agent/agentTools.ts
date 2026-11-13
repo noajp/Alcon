@@ -11,7 +11,7 @@ export { webSteps, webTools } from "../_shared/webTools.ts";
 export { INTEGRATION_SEPARATOR, integrationPrefix, uniqueToolName };
 export { approvalSummary } from "../_shared/integrationTools.ts";
 
-// What an Element-executing agent can do. Alcon's own operations come from the
+// What an Element-executing agent can do. Clayware's own operations come from the
 // one catalog under the Element policy (reads and writes, nothing that
 // removes) — the same tools and executor as the AI panel and a conversation,
 // with RLS deciding what each call may touch. The internal tools are how the

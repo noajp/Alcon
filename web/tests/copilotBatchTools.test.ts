@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 // Deno dependencies belong to the Edge runtime, not the web compiler graph.
 const { runBatchTool } = await import(new URL('../../supabase/functions/_shared/batchTools.ts', import.meta.url).pathname);
 const objectId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const actor = { agent: 'alcon-copilot' };
+const actor = { agent: 'clayware-copilot' };
 
 /** Records each insert; an elements insert answers with the rows given ids. */
 function recordingDb(inserts: { table: string; rows: Record<string, unknown>[] }[]) {

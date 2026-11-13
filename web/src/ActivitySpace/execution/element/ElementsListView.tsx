@@ -7,7 +7,7 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useState, useEffect, useMemo } from 'react';
 import { DomainIcon } from '@/Function/shared/conceptIcons';
-import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, updateElements, restoreElementsField, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/ActivitySpace/execution/element/useElementSelection';
@@ -235,7 +235,7 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
   );
 
 
-  const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
+  const objectsWithElements = useMemo<ClaywareObjectWithChildren[]>(() => {
     if (!explorerData) return [];
     return explorerData.objects.filter((o) => (o.elements?.length ?? 0) > 0);
   }, [explorerData]);

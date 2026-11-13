@@ -1,11 +1,11 @@
 {
-  "name": "alcon-runner",
+  "name": "clayware-runner",
   "version": "0.1.0",
   "private": true,
-  "description": "Lends your own computer's browser to your Alcon AI runs.",
+  "description": "Lends your own computer's browser to your Clayware AI runs.",
   "type": "module",
-  "bin": { "alcon-runner": "alcon-runner.mjs" },
-  "scripts": { "start": "node alcon-runner.mjs" },
+  "bin": { "clayware-runner": "clayware-runner.mjs" },
+  "scripts": { "start": "node clayware-runner.mjs" },
   "engines": { "node": ">=20" },
   "dependencies": { "playwright-core": "1.56.1" }
 }

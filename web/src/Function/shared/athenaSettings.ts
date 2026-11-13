@@ -21,7 +21,7 @@ type AthenaEffort = (typeof ATHENA_EFFORTS)[number]['id'];
 interface AthenaSettings { model: AthenaModel; effort: AthenaEffort }
 
 const DEFAULTS: AthenaSettings = { model: 'claude-sonnet-5-5', effort: 'medium' };
-const KEY = 'alcon:athena:settings';
+const KEY = 'clayware:athena:settings';
 const listeners = new Set<() => void>();
 let cached: AthenaSettings | null = null;
 

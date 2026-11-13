@@ -18,7 +18,7 @@ import {
   type BusWorkerInput,
   type InitiativeBusFactor,
 } from '@/Function/strategy/initiativeBusFactorModel';
-import type { AlconObject, ElementWithDetails } from '@/types/database';
+import type { ClaywareObject, ElementWithDetails } from '@/types/database';
 import type { CapacitySpan } from '@/Function/shared/workerCapacity';
 
 // =============================================================
@@ -33,7 +33,7 @@ import type { CapacitySpan } from '@/Function/shared/workerCapacity';
 
 export interface InitiativeRiskState {
   elements: ElementWithDetails[];
-  objects: AlconObject[];
+  objects: ClaywareObject[];
   report: InitiativeRiskReport | null;
   /** Who the Strategy's open work rests on alone. Null on the same terms as
    *  `report` — the two are read from one fetch and arrive together. */
@@ -45,7 +45,7 @@ export interface InitiativeRiskState {
 
 interface InitiativeRiskData {
   elements: ElementWithDetails[];
-  objects: AlconObject[];
+  objects: ClaywareObject[];
   report: InitiativeRiskReport;
   busFactor: InitiativeBusFactor;
 }
@@ -102,7 +102,7 @@ export function toRiskElements(
  * than no row at all.
  */
 export async function fetchDomainThresholds(
-  objects: Pick<AlconObject, 'domain_id'>[],
+  objects: Pick<ClaywareObject, 'domain_id'>[],
 ): Promise<Map<string, InitiativeRiskOptions>> {
   const domainIds = Array.from(
     new Set(objects.map((o) => o.domain_id).filter((d): d is string => typeof d === 'string' && d.length > 0)),
@@ -121,12 +121,12 @@ export async function fetchDomainThresholds(
 /** The Objects the model judges, in the caller's order, with their Domain's thresholds attached. */
 export function toRiskObjects(
   objectIds: string[],
-  byId: Map<string, AlconObject>,
+  byId: Map<string, ClaywareObject>,
   thresholdsByDomain: Map<string, InitiativeRiskOptions>,
 ): RiskObject[] {
   return objectIds
     .map((id) => byId.get(id))
-    .filter((o): o is AlconObject => o !== undefined)
+    .filter((o): o is ClaywareObject => o !== undefined)
     .map((o) => ({
       id: o.id,
       name: o.name,

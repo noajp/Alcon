@@ -41,7 +41,7 @@ import { TryDefinition } from './TryDefinition';
 // connectors it uses and, for a Strategy, how it is broken down. One page,
 // top to bottom: the Space's own harnesses, shared by its members (one of
 // them may be the Space's default, which Strategies are worked by when they
-// name none — otherwise Alcon's built-in way), then the catalog Alcon offers
+// name none — otherwise Clayware's built-in way), then the catalog Clayware offers
 // to start from, added by copying into the Space. Adding one starts an
 // install walk: the
 // connectors it still needs are connected one at a time through the usual
@@ -292,8 +292,8 @@ export function HarnessesPanel() {
               {defaultHarness
                 ? defaultHarness.enabled
                   ? t('Default harness: {name}', { name: defaultHarness.name })
-                  : t('Default harness: {name} · Off — Strategies use Alcon’s built-in way', { name: defaultHarness.name })
-                : t('A Strategy that names no harness is worked the way built into Alcon. Make one of these the default to change that.')}
+                  : t('Default harness: {name} · Off — Strategies use Clayware’s built-in way', { name: defaultHarness.name })
+                : t('A Strategy that names no harness is worked the way built into Clayware. Make one of these the default to change that.')}
             </p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => setEditing('new')} disabled={!spaceId}>
@@ -375,7 +375,7 @@ export function HarnessesPanel() {
       <section className="space-y-3">
         <div>
           <h2 className={`${FONT.lg} text-foreground`}>{t('Add from the catalog')}</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Ready-made harnesses from Alcon. Adding one copies it into this Space, where you can change it.')}</p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">{t('Ready-made harnesses from Clayware. Adding one copies it into this Space, where you can change it.')}</p>
         </div>
         {catalog.loading ? <p className="text-[12px] text-muted-foreground">{t('Loading…')}</p> : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

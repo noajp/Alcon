@@ -15,7 +15,7 @@ const automations = readFileSync(
   new URL('../../supabase/functions/automations/index.ts', import.meta.url).pathname, 'utf8',
 );
 const runner = readFileSync(
-  new URL('../../sdk/node/runner/alcon-runner.mjs', import.meta.url).pathname, 'utf8',
+  new URL('../../sdk/node/runner/clayware-runner.mjs', import.meta.url).pathname, 'utf8',
 );
 
 describe('run-agent: the machine is definition-gated (design §4.3)', () => {
@@ -75,7 +75,7 @@ describe('the tick reaps workspaces', () => {
 
 describe('the runner boots machine-only for a provisioned workspace', () => {
   it('takes its identity token from the environment as well as its state file', () => {
-    expect(runner).toContain('ALCON_TOKEN');
+    expect(runner).toContain('CLAYWARE_TOKEN');
   });
 
   it('--no-browser loads no browser handlers and offers shell/files only', () => {

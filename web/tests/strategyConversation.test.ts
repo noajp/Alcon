@@ -119,12 +119,12 @@ describe('conversationItems', () => {
   let n = 0;
   const step = (type: string, title: string, detail: string | null = null) => ({ id: `s${++n}`, type, title, detail });
   const steps = [
-    step('status', '会話を開始', 'Alcon Agent / Sonnet'),
+    step('status', '会話を開始', 'Clayware Agent / Sonnet'),
     step('message', '目的から決めたい', '目的から決めたい'),
-    step('action', 'Alcon: getInitiative', null),
+    step('action', 'Clayware: getInitiative', null),
     step('reply', '目的を書きます。', '目的を書きます。'),
-    step('write', 'Alcon: updateInitiative', '地域の問い合わせを倍にする'),
-    step('error', 'Alcon: addIntent', '持ち主だけです'),
+    step('write', 'Clayware: updateInitiative', '地域の問い合わせを倍にする'),
+    step('error', 'Clayware: addIntent', '持ち主だけです'),
     step('action', 'Web 検索: 問い合わせ 平均'),
     step('plan_request', '計画を Planner に渡す準備をしました', '広告は使わない'),
     step('reply', '記録しました。', '記録しました。\n次は前提です。'),
@@ -161,7 +161,7 @@ describe('conversationItems', () => {
   it('maps the proposal steps to items that carry the proposal', () => {
     const proposalSteps = [
       step('message', '進めて', '進めて'),
-      step('action', 'Alcon: getInitiativeExecution', null),
+      step('action', 'Clayware: getInitiativeExecution', null),
       step('start_request', '実行の開始を提案しました', JSON.stringify({ elementIds: ['e1', 'e2'], titles: ['下調べ', '集計'] })),
       step('answer_request', '実行への答えを提案しました', JSON.stringify({ runId: 'r1', elementId: 'e3', elementTitle: '確認', text: 'A で進めて', question: 'A と B どちらにしますか' })),
       step('reply', 'カードを出しました。', 'カードを出しました。'),

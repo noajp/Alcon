@@ -177,7 +177,7 @@ export async function ensureManagedWorkspace(
   };
 
   try {
-    await provider.create(spriteName, ["alcon-workspace", `space-${input.spaceId}`]);
+    await provider.create(spriteName, ["clayware-workspace", `space-${input.spaceId}`]);
 
     // The runner's asset, minted and accepted by the server: the
     // token is this workspace's own identity for the relay, its hash
@@ -189,7 +189,7 @@ export async function ensureManagedWorkspace(
       p_space: input.spaceId,
       p_name: assetName,
       p_manifest: {
-        runner: "alcon-runner", capabilities: ["shell", "files"], isolated: true, headless: true,
+        runner: "clayware-runner", capabilities: ["shell", "files"], isolated: true, headless: true,
         provisioned: { by: "server", run_id: input.runId, provider: provider.id, sandbox: spriteName },
       },
       p_token_hash: await sha256Hex(token),
@@ -209,7 +209,7 @@ export async function ensureManagedWorkspace(
     await provider.writeFile(spriteName, `${WORKSPACE_HOME}/env`,
       workspaceEnvFile({ relayUrl, token, name: assetName, runnerUrl: seat.config.runnerUrl }), "0600");
     await provider.writeFile(spriteName, `${WORKSPACE_HOME}/bootstrap.sh`, bootstrapScript(), "0700");
-    await provider.putService(spriteName, "alcon-runner", { cmd: "/bin/bash", args: [`${WORKSPACE_HOME}/bootstrap.sh`] });
+    await provider.putService(spriteName, "clayware-runner", { cmd: "/bin/bash", args: [`${WORKSPACE_HOME}/bootstrap.sh`] });
 
     const { data } = await admin.from("run_workspaces").select(COLUMNS).eq("id", record.id).single();
     record = data ? parseWorkspaceRow(data as Record<string, unknown>) : record;

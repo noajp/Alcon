@@ -172,7 +172,7 @@ async function hello(req: Request, db: SupabaseClient): Promise<Response> {
     asset_id: data,
     token,
     status: "unclaimed",
-    next: "A Space owner accepts this asset in Alcon › Settings › Customize › Connected assets. Keep the token: it identifies this asset from now on.",
+    next: "A Space owner accepts this asset in Clayware › Settings › Customize › Connected assets. Keep the token: it identifies this asset from now on.",
   });
 }
 
@@ -307,7 +307,7 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "GET" && path === "/") {
     return json(200, {
-      name: "Alcon asset relay",
+      name: "Clayware asset relay",
       hello: "POST /hello { space, name, kind?, manifest? }",
       events: "POST /events with Authorization: Bearer <token>",
       status: "GET /status with Authorization: Bearer <token>",

@@ -28,8 +28,8 @@ import type { FinishClaim } from "./finishClaims.ts";
 export const CODING_WORKDIR = "alcon-repo";
 
 /** The marker lines the capture command prints around its two halves. */
-const STATUS_MARK = "__ALCON_STATUS__";
-const DIFF_MARK = "__ALCON_DIFF__";
+const STATUS_MARK = "__CLAYWARE_STATUS__";
+const DIFF_MARK = "__CLAYWARE_DIFF__";
 
 // ── The target ─────────────────────────────────────────────────────────
 
@@ -102,15 +102,15 @@ export function shellQuote(value: string): string {
  */
 export function deliveryCommand(input: { url: string; target: CodingTarget; baseSha: string }): string {
   return [
-    `rm -rf ${CODING_WORKDIR} alcon-tree.tar.gz`,
-    `curl -fsSL ${shellQuote(input.url)} -o alcon-tree.tar.gz`,
+    `rm -rf ${CODING_WORKDIR} clayware-tree.tar.gz`,
+    `curl -fsSL ${shellQuote(input.url)} -o clayware-tree.tar.gz`,
     `mkdir -p ${CODING_WORKDIR}`,
-    `tar -xzf alcon-tree.tar.gz -C ${CODING_WORKDIR} --strip-components=1`,
-    `rm -f alcon-tree.tar.gz`,
+    `tar -xzf clayware-tree.tar.gz -C ${CODING_WORKDIR} --strip-components=1`,
+    `rm -f clayware-tree.tar.gz`,
     `cd ${CODING_WORKDIR}`,
     `git init -q -b ${shellQuote(input.target.baseBranch)}`,
     `git add -A`,
-    `git -c user.name=Alcon -c user.email=alcon@localhost commit -qm ${shellQuote(`base: ${input.target.repo}@${input.baseSha}`)}`,
+    `git -c user.name=Clayware -c user.email=clayware@localhost commit -qm ${shellQuote(`base: ${input.target.repo}@${input.baseSha}`)}`,
     `echo FILES $(git ls-files | wc -l)`,
   ].join(" && ");
 }

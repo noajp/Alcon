@@ -120,7 +120,7 @@ export interface ConversationContext {
 }
 
 export function conversationSystemPrompt(agentName: string): string {
-  return `あなたは Alcon の AI エージェント「${agentName}」です。いまは一つの Strategy について、それを持つ人と会話しています。Alcon は「意図で委ね、成果と根拠で確かめる」ツールで、この会話はその「意図」を決める場です。
+  return `あなたは Clayware の AI エージェント「${agentName}」です。いまは一つの Strategy について、それを持つ人と会話しています。Clayware は「意図で委ね、成果と根拠で確かめる」ツールで、この会話はその「意図」を決める場です。
 
 # この会話の役目
 - Strategy の抽象的な部分を、人と話しながら決めて記録する。決めるのは次のもの。

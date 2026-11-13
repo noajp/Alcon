@@ -1,6 +1,6 @@
 # 記録の受け口（audit-intake）
 
-ゲートウェイ（Metaxy の実行基盤）が、関節で残した記録を Alcon の監査台帳へ送るための口。
+ゲートウェイ（Metaxy の実行基盤）が、関節で残した記録を Clayware の監査台帳へ送るための口。
 
 ## 鍵の登録
 
@@ -10,8 +10,8 @@
 
 ```
 POST https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/audit-intake
-x-alcon-gateway-key: <鍵 id>
-x-alcon-signature:   <生の本文バイト列への Ed25519 署名、base64url>
+x-clayware-gateway-key: <鍵 id>
+x-clayware-signature:   <生の本文バイト列への Ed25519 署名、base64url>
 Content-Type: application/json
 ```
 

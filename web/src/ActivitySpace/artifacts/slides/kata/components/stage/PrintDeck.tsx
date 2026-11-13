@@ -11,7 +11,7 @@ export function PrintDeck() {
   if (!view || !printing) return null;
   return (
     <div className="print-deck">
-      {/* 用紙を 16:9 にするのは資料を印刷している間だけ（Alcon の他の画面の印刷には効かせない） */}
+      {/* 用紙を 16:9 にするのは資料を印刷している間だけ（Clayware の他の画面の印刷には効かせない） */}
       <style>{"@page { size: 1280px 720px; margin: 0; }"}</style>
       {view.deck.slides.map((s, i) => (
         <div key={s.id} className="print-slide">

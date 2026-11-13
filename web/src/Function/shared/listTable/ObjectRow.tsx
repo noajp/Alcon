@@ -2,7 +2,7 @@
 
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { memo } from 'react';
-import type { AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
+import type { ClaywareObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/Frame/icons';
@@ -15,7 +15,7 @@ import { ObjectCell } from './cells';
 // frozen first three columns all behave the same so Object lists and
 // Element lists feel like one surface.
 interface ObjectRowProps {
-  obj: AlconObjectWithChildren;
+  obj: ClaywareObjectWithChildren;
   isSelected: boolean;
   hasSelectionRef: { readonly current: boolean };
   visibleColumns: DataColumn[];

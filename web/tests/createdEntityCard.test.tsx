@@ -48,18 +48,18 @@ vi.mock('@/hooks/codeChangeData', () => ({
 }));
 
 import { CreatedEntities, CreatedEntityCard } from '@/AIP/ai/CreatedEntityCard';
-import type { ToolEvent } from '@/AIP/ai/useAlconCopilot';
+import type { ToolEvent } from '@/AIP/ai/useClaywareCopilot';
 
 const opened: { view: string; nav?: Record<string, unknown> }[] = [];
 const onOpenInApp = (e: Event) => { opened.push((e as CustomEvent).detail); };
 
 beforeEach(() => {
   opened.length = 0;
-  window.addEventListener('alcon:open-in-app', onOpenInApp);
+  window.addEventListener('clayware:open-in-app', onOpenInApp);
 });
 
 afterEach(() => {
-  window.removeEventListener('alcon:open-in-app', onOpenInApp);
+  window.removeEventListener('clayware:open-in-app', onOpenInApp);
   cleanup();
   state.elements.clear();
   state.objects.clear();

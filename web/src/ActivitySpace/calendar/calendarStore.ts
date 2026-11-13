@@ -10,8 +10,8 @@ import { toDateOnlyString } from '@/Function/shared/dateUtils';
 // so it survives a reload. The day lives for the page: leaving the Calendar
 // and coming back lands on the day that was open, a reload on today.
 
-const HIDDEN_KEY = 'alcon:calendar-hidden-workers';
-const CHANGE_EVENT = 'alcon:calendar-change';
+const HIDDEN_KEY = 'clayware:calendar-hidden-workers';
+const CHANGE_EVENT = 'clayware:calendar-change';
 
 const EMPTY: string[] = Object.freeze([]) as unknown as string[];
 

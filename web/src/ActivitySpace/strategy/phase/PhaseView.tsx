@@ -50,7 +50,7 @@ import {
 // time-boxed periods, scoped to the active Domain. A Phase is a named date
 // range ("要件定義", Jul 14 – Jul 27); Objects and Elements are assigned to
 // at most one Phase via their phase_id column. Unlike Linear's auto-rolling
-// cycles, Phases are created by hand — Alcon phases are milestones of a plan
+// cycles, Phases are created by hand — Clayware phases are milestones of a plan
 // (requirements → design → build), not a fixed sprint cadence.
 // =============================================================
 

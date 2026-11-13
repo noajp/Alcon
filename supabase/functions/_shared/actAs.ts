@@ -1,5 +1,5 @@
 // A session for a person, issued on the server, so work that person set up
-// (an automation) runs with their authority while nobody has Alcon open.
+// (an automation) runs with their authority while nobody has Clayware open.
 // RLS, budgets and approvals then apply exactly as if they had clicked.
 //
 // It goes through Supabase Auth's own flow: the service role generates a

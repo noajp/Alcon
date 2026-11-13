@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *, .theme-midnight *, .theme-carbon *, .theme-graphite *));
 
 /* =============================================
-   Alcon Design System
+   Clayware Design System
    Accent: Matte blue (#426fac) — muted, single accent
    Danger: Matte red (#d05249) — muted, warm red
    Surfaces: neutral dark-first ramp
@@ -188,7 +188,7 @@
   --sidebar-width: 240px;
 
   /* ---- Typography ---- */
-  --font-sans: "Inter Variable", "Alcon JP", -apple-system, "SF Pro Display", system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Clayware JP", -apple-system, "SF Pro Display", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Berkeley Mono", ui-monospace, monospace;
 
   /* ---- Shadcn/UI token mapping — Light ---- */
@@ -472,29 +472,29 @@
    Inter has no Japanese glyphs, so they fall to the system font, whose
    next face up from regular is a visibly bolder one: at the UI's medium
    (510) and semibold (590) a Japanese word read a step heavier than the
-   Latin beside it. "Alcon JP" holds only Japanese (unicode-range) and maps
+   Latin beside it. "Clayware JP" holds only Japanese (unicode-range) and maps
    each weight band to the Hiragino face that matches Inter's look, with
    the common Japanese fonts of other systems after it. */
 @font-face {
-  font-family: "Alcon JP";
+  font-family: "Clayware JP";
   src: local("HiraginoSans-W3"), local("Hiragino Sans W3"), local("YuGothic-Regular"), local("Yu Gothic UI"), local("NotoSansJP-Regular"), local("Meiryo");
   font-weight: 100 449;
   unicode-range: U+3000-303F, U+3040-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
 }
 @font-face {
-  font-family: "Alcon JP";
+  font-family: "Clayware JP";
   src: local("HiraginoSans-W4"), local("Hiragino Sans W4"), local("YuGothic-Medium"), local("Yu Gothic UI Semibold"), local("NotoSansJP-Medium"), local("Meiryo");
   font-weight: 450 569;
   unicode-range: U+3000-303F, U+3040-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
 }
 @font-face {
-  font-family: "Alcon JP";
+  font-family: "Clayware JP";
   src: local("HiraginoSans-W5"), local("Hiragino Sans W5"), local("YuGothic-Medium"), local("Yu Gothic UI Semibold"), local("NotoSansJP-Medium"), local("Meiryo");
   font-weight: 570 649;
   unicode-range: U+3000-303F, U+3040-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
 }
 @font-face {
-  font-family: "Alcon JP";
+  font-family: "Clayware JP";
   src: local("HiraginoSans-W6"), local("Hiragino Sans W6"), local("YuGothic-Bold"), local("Yu Gothic UI Bold"), local("NotoSansJP-Bold"), local("Meiryo Bold");
   font-weight: 650 900;
   unicode-range: U+3000-303F, U+3040-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
@@ -827,7 +827,7 @@ button, a, input, select, textarea {
 }
 
 /* ============================================
-   Slides (Kata) — the presentation editor's chrome reads Alcon's tokens
+   Slides (Kata) — the presentation editor's chrome reads Clayware's tokens
    through its own names, so it follows the app's look and light/dark theme.
    Slide content keeps its look tokens (--s-*), set per deck.
    ============================================ */

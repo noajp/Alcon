@@ -16,7 +16,7 @@ describe('i18n locale resolution', () => {
   });
 
   it('interpolates named values without removing unknown placeholders', () => {
-    expect(interpolate('Hello {name} {missing}', { name: 'Alcon' })).toBe('Hello Alcon {missing}');
+    expect(interpolate('Hello {name} {missing}', { name: 'Clayware' })).toBe('Hello Clayware {missing}');
   });
 
   it('keeps every non-English dictionary structurally complete', () => {

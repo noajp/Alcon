@@ -540,7 +540,7 @@ function buildTableChannel(table: WorkspaceTable) {
 
 // Dev-only handle for inspecting channel state from the browser console.
 if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-  (window as unknown as { __alconSupabase?: typeof supabase }).__alconSupabase = supabase;
+  (window as unknown as { __claywareSupabase?: typeof supabase }).__claywareSupabase = supabase;
 }
 
 /** Mount once, at the app root, while signed in. */

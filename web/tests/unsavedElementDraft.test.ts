@@ -43,8 +43,8 @@ describe('pendingDraft', () => {
 });
 
 describe('unsavedDraftKeysToDrop', () => {
-  const p = 'alcon:element-unsaved-draft:';
-  const keys = [`${p}u1:e1`, `${p}u2:e1`, `${p}u10:e2`, `${p}e3`, 'alcon-other-setting'];
+  const p = 'clayware:element-unsaved-draft:';
+  const keys = [`${p}u1:e1`, `${p}u2:e1`, `${p}u10:e2`, `${p}e3`, 'clayware-other-setting'];
 
   it('keeps only the signed-in user’s drafts', () => {
     expect(unsavedDraftKeysToDrop(keys, 'u1')).toEqual([`${p}u2:e1`, `${p}u10:e2`, `${p}e3`]);

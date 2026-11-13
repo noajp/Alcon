@@ -1,4 +1,4 @@
-# Alcon asset relay — 中継連結基盤
+# Clayware asset relay — 中継連結基盤
 
 ローカルで動くアプリや AI が、バックエンドの一行で Space に名乗り出て、承諾された時点で「資産」として認識され、以後の活動が Space に残る受け口。一行の SDK は [sdk/README.md](../sdk/README.md)。
 
@@ -28,7 +28,7 @@
 
 ## 仕事を受ける資産（実行役）
 
-`manifest.capabilities` に `"browser"` を持つ資産は、ブラウザを貸す実行役として扱われる（`sdk/node/runner/alcon-runner.mjs`）。
+`manifest.capabilities` に `"browser"` を持つ資産は、ブラウザを貸す実行役として扱われる（`sdk/node/runner/clayware-runner.mjs`）。
 
 - 使えるのは、その資産を承諾した人が始めた AI の実行だけ。直近 2 分以内に `/calls/next` を呼んでいる実行役が「つながっている」とみなされる
 - run-agent は `pc_open` / `pc_read` / `pc_click` / `pc_type` / `pc_back` を道具として持ち、呼ばれると `asset_calls` に仕事を書いて、答えを最長 60 秒待つ

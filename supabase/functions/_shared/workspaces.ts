@@ -196,7 +196,7 @@ export function capViolation(liveCount: number, monthSpend: number, caps: Worksp
 /** Pure. A run's sprite name: stable per run, so a retried slice
  *  finds the same machine instead of minting a second one. */
 export function spriteNameForRun(runId: string): string {
-  return `alcon-ws-${runId.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 24)}`;
+  return `clayware-ws-${runId.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 24)}`;
 }
 
 /** Pure. One value, shell-quoted for the env file the runner's
@@ -217,10 +217,10 @@ export function shellQuote(value: string): string {
  */
 export function workspaceEnvFile(input: { relayUrl: string; token: string; name: string; runnerUrl: string }): string {
   return [
-    `ALCON_RELAY=${shellQuote(input.relayUrl)}`,
-    `ALCON_TOKEN=${shellQuote(input.token)}`,
-    `ALCON_NAME=${shellQuote(input.name)}`,
-    `ALCON_RUNNER_URL=${shellQuote(input.runnerUrl)}`,
+    `CLAYWARE_RELAY=${shellQuote(input.relayUrl)}`,
+    `CLAYWARE_TOKEN=${shellQuote(input.token)}`,
+    `CLAYWARE_NAME=${shellQuote(input.name)}`,
+    `CLAYWARE_RUNNER_URL=${shellQuote(input.runnerUrl)}`,
     "",
   ].join("\n");
 }
@@ -242,22 +242,22 @@ export const RUNNER_PLAYWRIGHT_PIN = "1.56.1";
 export function bootstrapScript(): string {
   return [
     "#!/bin/bash",
-    "# Alcon workspace bootstrap — written by the server at provisioning.",
+    "# Clayware workspace bootstrap — written by the server at provisioning.",
     "# Sources the env file beside it (the workspace's own relay identity),",
     "# installs the runner build, and execs it. Safe to re-run on wake.",
     "set -eu",
-    'export ALCON_HOME="$HOME/.alcon"',
-    'mkdir -p "$ALCON_HOME/runner"',
+    'export CLAYWARE_HOME="$HOME/.clayware"',
+    'mkdir -p "$CLAYWARE_HOME/runner"',
     "set -a",
-    '. "$ALCON_HOME/env"',
+    '. "$CLAYWARE_HOME/env"',
     "set +a",
-    'cd "$ALCON_HOME/runner"',
-    '[ -f alcon-runner.mjs ] || curl -fsSL "$ALCON_RUNNER_URL" -o alcon-runner.mjs',
+    'cd "$CLAYWARE_HOME/runner"',
+    '[ -f clayware-runner.mjs ] || curl -fsSL "$CLAYWARE_RUNNER_URL" -o clayware-runner.mjs',
     "cat > package.json <<'JSON'",
-    `{"name":"alcon-runner","private":true,"type":"module","dependencies":{"playwright-core":"${RUNNER_PLAYWRIGHT_PIN}"}}`,
+    `{"name":"clayware-runner","private":true,"type":"module","dependencies":{"playwright-core":"${RUNNER_PLAYWRIGHT_PIN}"}}`,
     "JSON",
     "[ -d node_modules/playwright-core ] || npm install --omit=dev --no-audit --no-fund --loglevel=error",
-    "exec node alcon-runner.mjs --isolated --shell --no-browser --headless",
+    "exec node clayware-runner.mjs --isolated --shell --no-browser --headless",
     "",
   ].join("\n");
 }
@@ -265,7 +265,7 @@ export function bootstrapScript(): string {
 /** Pure. Where inside the workspace the bootstrap files live. Built from
  *  parts: the deploy bundler reads a literal absolute path as a local
  *  file to upload and fails on it. */
-export const WORKSPACE_HOME = ["", "home", "sprite", ".alcon"].join("/");
+export const WORKSPACE_HOME = ["", "home", "sprite", ".clayware"].join("/");
 
 // ── The provider seam ──────────────────────────────────────────────────
 

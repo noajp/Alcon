@@ -1,4 +1,4 @@
-// alcon-copilot — the tool-free JSON surface.
+// clayware-copilot — the tool-free JSON surface.
 //
 // What remains of the panel's old backend after the engine unification:
 // chat runs on run-agent (Athena's chat driver, on the session's run),

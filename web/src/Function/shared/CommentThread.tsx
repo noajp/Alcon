@@ -17,7 +17,7 @@ import { splitMentions } from './mentions';
 // =============================================================
 // The parts every comment thread is made of.
 //
-// Alcon has two threads — one on an Element, one on a Strategy — and they are
+// Clayware has two threads — one on an Element, one on a Strategy — and they are
 // the same object with two homes, so they render through the same parts. What
 // differs between them (reactions, pinning, who may delete) is passed in as
 // slots rather than forked: a second hand-rolled entry is where the two

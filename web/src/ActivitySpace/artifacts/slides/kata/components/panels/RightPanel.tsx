@@ -8,7 +8,7 @@ import { tx } from "@/ActivitySpace/artifacts/slides/kata/i18n";
 
 // The inspector beside the canvas, as in a design tool: two views of the open
 // deck — its look and its structure — on one surface divided from the canvas
-// by a hairline. Talking to the deck happens in Alcon's AI panel, which is the
+// by a hairline. Talking to the deck happens in Clayware's AI panel, which is the
 // deck's assistant while Slides is open.
 export function RightPanel() {
   const panel = useKata((s) => s.panel);

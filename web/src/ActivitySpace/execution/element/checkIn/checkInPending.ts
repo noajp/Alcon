@@ -15,7 +15,7 @@ const uuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}
 const status = (v: unknown) => v === null || STATUS_ORDER.some(s => s === v);
 const timestamp = (v: unknown) => v === null || (typeof v === 'string' && Number.isFinite(Date.parse(v)));
 const textOrNull = (v: unknown, max: number) => v === null || (typeof v === 'string' && v.length <= max);
-const pendingKey = (userId: string, elementId: string) => `alcon:pendingCheckIn:v1:${userId}:${elementId}`;
+const pendingKey = (userId: string, elementId: string) => `clayware:pendingCheckIn:v1:${userId}:${elementId}`;
 
 function validate(pending: PendingCheckIn, userId: string, elementId: string, limits: CheckInLimits) {
   const { base, draft, attempt } = pending ?? {};
