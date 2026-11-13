@@ -16,6 +16,8 @@ import { phaseWindowMs } from '@/Function/shared/phaseWindow';
 import { MilestoneDiamond } from '@/Function/shared/MilestoneDiamond';
 import { ItemIcon } from '@/Function/shared/itemIcon/ItemIcon';
 import { dragRange, linkRoute, roundedPath } from './ganttRange';
+import { createPortal } from 'react-dom';
+import { useWidgetActionSlot } from '@/Function/widget/WidgetActionSlot';
 import { DEPENDENCY_KINDS, asDependencyKind, endsOfKind, kindOfEnds, type BarEnd, type DependencyKind } from '@/Function/shared/objectDependencyModel';
 import { addElementDependency, removeElementDependency, setElementDependencyKind } from '@/hooks/elementDependencyData';
 import { outlook, warmthGradient, warnsAboutTime } from '@/Function/shared/pace';
@@ -258,6 +260,7 @@ export function GanttView({
   const ROW_H = ROW_SCALE[rowScale].row;
   const BAR_H = ROW_SCALE[rowScale].bar;
   const todayKey = fmtDateOnly(new Date());
+  const controlSlot = useWidgetActionSlot();
 
   // Elements bring their own dependencies (their depends_on edges) and are
   // linked, re-tied and unlinked here; a caller that passes `links` (the
@@ -641,55 +644,62 @@ export function GanttView({
     return formatDate((d ?? s)!, 'pill', locale);
   };
 
+  // Out, the scale, in, and back to today — one quiet group.
+  const scaleControl = (
+    <div className="flex h-7 items-center rounded-md bg-muted/50 p-0.5">
+      <button type="button" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={zoomScale <= ZOOM_MIN + 1e-6}
+        title={t('Zoom out')} aria-label={t('Zoom out')}
+        className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40">
+        <ZoomOut size={14} />
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" title={t('Scale')}
+            className="inline-flex h-6 min-w-[72px] items-center justify-center gap-1 rounded px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted">
+            {t(ZOOM_LABEL[zoom])}
+            {Math.abs(zoomScale - 1) > 1e-6 && <span className="tabular-nums text-muted-foreground">{Math.round(zoomScale * 100)}%</span>}
+            <ChevronDown size={12} className="text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[160px]">
+          {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map((z) => (
+            <DropdownMenuItem key={z} className="gap-2 text-[13px]" onSelect={() => { setZoom(z); setZoomScale(1); }}>
+              <span className="flex-1">{t(ZOOM_LABEL[z])}</span>
+              {zoom === z && <MenuCheck />}
+            </DropdownMenuItem>
+          ))}
+          {Math.abs(zoomScale - 1) > 1e-6 && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-[13px]" onSelect={() => setZoomScale(1)}>{t('Reset zoom')}</DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <button type="button" onClick={() => zoomBy(ZOOM_STEP)} disabled={zoomScale >= ZOOM_MAX - 1e-6}
+        title={t('Zoom in')} aria-label={t('Zoom in')}
+        className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40">
+        <ZoomIn size={14} />
+      </button>
+      <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+      <button type="button" onClick={() => scrollToToday(true)} title={t('Today')}
+        className="inline-flex h-6 items-center gap-1.5 rounded px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted">
+        <CalendarDays size={13} className="text-muted-foreground" />
+        {t('Today')}
+      </button>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Toolbar: one quiet control at the right — out, the scale, in, and
-          back to today. The pane's own header already names the view. */}
-      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card px-4 py-2">
-        {object?.name && <span className="min-w-0 truncate text-xs text-muted-foreground">{object.name}</span>}
-        <div className="ml-auto flex h-7 items-center rounded-md bg-muted/50 p-0.5">
-          <button type="button" onClick={() => zoomBy(1 / ZOOM_STEP)} disabled={zoomScale <= ZOOM_MIN + 1e-6}
-            title={t('Zoom out')} aria-label={t('Zoom out')}
-            className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40">
-            <ZoomOut size={14} />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" title={t('Scale')}
-                className="inline-flex h-6 min-w-[72px] items-center justify-center gap-1 rounded px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted">
-                {t(ZOOM_LABEL[zoom])}
-                {Math.abs(zoomScale - 1) > 1e-6 && <span className="tabular-nums text-muted-foreground">{Math.round(zoomScale * 100)}%</span>}
-                <ChevronDown size={12} className="text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[160px]">
-              {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map((z) => (
-                <DropdownMenuItem key={z} className="gap-2 text-[13px]" onSelect={() => { setZoom(z); setZoomScale(1); }}>
-                  <span className="flex-1">{t(ZOOM_LABEL[z])}</span>
-                  {zoom === z && <MenuCheck />}
-                </DropdownMenuItem>
-              ))}
-              {Math.abs(zoomScale - 1) > 1e-6 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-[13px]" onSelect={() => setZoomScale(1)}>{t('Reset zoom')}</DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button type="button" onClick={() => zoomBy(ZOOM_STEP)} disabled={zoomScale >= ZOOM_MAX - 1e-6}
-            title={t('Zoom in')} aria-label={t('Zoom in')}
-            className="inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40">
-            <ZoomIn size={14} />
-          </button>
-          <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
-          <button type="button" onClick={() => scrollToToday(true)} title={t('Today')}
-            className="inline-flex h-6 items-center gap-1.5 rounded px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-muted">
-            <CalendarDays size={13} className="text-muted-foreground" />
-            {t('Today')}
-          </button>
+      {/* The scale control stands in the tab bar's right end when there is
+          one (the same row as the tabs); otherwise in a strip of its own. */}
+      {controlSlot ? createPortal(scaleControl, controlSlot) : (
+        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card px-4 py-2">
+          {object?.name && <span className="min-w-0 truncate text-xs text-muted-foreground">{object.name}</span>}
+          <div className="ml-auto">{scaleControl}</div>
         </div>
-      </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden" ref={containerRef}>
