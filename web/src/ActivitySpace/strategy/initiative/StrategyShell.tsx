@@ -10,7 +10,9 @@ import { BoardOrientationToggle, useBoardOrientation } from '@/Function/shared/b
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
+import { Check, ChevronDown, ChevronRight, FileText, MessageCircle, MoreHorizontal, Plus, Search, X } from '@/ui/icons';
+import { NotePicker } from '@/ActivitySpace/artifacts/notebook/NotePicker';
+import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEmbed';
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
 import { EmbedHostContext } from '@/Function/notebook/editor/embedBlocks';
 import { useStrategyEmbeds } from './StrategyEmbeds';
@@ -613,6 +615,9 @@ function StrategyDetailView({
   // The conversation opens on request; another Strategy opens without it,
   // on its Overview.
   const [talking, setTalking] = useState(false);
+  // The Note pinned to this Strategy (its Document), as on an Element.
+  const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const linkNote = async (noteId: string | null) => { await updateStrategy(strategy.id, { note_id: noteId }); onSaved(); };
   const [tab, setTab] = useState<StrategyTab>(() => loadStrategyTab(strategy.id));
   // The boards' orientation — the one preference every board shares,
   // owned here so the tabs-row toggle turns the mounted board live.
@@ -1074,6 +1079,7 @@ function StrategyDetailView({
                   <ReactionPicker onToggle={(e) => void reactWith(e)} />
                   <AttachButton owner={{ kind: 'strategy', id: strategy.id }}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50" />
+                  <div className="relative">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button type="button" title={t('More')} aria-label={t('More')}
@@ -1090,16 +1096,26 @@ function StrategyDetailView({
                           <NavStrategyIcon size={15} />{t('Add existing Strategy')}
                         </DropdownMenuItem>
                       )}
+                      {canEdit && !strategy.note_id && (
+                        <DropdownMenuItem onSelect={() => setTimeout(() => setNotePickerOpen(true), 0)} className="gap-2.5 py-1.5 text-[13px]">
+                          <FileText size={15} className="text-muted-foreground" />{t('Document')}
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onSelect={() => { requestNewDeck(strategy.name); openInApp('slides'); }} className="gap-2.5 py-1.5 text-[13px]">
                         <NavSlidesIcon size={15} />{t('Slide')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <NotePicker open={notePickerOpen} onClose={() => setNotePickerOpen(false)}
+                    onPick={(noteId) => { setNotePickerOpen(false); void linkNote(noteId); }}
+                    anchorClassName="absolute top-full left-0 mt-1" />
+                  </div>
                   <ReactionChips reactions={reactions} userId={userId} onToggle={(e) => void reactWith(e)} />
                 </div>
               </ButtonAppearanceProvider>
               <AttachmentList owner={{ kind: 'strategy', id: strategy.id }} />
           </div>
+          {strategy.note_id && <LinkedNoteEmbed noteId={strategy.note_id} onUnlink={canEdit ? () => void linkNote(null) : undefined} />}
 
 
           {/* Talking it through is called up, not a tab: it opens here when

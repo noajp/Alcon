@@ -514,6 +514,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
         <>
           <DomainTabContent
             activeType={effectiveActiveType}
+            onOpenNote={() => setActiveTypeOnly('note')}
             allElements={allDomainElements}
             objects={explorerData.objects}
             onSelectObject={(id) => onNavigate({ objectId: id })}
@@ -562,6 +563,8 @@ function HierarchyHeader({
 
 interface DomainTabContentProps {
   activeType: ObjectTabType;
+  /** Switches to the Domain's Note tab. */
+  onOpenNote?: () => void;
   allElements: ReturnType<typeof collectAllElements>;
   /** The Domain's Objects, for the cards that name theirs. */
   objects?: { id: string; name: string; icon?: string | null; color?: string | null }[];
@@ -585,7 +588,7 @@ interface DomainTabContentProps {
   onElementDetailChange: (open: boolean) => void;
 }
 
-function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange, onElementDetailChange }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, objects, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange, onElementDetailChange, onOpenNote }: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -612,7 +615,7 @@ function DomainTabContent({ activeType, allElements, objects, onSelectObject, on
   }
 
   if (activeType === 'overview') {
-    return <DomainOverview key={domainId} domainId={domainId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />;
+    return <DomainOverview key={domainId} domainId={domainId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} onOpenNote={onOpenNote} />;
   }
 
   if (activeType === 'gantt') {

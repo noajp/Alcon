@@ -2104,6 +2104,8 @@ export interface Strategy {
   activity_space_id: string | null  // the Space it belongs to
   /** Order among its siblings in the Strategy list; null sorts after, oldest first. */
   order_index?: number | null
+  /** The Note pinned to it (its Document), shown under the description. */
+  note_id?: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -2130,6 +2132,7 @@ export interface StrategyUpdate {
   color?: string | null
   icon?: string | null
   updated_at?: string
+  note_id?: string | null
 }
 
 // Strategy → Objects junction — the single source of a Strategy's Object set.

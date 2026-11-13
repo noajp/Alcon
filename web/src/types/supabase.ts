@@ -5883,6 +5883,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          note_id: string | null
           order_index: number | null
           planner_constraints: Json
           scope: Json
@@ -5900,6 +5901,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          note_id?: string | null
           order_index?: number | null
           planner_constraints?: Json
           scope?: Json
@@ -5917,6 +5919,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          note_id?: string | null
           order_index?: number | null
           planner_constraints?: Json
           scope?: Json
