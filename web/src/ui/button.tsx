@@ -64,6 +64,10 @@ const buttonVariants = cva(
          */
         danger:
           "bg-[var(--status-danger-subtle)] text-[var(--status-danger)] hover:bg-[var(--status-danger)] hover:text-white",
+        /** Destructive as the main action of its place: filled red, the
+         *  counterpart of primary's filled blue. */
+        destructive:
+          "bg-[var(--status-danger)] text-white hover:bg-[color-mix(in_oklab,var(--status-danger),black_14%)]",
       },
       size: {
         xs: [CONTROL.height.xs, CONTROL.padX.xs, CONTROL.gap.xs, CONTROL.text.xs].join(" "),

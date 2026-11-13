@@ -12,6 +12,9 @@ import { applyObjectFilter, orderObjects, DEFAULT_STATE, type ListControlsState 
 import { getActiveDomainId, CREATE_DOMAIN_EVENT } from '@/Function/space/domainsStore';
 import { hydrateLabelColors } from '@/Function/shared/labelColor';
 import { EmptyState } from '@/Function/shared/EmptyState';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { useI18n } from '@/Function/i18n/I18nProvider';
+import { deleteDomain, useDomainRole } from '@/hooks/domainData';
 import { ListTable } from '@/Function/shared/listTable/ListTable';
 import type { ListSection } from '@/Function/shared/listTable/shared';
 import { ArchivedObjectsSection } from '@/ActivitySpace/execution/object/ArchivedObjects';
@@ -137,6 +140,20 @@ export function ObjListView({
 
 function ObjectsEmptyState() {
   const { openCreate } = useWorkspaceActions();
+  const { t } = useI18n();
+  const domainId = getActiveDomainId();
+  const role = useDomainRole(domainId ?? null);
+  const { data: domains } = useDomains();
+  const domain = domains.find((d) => d.id === domainId);
+  // A Domain with nothing in it can be removed from here. Only its owner may
+  // (the database says so too); one that still holds Objects, archived ones
+  // included, is refused with the count.
+  const remove = async () => {
+    if (!domain) return;
+    if (!await appDialog.confirm(t('Delete “{name}”? This can’t be undone.', { name: domain.name }))) return;
+    try { await deleteDomain(domain.id); }
+    catch (e) { await appDialog.alert(e instanceof Error && e.message ? e.message : t('The Domain could not be deleted. Try again.')); }
+  };
   return (
     <EmptyState
       art="objects"
@@ -144,6 +161,7 @@ function ObjectsEmptyState() {
       description="Objects are mid-level structural units — projects, departments, or any container you want to organise."
       cta="Create Object"
       onCta={() => openCreate('object')}
+      secondary={role.data === 'owner' && domain ? { label: 'Delete', variant: 'destructive', onClick: () => { void remove(); } } : undefined}
     />
   );
 }
