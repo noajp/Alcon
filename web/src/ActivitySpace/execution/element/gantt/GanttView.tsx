@@ -397,8 +397,10 @@ export function GanttView({
     };
   }, [dateRange.start, pxPerDay, dragging, dragDaysDelta]);
 
-  /** A dependency's line: out of the blocker's end, into the waiting bar's
-   *  start, as an S-curve that loops back when the waiting bar starts early. */
+  /** A dependency's line: out of the blocker's end in a straight run, a sharp
+   *  turn down (or up), straight to the waiting bar's row, a sharp turn and
+   *  straight into its start; when the waiting bar starts early it doubles
+   *  back between the rows. The mark sits on the line's middle stretch. */
   const linkGeometry = (link: GanttLink) => {
     const source = elements.find((el) => el.id === link.from);
     const target = elements.find((el) => el.id === link.to);
@@ -411,10 +413,12 @@ export function GanttView({
     const sy = barTopOf(sourceTop) + BAR_H / 2;
     const tx = targetPos.left;
     const ty = barTopOf(targetTop) + BAR_H / 2;
-    const reach = Math.min(90, Math.max(36, Math.abs(tx - sx) / 2));
+    const forward = tx - LINK_OUT >= sx + LINK_OUT;
     return {
       sx, sy, tx, ty,
-      d: `M ${sx} ${sy} C ${sx + reach} ${sy}, ${tx - reach} ${ty}, ${tx} ${ty}`,
+      markX: (sx + tx) / 2,
+      markY: forward ? (sy + ty) / 2 : sy + Math.sign(ty - sy || 1) * ROW_H / 2,
+      d: elbowPath(sx, sy, tx, ty, ROW_H, LINK_RADIUS),
       stroke: link.conflict ? 'var(--status-danger)' : 'color-mix(in oklab, var(--accent-default) 80%, transparent)',
     };
   };
@@ -1217,7 +1221,7 @@ export function GanttView({
                   if (!g) return null;
                   return (
                     <g key={`link-${link.from}-${link.to}`}>
-                      <path d={g.d} fill="none" stroke={g.stroke} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 5" />
+                      <path d={g.d} fill="none" stroke={g.stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       <circle cx={g.sx} cy={g.sy} r="2.5" fill={g.stroke} />
                       <circle cx={g.tx} cy={g.ty} r="2.5" fill={g.stroke} />
                     </g>
@@ -1230,9 +1234,8 @@ export function GanttView({
                   if (!pos || top === undefined) return null;
                   const sx = pos.left + Math.max(pos.width, 20);
                   const sy = barTopOf(top) + BAR_H / 2;
-                  const reach = Math.min(90, Math.max(36, Math.abs(linking.x - sx) / 2));
-                  return <path d={`M ${sx} ${sy} C ${sx + reach} ${sy}, ${linking.x - reach} ${linking.y}, ${linking.x} ${linking.y}`}
-                    fill="none" stroke="var(--accent-default)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="1 5" />;
+                  return <path d={elbowPath(sx, sy, linking.x, linking.y, ROW_H, LINK_RADIUS)}
+                    fill="none" stroke="var(--accent-default)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3 3" />;
                 })()}
                 {elements.map(element => {
                   const deps = getDependencies(element);
@@ -1279,7 +1282,7 @@ export function GanttView({
                     <DropdownMenuTrigger asChild>
                       <button type="button" aria-label={`${source?.title ?? ''} → ${target?.title ?? ''}`}
                         className="absolute z-20 flex size-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card transition-transform hover:scale-125"
-                        style={{ left: (g.sx + g.tx) / 2, top: (g.sy + g.ty) / 2, borderColor: g.stroke }}>
+                        style={{ left: g.markX, top: g.markY, borderColor: g.stroke }}>
                         <span className="h-px w-1.5" style={{ backgroundColor: g.stroke }} />
                       </button>
                     </DropdownMenuTrigger>
@@ -1343,15 +1346,19 @@ export function GanttView({
 /** A dependency drawn as an elbow with rounded corners: out of the source's
  *  end, down (or up) to the target's row, into its start. A target that
  *  starts before the source ends is reached by going round, between rows. */
-function elbowPath(sx: number, sy: number, tx: number, ty: number, rowH: number): string {
-  const out = 10;
+/** How far a dependency line runs straight out of a bar, and back in. */
+const LINK_OUT = 10;
+/** The rounding at a dependency line's turns: small, so the turns read sharp. */
+const LINK_RADIUS = 2;
+
+function elbowPath(sx: number, sy: number, tx: number, ty: number, rowH: number, radius = 6): string {
+  const out = LINK_OUT;
   const pts: [number, number][] = tx - out >= sx + out
     ? [[sx, sy], [Math.round((sx + tx) / 2), sy], [Math.round((sx + tx) / 2), ty], [tx, ty]]
     : (() => {
         const midY = sy + Math.sign(ty - sy || 1) * rowH / 2;
         return [[sx, sy], [sx + out, sy], [sx + out, midY], [tx - out, midY], [tx - out, ty], [tx, ty]];
       })();
-  const radius = 6;
   let d = `M ${pts[0][0]} ${pts[0][1]}`;
   for (let i = 1; i < pts.length - 1; i++) {
     const [px, py] = pts[i - 1];
