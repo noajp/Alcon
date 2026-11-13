@@ -335,7 +335,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Progress',
     description: 'Completion across the whole subject, as a bar',
     group: 'progress',
-    accepts: ['object', 'me', 'initiative', 'phase'],
+    accepts: ['me', 'initiative', 'phase'],
     zones: ['band', 'main', 'rail'],
     singleton: true,
     defaultSize: 'full',

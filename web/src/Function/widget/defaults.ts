@@ -11,8 +11,9 @@ import { type BoardLayout } from './types';
 
 /** Object Overview. The spine (icon / title / description) is not a widget. */
 export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
-  // The summary line under the name: how much is done and what is still open.
-  band: [{ id: 'ov-progress', type: 'progress-band' }],
+  // Nothing under the name: a completion bar there read as a score for the
+  // Object, which its Elements' board already shows.
+  band: [],
   // The document column is fixed on an Object's page (attachments,
   // Milestones, Updates), so the board holds no main zone of its own.
   main: [],
