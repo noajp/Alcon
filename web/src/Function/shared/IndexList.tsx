@@ -14,7 +14,9 @@ import type { ReactNode } from 'react';
 // count are the caller's, the geometry is here.
 // =============================================================
 
-const COLUMNS = 'grid-cols-[1fr_minmax(0,16rem)_88px_minmax(0,9rem)_72px]';
+// The name takes what is left; the four beside it are fixed, so every row's
+// cells stand under the headings and the title always has the room.
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_176px_80px_128px_56px]';
 
 export function IndexList({ headers, showHeader = true, withActions = false, children }: {
   /** The five column headings: name, health, due date, lead, count. */
@@ -28,7 +30,7 @@ export function IndexList({ headers, showHeader = true, withActions = false, chi
   return (
     <div className="px-2 pb-2 pt-2">
       {showHeader && (
-        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-3 bg-card py-2.5 pl-[22px] pr-4 text-[13px] font-normal text-muted-foreground ${withActions ? 'mr-7' : ''}`}>
+        <div className={`sticky top-0 z-10 grid ${COLUMNS} gap-5 bg-card py-2.5 pl-[22px] pr-4 text-[13px] font-normal text-muted-foreground ${withActions ? 'mr-7' : ''}`}>
           <span>{headers[0]}</span>
           <span className="text-right">{headers[1]}</span>
           <span>{headers[2]}</span>
@@ -63,14 +65,14 @@ export function IndexRow({ icon, name, description, health, due, person, count, 
   /** After the card — a "…" that shows while the row is hovered or its menu is open. */
   actions?: ReactNode;
 }) {
-  const card = `grid min-h-11 min-w-0 flex-1 ${COLUMNS} items-center gap-3 rounded-md py-2.5 pl-[22px] pr-4 text-left transition-colors`;
+  const card = `grid min-h-11 min-w-0 flex-1 ${COLUMNS} items-center gap-5 rounded-md py-2.5 pl-[22px] pr-4 text-left transition-colors`;
   const content = (
     <>
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         {renameField ?? (
           <>
-            <span className="truncate text-[14px] font-normal text-foreground">{name}</span>
+            <span className="truncate text-[15px] font-medium text-foreground">{name}</span>
             {description && <span className="hidden min-w-0 truncate text-[13px] font-normal text-muted-foreground sm:inline">{description}</span>}
           </>
         )}
