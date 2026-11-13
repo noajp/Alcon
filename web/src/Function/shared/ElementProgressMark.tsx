@@ -52,7 +52,7 @@ export function getElementProgress(
 //   in_progress → solid ring + inner disc, a pie filled to progress%
 //                 (half when no progress is known yet, so it never reads
 //                 as an empty To Do ring)
-//   review      → filled disc + white review lines
+//   review      → half-solid, half-dashed ring + an arrow pointing on
 //   done        → filled disc + white check
 //   blocked     → ring + horizontal bar
 //   cancelled   → ring + ×
@@ -122,13 +122,14 @@ export function ElementProgressMark({
       break;
     }
     case 'review':
-      // Filled disc + white review lines — the same silhouette as Done, with
-      // the lines knocked out where Done has its check.
+      // A ring half drawn, half dashed — the work has left one pair of hands
+      // and is on its way to another — with an arrow pointing on through it.
       inner = (
-        <>
-          <circle cx="24" cy="24" r="15" fill="currentColor" stroke="currentColor" strokeWidth={sw(1.7)} />
-          <path d="M17 20h14 M17 28h9" fill="none" stroke="var(--primary-foreground)" strokeWidth={sw(2.2)} strokeLinecap="round" />
-        </>
+        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M24 9 A15 15 0 0 0 24 39" />
+          <path d="M31.5 11 A15 15 0 0 1 31.5 37" strokeDasharray="2.4 12.1" />
+          <path d="M16 24 H29 M24.5 19.5 L29 24 L24.5 28.5" />
+        </g>
       );
       break;
     case 'done':
