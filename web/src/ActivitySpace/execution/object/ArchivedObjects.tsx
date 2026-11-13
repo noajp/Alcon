@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { DisclosureTriangle } from '@/Function/shared/DisclosureTriangle';
 import { Archive } from '@/ui/icons';
 import { Button } from '@/ui/button';
+import { HoverGroup, ListItem } from '@/ui/list-item';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { canManageObject } from '@/Function/shared/objectArchive';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -116,45 +117,28 @@ export function ArchivedObjectsSection({
         {t('Archived ({count})', { count: objects.length })}
       </Button>
       {open && (
-        <ul className="mt-1">
+        <HoverGroup className="mt-1">
           {objects.map((object) => (
-            <li key={object.id} className="group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/40">
-              <button
-                type="button"
-                onClick={() => onOpen(object.id)}
-                className="min-w-0 flex-1 truncate text-left text-[13px] text-muted-foreground hover:text-foreground"
-              >
-                {object.name}
-              </button>
-              {object.archived_at && (
-                <span className="shrink-0 text-[12px] text-muted-foreground/70">
-                  {new Date(object.archived_at).toLocaleDateString(locale)}
-                </span>
-              )}
-              {managesObject(object) && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={busyId === object.id}
-                  onClick={() => { void restore(object.id); }}
-                >
-                  {t('Restore')}
-                </Button>
-              )}
-              {managesObject(object) && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={busyId === object.id}
-                  onClick={() => { void remove(object); }}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  {t('Delete')}
-                </Button>
-              )}
-            </li>
+            <ListItem key={object.id} title={object.name} onClick={() => onOpen(object.id)}
+              trailing={(
+                <>
+                  {object.archived_at && (
+                    <span className="text-[12px] text-muted-foreground">{new Date(object.archived_at).toLocaleDateString(locale)}</span>
+                  )}
+                  {managesObject(object) && (
+                    <Button variant="ghost" size="xs" disabled={busyId === object.id} onClick={() => { void restore(object.id); }}>
+                      {t('Restore')}
+                    </Button>
+                  )}
+                  {managesObject(object) && (
+                    <Button variant="ghost" size="xs" disabled={busyId === object.id} onClick={() => { void remove(object); }}>
+                      {t('Delete')}
+                    </Button>
+                  )}
+                </>
+              )} />
           ))}
-        </ul>
+        </HoverGroup>
       )}
     </div>
   );

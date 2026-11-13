@@ -4,6 +4,8 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, ChevronDown, Sparkles } from '@/ui/icons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
+import { Button } from '@/ui/button';
+import { HoverGroup, ListItem } from '@/ui/list-item';
 
 // Athena at work, as one line that opens into its trace. While it works the
 // line reads "Thinking…" with light sweeping across it and the steps appear
@@ -42,54 +44,49 @@ export function ThinkingTrace({ working, steps = [], className }: {
     ? t('Thought for {n}s', { n: seconds })
     : steps.length === 1 ? t('Used 1 tool') : t('Used {n} tools', { n: steps.length });
 
+  // The glyph keeps the key color; the label rolls in when the state changes.
+  const line = (
+    <>
+      <Sparkles size={14} aria-hidden="true" className="text-[var(--accent-default)]" />
+      <span role="status" key={working ? 'busy' : 'done'} className="flex min-w-0 items-baseline gap-1.5 animate-slide-up">
+        {working
+          ? <span className="animate-shimmer">{t('Thinking…')}</span>
+          : <span className="text-muted-foreground">{doneLabel}</span>}
+        {!working && failed > 0 && <span className="text-[var(--status-danger)]">· {t('{n} failed', { n: failed })}</span>}
+      </span>
+    </>
+  );
+
   return (
     <div className={cn('grid text-[13px] leading-5', className)}>
-      <button type="button" aria-expanded={expanded} aria-controls={`${id}-trace`}
-        disabled={steps.length === 0}
-        onClick={() => setManual(!expanded)}
-        className="-ml-1.5 flex min-h-7 max-w-full items-center gap-2 justify-self-start rounded-[var(--radius-sm)] py-0.5 pl-1.5 pr-2 text-left transition-colors enabled:hover:bg-muted/50 focus-visible:bg-muted/60">
-        <Sparkles size={14} aria-hidden="true"
-          className={cn('shrink-0 text-[var(--accent-default)] transition-opacity', !working && 'opacity-70')} />
-        <span role="status" key={working ? 'busy' : 'done'} className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap animate-fade-in">
-          {working
-            ? <span className="animate-shimmer font-medium">{t('Thinking…')}</span>
-            : <span className="font-medium text-muted-foreground">{doneLabel}</span>}
-          {!working && failed > 0 && <span className="shrink-0 text-[var(--status-danger)]">· {t('{n} failed', { n: failed })}</span>}
-        </span>
-        {steps.length > 0 && (
+      {steps.length > 0 ? (
+        <Button variant="ghost" size="xs" align="start" aria-expanded={expanded} aria-controls={`${id}-trace`}
+          onClick={() => setManual(!expanded)} className="-ml-1.5 max-w-full justify-self-start">
+          {line}
           <ChevronDown size={12} aria-hidden="true"
-            className={cn('shrink-0 text-muted-foreground transition-transform duration-300', expanded && 'rotate-180')} />
-        )}
-      </button>
+            className={cn('transition-transform duration-300', expanded && 'rotate-180')} />
+        </Button>
+      ) : <div className="flex min-h-6 items-center gap-1.5">{line}</div>}
 
       <div id={`${id}-trace`} inert={!expanded}
         className={cn('grid transition-[grid-template-rows,opacity] duration-300', expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')}>
         <div className="min-h-0 overflow-hidden">
           {/* The line down the side ties the steps to the header's glyph. */}
-          <div className="ml-[6px] mt-0.5 grid gap-0.5 border-l border-[var(--border-subtle)] py-0.5 pl-3">
+          <HoverGroup className="ml-[6px] mt-0.5 grid border-l border-[var(--border-subtle)] py-0.5 pl-2">
             {steps.map((step) => {
               const open = openStep === step.key;
-              const row = (
-                <>
-                  <StepMark status={step.status} />
-                  <span className={cn('shrink-0 font-medium', step.status === 'error' ? 'text-[var(--status-danger)]' : 'text-foreground')}>{step.primary}</span>
-                  {step.secondary != null && <span dir="auto" className="min-w-0 truncate text-muted-foreground">{step.secondary}</span>}
-                </>
-              );
-              const rowClass = 'flex min-h-7 w-full min-w-0 items-center gap-2 rounded-[var(--radius-xs)] px-1.5 py-0.5 text-left text-[12.5px] animate-slide-up';
               return (
                 <div key={step.key} className="min-w-0">
-                  {step.detail != null ? (
-                    <button type="button" aria-expanded={open} onClick={() => setOpenStep(open ? null : step.key)}
-                      className={cn(rowClass, 'transition-colors', open ? 'bg-muted/60' : 'hover:bg-muted/40')}>
-                      {row}
-                    </button>
-                  ) : <div className={rowClass}>{row}</div>}
-                  {open && step.detail != null && <div className="pb-1 pl-1.5 pt-1 animate-fade-in">{step.detail}</div>}
+                  <ListItem inline className="animate-slide-up text-[12.5px]"
+                    leading={<StepMark status={step.status} />}
+                    title={step.primary} description={step.secondary}
+                    expanded={step.detail != null ? open : undefined}
+                    onClick={step.detail != null ? () => setOpenStep(open ? null : step.key) : undefined} />
+                  {open && step.detail != null && <div className="pb-1 pl-2 pt-1 animate-fade-in">{step.detail}</div>}
                 </div>
               );
             })}
-          </div>
+          </HoverGroup>
         </div>
       </div>
     </div>
