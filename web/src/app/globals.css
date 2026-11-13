@@ -48,18 +48,19 @@
      The hue an Element status is drawn in: the mark in every list row, the
      Gantt bar, the calendar dot, the dashboard chart slice. Separate from the
      semantic --status-* ramp above, which carries severity (success / warning
-     / danger) on badges and toasts — an Element that is `blocked` is not the
-     same statement as a destructive action.
+     / danger) on badges and toasts. Blue is for what moves forward (Done),
+     red for what is stopped (Blocked), grey for what is set aside
+     (Cancelled).
      Backlog and To Do blend the theme's own muted-foreground so they re-tone
      with the surface ramp (and with the .app-sidebar override) instead of
      freezing one gray. The hues are theme-invariant, like --status-*. */
   --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
   --element-status-in-progress: #2f9e44;
-  --element-status-review:      #06b6d4;
+  --element-status-review:      #eab308;
   --element-status-done:        var(--accent-default);
-  --element-status-blocked:     #eea21f;
-  --element-status-cancelled:   var(--status-danger);
+  --element-status-blocked:     var(--status-danger);
+  --element-status-cancelled:   var(--muted-foreground);
 
   /* Badge grounds — subtle pair for every hue above (§1.3: badge ground is
      subtle, dot / icon is default). Derived, so a hue is edited in one place. */
