@@ -79,13 +79,28 @@ export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote 
           <RailRow icon={domain.privacy === 'private' ? <Lock className="size-3.5 text-muted-foreground" /> : <Users className="size-3.5 text-muted-foreground" />}
             name={t('Access')} label={domain.privacy === 'private' ? t('Private') : 'Space'} dense />
           {domain.identifier && <RailRow icon={<Hash className="size-3.5 text-muted-foreground" />} name={t('Identifier')} label={domain.identifier} dense />}
+          {/* The Strategies this Domain's Objects serve: what its work is for, read first. */}
+          <div className="flex items-start gap-2 rounded-md px-2 py-1.5 text-[13px] leading-5">
+            <span className="w-24 shrink-0 pt-px text-left text-[12px] text-muted-foreground">Strategy</span>
+            {initiatives.length === 0 ? <span className="text-muted-foreground">{t('None')}</span> : (
+              <span className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-1">
+                {initiatives.map(({ initiative }) => (
+                  <button key={initiative.id} type="button" title={initiative.name}
+                    className="flex min-w-0 max-w-full items-center gap-1.5 text-foreground hover:underline"
+                    onClick={() => { onNavigate({ strategyId: initiative.id }); onViewChange?.('strategy'); }}>
+                    <NavStrategyIcon size={14} />
+                    <span className="truncate">{initiative.name}</span>
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>
             <RailRow icon={<ObjectIcon size={14} />} name="Objects" label={String(explorer.objects.length)} dense />
           </button>
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>
             <RailRow icon={<ElementIcon size={14} />} name="Elements" label={String(elements.length)} dense />
           </button>
-          <RailRow icon={<NavStrategyIcon size={14} />} name="Strategies" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
         </RailCard>
       }>
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>{t('Unable to refresh this Domain. Showing the last loaded data; drafts are retained.')}</p><Button variant="ghost" onClick={() => void query.refetch()}>{t('Retry')}</Button></div>}
