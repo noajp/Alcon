@@ -43,12 +43,11 @@ export interface DataColumn {
   custom?: CustomColumnWithValues;
 }
 
-// One shared default width across every data column — built-in or custom —
-// so the column rhythm stays even out of the box. Tuned to Asana's typical
-// custom-field column (~120px): tag chips and date ranges land with a
-// little slack instead of truncating, while the table still reads dense.
-// Users can per-column resize from there.
-const DEFAULT_COLUMN_WIDTH = 128;
+// A column is as wide as what it usually holds, not a roomy even grid: the
+// width goes to the title, and there is room to add many more columns. A
+// value longer than its column ends in "…" (the whole of it is in the cell's
+// menu or the Element), and the column can be dragged wider.
+const DEFAULT_COLUMN_WIDTH = 104;
 // A due date is one short date ("Nov 13", "11月13日"), so its column hugs
 // it and sits flush right: the assignee or lead after it is the same 20px
 // away as the label before it, not across an empty half column. The width
@@ -70,18 +69,18 @@ const NAME_MAX_WIDTH = 1200;
 // non-toggleable) on both. Elements carry an Assignee; Objects carry a Lead
 // (objects.lead_id), a computed Progress bar, and an Elements count instead.
 const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
-  { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 160 },
-  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: true, defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 128 },
+  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: true, defaultWidth: 88 },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
-  { id: 'activity', label: 'Updates', kind: 'builtin', toggleable: true,  defaultWidth: 120 },
+  { id: 'activity', label: 'Updates', kind: 'builtin', toggleable: true,  defaultWidth: 96 },
 ];
 const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
-  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: 88 },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'lead',     label: 'Lead',     kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
-  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 120 },
-  { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: 112 },
+  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 96 },
+  { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: 80 },
 ];
 
 function builtinsFor(entity: ColumnEntity): DataColumn[] {
@@ -94,10 +93,9 @@ function defaultVisibleFor(entity: ColumnEntity): ColumnId[] {
 // Element default — the SSR/empty snapshot fallback (the hook reconciles to the
 // per-entity set once it knows the entity).
 const DEFAULT_VISIBLE: ColumnId[] = ELEMENT_DEFAULT_VISIBLE;
-// Floor matches the default width so columns never resize below their
-// natural readable size — labels stay fully visible and tags/chips don't
-// truncate from a drag-down.
-const COLUMN_MIN_WIDTH = 110;
+// A column can be dragged down to a few characters; what no longer fits
+// ends in "…".
+const COLUMN_MIN_WIDTH = 48;
 const COLUMN_MAX_WIDTH = 600;
 
 /** Active sort applied to every section's elements. `null` means natural
@@ -163,7 +161,9 @@ function keysFor(storageKey: string) {
   return {
     order:   `obj-list-cols:${storageKey}:order`,
     visible: `obj-list-cols:${storageKey}:visible`,
-    widths:  `obj-list-cols:${storageKey}:widths`,
+    // v2: widths saved before the floor dropped from 110px are that floor,
+    // not a choice; they start again from the fitted defaults.
+    widths:  `obj-list-cols:${storageKey}:widths:v2`,
     sort:    `obj-list-cols:${storageKey}:sort`,
     hidden: `obj-list-cols:${storageKey}:hidden`,
     legacy:  `obj-list-cols:${storageKey}`,

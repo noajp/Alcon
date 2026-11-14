@@ -515,6 +515,8 @@ export function ListTable({
   const freezeName = () => { if (nameFluid) cols.setWidth(NAME_COL_KEY, drawnNameWidth()); };
   // A column only as wide as its words (the due date) has no room for the
   // sort arrow, so it grows by the arrow while it holds the sort.
+  // The trailing "+" (which fields show) is one 28px button.
+  const TRAILING_COL_WIDTH = 40;
   const drawnWidth = (c: DataColumn) => cols.widthFor(c.id) + (c.align === 'end' && cols.sort?.id === c.id ? 16 : 0);
   // Name is pinned while the rest scrolls under it, so a Name wider than the
   // pane would hide every other column for good. It is drawn no wider than
@@ -540,7 +542,7 @@ export function ListTable({
   // half of Name as it is drawn (signalsTrackWidth): a row is read for
   // its title first, and the room the view leaves is the title's and the
   // signals' to share, not the set width alone.
-  const drawnName = nameTrackWidth(nameWidth, viewWidth, 52 + dataWidth + (hasTrailingCol ? 80 : 0));
+  const drawnName = nameTrackWidth(nameWidth, viewWidth, 52 + dataWidth + (hasTrailingCol ? TRAILING_COL_WIDTH : 0));
   useLayoutEffect(() => {
     const table = tableRef.current;
     if (!table) return;
@@ -552,7 +554,7 @@ export function ListTable({
     // lands, or a mark that came late would sit in a track of the old width.
   }, [sortedSections, visibleColumns, drawnName, awaitingAnswer, unreadComments, elementBlockers]);
   const titleWidth = `calc(${nameWidth}px - var(--signals-w, 0px))`;
-  const packedWidth = 52 + nameWidth + visibleColumns.reduce((sum, c) => sum + drawnWidth(c), 0) + (hasTrailingCol ? 80 : 0);
+  const packedWidth = 52 + nameWidth + visibleColumns.reduce((sum, c) => sum + drawnWidth(c), 0) + (hasTrailingCol ? TRAILING_COL_WIDTH : 0);
 
   // With no rows the table is its header alone, and a horizontal scrollbar
   // (when the columns are wider than the pane) would sit right under it as a
@@ -594,7 +596,7 @@ export function ListTable({
             // an empty gap and force horizontal scroll in narrow panels.
             return <col key={c.id} className="table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col className="table-column" style={{ width: 80, minWidth: 80 }} />}
+          {hasTrailingCol && <col className="table-column" style={{ width: TRAILING_COL_WIDTH, minWidth: TRAILING_COL_WIDTH }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
