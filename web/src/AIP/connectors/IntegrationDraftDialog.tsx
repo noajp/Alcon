@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDateTime } from '@/Function/shared/dateUtils';
 import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/ui/dialog';
@@ -239,7 +240,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
             {latestRound ? (
               <div className="space-y-1">
                 <p className="text-[12px] text-muted-foreground">
-                  {t('Last tested {when}: {outcome}', { when: new Date(latestRound.at).toLocaleString(), outcome: latestRound.outcome })}
+                  {t('Last tested {when}: {outcome}', { when: formatDateTime(latestRound.at), outcome: latestRound.outcome })}
                 </p>
                 <ul className="space-y-1">
                   {latestRound.results.map((r) => (
@@ -267,7 +268,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
               <h3 className={FONT.label}>{t('Review')}</h3>
               {draft.expires_at && (
                 <p className="text-[12px] text-muted-foreground">
-                  {t('Decide by {when} — after that the draft expires.', { when: new Date(draft.expires_at).toLocaleString() })}
+                  {t('Decide by {when} — after that the draft expires.', { when: formatDateTime(draft.expires_at) })}
                 </p>
               )}
               {targetName && targetName !== draft.name && (
@@ -293,7 +294,7 @@ export function IntegrationDraftDialog({ draft, spaceId, integrations, canReview
 
           {draft.status === 'active' && draft.decided_at && (
             <p className="text-[12px] text-muted-foreground">
-              {t('Activated on {when}.', { when: new Date(draft.decided_at).toLocaleString() })}
+              {t('Activated on {when}.', { when: formatDateTime(draft.decided_at) })}
             </p>
           )}
 

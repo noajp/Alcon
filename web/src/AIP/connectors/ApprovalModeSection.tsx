@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDateTime } from '@/Function/shared/dateUtils';
 import { formatError } from '@/Function/shared/formatError';
 import { useState } from 'react';
 import { ChevronDown, ChevronRight } from '@/ui/icons';
@@ -92,7 +93,7 @@ export function ApprovalModeSection({ spaceId, isOwner }: { spaceId: string; isO
             <ul className="mt-2 space-y-1">
               {changes.slice(0, 5).map((c) => (
                 <li key={c.id} className="text-[12px] text-muted-foreground">
-                  {new Date(c.created_at).toLocaleString()} — {t(APPROVAL_MODE_LABELS[approvalModeOf(c.from_mode)])} → {t(APPROVAL_MODE_LABELS[approvalModeOf(c.to_mode)])}
+                  {formatDateTime(c.created_at)} — {t(APPROVAL_MODE_LABELS[approvalModeOf(c.from_mode)])} → {t(APPROVAL_MODE_LABELS[approvalModeOf(c.to_mode)])}
                 </li>
               ))}
             </ul>

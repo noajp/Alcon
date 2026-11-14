@@ -35,6 +35,19 @@ export function formatElementDate(
   return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
+/** A moment as the viewer reads it, in the app's language (not the
+ *  browser's): "Nov 14, 2026, 18:06" / "2026年11月14日 18:06". Pass
+ *  `options` for another shape; returns '' for missing or invalid input. */
+export function formatDateTime(
+  value: string | number | Date | null | undefined,
+  options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
+): string {
+  if (value === null || value === undefined || value === '') return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(viewerDateLocale(), options);
+}
+
 /** Local-timezone yyyy-MM-dd, for writing date-only columns (due_date etc.). */
 export function toDateOnlyString(date: Date): string {
   const m = `${date.getMonth() + 1}`.padStart(2, '0');
