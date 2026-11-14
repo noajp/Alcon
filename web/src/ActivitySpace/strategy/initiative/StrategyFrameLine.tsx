@@ -2,14 +2,18 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { MoreHorizontal, Trash2 } from '@/ui/icons';
+import { Check, MoreHorizontal, Trash2 } from '@/ui/icons';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Input } from '@/ui/input';
+import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { appDialog } from '@/Function/shared/appDialogStore';
 import { formatError } from '@/Function/shared/formatError';
 import { isCancelKey, isCommitEnter, isSubmitChord } from '@/Function/shared/keyboard';
 import { createIntent, deleteIntent, strategyIntentBundleKey, updateIntent, type IntentBundle } from '@/hooks/useSupabase';
-import type { Intent } from '@/types/database';
+import type { Intent, IntentVerdict, MeasureDirection } from '@/types/database';
+import { MEASURE_DIRECTIONS, directionLabel, parseMeasureValue } from './initiativeMeasureModel';
 import type { EmbedBlock, EmbedSpec } from '@/Function/notebook/editor/embedBlocks';
 import { useInitiativeIntentContext } from './InitiativeIntent';
 import {
@@ -42,7 +46,7 @@ function patchBundle(qc: QueryClient, strategyId: string, change: (bundle: Inten
 }
 
 /** A sentence that grows with what is written in it, one line to start. */
-function LineText({ label, value, onChange, onCommit, placeholder, readOnly, autoFocus, muted }: {
+function LineText({ label, value, onChange, onCommit, placeholder, readOnly, autoFocus, muted, dim }: {
   /** What the sentence is, for someone who cannot see the label beside it. */
   label: string;
   value: string;
@@ -53,6 +57,8 @@ function LineText({ label, value, onChange, onCommit, placeholder, readOnly, aut
   readOnly: boolean;
   autoFocus?: boolean;
   muted?: boolean;
+  /** Set aside without being struck out: a hypothesis found not to hold. */
+  dim?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   // Whether the blur about to come is Enter's own.
@@ -79,7 +85,7 @@ function LineText({ label, value, onChange, onCommit, placeholder, readOnly, aut
           e.currentTarget.blur();
         }
       }}
-      className={`block w-full resize-none overflow-hidden rounded-sm border-none bg-transparent p-0 text-[14px] leading-[1.65] outline-none focus-visible:bg-muted/50 placeholder:text-muted-foreground/60 ${muted ? 'text-muted-foreground line-through' : 'text-foreground'}`} />
+      className={`block w-full resize-none overflow-hidden rounded-sm border-none bg-transparent p-0 text-[14px] leading-[1.65] outline-none focus-visible:bg-muted/50 placeholder:text-muted-foreground/60 ${muted ? 'text-muted-foreground line-through' : dim ? 'text-muted-foreground' : 'text-foreground'}`} />
   );
 }
 
@@ -124,7 +130,7 @@ function DraftLine({ kind, written, block }: { kind: FrameKind; written: string;
       id, strategy_id: intent.initiativeId, parent_intent_id: intent.data?.master?.id ?? null, kind, title,
       target_value: null, actual_value: null, unit: null, measured_at: null, direction: null, slug: null, subtitle: null,
       captured_dimensions: [], uncaptured_dimensions: [], abandoned: null, horizon: null, status: 'on_track',
-      decided_by_name: null, decided_by_role: null, decided_at: null, superseded_by_intent_id: null,
+      decided_by_name: null, decided_by_role: null, decided_at: null, superseded_by_intent_id: null, verdict: null,
       order_index: order, created_by: '', created_at: now, updated_at: now,
     };
     patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: [...bundle.subs, provisional] }));
@@ -165,6 +171,123 @@ function GoneLine({ block, canEdit }: { block?: EmbedBlock; canEdit: boolean }) 
   );
 }
 
+// What was found out about a hypothesis. None yet reads as unverified.
+const VERDICTS: readonly (IntentVerdict | null)[] = [null, 'supported', 'rejected'];
+const VERDICT_LABEL = (verdict: IntentVerdict | null) => (verdict === 'supported' ? 'Supported' : verdict === 'rejected' ? 'Disproved' : 'Unverified');
+const VERDICT_TONE = (verdict: IntentVerdict | null) =>
+  (verdict === 'supported' ? 'text-[var(--status-success-text)]' : verdict === 'rejected' ? 'text-[var(--status-danger-text)]' : 'text-muted-foreground');
+
+const TAIL_BUTTON = 'rounded px-1 outline-none transition-colors hover:bg-muted focus-visible:bg-muted';
+
+/** The verdict on a hypothesis, picked on its line. */
+function VerdictControl({ row, canEdit, onPick }: { row: Intent; canEdit: boolean; onPick: (verdict: IntentVerdict | null) => void }) {
+  const { t } = useI18n();
+  const label = <span className={VERDICT_TONE(row.verdict)}>{t(VERDICT_LABEL(row.verdict))}</span>;
+  if (!canEdit) return label;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className={TAIL_BUTTON} aria-label={t('Verdict: {verdict}', { verdict: t(VERDICT_LABEL(row.verdict)) })}>{label}</button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {VERDICTS.map((verdict) => (
+          <DropdownMenuItem key={verdict ?? 'none'} onSelect={() => onPick(verdict)} className="gap-2.5 py-1.5 text-[13px]">
+            <Check size={14} className={verdict === row.verdict ? '' : 'invisible'} />{t(VERDICT_LABEL(verdict))}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+type MeasureValues = Pick<Intent, 'target_value' | 'actual_value' | 'unit' | 'direction' | 'measured_at'>;
+
+/** Where a success condition stands, and the small form that sets it: the
+ *  reading, the target, its unit and which way counts. A form with a Save, so
+ *  Escape leaves it without keeping anything. */
+function StandingControl({ row, canEdit, onSave }: { row: Intent; canEdit: boolean; onSave: (values: Partial<MeasureValues>) => Promise<boolean> }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [actual, setActual] = useState('');
+  const [target, setTarget] = useState('');
+  const [unit, setUnit] = useState('');
+  const [direction, setDirection] = useState<MeasureDirection>('at_least');
+  const [bad, setBad] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const standing = measureStanding(row);
+  if (!canEdit) return standing ? <span>{standing}</span> : null;
+  const start = (next: boolean) => {
+    if (next) {
+      setActual(row.actual_value === null ? '' : String(row.actual_value));
+      setTarget(row.target_value === null ? '' : String(row.target_value));
+      setUnit(row.unit ?? '');
+      setDirection(row.direction ?? 'at_least');
+      setBad(false);
+    }
+    setOpen(next);
+  };
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const a = parseMeasureValue(actual);
+    const g = parseMeasureValue(target);
+    // A condition is held to a number: the target cannot be left out.
+    if (!a.ok || !g.ok || g.value === null) { setBad(true); return; }
+    // Only what was changed is sent: a reading another surface wrote since
+    // this page read the row must survive a change to the target alone.
+    const patch: Partial<MeasureValues> = {};
+    if (g.value !== row.target_value) patch.target_value = g.value;
+    if ((unit.trim() || null) !== row.unit) patch.unit = unit.trim() || null;
+    if (direction !== row.direction) patch.direction = direction;
+    if (a.value !== row.actual_value) {
+      patch.actual_value = a.value;
+      patch.measured_at = a.value === null ? null : new Date().toISOString();
+    }
+    if (!Object.keys(patch).length) { setOpen(false); return; }
+    setSaving(true);
+    try {
+      // Refused, the form stays open with what was typed.
+      if (await onSave(patch)) setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const field = 'h-8 text-[13px]';
+  return (
+    <Popover open={open} onOpenChange={start}>
+      <PopoverTrigger asChild>
+        <button type="button" className={`${TAIL_BUTTON} ${standing ? '' : 'text-muted-foreground/70'}`}>{standing ?? t('Set target')}</button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-3">
+        <form onSubmit={(e) => void submit(e)} className="space-y-2.5">
+          <label className="block space-y-1 text-[12px] text-muted-foreground">{t('Reading')}
+            <Input value={actual} onChange={(e) => { setActual(e.target.value); setBad(false); }} inputMode="decimal" className={field} autoFocus />
+          </label>
+          <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
+            <label className="block space-y-1 text-[12px] text-muted-foreground">{t('Target')}
+              <Input value={target} onChange={(e) => { setTarget(e.target.value); setBad(false); }} inputMode="decimal" className={field} />
+            </label>
+            <label className="block space-y-1 text-[12px] text-muted-foreground">{t('Unit')}
+              <Input value={unit} onChange={(e) => setUnit(e.target.value)} className={field} />
+            </label>
+          </div>
+          <div className="flex gap-1" role="radiogroup" aria-label={t('Which way counts')}>
+            {MEASURE_DIRECTIONS.map((d) => (
+              <button key={d} type="button" role="radio" aria-checked={direction === d} onClick={() => setDirection(d)}
+                className={`flex-1 rounded-md px-2 py-1 text-[12px] outline-none transition-colors focus-visible:bg-muted ${direction === d ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'}`}>
+                {directionLabel(d)}
+              </button>
+            ))}
+          </div>
+          {bad && <p role="alert" className="text-[12px] text-[var(--status-danger-text)]">{t('Enter a number for the target, and for the reading if there is one.')}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" size="sm" disabled={saving}>{t('Save')}</Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: EmbedBlock }) {
   const { t } = useI18n();
   const intent = useInitiativeIntentContext();
@@ -177,7 +300,6 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
   if (row.title !== seed && !focused) { setSeed(row.title); setText(row.title); }
   if (!intent) return null;
   const count = elementsOn(intent.data?.bindings ?? [], row.id);
-  const standing = kind === 'measure' ? measureStanding(row) : null;
   const reversed = !!row.superseded_by_intent_id;
 
   const save = async () => {
@@ -193,6 +315,27 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
     } catch (e) {
       patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: bundle.subs.map((s) => (s.id === row.id ? { ...s, title: before } : s)) }));
       void appDialog.alert(formatError(e));
+    }
+  };
+  /** One change to the row, shown at once and taken back if it is refused. */
+  const change = async (updates: Partial<Intent>, reading?: 'manual'): Promise<boolean> => {
+    const before = row;
+    const swap = (to: Intent) => patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: bundle.subs.map((s) => (s.id === row.id ? to : s)) }));
+    swap({ ...row, ...updates });
+    try {
+      await updateIntent(row.id, updates, reading);
+      intent.refetch();
+      if (kind === 'measure') {
+        // What else reads a condition: the tallies, and its readings — the
+        // database appended one if the value changed.
+        void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
+        void qc.invalidateQueries({ queryKey: ['measure-readings', row.id] });
+      }
+      return true;
+    } catch (e) {
+      swap(before);
+      void appDialog.alert(formatError(e));
+      return false;
     }
   };
   const remove = async () => {
@@ -218,7 +361,8 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
     <LineShell kind={kind} tail={
       <div className="flex shrink-0 items-center gap-2.5 pt-[3px] text-[12px] leading-[1.65] tabular-nums text-muted-foreground">
         {reversed && <span>{t('Reversed')}</span>}
-        {standing && <span>{standing}</span>}
+        {kind === 'measure' && <StandingControl row={row} canEdit={intent.canEdit} onSave={(values) => change(values, 'manual')} />}
+        {kind === 'assumption' && <VerdictControl row={row} canEdit={intent.canEdit} onPick={(verdict) => void change({ verdict })} />}
         <span className={count === 0 ? 'text-muted-foreground/60' : undefined}>{t('{n} Elements', { n: count })}</span>
         {intent.canEdit && (
           <DropdownMenu>
@@ -239,7 +383,7 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
     }>
       <div onFocus={() => setFocused(true)}>
         <LineText label={t(KIND_LABEL[kind])} value={text} onChange={setText} onCommit={() => void save()} placeholder={t(KIND_PLACEHOLDER[kind])}
-          readOnly={!intent.canEdit} muted={reversed} />
+          readOnly={!intent.canEdit} muted={reversed} dim={row.verdict === 'rejected'} />
       </div>
     </LineShell>
   );

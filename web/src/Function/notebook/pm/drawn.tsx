@@ -176,7 +176,12 @@ function EmbedDrawing({ source, editing, editable, onEdit, onRemove, block }: { 
   // written on the line itself, and its source is never what one wants there.
   if (editing && !line) return null;
   return (
-    <div data-line={line || undefined} className={`group/embed relative bg-card ${line ? '' : 'rounded-md'}`}>
+    // A press on one of a line's buttons must not move the editor's caret: the
+    // caret landing beside the line re-draws it under the menu that press just
+    // opened, and the menu shuts. A press anywhere else on the line places the
+    // caret as it would beside any other text.
+    <div data-line={line || undefined} className={`group/embed relative bg-card ${line ? '' : 'rounded-md'}`}
+      onMouseDown={line ? (e) => { if ((e.target as HTMLElement).closest('button')) e.preventDefault(); } : undefined}>
       {!spec ? <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">{t('This block cannot be read. Edit its source.')}</p>
         : spec.view === FILE_VIEW ? (typeof spec.id === 'string' ? <FileBlock id={spec.id} /> : null)
           : host ? host.render(spec, block)
