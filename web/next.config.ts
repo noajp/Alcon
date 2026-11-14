@@ -15,6 +15,16 @@ const nextConfig: NextConfig = {
     const frameSrc = supabase ? `${supabase}/storage/v1/object/sign/element-files/` : "'none'";
     return [
       { source: '/:path*', headers: [{ key: 'Content-Security-Policy', value: `frame-src ${frameSrc}; object-src 'none'` }] },
+      // The public MCP endpoint (app/mcp) is published as clayware.app/mcp
+      // precisely so the Supabase project ref stays out of its URLs; the
+      // catch-all CSP above would reintroduce the raw Supabase origin into
+      // every /mcp response header. These later rules replace it with a
+      // frame-less policy on the MCP and OAuth-metadata paths (they are
+      // API responses, never framed documents).
+      { source: '/mcp', headers: [{ key: 'Content-Security-Policy', value: "object-src 'none'" }] },
+      { source: '/mcp/:path*', headers: [{ key: 'Content-Security-Policy', value: "object-src 'none'" }] },
+      { source: '/.well-known/oauth-protected-resource', headers: [{ key: 'Content-Security-Policy', value: "object-src 'none'" }] },
+      { source: '/.well-known/oauth-protected-resource/:path*', headers: [{ key: 'Content-Security-Policy', value: "object-src 'none'" }] },
       // A design downloaded as HTML loads its fonts from the app wherever it is
       // opened; fonts are fetched in CORS mode, so the app's own font files say
       // anyone may read them. They are public files with no user data.
