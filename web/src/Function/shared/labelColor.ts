@@ -46,6 +46,12 @@ export function hydrateLabelColors(domainId: string, map: Record<string, string>
   emit();
 }
 
+/** Seed every listed Domain's catalogue at once — what the Domain list holds
+ *  is what each Domain's chips draw, whichever screen reads them first. */
+export function hydrateDomainLabelColors(domains: readonly { id: string; label_colors?: Record<string, string> | null }[]) {
+  for (const d of domains) hydrateLabelColors(d.id, d.label_colors);
+}
+
 /** Optimistically set one label's colour locally (pair with the DB write). */
 export function setLabelColorLocal(domainId: string, name: string, colorKey: string) {
   catalog.set(domainId, { ...(catalog.get(domainId) ?? {}), [name]: colorKey });
