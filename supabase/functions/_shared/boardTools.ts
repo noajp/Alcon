@@ -110,6 +110,21 @@ export function objectPatch(input: Record<string, unknown>): { ok: true; patch: 
   return error ? { ok: false, error } : { ok: true, patch };
 }
 
+/** Why a Worker cannot lead an Object in this Domain, or null. The Space
+ *  boundary an assignee keeps (worker_assignable) holds for a Lead too:
+ *  the database's list of who can be assigned in the Domain decides. */
+async function leadRefusal(supabase: SupabaseClient, domainId: string | null, workerId: unknown): Promise<string | null> {
+  if (workerId === undefined || workerId === null) return null;
+  const { data, error } = await supabase
+    .rpc("list_assignable_workers", { p_space_id: null, p_domain_id: domainId, p_element_id: null })
+    .select("id");
+  if (error) throw error;
+  const rows = (Array.isArray(data) ? data : data ? [data] : []) as { id: string }[];
+  return rows.some((w) => w.id === String(workerId))
+    ? null
+    : "This Worker can't lead this Object: it is in another Space or inactive. listWorkers with objectId returns who can.";
+}
+
 export const BOARD_TOOLS: ToolDef[] = [
   {
     name: "listMyDomains",
@@ -477,13 +492,13 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "setLabelColor",
-    description: "Domain のラベルの色を決める。決めるまでは名前から自動で色が付く。同じ Domain のその名前のラベルすべてに効く。",
+    description: "Domain のラベルの色を決める。決めるまでは名前から自動で色が付く。同じ Domain のその名前のラベルすべてに効く。決めた色を外すのは Settings から（このラベルの一覧も一緒に消えるため）。",
     input_schema: {
       type: "object",
       properties: {
         domainId: { type: "string", description: "Domain UUID" },
         label: { type: "string", description: "ラベル名" },
-        color: { type: "string", enum: [...PALETTE_KEYS, "auto"], description: "色。auto で名前から決まる自動の色に戻す" },
+        color: { type: "string", enum: [...PALETTE_KEYS], description: "色" },
       },
       required: ["domainId", "label", "color"],
       additionalProperties: false,
@@ -636,6 +651,8 @@ export async function updateElementById(
   }
   const dateError = dateFieldsError(patch, ["start_date", "due_date"]) ?? spanError(patch.start_date, patch.due_date);
   if (dateError) return { ok: false, error: dateError };
+  const crossed = await storedSpanCrossed(supabase, [id], patch);
+  if (crossed) return { ok: false, error: crossed };
   if (Array.isArray(input.labels)) patch.labels = input.labels;
   if (input.action !== undefined) {
     const a = actionOf(input.action);
@@ -650,6 +667,21 @@ export async function updateElementById(
   if (error) throw error;
   await audit(supabase, actor, id, describePatch(patch));
   return { ok: true, data, meta: { rows: 1 } };
+}
+
+/** Why moving one end of these Elements' spans would cross the stored
+ *  other end, or null. Only one end moving needs the stored dates. */
+async function storedSpanCrossed(supabase: SupabaseClient, ids: string[], patch: Record<string, unknown>): Promise<string | null> {
+  const moves = (patch.start_date && patch.due_date === undefined) || (patch.due_date && patch.start_date === undefined);
+  if (!moves || ids.length === 0) return null;
+  const { data, error } = await supabase.from("elements").select("title, start_date, due_date").in("id", ids);
+  if (error) throw error;
+  for (const e of (data ?? []) as { title: string; start_date: string | null; due_date: string | null }[]) {
+    if (spanError(patch.start_date ?? e.start_date, patch.due_date ?? e.due_date)) {
+      return `「${e.title}」: start_date must not be after due_date`;
+    }
+  }
+  return null;
 }
 
 /**
@@ -1094,6 +1126,8 @@ export async function runBoardTool(
         if (!name) return { ok: false, error: "name is required" };
         const look = objectPatch(input);
         if (!look.ok) return look;
+        const leadError = await leadRefusal(supabase, domainId, look.patch.lead_id);
+        if (leadError) return { ok: false, error: leadError };
         const payload: Record<string, unknown> = { ...look.patch, domain_id: domainId, name };
         const { data, error } = await supabase
           .from("objects").insert(payload)
@@ -1114,6 +1148,12 @@ export async function runBoardTool(
           const { data: current } = await supabase.from("objects").select("start_date, due_date").eq("id", id).maybeSingle();
           const crossed = spanError(patch.start_date ?? current?.start_date, patch.due_date ?? current?.due_date);
           if (crossed) return { ok: false, error: crossed };
+        }
+        if (patch.lead_id) {
+          const { data: obj } = await supabase.from("objects").select("domain_id").eq("id", id).maybeSingle();
+          if (!obj) return { ok: false, error: "Object not found" };
+          const leadError = await leadRefusal(supabase, (obj as { domain_id: string | null }).domain_id, patch.lead_id);
+          if (leadError) return { ok: false, error: leadError };
         }
         const { data, error } = await supabase
           .from("objects").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id)
@@ -1205,6 +1245,8 @@ export async function runBoardTool(
           if (r) resolved.push(r);
         }
         if (resolved.length === 0) return { ok: false, error: "no resolvable Element ids" };
+        const crossed = await storedSpanCrossed(supabase, resolved, patch);
+        if (crossed) return { ok: false, error: crossed };
         const normalized = normalizeStatusPatch(patch);
         const { data, error } = await supabase
           .from("elements").update(normalized).in("id", resolved)
@@ -1220,15 +1262,17 @@ export async function runBoardTool(
         const color = String(input.color ?? "");
         if (!UUID_RE.test(domainId)) return { ok: false, error: "domainId must be a Domain UUID" };
         if (!label) return { ok: false, error: "label is required" };
-        if (color !== "auto" && !(PALETTE_KEYS as readonly string[]).includes(color)) {
-          return { ok: false, error: `color must be one of ${PALETTE_KEYS.join(" / ")} or auto` };
+        if (!(PALETTE_KEYS as readonly string[]).includes(color)) {
+          return { ok: false, error: `color must be one of ${PALETTE_KEYS.join(" / ")}` };
         }
         // The same atomic merge the app's Label settings use, so a pick made
-        // here and one made in the app at the same time both land.
+        // here and one made in the app at the same time both land. It only
+        // sets: a key removed from label_colors is a label removed from
+        // Settings' catalogue, so clearing a colour is left to Settings.
         const { data, error } = await supabase.rpc("merge_domain_label_colors", {
           p_domain_id: domainId,
-          p_set: color === "auto" ? {} : { [label]: color },
-          p_remove: color === "auto" ? [label] : [],
+          p_set: { [label]: color },
+          p_remove: [],
         });
         if (error) throw error;
         return { ok: true, data: { domainId, label, color, labelColors: data ?? {} }, meta: { rows: 1 } };

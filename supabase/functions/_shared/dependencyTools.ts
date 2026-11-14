@@ -41,7 +41,7 @@ export const DEPENDENCY_TOOLS: ToolDef[] = [
   },
   {
     name: "addDependency",
-    description: "waitingId が blockerId を待つ、という依存を足す。Timeline にはこの2本の帯をつなぐ線が引かれる。既にあれば何もしない。輪になる依存は作らない。",
+    description: "waitingId が blockerId を待つ、という依存を足す。Timeline にはこの2本の帯をつなぐ線が引かれる。同じ組がすでにあれば kind だけを合わせる。輪になる依存は作らない。",
     input_schema: {
       type: "object",
       properties: {
@@ -147,10 +147,22 @@ export async function runDependencyTool(db: SupabaseClient, name: string, input:
   if (!kind) return { ok: false, error: `kind must be one of ${DEPENDENCY_KINDS.join(" / ")}` };
 
   const existing = isElement
-    ? await db.from("element_edges").select("id").eq("from_element", blocker).eq("to_element", waiting).eq("edge_type", "depends_on").limit(1)
-    : await db.from("object_dependencies").select("id").eq("blocker_object_id", blocker).eq("blocked_object_id", waiting).limit(1);
+    ? await db.from("element_edges").select("id, attributes").eq("from_element", blocker).eq("to_element", waiting).eq("edge_type", "depends_on").limit(1)
+    : await db.from("object_dependencies").select("id, kind").eq("blocker_object_id", blocker).eq("blocked_object_id", waiting).limit(1);
   if (existing.error) return { ok: false, error: existing.error.message };
-  if ((existing.data ?? []).length > 0) return { ok: true, data: { id: existing.data![0].id, alreadyThere: true }, meta: { rows: 0 } };
+  const found = (existing.data ?? [])[0] as { id: string; kind?: string | null; attributes?: Record<string, unknown> | null } | undefined;
+  if (found) {
+    // Already there: the same pair with another tie changes the tie, as the
+    // Timeline's dependency menu does.
+    const current = dependencyKindOf(isElement ? found.attributes?.kind : found.kind) ?? "fs";
+    if (current === kind) return { ok: true, data: { id: found.id, kind, alreadyThere: true }, meta: { rows: 0 } };
+    const { data, error } = isElement
+      ? await db.from("element_edges").update({ attributes: { ...(found.attributes ?? {}), kind } }).eq("id", found.id).select("id")
+      : await db.from("object_dependencies").update({ kind }).eq("id", found.id).select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data || data.length === 0) return { ok: false, error: `この ${target} を変える権限がありません` };
+    return { ok: true, data: { id: found.id, kind, changedFrom: current }, meta: { rows: 1 } };
+  }
 
   const blockersOf = isElement
     ? async (ids: string[]) => {
