@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarPeoplePicker } from '@/ActivitySpace/calendar/CalendarPickers';
 import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -95,6 +96,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
         <NavCalendarIcon size={14} />
         <span className="text-[13px] font-medium text-foreground">{t('Calendar')}</span>
         <div className="flex-1" />
+        <CalendarPeoplePicker />
         <CalendarScopePicker domains={domains} objects={scoped.availableObjects} selection={{ ...selection, domainIds }} onChange={setSelection} />
       </div>
       {error && <div role="alert" className="px-4 py-2 text-sm text-destructive">{t('Could not load the calendar.')} <Button size="xs" variant="ghost" onClick={() => { void domainQuery.refetch(); void fetchMine(); }}>{t('Retry')}</Button></div>}

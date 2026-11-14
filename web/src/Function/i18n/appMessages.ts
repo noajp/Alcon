@@ -1370,6 +1370,8 @@ const APP_MESSAGES: Record<string, Row> = {
   'Enter your email, then choose “Forgot password?” again.': ['メールアドレスを入力してから、もう一度「パスワードを忘れた場合」を押してください。', '이메일을 입력한 뒤 “비밀번호를 잊으셨나요?”를 다시 누르세요.', 'Saisissez votre e-mail, puis choisissez à nouveau « Mot de passe oublié ? ».', 'Escribe tu correo y vuelve a elegir «¿Olvidaste la contraseña?».'],
   'Forgot password?': ['パスワードを忘れた場合', '비밀번호를 잊으셨나요?', 'Mot de passe oublié ?', '¿Olvidaste la contraseña?'],
   'Switch Space': ['Space を切り替える', 'Space 전환', 'Changer de Space', 'Cambiar de Space'],
+  'People: {shown} of {all} shown': ['メンバー：{all} 人中 {shown} 人を表示', '사람: {all}명 중 {shown}명 표시', 'Personnes : {shown} sur {all} affichées', 'Personas: {shown} de {all} visibles'],
+  'Choose a date': ['日付を選ぶ', '날짜 선택', 'Choisir une date', 'Elegir una fecha'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));
