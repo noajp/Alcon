@@ -202,6 +202,7 @@ export {
   useStrategiesInSpace,
   useStrategyComments,
   useStrategyIntentBundle,
+  strategyIntentBundleKey,
   type IntentBundle,
 } from '@/hooks/strategyData';
 

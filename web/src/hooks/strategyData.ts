@@ -530,9 +530,13 @@ async function fetchStrategyIntentBundle(strategyId: string): Promise<IntentBund
   }
 }
 
+/** Where a Strategy's intent bundle is cached: a write that already knows its
+ *  result puts it there rather than showing the old rows until the re-read. */
+export const strategyIntentBundleKey = (strategyId: string) => ['strategy-intent-bundle', strategyId] as const
+
 export function useStrategyIntentBundle(strategyId: string | null) {
   const qc = useQueryClient()
-  const key = useMemo(() => ['strategy-intent-bundle', strategyId ?? ''] as const, [strategyId])
+  const key = useMemo(() => strategyIntentBundleKey(strategyId ?? ''), [strategyId])
   const query = useQuery({
     queryKey: key,
     queryFn: () => fetchStrategyIntentBundle(strategyId!),

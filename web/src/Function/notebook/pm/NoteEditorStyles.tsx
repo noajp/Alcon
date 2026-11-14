@@ -28,6 +28,7 @@ export function NoteEditorStyles() {
         /* A drawn block (diagram, live view, file): its source shows only
            while the caret is in it. */
         .note-editor .note-drawn { margin: 0.5rem 0; }
+        .note-editor .note-drawn:has(> .note-drawn-view [data-line]) { margin: 0.25rem 0; }
         .note-editor .note-drawn > pre { margin: 0; }
         .note-editor .note-drawn:not(.is-editing) > pre {
           height: 0; min-height: 0; padding: 0; overflow: hidden; opacity: 0; margin: 0;

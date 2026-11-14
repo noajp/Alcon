@@ -24,13 +24,32 @@ export interface EmbedView {
   label: string;
   hint?: string;
   icon?: ReactNode;
+  /** The heading it stands under in "/"; with the other inserts when omitted. */
+  group?: string;
+  /** Words that also find it in "/". */
+  keywords?: string;
+  /** What picking it places, when that is not just `{ view: id }`. */
+  insert?: EmbedSpec;
+}
+
+/** A drawn block's hold on its own source. */
+export interface EmbedBlock {
+  /** Placed while this editor was open, rather than read from the saved text. */
+  fresh: boolean;
+  /** Rewrites the block's spec, and saves. */
+  update: (next: EmbedSpec) => void;
+  /** Takes the block out of the text, and saves. */
+  remove: () => void;
 }
 
 export interface EmbedHost {
   /** The views "/" offers, in order. */
   views: EmbedView[];
   /** Draws one block. */
-  render: (spec: EmbedSpec) => ReactNode;
+  render: (spec: EmbedSpec, block: EmbedBlock) => ReactNode;
+  /** Whether a block reads as one line of the text: it sits as close as a
+   *  paragraph does and brings its own controls. */
+  line?: (spec: EmbedSpec) => boolean;
 }
 
 export const EmbedHostContext = createContext<EmbedHost | null>(null);
@@ -47,3 +66,16 @@ export function parseEmbed(source: string): EmbedSpec | null {
 }
 
 export const embedSource = (spec: EmbedSpec) => JSON.stringify(spec);
+
+/** Every block a saved description holds, in the order it holds them. A fence
+ *  whose body is not a spec is skipped: it draws as a note, and places nothing. */
+export function embedSpecsIn(markdown: string | null | undefined): EmbedSpec[] {
+  if (!markdown) return [];
+  const specs: EmbedSpec[] = [];
+  const fence = new RegExp('^```(?:' + EMBED_LANGS.join('|') + ')[ \\t]*\\n([\\s\\S]*?)\\n```[ \\t]*$', 'gm');
+  for (const m of markdown.matchAll(fence)) {
+    const spec = parseEmbed(m[1]);
+    if (spec) specs.push(spec);
+  }
+  return specs;
+}

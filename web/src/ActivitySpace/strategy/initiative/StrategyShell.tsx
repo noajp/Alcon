@@ -16,6 +16,7 @@ import { LinkedNoteEmbed } from '@/ActivitySpace/artifacts/notebook/LinkedNoteEm
 import { FoldSection, FoldSectionAddRow } from '@/Function/shared/FoldSection';
 import { EmbedHostContext } from '@/Function/notebook/editor/embedBlocks';
 import { useStrategyEmbeds } from './StrategyEmbeds';
+import { UnplacedFrameLines } from './StrategyFrameLine';
 import { ReactionChips, ReactionPicker } from '@/Function/shared/ReactionControls';
 import { AttachButton } from '@/Function/shared/attachments/AttachButton';
 import { AttachmentList } from '@/Function/shared/attachments/AttachmentList';
@@ -603,6 +604,16 @@ function StrategyDetailView({
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
 
+  // The description as it reads right now, typing included: which lines of
+  // the frame it places is asked of this, so a line just placed is not also
+  // listed as unplaced until the save lands.
+  const [savedDescription, setSavedDescription] = useState(strategy.description ?? '');
+  const [liveDescription, setLiveDescription] = useState(savedDescription);
+  if ((strategy.description ?? '') !== savedDescription) {
+    setSavedDescription(strategy.description ?? '');
+    setLiveDescription(strategy.description ?? '');
+  }
+
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
   // Nested Strategies' counts leave archived Objects out, like the list.
@@ -1082,8 +1093,10 @@ function StrategyDetailView({
           </div>
           <EmbedHostContext.Provider value={embeds}>
             <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
-              placeholder={t('What this Strategy aims for… Type / for a live block')} onSave={saveDescription} />
+              placeholder={t('What this Strategy aims for… Type / for a live block')} onSave={saveDescription} onChange={setLiveDescription} />
           </EmbedHostContext.Provider>
+          {/* The frame's lines the description does not place stand after it. */}
+          <UnplacedFrameLines description={liveDescription} />
 
           {/* Under the description, as on an Element: one quiet row —
               reactions, attaching a file, and the "…" of other things to do
