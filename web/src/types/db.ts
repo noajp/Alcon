@@ -24,7 +24,7 @@ import type {
   DomainPrivacy, DomainRiskThresholds, EdgeType, ElementDirection, ElementPriority, ElementStatus,
   IntentAlignmentKind, IntentAlignmentSeverity, IntentBindingTarget, IntentEscalationStatus,
   IntentEscalationTrigger, IntentKind, IntentLineageKind, IntentNextActionStatus, IntentPredictionRole,
-  IntentRelationship, IntentStatus, InvitationRole, InvitationStatus, MeasureDirection,
+  IntentRelationship, IntentStatus, IntentVerdict, InvitationRole, InvitationStatus, MeasureDirection,
   MeasureReadingSource, MemberRole, NotificationKind, ObjectTabType, PersonalAccessTokenAccess,
   PhaseStatus, StrategyDelegation, StrategyScope, StrategyStatus, WorkerAvailabilityKind, WorkerSkillLevel,
   Element, ElementComment, IssuedPersonalAccessToken,
@@ -94,7 +94,7 @@ interface ColumnOverrides {
   phases: { status: PhaseStatus }
   tables: { status: DataTableStatus }
   table_columns: { type: DataTableColumnType }
-  intents: { kind: IntentKind; direction: MeasureDirection; status: IntentStatus }
+  intents: { kind: IntentKind; direction: MeasureDirection; status: IntentStatus; verdict: IntentVerdict | null }
   intent_bindings: { target_type: IntentBindingTarget; relationship_type: IntentRelationship }
   intent_predictions: { role_group: IntentPredictionRole }
   intent_lineage: { action_kind: IntentLineageKind }

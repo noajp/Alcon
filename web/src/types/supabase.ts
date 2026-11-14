@@ -4237,6 +4237,7 @@ export type Database = {
           strategy_id: string
           subtitle: string | null
           superseded_by_intent_id: string | null
+          verdict: string | null
           target_value: number | null
           title: string
           uncaptured_dimensions: string[]
@@ -4264,6 +4265,7 @@ export type Database = {
           strategy_id: string
           subtitle?: string | null
           superseded_by_intent_id?: string | null
+          verdict?: string | null
           target_value?: number | null
           title: string
           uncaptured_dimensions?: string[]
@@ -4291,6 +4293,7 @@ export type Database = {
           strategy_id?: string
           subtitle?: string | null
           superseded_by_intent_id?: string | null
+          verdict?: string | null
           target_value?: number | null
           title?: string
           uncaptured_dimensions?: string[]
