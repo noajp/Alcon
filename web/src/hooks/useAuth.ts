@@ -112,10 +112,11 @@ export function useAuth() {
       password,
       options: {
         data: { display_name: displayName || email.split('@')[0] },
-        // Signing up on the OAuth consent page: the confirmation link returns
-        // to the same request, so connecting continues after confirming.
-        ...(typeof window !== 'undefined' && window.location.pathname.startsWith('/oauth/')
-          ? { emailRedirectTo: window.location.href }
+        // Where /auth/confirm sends the person once the address is confirmed.
+        // Signing up on the OAuth consent page returns to the same request, so
+        // connecting continues after confirming; anywhere else, the app.
+        ...(typeof window !== 'undefined'
+          ? { emailRedirectTo: window.location.pathname.startsWith('/oauth/') ? window.location.href : `${window.location.origin}/` }
           : {}),
       },
     });
@@ -191,6 +192,15 @@ export function useAuth() {
     updateProfile,
   };
 }
+
+/** Confirms the address from the link in an auth email (supabase/templates):
+ *  the link carries a one-time token hash, and verifying it signs the person in. */
+export async function verifyEmailLink(tokenHash: string, type: EmailLinkType) {
+  const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+  if (error) throw error;
+}
+
+export type EmailLinkType = 'email' | 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change';
 
 /** The signed-in person's missing profile row, named as their own Worker
  *  is, else as their sign-in says, else by their email's local part. */
