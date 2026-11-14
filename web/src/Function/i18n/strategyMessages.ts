@@ -496,6 +496,7 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'All {n} done': ['{n} 件すべて完了', '{n}건 모두 완료', 'Les {n} terminés', 'Los {n} hechos'],
   '{n}/{all} running': ['{n}/{all} 件実行中', '{n}/{all}건 실행 중', '{n}/{all} en cours', '{n}/{all} en curso'],
   'No Elements in this Object yet.': ['この Object にはまだ Element がありません。', '이 Object에는 아직 Element가 없습니다.', 'Aucun Element dans cet Object pour l’instant.', 'Aún no hay Elements en este Object.'],
+  '{n} of your answers could not be saved as assumptions. The Planner used them for this plan; add them again on the Strategy to keep them.': ['回答のうち {n} 件を前提として保存できませんでした。今回の計画には使われています。残すには、Strategy に前提として追加し直してください。', '답변 중 {n}건을 전제로 저장하지 못했습니다. 이번 계획에는 사용되었습니다. 남기려면 Strategy에 전제로 다시 추가하세요.', '{n} de vos réponses n’ont pas pu être enregistrées comme hypothèses. Le Planner les a utilisées pour ce plan ; ajoutez-les à nouveau sur la Strategy pour les garder.', '{n} de tus respuestas no se pudieron guardar como supuestos. El Planner las usó para este plan; vuelve a añadirlas en la Strategy para conservarlas.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(STRATEGY_MESSAGES).map(([key, row]) => [key, row[index]]));

@@ -969,7 +969,7 @@ function ReviewComposer({
         <input
           value={reviewedBy}
           onChange={(e) => onReviewedBy(e.target.value)}
-          placeholder={t('Reviewed by')}
+          aria-label={t('Reviewed by')} placeholder={t('Reviewed by')}
           className={`${FIELD} flex-1 min-w-0 text-[12px]`}
         />
         {suggested && (
@@ -1053,21 +1053,21 @@ function Composer({
         rows={1}
         autoFocus
         onChange={(e) => onTitle(e.target.value)}
-        placeholder={t('What was decided')}
+        aria-label={t('What was decided')} placeholder={t('What was decided')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <textarea
         value={abandoned}
         rows={1}
         onChange={(e) => onAbandoned(e.target.value)}
-        placeholder={t('What it gave up')}
+        aria-label={t('What it gave up')} placeholder={t('What it gave up')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <div className="flex items-center gap-2">
         <input
           value={decidedBy}
           onChange={(e) => onDecidedBy(e.target.value)}
-          placeholder={t('Decided by')}
+          aria-label={t('Decided by')} placeholder={t('Decided by')}
           className={`${FIELD} flex-1 min-w-0 text-[12px]`}
         />
         <DateField

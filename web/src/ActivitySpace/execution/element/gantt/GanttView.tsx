@@ -858,6 +858,9 @@ export function GanttView({
           {/* Timeline body */}
           <div
             ref={bodyScrollRef}
+            tabIndex={0}
+            role="region"
+            aria-label={t('Timeline')}
             className="flex-1 overflow-auto"
             onScroll={(e) => {
               const el = e.currentTarget;

@@ -1171,7 +1171,7 @@ function StrategyDetailView({
                     <div className="mb-1 flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
                       <Search size={12} className="text-muted-foreground" />
                       <input value={childQuery} onChange={(e) => setChildQuery(e.target.value)}
-                        placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
+                        aria-label={t('Search Strategies…')} placeholder={t('Search Strategies…')} className="flex-1 bg-transparent text-[13px] outline-none" autoFocus />
                       <button type="button" onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
                         aria-label={t('Close')} className="text-muted-foreground hover:text-foreground">
                         <X size={12} />
@@ -1255,7 +1255,7 @@ function StrategyDetailView({
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder={t('Search Objects across Domains…')}
+                      aria-label={t('Search Objects across Domains…')} placeholder={t('Search Objects across Domains…')}
                       className="flex-1 bg-transparent text-[13px] outline-none"
                       autoFocus
                     />
@@ -1279,7 +1279,7 @@ function StrategyDetailView({
                   <input
                     value={newObjectName}
                     onChange={(e) => setNewObjectName(e.target.value)}
-                    placeholder={t('Object name')}
+                    aria-label={t('Object name')} placeholder={t('Object name')}
                     autoFocus
                     onKeyDown={(e) => {
                       if (isCommitEnter(e)) {

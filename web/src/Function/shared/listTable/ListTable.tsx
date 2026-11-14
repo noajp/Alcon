@@ -608,7 +608,7 @@ export function ListTable({
             <th colSpan={2} className="sticky top-0 left-0 z-30 relative pl-7.5 pr-3 py-2.5 text-left text-[13px] font-normal text-muted-foreground bg-card">
               {t('Name')}
             </th>
-            <th className="relative p-0 bg-card">
+            <th className="relative p-0 bg-card" aria-label={t('More')}>
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. Fixed on the Object list
                   instead (see the colgroup above), so no handle there. */}

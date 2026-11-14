@@ -14,6 +14,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { useActiveSpaceId, setActiveSpaceId } from './activeSpaceStore';
 import { countSpaceDomains } from './data';
 import { MenuCheck } from '@/ui/dropdown-menu';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 type Panel = 'main' | 'spaces' | 'create';
 
@@ -22,6 +23,7 @@ interface SpaceSwitcherProps {
 }
 
 export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
+  const { t } = useI18n();
   const { user, signOut } = useAuthContext();
   const { data: spaces } = useActivitySpaces();
   const [open, setOpen] = useState(false);
@@ -82,7 +84,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
         <button
           type="button"
           className="w-full flex items-center gap-2 px-1 h-7 rounded-md hover:bg-sidebar-accent/50 transition-colors"
-          title="Switch Space"
+          title={t('Switch Space')}
         >
           <SpaceMark space={active} size={24} />
           <span className="text-left text-[13px] font-medium text-foreground truncate max-w-[100px]">
@@ -90,7 +92,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-60 p-1">
+      <PopoverContent align="start" aria-label={t('Switch Space')} className="w-60 p-1">
 
         {/* ── Main panel ── */}
         {panel === 'main' && (

@@ -272,7 +272,7 @@ export function TimelineView({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div tabIndex={0} role="region" aria-label={t('Timeline')} className="flex-1 overflow-auto">
         {!loading && rootStrategies.length === 0 ? (
           <EmptyState art="initiative" title="Nothing on the Timeline yet"
             description="Create a Strategy and give its Objects start and due dates to see them here." />

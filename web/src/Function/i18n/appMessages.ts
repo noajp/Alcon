@@ -1366,6 +1366,7 @@ const APP_MESSAGES: Record<string, Row> = {
   'An account with this email already exists. Sign in instead.': ['このメールアドレスのアカウントはすでにあります。ログインしてください。', '이 이메일로 된 계정이 이미 있습니다. 로그인하세요.', 'Un compte existe déjà avec cet e-mail. Connectez-vous plutôt.', 'Ya existe una cuenta con este correo. Inicia sesión.'],
   'Enter your email, then choose “Forgot password?” again.': ['メールアドレスを入力してから、もう一度「パスワードを忘れた場合」を押してください。', '이메일을 입력한 뒤 “비밀번호를 잊으셨나요?”를 다시 누르세요.', 'Saisissez votre e-mail, puis choisissez à nouveau « Mot de passe oublié ? ».', 'Escribe tu correo y vuelve a elegir «¿Olvidaste la contraseña?».'],
   'Forgot password?': ['パスワードを忘れた場合', '비밀번호를 잊으셨나요?', 'Mot de passe oublié ?', '¿Olvidaste la contraseña?'],
+  'Switch Space': ['Space を切り替える', 'Space 전환', 'Changer de Space', 'Cambiar de Space'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));

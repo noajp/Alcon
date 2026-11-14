@@ -130,7 +130,7 @@ function MemoryView({ state, userId, isSpaceOwner, captureEditable, onToggleCapt
           <option value="fact">{t('Fact')}</option>
         </select>
         <input
-          value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search memories')}
+          value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('Search memories')} placeholder={t('Search memories')}
           className={`w-48 px-2 py-1 text-[12px] ${FIELD.base} bg-transparent text-foreground`}
         />
         <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
