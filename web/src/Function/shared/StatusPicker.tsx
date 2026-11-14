@@ -11,6 +11,7 @@ import type { ElementStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { stepProgress } from '@/Function/shared/progressStep';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { notifyError } from '@/Function/shared/toastStore';
 
 // Linear-style status picker — opens from the progress ○ mark. Each row's
 // icon is the same ElementProgressMark used in the list itself, so the
@@ -78,7 +79,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
       setOpen(false);
       onChanged?.(resolved);
     } catch (e) {
-      console.error('Failed to change status', e);
+      notifyError(e, t('Could not change the status.'));
     }
   };
 

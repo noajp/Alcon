@@ -59,7 +59,7 @@ export function TableBrowser({ tables, browse, onBrowse, onOpenTable, onRefresh 
       <span className="w-20 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">{formatAge(tb.updated_at, true)}</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Move to')} title={t('Move to')} className="opacity-0 group-hover/table:opacity-100 data-[state=open]:opacity-100"><FolderInput size={13} /></Button>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label={t('Move to')} title={t('Move to')} className="opacity-0 focus-visible:opacity-100 group-hover/table:opacity-100 data-[state=open]:opacity-100"><FolderInput size={13} /></Button>
         </DropdownMenuTrigger>
         <MenuShell as="dropdown" align="end">
           <MoveToFolderItems app="tables" domainId={tb.domain_id} current={tb.folder_id} allowNone onMove={(id) => {

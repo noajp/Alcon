@@ -2,7 +2,8 @@
 
 import { Button } from '@/ui/button';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
 import { useI18n } from '@/Function/i18n/I18nProvider';
@@ -17,6 +18,24 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [signUpSuccess, setSignUpSuccess] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const ids = { name: useId(), email: useId(), password: useId(), error: useId() };
+
+  // Supabase's English sentences, for the failures a person can act on.
+  const readableAuthError = (message: string): string => {
+    if (/invalid login credentials/i.test(message)) return t('The email or password is not correct.');
+    if (/email not confirmed/i.test(message)) return t('Confirm your email first: open the link we sent you.');
+    if (/already registered|already been registered/i.test(message)) return t('An account with this email already exists. Sign in instead.');
+    return message;
+  };
+
+  const sendReset = async () => {
+    setError(null);
+    if (!email.trim()) { setError(t('Enter your email, then choose “Forgot password?” again.')); return; }
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (resetError) { setError(readableAuthError(resetError.message)); return; }
+    setResetSent(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +50,7 @@ export function AuthPage() {
         await signIn(email, password);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : t('Something went wrong'));
+      setError(err instanceof Error ? readableAuthError(err.message) : t('Something went wrong'));
     } finally {
       setLoading(false);
     }
@@ -39,7 +58,7 @@ export function AuthPage() {
 
   if (signUpSuccess) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
+      <main className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
         <div className="absolute right-4 top-4"><LanguageSelect /></div>
         <div className="w-full max-w-sm">
           {/* A message, not a form: no card around it. The mark is the app's
@@ -62,12 +81,12 @@ export function AuthPage() {
             </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
+    <main className="relative min-h-screen flex items-center justify-center bg-[var(--content-bg)]">
       <div className="absolute right-4 top-4"><LanguageSelect /></div>
       <div className="w-full max-w-sm">
         {/* Card */}
@@ -82,8 +101,10 @@ export function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">{t('Name')}</label>
+                <label htmlFor={ids.name} className="block text-sm font-medium text-foreground mb-1.5">{t('Name')}</label>
                 <input
+                  id={ids.name}
+                  autoComplete="name"
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -94,8 +115,11 @@ export function AuthPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">{t('Email')}</label>
+              <label htmlFor={ids.email} className="block text-sm font-medium text-foreground mb-1.5">{t('Email')}</label>
               <input
+                id={ids.email}
+                autoComplete="email"
+                aria-describedby={error ? ids.error : undefined}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -106,20 +130,33 @@ export function AuthPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">{t('Password')}</label>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <label htmlFor={ids.password} className="block text-sm font-medium text-foreground">{t('Password')}</label>
+                {mode === 'signin' && (
+                  <button type="button" onClick={() => void sendReset()} className="text-[12px] text-muted-foreground hover:text-foreground hover:underline">
+                    {t('Forgot password?')}
+                  </button>
+                )}
+              </div>
               <input
+                id={ids.password}
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                aria-describedby={error ? ids.error : undefined}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('At least 6 characters')}
+                placeholder={mode === 'signup' ? t('At least 6 characters') : undefined}
                 required
-                minLength={6}
+                minLength={mode === 'signup' ? 6 : undefined}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
               />
             </div>
 
+            {resetSent && !error && (
+              <p role="status" className="text-sm text-muted-foreground">{t('Reset email sent. Check your inbox.')}</p>
+            )}
             {error && (
-              <div className="p-3 bg-[var(--status-danger-subtle)] dark:bg-[var(--status-danger)]/20 border border-[var(--status-danger)] dark:border-[var(--status-danger)] rounded-lg">
+              <div id={ids.error} role="alert" className="p-3 bg-[var(--status-danger-subtle)] dark:bg-[var(--status-danger)]/20 border border-[var(--status-danger)] dark:border-[var(--status-danger)] rounded-lg">
                 <p className="text-sm text-[var(--status-danger)] dark:text-[var(--status-danger)]">{error}</p>
               </div>
             )}
@@ -152,6 +189,6 @@ export function AuthPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

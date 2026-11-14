@@ -1,6 +1,7 @@
 import type React from 'react';
 import { cn } from '@/lib/utils';
 import { beltGradient } from '@/Function/shared/pace';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 /**
  * Progress as a belt, in the Timeline's own manner: a quiet rounded track and a
@@ -9,7 +10,8 @@ import { beltGradient } from '@/Function/shared/pace';
  * (`outlook`, -1…1, from Function/shared/pace; left out, blue). The shared
  * progress visual for Object lists, detail rails and Strategy rows.
  */
-export function ProgressBelt({ value, outlook = 0, className = '', style }: { value: number; outlook?: number; className?: string; style?: React.CSSProperties }) {
+export function ProgressBelt({ value, outlook = 0, className = '', style, label }: { value: number; outlook?: number; className?: string; style?: React.CSSProperties; label?: string }) {
+  const { t } = useI18n();
   const clamped = Math.max(0, Math.min(100, value));
   return (
     <div
@@ -17,6 +19,7 @@ export function ProgressBelt({ value, outlook = 0, className = '', style }: { va
       aria-valuenow={Math.round(clamped)}
       aria-valuemin={0}
       aria-valuemax={100}
+      aria-label={label ?? t('Progress')}
       className={cn('relative h-2.5 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-foreground/[0.07]', className)}
       style={style}
     >

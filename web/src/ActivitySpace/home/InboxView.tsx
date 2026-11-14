@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Archive, Check } from '@/ui/icons';
 import { ElementDetailView } from '@/ActivitySpace/execution/element/ElementDetailView';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { readableBody } from './inboxRow';
 import { InvitationCard } from '@/Function/membership/InvitationCard';
 import { WorkflowApprovalCard } from '@/Function/audit/WorkflowApprovalCard';
 import { CopilotApprovalInboxCard } from './CopilotApprovalInboxCard';
@@ -157,7 +158,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       ) : (
         <article className="mx-auto w-full max-w-3xl overflow-auto px-8 py-10">
           <h1 className="text-2xl font-semibold">{selected.title}</h1>
-          <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{selected.body}</p>
+          <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{readableBody(selected.body, t)}</p>
         </article>
       )}
     </div>

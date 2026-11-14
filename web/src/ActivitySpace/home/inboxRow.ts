@@ -4,6 +4,8 @@
 // one its title does not already name; the title follows as what happened,
 // and the body is the detail.
 
+import { serviceErrorLine } from '@/Function/shared/formatError';
+
 export interface InboxRowText {
   /** What it is about — the first line. */
   subject: string;
@@ -18,4 +20,12 @@ export function inboxRowText(n: { title: string; body: string | null; element?: 
   const detail = n.body?.trim() || null;
   if (about && !n.title.includes(about)) return { subject: about, event: n.title, detail };
   return { subject: n.title, event: null, detail };
+}
+
+/** A notification's body as a person reads it: a model provider's raw error
+ *  body becomes its readable line in the viewer's language (`t`), any other
+ *  body is shown as written. */
+export function readableBody(body: string | null, t: (message: string) => string): string | null {
+  const line = serviceErrorLine(body);
+  return line ? t(line) : body;
 }

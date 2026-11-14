@@ -22,6 +22,18 @@
   --selection-background: var(--accent-default);
   --selection-foreground: var(--primary-foreground);
 
+  /* ---- Colour as text, and the keyboard focus ring ----
+     The accent and the status colours are picked as fills. Read as text or
+     as a thin mark they need their own value per theme to stay legible:
+     here the fills already read on a light surface except warning, success
+     and the In Review yellow, which are darkened. */
+  --accent-text:               var(--accent-default);
+  --status-danger-text:        var(--status-danger);
+  --status-warning-text:       #9a6200;
+  --status-success-text:       #1c7c33;
+  --element-status-review-text: #8a6500;
+  --focus-ring:                var(--accent-hover);
+
   /* ---- Status (semantic only) ---- */
   --status-success:        #27a644;
   --status-success-subtle: rgba(39, 166, 68, 0.15);
@@ -291,6 +303,17 @@
   --text-tertiary:  #8a8f98;
   --text-disabled:  #62666d;
 
+  /* ---- Colour as text, and the keyboard focus ring — Dark ----
+     On a dark surface it is the accent and the danger red that fall short
+     as text, so they are lifted; warning, success and the yellow read as
+     they are. */
+  --accent-text:               #8fa8e6;
+  --status-danger-text:        #f08080;
+  --status-warning-text:       var(--status-warning);
+  --status-success-text:       var(--status-success);
+  --element-status-review-text: var(--element-status-review);
+  --focus-ring:                #8fa8e6;
+
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);
   --foreground:           var(--text-primary);
@@ -546,12 +569,28 @@ textarea.quick-create-title {
 .app-sidebar *::-webkit-scrollbar { display: none; }
 
 /* ---- Focus rings ----
- * No automatic focus outline anywhere. Nothing acquires a ring just by being a
- * button / link / focused element. A component adds its own focus affordance
- * only where it's intentionally wanted; inputs / contenteditable never get a
- * border or ring.
+ * A pointer never draws a ring: clicking a button or a link leaves it as it
+ * was. Moving by keyboard does — whatever takes the focus shows a ring drawn
+ * inside its own edge, so it is never clipped by a scrolling list. Text
+ * fields are the exception: inputs / contenteditable never get a border or
+ * ring, and show focus by their caret.
  */
-*:focus, *:focus-visible { outline: none; }
+*:focus { outline: none; }
+:where(a, button, summary, [role], [tabindex]):not(input, textarea, select, [contenteditable="true"], [tabindex="-1"], [data-slot="button"]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* ---- Colour as text ----
+ * Wherever the accent or a status colour is the colour of text or of a mark,
+ * it takes the value that reads in this theme (the -text tokens above).
+ * Fills keep the base colour.
+ */
+.text-primary, .text-\[var\(--accent-default\)\], .text-\[var\(--element-status-done\)\] { color: var(--accent-text); }
+.text-destructive, .text-\[var\(--status-danger\)\], .text-\[var\(--priority-urgent\)\], .text-\[var\(--element-status-blocked\)\] { color: var(--status-danger-text); }
+.text-\[var\(--status-warning\)\], .text-\[var\(--priority-high\)\] { color: var(--status-warning-text); }
+.text-\[var\(--status-success\)\] { color: var(--status-success-text); }
+.text-\[var\(--element-status-review\)\] { color: var(--element-status-review-text); }
 
 /* ---- Selection ---- */
 ::selection { background: var(--selection-background); color: var(--selection-foreground); }

@@ -376,7 +376,7 @@ function FolderRow({ folder, where, onOpen }: { folder: Folder; where?: React.Re
       {where !== undefined && <span className="w-40 shrink-0">{where}</span>}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label={t('More')} className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted group-hover/row:opacity-100 data-[state=open]:opacity-100">
+          <button type="button" aria-label={t('More')} className="flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity focus-visible:opacity-100 hover:bg-muted group-hover/row:opacity-100 data-[state=open]:opacity-100">
             <MoreHorizontal size={14} />
           </button>
         </DropdownMenuTrigger>

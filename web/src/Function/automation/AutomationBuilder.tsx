@@ -7,6 +7,7 @@ import { ChevronLeft } from '@/ui/icons';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
 import { Switch } from '@/Function/settings/SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { appDialog } from '@/Function/shared/appDialogStore';
 import { formatError } from '@/Function/shared/formatError';
 import { formatRelative } from '@/Function/shared/dateUtils';
 import { NavAutomationIcon } from '@/Frame/sidebar/NavIcons';
@@ -230,7 +231,7 @@ export function AutomationBuilder({ a, spaceId, harnesses, objects, sources, tok
               onChange={(v) => void act(() => setAutomationEnabled(a, v))} />
           </span>
           <Button size="xs" variant="ghost" className="text-[var(--status-danger)]" disabled={busy}
-            onClick={() => void act(async () => { await deleteAutomation(a.id); onDeleted(); })}>{t('Delete')}</Button>
+            onClick={() => void (async () => { if (!await appDialog.confirm(t('Delete the automation “{name}”? It stops running and cannot be restored.', { name: a.name }))) return; await act(async () => { await deleteAutomation(a.id); onDeleted(); }); })()}>{t('Delete')}</Button>
         </span>
       </div>
       {(error || notice) && (

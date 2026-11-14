@@ -1353,6 +1353,19 @@ const APP_MESSAGES: Record<string, Row> = {
   'Substantial': ['充実', '충실함', 'Substantiel', 'Sustancial'],
   'Thin': ['薄い', '얇음', 'Mince', 'Pobre'],
   'Trend': ['推移', '추세', 'Tendance', 'Tendencia'],
+  'The AI service did not accept the API key. Check the key under Settings, Connectors.': ['AI サービスが API キーを受け付けませんでした。設定の Connectors でキーを確認してください。', 'AI 서비스가 API 키를 받아들이지 않았습니다. 설정의 Connectors에서 키를 확인하세요.', 'Le service d’IA n’a pas accepté la clé API. Vérifiez la clé dans Réglages, Connectors.', 'El servicio de IA no aceptó la clave de API. Revisa la clave en Ajustes, Connectors.'],
+  'The AI service is busy right now. Run it again in a moment.': ['AI サービスが混み合っています。少し待ってから、もう一度実行してください。', 'AI 서비스가 지금 혼잡합니다. 잠시 후 다시 실행하세요.', 'Le service d’IA est occupé pour le moment. Relancez dans un instant.', 'El servicio de IA está ocupado ahora mismo. Vuelve a ejecutarlo en un momento.'],
+  'The AI service rejected this request, so the run stopped. Open the run to see the step it stopped at.': ['AI サービスがこの依頼を受け付けなかったため、実行が止まりました。実行を開くと、止まった手順を確認できます。', 'AI 서비스가 이 요청을 거부하여 실행이 멈췄습니다. 실행을 열면 멈춘 단계를 확인할 수 있습니다.', 'Le service d’IA a refusé cette demande, l’exécution s’est donc arrêtée. Ouvrez l’exécution pour voir l’étape où elle s’est arrêtée.', 'El servicio de IA rechazó esta solicitud, por lo que la ejecución se detuvo. Abre la ejecución para ver el paso en el que se detuvo.'],
+  'The AI service returned an error, so the run stopped. Run it again.': ['AI サービスがエラーを返したため、実行が止まりました。もう一度実行してください。', 'AI 서비스가 오류를 반환하여 실행이 멈췄습니다. 다시 실행하세요.', 'Le service d’IA a renvoyé une erreur, l’exécution s’est donc arrêtée. Relancez-la.', 'El servicio de IA devolvió un error, por lo que la ejecución se detuvo. Vuelve a ejecutarla.'],
+  'Could not change the status.': ['ステータスを変更できませんでした。', '상태를 변경하지 못했습니다.', 'Impossible de modifier le statut.', 'No se pudo cambiar el estado.'],
+  'Delete the automation “{name}”? It stops running and cannot be restored.': ['自動化「{name}」を削除しますか？実行が止まり、元に戻せません。', '자동화 “{name}”을(를) 삭제할까요? 실행이 멈추고 복원할 수 없습니다.', 'Supprimer l’automatisation « {name} » ? Elle cesse de s’exécuter et ne peut pas être restaurée.', '¿Eliminar la automatización «{name}»? Dejará de ejecutarse y no se podrá restaurar.'],
+  'Delete the Phase “{name}”? Its Elements stay, without a Phase.': ['Phase「{name}」を削除しますか？中の Element は Phase なしで残ります。', 'Phase “{name}”을(를) 삭제할까요? Element는 Phase 없이 남습니다.', 'Supprimer la Phase « {name} » ? Ses Elements restent, sans Phase.', '¿Eliminar la Phase «{name}»? Sus Elements se conservan, sin Phase.'],
+  'Could not delete the Phase.': ['Phase を削除できませんでした。', 'Phase를 삭제하지 못했습니다.', 'Impossible de supprimer la Phase.', 'No se pudo eliminar la Phase.'],
+  'The email or password is not correct.': ['メールアドレスかパスワードが違います。', '이메일 또는 비밀번호가 올바르지 않습니다.', 'L’e-mail ou le mot de passe est incorrect.', 'El correo o la contraseña no son correctos.'],
+  'Confirm your email first: open the link we sent you.': ['先にメールアドレスを確認してください。送ったメールのリンクを開いてください。', '먼저 이메일을 확인하세요. 보내 드린 링크를 여세요.', 'Confirmez d’abord votre e-mail : ouvrez le lien que nous vous avons envoyé.', 'Confirma primero tu correo: abre el enlace que te enviamos.'],
+  'An account with this email already exists. Sign in instead.': ['このメールアドレスのアカウントはすでにあります。ログインしてください。', '이 이메일로 된 계정이 이미 있습니다. 로그인하세요.', 'Un compte existe déjà avec cet e-mail. Connectez-vous plutôt.', 'Ya existe una cuenta con este correo. Inicia sesión.'],
+  'Enter your email, then choose “Forgot password?” again.': ['メールアドレスを入力してから、もう一度「パスワードを忘れた場合」を押してください。', '이메일을 입력한 뒤 “비밀번호를 잊으셨나요?”를 다시 누르세요.', 'Saisissez votre e-mail, puis choisissez à nouveau « Mot de passe oublié ? ».', 'Escribe tu correo y vuelve a elegir «¿Olvidaste la contraseña?».'],
+  'Forgot password?': ['パスワードを忘れた場合', '비밀번호를 잊으셨나요?', 'Mot de passe oublié ?', '¿Olvidaste la contraseña?'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(APP_MESSAGES).map(([key, row]) => [key, row[index]]));
