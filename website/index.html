@@ -1,555 +1,294 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="light">
+<html lang="en" data-mode="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clayware — AIに任せられる会社を、つくる。</title>
-<meta name="description" content="Claywareは、AIの運用基盤と、チェンジマネジメント・教育の3つで、人とAIが一緒に働く会社への移行を支えます。">
-<meta property="og:title" content="Clayware — AIに任せられる会社を、つくる。">
-<meta property="og:description" content="プロダクト・チェンジマネジメント・教育で、人とAIが一緒に働く会社へ。">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 22h48c0 18-10 30-24 30S8 40 8 22z' fill='%23f5f3ee' stroke='%23142445' stroke-width='2'/%3E%3Cpath d='M10 28h44' stroke='%23426fac' stroke-width='3'/%3E%3Cpath d='M30 22l4 9-5 7 4 14' stroke='%23c9a24a' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>Clayware | Hand off the work. Keep the decisions.</title>
+<meta name="description" content="Clayware turns the work that arrives into tasks, gets AI to do them, and stops only where a person has to decide. Product, change management and education for companies moving to AI.">
+<meta property="og:title" content="Clayware | Hand off the work. Keep the decisions.">
+<meta property="og:description" content="AI sorts the work that arrives and does it. You make the calls.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 22h48c0 18-10 30-24 30S8 40 8 22z' fill='%23f4f5f8'/%3E%3Cpath d='M11 29h42' stroke='%233d5fae' stroke-width='4'/%3E%3Cpath d='M30 22l4 9-5 7 4 14' stroke='%23ffd700' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>
-try{var t=localStorage.getItem('cw-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}
+document.documentElement.classList.add('js');
+try{var m=localStorage.getItem('cw-theme');if(m==='dark'||m==='light')document.documentElement.setAttribute('data-mode',m)}catch(e){}
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --blue:#426fac;--blue-2:#2f5486;--blue-soft:#8fb0de;
-  --gold:#c9a24a;--gold-2:#e3c477;
-  --font:"Inter","Noto Sans JP","Hiragino Sans",sans-serif;
-}
-[data-theme="light"]{
-  --bg:#ffffff;--bg-2:#f7f8fa;--bg-3:#eff1f5;--panel:#ffffff;
-  --line:#e6e8ee;--line-2:#d8dce5;
-  --text:#0f1424;--text-2:#4b5366;--text-3:#7d8496;
-  --nav:rgba(255,255,255,.78);--shadow:0 1px 2px rgba(16,24,40,.04),0 12px 40px rgba(16,24,40,.08);
-  --accent:var(--blue);--chip:#eef3fa;--chip-text:#2f5486;
-}
-[data-theme="dark"]{
-  --bg:#08090a;--bg-2:#0f1011;--bg-3:#16171a;--panel:#121315;
-  --line:#1f2124;--line-2:#2a2c31;
-  --text:#f2f3f5;--text-2:#a2a6b0;--text-3:#6c707a;
-  --nav:rgba(8,9,10,.72);--shadow:0 0 0 1px rgba(255,255,255,.04),0 20px 60px rgba(0,0,0,.6);
-  --accent:var(--blue-soft);--chip:#121a2a;--chip-text:#8fb0de;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.7;-webkit-font-smoothing:antialiased;font-feature-settings:"palt";transition:background .3s,color .3s}
-a{color:inherit;text-decoration:none}
-img{max-width:100%;display:block}
-.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
-section{padding:120px 0;border-top:1px solid var(--line)}
-.kicker{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--text-2)}
-.kicker i{width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block}
-h1,h2,h3{letter-spacing:-.02em;font-weight:600;line-height:1.25}
-h2{font-size:clamp(30px,4vw,48px);margin:14px 0 18px;max-width:780px}
-.sub{color:var(--text-2);font-size:17px;max-width:620px}
-
-/* NAV */
-nav{position:sticky;top:0;z-index:50;background:var(--nav);backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line)}
-nav .wrap{display:flex;align-items:center;height:64px;gap:28px}
-.logo{display:flex;align-items:center;gap:9px;font-weight:600;font-size:16px;letter-spacing:-.01em;margin-right:auto}
-.logo svg{width:24px;height:24px}
-.menu{display:flex;align-items:center;gap:2px;font-size:14px}
-.menu>a,.menu>.dd>button{color:var(--text-2);padding:7px 12px;border-radius:8px;background:none;border:0;font:inherit;cursor:pointer;transition:.15s}
-.menu>a:hover,.menu>.dd>button:hover,.dd.open>button{color:var(--text);background:var(--bg-3)}
-.dd{position:relative}
-.mega{position:absolute;top:calc(100% + 12px);left:-24px;width:820px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr 1fr .8fr;opacity:0;visibility:hidden;transform:translateY(-4px);transition:.18s}
-.dd:hover .mega,.dd.open .mega{opacity:1;visibility:visible;transform:none}
-.dd:before{content:"";position:absolute;left:0;right:0;top:100%;height:14px}
-.mega .col{padding:22px 24px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
-.mega .col:last-child{border-right:0;justify-content:flex-start}
-.mega a.item{display:block;padding:10px 12px;border-radius:9px;transition:.15s}
-.mega a.item:hover{background:var(--bg-3)}
-.mega a.item b{display:block;font-weight:500;font-size:14px;color:var(--text)}
-.mega a.item span{display:block;font-size:13px;color:var(--text-3);line-height:1.55;margin-top:2px}
-.mega .lnk{font-size:14px;color:var(--text-2);padding:8px 12px;border-radius:8px}
-.mega .lnk:hover{background:var(--bg-3);color:var(--text)}
-.right{display:flex;align-items:center;gap:10px}
-.sep{width:1px;height:18px;background:var(--line-2);margin:0 6px}
-.tbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line-2);background:transparent;color:var(--text-2);display:grid;place-items:center;cursor:pointer;transition:.15s}
-.tbtn:hover{color:var(--text);background:var(--bg-3)}
-.tbtn svg{width:16px;height:16px}
-[data-theme="light"] .moon{display:block}[data-theme="light"] .sun{display:none}
-[data-theme="dark"] .moon{display:none}[data-theme="dark"] .sun{display:block}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:9px;font-size:14px;font-weight:500;transition:.15s;border:1px solid transparent;cursor:pointer}
-.btn-primary{background:var(--text);color:var(--bg)}
-.btn-primary:hover{opacity:.86}
-.btn-gold{background:var(--gold);color:#17140c}
-.btn-gold:hover{background:var(--gold-2)}
-.btn-line{border-color:var(--line-2);color:var(--text)}
-.btn-line:hover{background:var(--bg-3)}
-.btn-lg{padding:12px 20px;font-size:15px;border-radius:10px}
-.burger{display:none}
-.lin{font-size:14px;color:var(--text-2);padding:7px 10px;border-radius:8px}
-.lin:hover{color:var(--text);background:var(--bg-3)}
-
-/* HERO */
-.hero{padding:110px 0 0;border-top:0;overflow:hidden}
-.hero h1{font-size:clamp(40px,6.4vw,76px);letter-spacing:-.035em;line-height:1.12;max-width:900px}
-.hero h1 .g{background:linear-gradient(90deg,var(--gold),var(--gold-2));-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero .sub{font-size:19px;margin-top:24px;max-width:640px}
-.hero .cta{display:flex;gap:12px;margin-top:36px;flex-wrap:wrap}
-.pill{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--text-2);border:1px solid var(--line-2);border-radius:999px;padding:5px 14px 5px 6px;margin-bottom:28px;transition:.15s}
-.pill:hover{background:var(--bg-3)}
-.pill em{font-style:normal;background:var(--chip);color:var(--chip-text);border-radius:999px;padding:2px 10px;font-weight:500}
-.stage{margin-top:80px;position:relative}
-.stage:before{content:"";position:absolute;left:10%;right:10%;top:-40px;height:280px;background:radial-gradient(ellipse at center,rgba(66,111,172,.28),transparent 70%);filter:blur(30px);z-index:0}
-.window{position:relative;z-index:1;border-radius:14px 14px 0 0;border:1px solid var(--line-2);border-bottom:0;overflow:hidden;background:#0f1011;box-shadow:var(--shadow)}
-.window .bar{height:38px;display:flex;align-items:center;gap:7px;padding:0 14px;background:#151619;border-bottom:1px solid #222428}
-.window .bar i{width:11px;height:11px;border-radius:50%;background:#2c2e33;display:block}
-.window .bar span{margin-left:14px;font-size:12px;color:#7d818b}
-.window img{width:100%}
-.seam{position:absolute;z-index:2;top:0;left:62%;width:120px;height:90px;pointer-events:none}
-
-/* SERVICE */
-.three{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:56px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
-.svc{padding:34px 30px 30px;border-right:1px solid var(--line);background:var(--bg);transition:.2s;display:flex;flex-direction:column}
-.svc:last-child{border-right:0}
-.svc:hover{background:var(--bg-2)}
-.svc .num{font-size:12px;color:var(--text-3);font-weight:500;letter-spacing:.08em}
-.svc h3{font-size:24px;margin:14px 0 4px}
-.svc .en{font-size:13px;color:var(--accent);font-weight:500}
-.svc p{color:var(--text-2);font-size:15px;margin:16px 0 22px}
-.svc ul{list-style:none;margin-top:auto;border-top:1px solid var(--line);padding-top:16px}
-.svc li{font-size:14px;color:var(--text-2);padding:5px 0 5px 18px;position:relative}
-.svc li:before{content:"";position:absolute;left:0;top:14px;width:8px;height:1.5px;background:var(--gold)}
-.svc .more{margin-top:18px;font-size:14px;color:var(--text);font-weight:500}
-.svc .more:hover{color:var(--accent)}
-
-/* PRODUCT */
-.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:56px}
-.fstep{border:1px solid var(--line);border-radius:14px;padding:24px 22px;background:var(--bg-2)}
-.fstep .en{font-size:12px;letter-spacing:.12em;color:var(--accent);font-weight:600}
-.fstep h3{font-size:19px;margin:10px 0 8px}
-.fstep p{font-size:14px;color:var(--text-2)}
-.fstep.you{border-color:var(--gold);background:linear-gradient(180deg,rgba(201,162,74,.10),transparent)}
-.fstep.you .en{color:var(--gold)}
-.feat{display:grid;grid-template-columns:1fr 1.55fr;gap:56px;align-items:center;margin-top:100px}
-.feat.rev{grid-template-columns:1.55fr 1fr}
-.feat.rev .txt{order:2}
-.feat h3{font-size:28px;margin:10px 0 14px}
-.feat p{color:var(--text-2);font-size:15px}
-.feat .tag{font-size:13px;color:var(--accent);font-weight:500}
-.shot{border-radius:12px;overflow:hidden;border:1px solid var(--line-2);box-shadow:var(--shadow);background:#0f1011}
-.grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:56px}
-.cell{background:var(--bg);padding:28px 26px}
-.cell h4{font-size:16px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:10px}
-.cell h4:before{content:"";width:7px;height:7px;border-radius:2px;background:var(--accent)}
-.cell p{font-size:14px;color:var(--text-2)}
-.sublabel{margin-top:100px;font-size:14px;font-weight:600;color:var(--text)}
-
-/* CHANGE / EDU */
-.split{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start}
-.steps{border-top:1px solid var(--line)}
-.st{display:grid;grid-template-columns:56px 1fr;gap:12px;padding:24px 0;border-bottom:1px solid var(--line)}
-.st .n{font-size:14px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
-.st h3{font-size:18px;margin-bottom:4px}
-.st p{font-size:14px;color:var(--text-2)}
-.modes{display:flex;gap:10px;margin-top:28px;flex-wrap:wrap}
-.mode{flex:1;min-width:150px;border:1px solid var(--line-2);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--text-2)}
-.mode b{display:block;color:var(--text);font-size:14px;font-weight:600;margin-bottom:2px}
-.mode.on{border-color:var(--gold)}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:56px}
-.card{border:1px solid var(--line);border-radius:14px;padding:26px 24px;background:var(--bg-2);transition:.2s}
-.card:hover{border-color:var(--line-2);transform:translateY(-2px)}
-.card .who{font-size:12px;color:var(--accent);font-weight:600;letter-spacing:.06em}
-.card h3{font-size:18px;margin:10px 0 8px}
-.card p{font-size:14px;color:var(--text-2)}
-
-/* CASE */
-.case-empty{margin-top:48px;border:1px dashed var(--line-2);border-radius:16px;padding:44px;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:center}
-.case-empty h3{font-size:24px;margin-bottom:10px}
-.case-empty p{color:var(--text-2);font-size:15px}
-.case-empty ul{list-style:none}
-.case-empty li{font-size:14px;color:var(--text-2);padding:10px 0;border-bottom:1px solid var(--line)}
-.case-empty li b{color:var(--text);font-weight:500;margin-right:8px}
-
-/* RESOURCE / NEW */
-.two{display:grid;grid-template-columns:1fr 1fr;gap:64px}
-.list a,.list div.row{display:flex;justify-content:space-between;gap:20px;padding:18px 0;border-bottom:1px solid var(--line);font-size:15px}
-.list a:hover b{color:var(--accent)}
-.list b{font-weight:500}
-.list span{color:var(--text-3);font-size:13px;white-space:nowrap}
-.list .soon{font-size:12px;border:1px solid var(--line-2);border-radius:999px;padding:1px 9px;color:var(--text-3)}
-.log .row{display:grid !important;grid-template-columns:96px 1fr;gap:16px}
-.log time{font-size:13px;color:var(--text-3);font-variant-numeric:tabular-nums}
-.log p{font-size:14px;color:var(--text-2);margin-top:2px}
-
-/* PRICING */
-.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:56px}
-.price{border:1px solid var(--line);border-radius:16px;padding:30px 28px;display:flex;flex-direction:column;background:var(--bg)}
-.price.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
-.price .plan{font-size:14px;font-weight:600}
-.price .amt{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:14px 0 4px}
-.price .note{font-size:13px;color:var(--text-3)}
-.price p.d{font-size:14px;color:var(--text-2);margin:16px 0 18px}
-.price ul{list-style:none;border-top:1px solid var(--line);padding-top:16px;margin-bottom:24px}
-.price li{font-size:14px;color:var(--text-2);padding:5px 0 5px 22px;position:relative}
-.price li:before{content:"";position:absolute;left:2px;top:11px;width:9px;height:5px;border-left:1.6px solid var(--accent);border-bottom:1.6px solid var(--accent);transform:rotate(-45deg)}
-.price .btn{margin-top:auto;justify-content:center}
-
-/* STORY / CTA */
-.story{text-align:center}
-.story svg{width:180px;margin:0 auto 30px}
-.story h2{margin:12px auto 16px}
-.story .sub{margin:0 auto}
-.final{text-align:center;padding:130px 0}
-.final h2{margin:0 auto 14px;font-size:clamp(32px,4.6vw,56px)}
-.final .sub{margin:0 auto 34px}
-footer{border-top:1px solid var(--line);padding:56px 0 40px;font-size:13px;color:var(--text-3)}
-.fgrid{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:24px}
-.fgrid h5{font-size:13px;color:var(--text);font-weight:500;margin-bottom:12px}
-.fgrid a{display:block;padding:4px 0;color:var(--text-3)}
-.fgrid a:hover{color:var(--text)}
-.copy{margin-top:48px;display:flex;justify-content:space-between}
-
-.reveal{opacity:0;transform:translateY(16px);transition:opacity .7s ease,transform .7s ease}
-.reveal.in{opacity:1;transform:none}
-
-@media (max-width:960px){
-  .menu{display:none}
-  .menu.show{display:flex;flex-direction:column;align-items:stretch;position:absolute;top:64px;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 20px}
-  .menu.show .mega{display:none}
-  .burger{display:grid}
-  .right .btn-line,.sep,.lin{display:none}
-  .three,.flow,.grid6,.cards,.prices{grid-template-columns:1fr}
-  .svc{border-right:0;border-bottom:1px solid var(--line)}
-  .feat,.feat.rev,.split,.two,.case-empty{grid-template-columns:1fr}
-  .feat.rev .txt{order:0}
-  .fgrid{grid-template-columns:1fr 1fr}
-  section{padding:84px 0}
-}
-</style>
+<link rel="preload" href="assets/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/Geist-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<nav>
-  <div class="wrap">
-    <a href="/homepage" class="logo" aria-label="Clayware">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 22h48c0 18-10 30-24 30S8 40 8 22z" fill="#f5f3ee" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M11 29h42" stroke="#426fac" stroke-width="3"/><path d="M30 22l4 9-5 7 4 14" stroke="#c9a24a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<header class="nav">
+  <div class="container nav__bar">
+    <a href="/homepage" class="wordmark" aria-label="Clayware home">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path class="bowl__body" d="M8 22h48c0 18-10 30-24 30S8 40 8 22z"/><path class="bowl__band" d="M11 29h42"/><path class="bowl__seam" d="M30 22l4 9-5 7 4 14"/></svg>
       Clayware
     </a>
-    <div class="menu" id="menu">
+    <nav class="menu" id="menu" aria-label="Main">
       <div class="dd" id="dd">
-        <button aria-haspopup="true" aria-expanded="false" id="ddbtn">Service</button>
-        <div class="mega" role="menu">
-          <div class="col">
-            <a class="item" href="#product"><b>Product — Clayware</b><span>届いた仕事をAIが振り分けて進め、人は判断だけ</span></a>
-            <a class="item" href="#change"><b>Change management</b><span>現場に入り、仕事の流れをAI前提に組み替える</span></a>
+        <button type="button" class="dd__btn" id="ddbtn" aria-haspopup="true" aria-expanded="false">Service</button>
+        <div class="mega">
+          <div class="mega__col">
+            <a href="#product"><b>Product</b><span>AI sorts and runs the work that arrives. You decide.</span></a>
+            <a href="#change"><b>Change management</b><span>We work on site and rebuild the workflow around AI.</span></a>
           </div>
-          <div class="col">
-            <a class="item" href="#education"><b>Education</b><span>経営から現場まで、AIを使いこなす力を育てる</span></a>
-            <a class="item" href="#product-safety"><b>Security</b><span>止まるべきところで止まる、承認と検証の仕組み</span></a>
+          <div class="mega__col">
+            <a href="#education"><b>Education</b><span>From leadership to the front line, people who can hand work to AI.</span></a>
+            <a href="#product-safety"><b>Security</b><span>Approvals and checks that stop where they should.</span></a>
           </div>
-          <div class="col">
-            <a class="lnk" href="#integrations">連携できるサービス</a>
-            <a class="lnk" href="#new">更新情報</a>
-            <a class="lnk" href="#pricing">料金</a>
-            <a class="lnk" href="#story">Claywareについて</a>
+          <div class="mega__col mega__col--plain">
+            <a href="#integrations">Integrations</a>
+            <a href="#new">Changelog</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#contact">Contact</a>
           </div>
         </div>
       </div>
-      <a href="#resource">Resource</a>
-      <a href="#case">Case</a>
-      <a href="#new">New</a>
-      <a href="#pricing">Pricing</a>
-    </div>
-    <div class="right">
-      <button class="tbtn" id="theme" aria-label="ライトとダークを切り替える" title="ライト／ダーク">
-        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <a class="menu__link" href="#resource">Resource</a>
+      <a class="menu__link" href="#case">Case</a>
+      <a class="menu__link" href="#new">New</a>
+      <a class="menu__link" href="#pricing">Pricing</a>
+    </nav>
+    <div class="nav__end">
+      <button type="button" class="icon-btn" id="theme" aria-label="Switch between dark and light">
+        <svg class="mode-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="mode-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
-      <span class="sep"></span>
-      <a href="/login" class="lin">ログイン</a>
-      <a href="#contact" class="btn btn-line">資料をもらう</a>
-      <a href="#contact" class="btn btn-primary">相談する</a>
-      <button class="tbtn burger" id="burger" aria-label="メニュー"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-    </div>
-  </div>
-</nav>
-
-<!-- HERO -->
-<header class="hero">
-  <div class="wrap">
-    <a href="#new" class="pill reveal"><em>New</em>Clayware v4 — 届いた情報からタスクを作る自動化 →</a>
-    <h1 class="reveal">AIに任せられる会社を、<br><span class="g">つくる。</span></h1>
-    <p class="sub reveal">Claywareは、AIの運用基盤と、チェンジマネジメント・教育の3つで、人とAIが一緒に働く会社への移行を支えます。道具を入れて終わりにせず、現場の仕事が変わるところまで。</p>
-    <div class="cta reveal">
-      <a href="#contact" class="btn btn-primary btn-lg">導入の相談をする</a>
-      <a href="#service" class="btn btn-line btn-lg">サービスを見る →</a>
-    </div>
-    <div class="stage reveal">
-      <svg class="seam" viewBox="0 0 120 90" aria-hidden="true"><path d="M60 0l10 22-12 16 14 20-6 32" stroke="#c9a24a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="window">
-        <div class="bar"><i></i><i></i><i></i><span>Clayware — Elements</span></div>
-        <img src="assets/elements.jpg" alt="Claywareの画面。届いた問い合わせやクレームから作られた作業が、担当と状態つきで並ぶ">
-      </div>
+      <a href="/login" class="navlink">Log in</a>
+      <a href="#contact" class="btn btn--quiet btn--small">Talk to us</a>
+      <button type="button" class="icon-btn burger" id="burger" aria-label="Open menu" aria-controls="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     </div>
   </div>
 </header>
 
-<!-- SERVICE -->
-<section id="service">
-  <div class="wrap">
-    <div class="kicker reveal"><i></i>Service</div>
-    <h2 class="reveal">道具と、仕事の変え方と、使い手。<br>3つそろって、はじめて任せられる。</h2>
-    <p class="sub reveal">AIを入れても、文章の下書きにしか使われない。その原因は、道具だけが入って、仕事の流れも人も変わっていないことにあります。</p>
-    <div class="three reveal">
-      <div class="svc">
-        <div class="num">01</div>
-        <h3>プロダクト</h3><div class="en">Product — Clayware</div>
-        <p>届いた仕事をAIがタスクに振り分けて進め、人は判断だけを行う運用基盤。</p>
-        <ul><li>メール・ドライブ・GitHubにつながる</li><li>取り消せない操作だけ人が承認</li><li>結果は別のAIが確かめて完了</li></ul>
-        <a href="#product" class="more">プロダクトを見る →</a>
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="container">
+    <div class="hero__top">
+      <h1 id="hero-title">Hand off the work. Keep the decisions.</h1>
+      <div class="hero__row">
+        <p class="lead">AI sorts what arrives and does the work. You make the calls.</p>
+        <div class="actions">
+          <a href="#contact" class="btn">Talk to us</a>
+          <a href="#new" class="textlink news">New: Clayware v4</a>
+        </div>
       </div>
-      <div class="svc">
-        <div class="num">02</div>
-        <h3>チェンジマネジメント</h3><div class="en">Change management</div>
-        <p>エンジニアが現場に入り、いまの仕事をほどいて、AIに任せる部分を組み立て直す。</p>
-        <ul><li>業務の洗い出しと設計</li><li>試し実行から段階的に任せる</li><li>成功条件で効果を測る</li></ul>
-        <a href="#change" class="more">進め方を見る →</a>
+    </div>
+    <figure class="hero__shot">
+      <img src="assets/elements.jpg" alt="The Clayware Elements view: tasks made from incoming enquiries and complaints, each with an owner and a status" width="1600" height="1000">
+    </figure>
+  </div>
+</section>
+
+<section class="section section--l" id="service" aria-labelledby="service-title">
+  <div class="container">
+    <div class="head">
+      <h2 id="service-title">The software, the change, and the people.</h2>
+      <p class="lead">AI stalls at drafts when only the tool changes.</p>
+    </div>
+    <ol class="rows">
+      <li class="row"><h3>Product<small>Clayware</small></h3><p>AI turns incoming work into tasks and runs them.</p><a href="#product" class="textlink">See the product</a></li>
+      <li class="row"><h3>Change management<small>On site, with your team</small></h3><p>Engineers on site rebuild the workflow around AI.</p><a href="#change" class="textlink">How we work</a></li>
+      <li class="row"><h3>Education<small>Leaders, teams, champions</small></h3><p>Every role learns to hand work to AI.</p><a href="#education" class="textlink">What we teach</a></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section--l" id="product" aria-labelledby="product-title">
+  <div class="container">
+    <div class="head">
+      <h2 id="product-title">Every request becomes an owned task.</h2>
+      <p class="lead">Anything you cannot undo waits for your approval.</p>
+    </div>
+    <ol class="flow" aria-label="How work moves">
+      <li><b>Collect</b><span>On arrival, or at 9am</span></li>
+      <li><b>Sort</b><span>To a person or to AI</span></li>
+      <li class="you"><b>You decide <span class="flag">Needs you</span></b><span>Approve or send back</span></li>
+      <li><b>Verify</b><span>A second AI checks it</span></li>
+    </ol>
+    <div class="shots">
+      <figure class="shot shot--wide">
+        <div class="shot__frame"><img src="assets/agent.jpg" alt="The Agent view: this week's decisions in deadline order, and a task handed to AI on request" width="1600" height="1000" loading="lazy"></div>
+        <figcaption><b>Agent.</b> Ask in plain words. Decisions are listed by deadline.</figcaption>
+      </figure>
+      <figure class="shot shot--7">
+        <div class="shot__frame"><img src="assets/board.jpg" alt="The Board view: tasks under a goal in columns from Backlog to Done" width="1600" height="1000" loading="lazy"></div>
+        <figcaption><b>Board.</b> From a goal to tasks, and where each one stands.</figcaption>
+      </figure>
+      <figure class="shot shot--5">
+        <div class="shot__frame"><img src="assets/gantt.jpg" alt="The Gantt view: each team's tasks laid out on a timeline by project" width="1600" height="1000" loading="lazy"></div>
+        <figcaption><b>Gantt.</b> Left of today and not done means late.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section section--flush" id="integrations" aria-labelledby="agents-title">
+  <div class="container">
+    <div class="head">
+      <h2 id="agents-title">Five agents. You sign off on each.</h2>
+      
+    </div>
+    <table class="index">
+      <caption>Gmail, Google Drive, GitHub, and your systems over MCP or HTTP.</caption>
+      <thead><tr><th scope="col">Workflow</th><th scope="col">AI does</th><th scope="col">You decide</th></tr></thead>
+      <tbody>
+        <tr><td>Enquiry intake</td><td>Classifies, records, drafts the reply</td><td>Whether to send it</td></tr>
+        <tr><td>Morning digest</td><td>Puts open and high-risk items first</td><td>Where to start</td></tr>
+        <tr><td>Complaint analysis</td><td>Groups causes, proposes fixes</td><td>Which fix to adopt</td></tr>
+        <tr><td>Sales follow-up</td><td>Drafts the follow-ups</td><td>What goes out</td></tr>
+        <tr><td>Engineering</td><td>Codes in a sandbox, opens a PR</td><td>Whether to merge</td></tr>
+      </tbody>
+    </table>
+    <div class="safety" id="product-safety">
+      <h2>Stops where it should.</h2>
+      <dl class="facts">
+        <div><dt>Approval</dt><dd>Tied to the exact input. Never self-approved.</dd></div>
+        <div><dt>Verifier</dt><dd>A second AI checks every result.</dd></div>
+        <div><dt>Automatic stop</dt><dd>On repeat writes, errors, new recipients.</dd></div>
+        <div><dt>Spend limit</dt><dd>A monthly budget it never passes.</dd></div>
+        <div><dt>Hidden credentials</dt><dd>Logins stay in a vault.</dd></div>
+        <div><dt>Full record</dt><dd>Every run is logged.</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="section section--l" id="change" aria-labelledby="change-title">
+  <div class="container">
+    <div class="head">
+      <h2 id="change-title">We don’t hand over a tool and leave.</h2>
+      <p class="lead">Engineers start where the work gets stuck.</p>
+    </div>
+    <ol class="steps">
+      <li><h3>Watch the work</h3><p>Map what arrives and who decides.</p></li>
+      <li><h3>Set the bar</h3><p>Agree a number, like a four-hour first reply.</p></li>
+      <li><h3>Connect and dry-run</h3><p>Writes off. Check every action.</p></li>
+      <li><h3>Run and adjust</h3><p>A morning review, tuned to the bar.</p></li>
+    </ol>
+    <div class="switch" data-switch>
+      <div class="switch__label"><h3>Hand over more as trust builds</h3></div>
+      <div class="seg" role="tablist" aria-label="How much to hand over">
+        <button type="button" role="tab" id="t-ask" aria-controls="p-ask" aria-selected="true">Ask every time</button>
+        <button type="button" role="tab" id="t-auto" aria-controls="p-auto" aria-selected="false" tabindex="-1">Auto</button>
+        <button type="button" role="tab" id="t-free" aria-controls="p-free" aria-selected="false" tabindex="-1">Don’t ask</button>
       </div>
-      <div class="svc">
-        <div class="num">03</div>
-        <h3>教育</h3><div class="en">Education</div>
-        <p>経営層・現場・推進担当それぞれに、AIに仕事を任せる考え方と使い方を身につけてもらう。</p>
-        <ul><li>経営向けの判断のしかた</li><li>現場向けのハンズオン</li><li>社内の推進役を育てる</li></ul>
-        <a href="#education" class="more">内容を見る →</a>
+      <div class="panels">
+        <div class="panel" role="tabpanel" id="p-ask" aria-labelledby="t-ask" tabindex="0"><b>Ask every time</b>Every outside write waits for a person.</div>
+        <div class="panel" role="tabpanel" id="p-auto" aria-labelledby="t-auto" tabindex="0"><b>Auto</b>Clean approval runs are handed over first.</div>
+        <div class="panel" role="tabpanel" id="p-free" aria-labelledby="t-free" tabindex="0"><b>Don’t ask</b>Runs freely inside your limits. Nothing irreversible.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- PRODUCT -->
-<section id="product">
-  <div class="wrap">
-    <div class="kicker reveal"><i></i>Product — Clayware</div>
-    <h2 class="reveal">届いた仕事を、AIが片づける。<br>人は、判断だけ。</h2>
-    <p class="sub reveal">AI基盤「Athena」が自分で起きて情報を集め、最小の作業単位（Element）に分けて担当を決めます。AIで済む作業はAIが進め、送信や支払いのような取り消せない操作だけ人の承認を待ちます。</p>
-    <div class="flow">
-      <div class="fstep reveal"><div class="en">COLLECT</div><h3>集める</h3><p>メールやフォームが届いたとき、または毎朝9時などの時刻に受け取る</p></div>
-      <div class="fstep reveal"><div class="en">SORT</div><h3>振り分ける</h3><p>分類して表に記録し、人かAIの担当を決めて作業にする</p></div>
-      <div class="fstep you reveal"><div class="en">YOUR TURN</div><h3>人が判断する</h3><p>判断待ちを上から見て、承認・回答・差し戻しをする</p></div>
-      <div class="fstep reveal"><div class="en">VERIFY</div><h3>確かめて完了</h3><p>別のAIが成果物を確かめ、通ったものだけを完了にする</p></div>
+<section class="section section--l" id="education" aria-labelledby="edu-title">
+  <div class="container">
+    <div class="head">
+      <h2 id="edu-title">Without skilled people, AI stays a search box.</h2>
+      
     </div>
-
-    <div class="feat">
-      <div class="txt reveal">
-        <div class="tag">Agent</div>
-        <h3>話しかけると、集計して、<br>作業まで動かす</h3>
-        <p>「今週の進み具合をグラフで見せて」と頼めば、データを読んで答え、判断が要るものを期限順に並べます。「デモ環境はClaudeに任せて」で、担当がAIに変わります。</p>
-      </div>
-      <div class="shot reveal"><img src="assets/agent.jpg" alt="Agentの画面。今週判断が要るものを並べ、作業の担当をAIに変えている" loading="lazy"></div>
-    </div>
-    <div class="feat rev">
-      <div class="shot reveal"><img src="assets/board.jpg" alt="Boardの画面。目標の下の作業がBacklogからDoneまでの列に並ぶ" loading="lazy"></div>
-      <div class="txt reveal">
-        <div class="tag">Strategy & Board</div>
-        <h3>目標の下で、どこまで進み、<br>どこで止まっているか</h3>
-        <p>目的と成功条件を書けば、AIがプロジェクトと作業に分けます。進捗の表を人が作り直す必要はありません。</p>
-      </div>
-    </div>
-    <div class="feat">
-      <div class="txt reveal">
-        <div class="tag">Gantt</div>
-        <h3>期限と担当を、<br>日程の上で確かめる</h3>
-        <p>部署ごとの作業をプロジェクト単位で並べます。今日の線より左で終わっていない作業は、遅れています。</p>
-      </div>
-      <div class="shot reveal"><img src="assets/gantt.jpg" alt="Ganttの画面。部署の作業がプロジェクトごとに日程上に並ぶ" loading="lazy"></div>
-    </div>
-
-    <div class="sublabel reveal" id="integrations">すぐ使える業務のAI Agent</div>
-    <div class="grid6 reveal">
-      <div class="cell"><h4>問い合わせの受付と振り分け</h4><p>分類して記録し、返信を下書き。送信は人が承認する。</p></div>
-      <div class="cell"><h4>問い合わせの朝のまとめ</h4><p>前日分を集計し、未対応と高リスクを先頭に並べる。</p></div>
-      <div class="cell"><h4>クレームの分析と改善提案</h4><p>毎週、原因を分類して改善案を出す。採用は人が決める。</p></div>
-      <div class="cell"><h4>営業のフォロー</h4><p>商談後の連絡を洗い出して下書きし、担当の作業にする。</p></div>
-      <div class="cell"><h4>開発（コーディング）</h4><p>隔離した環境で変更し、テストを通してPRに。マージは人が承認。</p></div>
-      <div class="cell"><h4>つながる先</h4><p>Gmail・Google Drive・GitHub。MCPやHTTP APIで社内システムにも。</p></div>
-    </div>
-
-    <div class="sublabel reveal" id="product-safety">安全の仕組み</div>
-    <div class="grid6 reveal">
-      <div class="cell"><h4>承認</h4><p>実行する入力そのものに承認を結び付ける。AIは自分で承認できない。</p></div>
-      <div class="cell"><h4>検証役</h4><p>別のAIが成果物を確かめ、人の判定と食い違うやり方は見直す。</p></div>
-      <div class="cell"><h4>自動停止</h4><p>連続した書き込み、エラーの増加、初めての送信先で止まる。</p></div>
-      <div class="cell"><h4>費用の上限</h4><p>月の予算を決め、それを超えて動かない。</p></div>
-      <div class="cell"><h4>資格情報を見せない</h4><p>ログイン情報は保管庫に置き、AIの文脈には出さない。</p></div>
-      <div class="cell"><h4>すべて記録に残る</h4><p>誰が何を見られるかはデータベースで判定し、実行は記録される。</p></div>
-    </div>
+    <table class="index index--edu">
+      <thead><tr><th scope="col">Who</th><th scope="col">What they learn</th><th scope="col">Format</th></tr></thead>
+      <tbody>
+        <tr><td>Leaders</td><td>What to hand off, and how to design approvals</td><td>Half-day session</td></tr>
+        <tr><td>Teams</td><td>Ask, check and send back, on their own work</td><td>Hands-on workshop</td></tr>
+        <tr><td>Champions</td><td>Build, dry-run and run the automations</td><td>Several sessions</td></tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
-<!-- CHANGE -->
-<section id="change">
-  <div class="wrap split">
-    <div class="reveal">
-      <div class="kicker"><i></i>Change management</div>
-      <h2>道具を渡して、<br>終わりにしない。</h2>
-      <p class="sub">私たちのエンジニアが現場に入り、どこで仕事が詰まり、誰が何を書き写しているかを一緒に見ます。いきなり全部を任せず、「毎回聞く」から始めて、慣れに合わせて任せる範囲を広げます。</p>
-      <div class="modes">
-        <div class="mode on"><b>毎回聞く</b>最初はここから</div>
-        <div class="mode"><b>自動</b>実績に応じて広がる</div>
-        <div class="mode"><b>聞かない</b>許可した範囲だけ</div>
-      </div>
+<section class="section section--l section--raised" id="pricing" aria-labelledby="pricing-title">
+  <div class="container">
+    <div class="statement" id="case">
+      <h2>We are looking for our first case studies.</h2>
+      <dl>
+        <div><dt>Length</dt><dd>From four weeks</dd></div>
+        <div><dt>Scope</dt><dd>One workflow, one team</dd></div>
+        <div><dt>Measured</dt><dd>Handling time, send-backs, waiting decisions</dd></div>
+      </dl>
+      <div class="actions"><a href="#contact" class="btn btn--quiet">Start a pilot</a></div>
     </div>
-    <div class="steps reveal">
-      <div class="st"><div class="n">01</div><div><h3>現場の仕事を一緒に見る</h3><p>届く情報、書き写し、判断の場面を洗い出し、AIに任せる部分と人が持つ部分を分けます。</p></div></div>
-      <div class="st"><div class="n">02</div><div><h3>成功条件を決める</h3><p>「一次返信の中央値4時間以内」のように、数字で確かめられる目標を先に置きます。</p></div></div>
-      <div class="st"><div class="n">03</div><div><h3>つないで、試し実行する</h3><p>書き込みを止めた状態で流し、行う操作と結果をチームで確かめます。</p></div></div>
-      <div class="st"><div class="n">04</div><div><h3>運用に乗せて、測って、直す</h3><p>判断待ちを毎朝見る習慣を作り、成功条件と照らして分類のルールややり方を見直します。</p></div></div>
-    </div>
+    <h2 id="pricing-title" class="visually-hidden">Pricing</h2>
+    <table class="price">
+      <thead><tr><th scope="col">Plan</th><th scope="col">What it is</th><th scope="col">Price</th><th scope="col"><span class="visually-hidden">Contact</span></th></tr></thead>
+      <tbody>
+        <tr><td class="plan">Pilot<small>Four-week trial</small></td><td>One workflow, one team, measured at week four.</td><td class="cost">Quote</td><td class="go"><a href="#contact" class="textlink">Talk to us</a></td></tr>
+        <tr class="pick"><td class="plan">Transformation<small>Rollout and monthly use, our pick</small></td><td>Product, an engineer alongside you, and training.</td><td class="cost">Quote</td><td class="go"><a href="#contact" class="textlink">Talk to us</a></td></tr>
+        <tr><td class="plan">Education<small>Training and workshops</small></td><td>Training for leaders, teams or champions.</td><td class="cost">Quote</td><td class="go"><a href="#contact" class="textlink">Talk to us</a></td></tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
-<!-- EDUCATION -->
-<section id="education">
-  <div class="wrap">
-    <div class="kicker reveal"><i></i>Education</div>
-    <h2 class="reveal">使い手が育たないと、<br>AIはただの検索窓になる。</h2>
-    <p class="sub reveal">AIを使いこなせる人とそうでない人の差が、そのまま成果の差になり始めています。立場ごとに、AIに仕事を任せるための考え方と手の動かし方を身につけてもらいます。</p>
-    <div class="cards">
-      <div class="card reveal"><div class="who">FOR LEADERS</div><h3>経営・管理職向け</h3><p>何をAIに任せ、何を人が判断するか。目的と成功条件の書き方、承認の設計を学ぶ。</p></div>
-      <div class="card reveal"><div class="who">FOR TEAMS</div><h3>現場向けハンズオン</h3><p>自分の業務を題材に、頼み方・確かめ方・差し戻し方を実際に手を動かして覚える。</p></div>
-      <div class="card reveal"><div class="who">FOR CHAMPIONS</div><h3>社内の推進役を育てる</h3><p>自動化を作り、試し実行し、運用を回せる人を社内に置く。外部に頼りきりにしない。</p></div>
+<section class="section" id="resource" aria-label="Resources and changelog">
+  <div class="container lists">
+    <div>
+      <h2>Read and learn</h2>
+      <ul class="list">
+        <li><a href="#contact">Clayware overview</a><span class="meta">PDF, on request</span></li>
+      </ul>
     </div>
-  </div>
-</section>
-
-<!-- CASE -->
-<section id="case">
-  <div class="wrap">
-    <div class="kicker reveal"><i></i>Case</div>
-    <h2 class="reveal">最初の事例を、一緒につくる会社を探しています。</h2>
-    <div class="case-empty reveal">
-      <div>
-        <h3>試験導入パートナーの募集</h3>
-        <p>問い合わせ対応・営業のフォロー・社内の進捗管理など、届いた情報から仕事が始まる業務をお持ちの会社と、小さく始めて効果を測ります。結果は事例として、ここで紹介させてください。</p>
-      </div>
-      <ul>
-        <li><b>期間</b>4週間から</li>
-        <li><b>範囲</b>1つの業務・1つのチーム</li>
-        <li><b>測るもの</b>処理時間、差し戻し率、判断待ちの滞留</li>
+    <div id="new">
+      <h2>Changelog</h2>
+      <ul class="list log">
+        <li><time datetime="2026-11-13">Nov 13, 2026</time><div><b>clayware.app is live</b></div></li>
+        <li><time datetime="2026-11-11">Nov 11, 2026</time><div><b>Clayware v4</b><p>Incoming work becomes owned tasks.</p></div></li>
+        <li><span class="meta">Next</span><div><b>Decision alerts, and guides</b><p>Alerts to email and Slack. Guides on finding work for AI and on designing approvals.</p></div></li>
       </ul>
     </div>
   </div>
 </section>
 
-<!-- RESOURCE + NEW -->
-<section id="resource">
-  <div class="wrap two">
-    <div>
-      <div class="kicker reveal"><i></i>Resource</div>
-      <h2 class="reveal" style="font-size:clamp(26px,3vw,36px)">読む・学ぶ</h2>
-      <div class="list reveal">
-        <a href="#contact"><b>Clayware 概要資料</b><span>PDF・ご請求</span></a>
-        <a href="#contact"><b>AIに任せる業務の見つけ方</b><span class="soon">準備中</span></a>
-        <a href="#contact"><b>承認と検証の設計ガイド</b><span class="soon">準備中</span></a>
-        <a href="#contact"><b>中小企業のAI導入、最初の4週間</b><span class="soon">準備中</span></a>
-      </div>
-    </div>
-    <div id="new">
-      <div class="kicker reveal"><i></i>New</div>
-      <h2 class="reveal" style="font-size:clamp(26px,3vw,36px)">更新情報</h2>
-      <div class="list log reveal">
-        <div class="row"><time>2026.11.13</time><div><b>Claywareのサイトを公開</b><p>プロダクト・チェンジマネジメント・教育の3つのサービスを始めました。</p></div></div>
-        <div class="row"><time>2026.11.11</time><div><b>Clayware v4</b><p>届いた情報をAI Agentが分類し、担当つきの作業にする自動化。試し実行で操作を事前に確かめられます。</p></div></div>
-        <div class="row"><time>Coming</time><div><b>判断待ちの外部通知</b><p>判断待ちをメールやSlackにも届けます。</p></div></div>
-      </div>
-    </div>
-  </div>
-</section>
+</main>
 
-<!-- PRICING -->
-<section id="pricing">
-  <div class="wrap">
-    <div class="kicker reveal"><i></i>Pricing</div>
-    <h2 class="reveal">小さく試して、効果を見てから広げる。</h2>
-    <p class="sub reveal">会社の規模と業務の範囲に合わせてお見積もりします。まずは1つの業務で試すところから。</p>
-    <div class="prices">
-      <div class="price reveal">
-        <div class="plan">Pilot</div><div class="amt">個別見積</div><div class="note">4週間の試験導入</div>
-        <p class="d">1つの業務・1つのチームで、Claywareを動かして効果を測る。</p>
-        <ul><li>業務の洗い出しと設計</li><li>接続と試し実行</li><li>4週間後の効果レポート</li></ul>
-        <a href="#contact" class="btn btn-line">相談する</a>
-      </div>
-      <div class="price hl reveal">
-        <div class="plan">Transformation</div><div class="amt">個別見積</div><div class="note">導入支援＋月額利用</div>
-        <p class="d">プロダクト・チェンジマネジメント・教育をまとめて、部署や会社の単位で進める。</p>
-        <ul><li>Claywareの利用</li><li>エンジニアの伴走</li><li>立場ごとの研修</li><li>成功条件の定期レビュー</li></ul>
-        <a href="#contact" class="btn btn-gold">相談する</a>
-      </div>
-      <div class="price reveal">
-        <div class="plan">Education</div><div class="amt">個別見積</div><div class="note">研修・ワークショップ</div>
-        <p class="d">まずは人から。経営向け、現場向け、推進役向けの研修だけを受ける。</p>
-        <ul><li>半日〜複数回のプログラム</li><li>自社の業務を題材にしたハンズオン</li><li>オンライン・訪問に対応</li></ul>
-        <a href="#contact" class="btn btn-line">相談する</a>
-      </div>
+<footer class="footer">
+  <div class="container footer__close" id="contact">
+    <h2>Start with one workflow.</h2>
+    <div class="actions">
+      <a href="mailto:hello@clayware.app?subject=Talk%20to%20Clayware" class="btn">Talk to us</a>
+      <a href="mailto:hello@clayware.app?subject=Clayware%20overview" class="textlink">Get the overview</a>
     </div>
   </div>
-</section>
-
-<!-- STORY -->
-<section class="story" id="story">
-  <div class="wrap">
-    <svg viewBox="0 0 220 130" aria-hidden="true">
-      <path d="M14 30h192c0 52-40 90-96 90S14 82 14 30z" fill="#f5f3ee" stroke="var(--line-2)" stroke-width="1.5"/>
-      <path d="M22 44h176" stroke="#426fac" stroke-width="3"/>
-      <path d="M40 98c40 10 100 10 140 0" stroke="#426fac" stroke-width="2.4" fill="none"/>
-      <path d="M96 30l14 26-16 18 18 22-6 22" stroke="#c9a24a" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M110 56l30 6 12 18" stroke="#c9a24a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <div class="kicker reveal"><i></i>金継ぎ</div>
-    <h2 class="reveal">ひびを隠さず、金で継ぐ。</h2>
-    <p class="sub reveal">割れた器を漆と金で継ぎ、前よりも美しくする。Claywareは仕事のひびを見つけ、人とAIのあいだを継ぎ直します。継ぎ目こそが、その会社だけの強さになると考えています。</p>
+  <div class="container footer__grid">
+    <a href="/homepage" class="wordmark" aria-label="Clayware home"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="bowl__body" d="M8 22h48c0 18-10 30-24 30S8 40 8 22z"/><path class="bowl__band" d="M11 29h42"/><path class="bowl__seam" d="M30 22l4 9-5 7 4 14"/></svg>Clayware</a>
+    <nav aria-label="Service"><h2>Service</h2><a href="#service">Overview</a><a href="#product">Product</a><a href="#change">Change management</a><a href="#education">Education</a><a href="#integrations">Integrations</a></nav>
+    <nav aria-label="Resource"><h2>Resource</h2><a href="#resource">Read and learn</a><a href="#new">Changelog</a></nav>
+    <nav aria-label="Company"><h2>Company</h2><a href="#case">Case</a><a href="#pricing">Pricing</a></nav>
+    <nav aria-label="Contact"><h2>Contact</h2><a href="mailto:hello@clayware.app">hello@clayware.app</a><a href="/login">Log in</a></nav>
   </div>
-</section>
-
-<!-- CTA -->
-<section class="final" id="contact">
-  <div class="wrap">
-    <h2 class="reveal">まずは、仕事のひびを<br>一緒に探しましょう。</h2>
-    <p class="sub reveal">試験導入、研修、資料のご請求はこちらから。</p>
-    <div class="reveal" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="mailto:hello@clayware.app?subject=%E5%B0%8E%E5%85%A5%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87" class="btn btn-primary btn-lg">相談する</a>
-      <a href="mailto:hello@clayware.app?subject=%E8%B3%87%E6%96%99%E3%81%AE%E3%81%94%E8%AB%8B%E6%B1%82" class="btn btn-line btn-lg">資料をもらう</a>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap">
-    <div class="fgrid">
-      <div><a href="#" class="logo" style="color:var(--text)"><svg viewBox="0 0 64 64" style="width:20px;height:20px"><path d="M8 22h48c0 18-10 30-24 30S8 40 8 22z" fill="#f5f3ee" stroke="currentColor" stroke-width="2.4"/><path d="M11 29h42" stroke="#426fac" stroke-width="3"/><path d="M30 22l4 9-5 7 4 14" stroke="#c9a24a" stroke-width="3" fill="none" stroke-linecap="round"/></svg>Clayware</a></div>
-      <div><h5>Service</h5><a href="#product">Product</a><a href="#change">Change management</a><a href="#education">Education</a></div>
-      <div><h5>Resource</h5><a href="#resource">資料</a><a href="#new">更新情報</a></div>
-      <div><h5>Company</h5><a href="#case">Case</a><a href="#story">Claywareについて</a></div>
-      <div><h5>Contact</h5><a href="#pricing">Pricing</a><a href="#contact">相談する</a></div>
-    </div>
-    <div class="copy"><span>© 2026 Clayware</span><span>clayware.app</span></div>
-  </div>
+  <div class="container footer__legal"><span>© 2026 Clayware</span><span>clayware.app</span></div>
 </footer>
 
 <script>
 (function(){
   var root=document.documentElement;
   document.getElementById('theme').addEventListener('click',function(){
-    var t=root.getAttribute('data-theme')==='dark'?'light':'dark';
-    root.setAttribute('data-theme',t);
-    try{localStorage.setItem('cw-theme',t)}catch(e){}
+    var m=root.getAttribute('data-mode')==='light'?'dark':'light';
+    root.setAttribute('data-mode',m);
+    try{localStorage.setItem('cw-theme',m)}catch(e){}
   });
   var dd=document.getElementById('dd'),btn=document.getElementById('ddbtn');
-  btn.addEventListener('click',function(e){e.stopPropagation();var o=dd.classList.toggle('open');btn.setAttribute('aria-expanded',o)});
-  document.addEventListener('click',function(){dd.classList.remove('open');btn.setAttribute('aria-expanded',false)});
-  dd.querySelectorAll('.mega a').forEach(function(a){a.addEventListener('click',function(){dd.classList.remove('open')})});
-  var menu=document.getElementById('menu');
-  document.getElementById('burger').addEventListener('click',function(e){e.stopPropagation();menu.classList.toggle('show')});
+  function shut(){dd.classList.remove('open');btn.setAttribute('aria-expanded','false')}
+  btn.addEventListener('click',function(e){e.stopPropagation();var o=dd.classList.toggle('open');btn.setAttribute('aria-expanded',String(o))});
+  document.addEventListener('click',shut);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')shut()});
+  dd.querySelectorAll('.mega a').forEach(function(a){a.addEventListener('click',shut)});
+  var menu=document.getElementById('menu'),burger=document.getElementById('burger');
+  burger.addEventListener('click',function(e){e.stopPropagation();var o=menu.classList.toggle('show');burger.setAttribute('aria-expanded',String(o))});
   menu.querySelectorAll(':scope > a').forEach(function(a){a.addEventListener('click',function(){menu.classList.remove('show')})});
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
-  document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+  document.querySelectorAll('[data-switch]').forEach(function(sw){
+    var tabs=[].slice.call(sw.querySelectorAll('[role=tab]'));
+    function pick(t){tabs.forEach(function(x){var on=x===t;x.setAttribute('aria-selected',String(on));x.tabIndex=on?0:-1;document.getElementById(x.getAttribute('aria-controls')).hidden=!on})}
+    pick(tabs[0]);
+    tabs.forEach(function(t,i){
+      t.addEventListener('click',function(){pick(t)});
+      t.addEventListener('keydown',function(e){var d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(!d)return;e.preventDefault();var n=tabs[(i+d+tabs.length)%tabs.length];pick(n);n.focus()});
+    });
+  });
 })();
 </script>
 </body>
