@@ -79,13 +79,27 @@ export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote 
           <RailRow icon={domain.privacy === 'private' ? <Lock className="size-3.5 text-muted-foreground" /> : <Users className="size-3.5 text-muted-foreground" />}
             name={t('Access')} label={domain.privacy === 'private' ? t('Private') : 'Space'} dense />
           {domain.identifier && <RailRow icon={<Hash className="size-3.5 text-muted-foreground" />} name={t('Identifier')} label={domain.identifier} dense />}
+          {/* The Strategies this Domain's Objects serve: what its work is for, read first. */}
+          <RailRow icon={<NavStrategyIcon size={14} />} name={t('Related Strategies')} dense
+            placeholder={initiatives.length === 0}
+            label={initiatives.length === 0 ? t('None') : (
+              <span className="flex min-w-0 items-center gap-1 truncate">
+                {initiatives.map(({ initiative }, i) => (
+                  <span key={initiative.id} className="min-w-0 truncate">
+                    <button type="button" className="truncate hover:underline"
+                      onClick={() => { onNavigate({ strategyId: initiative.id }); onViewChange?.('strategy'); }}>
+                      {initiative.name}
+                    </button>{i < initiatives.length - 1 ? ',' : ''}
+                  </span>
+                ))}
+              </span>
+            )} />
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>
             <RailRow icon={<ObjectIcon size={14} />} name="Objects" label={String(explorer.objects.length)} dense />
           </button>
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('domain-elements'); }}>
             <RailRow icon={<ElementIcon size={14} />} name="Elements" label={String(elements.length)} dense />
           </button>
-          <RailRow icon={<NavStrategyIcon size={14} />} name="Strategies" label={String(initiatives.length)} placeholder={initiatives.length === 0} dense />
         </RailCard>
       }>
         {query.isError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm"><p>{t('Unable to refresh this Domain. Showing the last loaded data; drafts are retained.')}</p><Button variant="ghost" onClick={() => void query.refetch()}>{t('Retry')}</Button></div>}
