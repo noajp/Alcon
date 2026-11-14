@@ -95,6 +95,9 @@ describe('MCP protocol', () => {
     expect(await handleBody(JSON.stringify({ jsonrpc: '2.0', id: 9, result: {} }), host())).toEqual({ status: 202 });
     expect(protocol.acceptsProtocolHeader(null)).toBe(true);
     expect(protocol.acceptsProtocolHeader('2025-06-18')).toBe(true);
+    // The version Claude connects with (claude.ai, 2026-11).
+    expect(protocol.acceptsProtocolHeader('2025-11-25')).toBe(true);
+    expect(negotiateVersion('2025-11-25')).toBe('2025-11-25');
     expect(protocol.acceptsProtocolHeader('1.0')).toBe(false);
   });
 
