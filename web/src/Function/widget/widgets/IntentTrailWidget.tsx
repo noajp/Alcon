@@ -173,7 +173,7 @@ function TrailRowView({
           "could falsify" and "delivers" are different reasons to care. */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="font-semibold text-muted-foreground">
-          {row.kind === 'decision' ? t('Decision') : row.kind === 'measure' ? t('Success condition') : t('Assumption')}
+          {row.kind === 'decision' ? t('Decided') : row.kind === 'measure' ? t('Success condition') : t('Hypothesis')}
         </span>
         <span className="text-muted-foreground/70 truncate">
           · {row.relationships.map((r) => t(RELATIONSHIP_LABEL[r])).join(' · ')}

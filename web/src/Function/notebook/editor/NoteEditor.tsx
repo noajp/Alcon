@@ -19,7 +19,7 @@ import {
 } from '@/ui/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { EMBED_LANG, embedSource, useEmbedHost, type EmbedSpec } from './embedBlocks';
+import { EMBED_LANG, embedSource, parseEmbed, useEmbedHost, type EmbedSpec } from './embedBlocks';
 import { ArtifactPicker, FILE_VIEW } from './fileBlocks';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { uploadToArtifacts } from '@/hooks/artifactData';
@@ -250,6 +250,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const spaceIdRef = useRef(spaceId);
   spaceIdRef.current = spaceId;
   const embedHost = useEmbedHost();
+  // Which blocks the page calls lines, for the editor made once to ask later.
+  const embedLineRef = useRef(embedHost?.line);
+  useEffect(() => { embedLineRef.current = embedHost?.line; }, [embedHost]);
   const me = usePresenceName(!!collab && editable);
   const user = useMemo<CollabUser>(
     () => ({ name: me.name || t('Someone'), tone: (hashText(me.userId ?? '') % CURSOR_COLORS) + 1 }),
@@ -548,7 +551,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       ...noteKeymap(undo, redo, { underline: !compact }),
       shortcuts(),
       checklistMarks(marks),
-      drawnEditing(),
+      drawnEditing((source) => { const spec = parseEmbed(source); return !!spec && !!embedLineRef.current?.(spec); }),
       ...cursors(),
     ];
 
@@ -749,6 +752,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // as Markdown, so it has no underline or alignment.
   const headingIcon = (n: number) => <span className="text-[11px] font-semibold leading-none">H{n}</span>;
   const slashItems: SlashItem[] = [
+    // What the page itself offers under its own headings leads the menu.
+    ...(embedHost?.views ?? []).filter((v) => !!v.group).map((v) => ({
+      id: `embed:${v.id}`, group: v.group ?? 'Insert', label: v.label, hint: v.hint, icon: v.icon ?? null, translated: true, keywords: v.keywords,
+      run: () => insertEmbed(v.insert ?? { view: v.id }),
+    })),
     { id: 'p', group: 'Style', label: 'Text', icon: <FileText size={15} />, keywords: 'paragraph body', run: () => applyBlock('P') },
     { id: 'h1', group: 'Style', label: 'Heading 1', icon: headingIcon(1), keywords: 'title h1', run: () => applyBlock('H1') },
     { id: 'h2', group: 'Style', label: 'Heading 2', icon: headingIcon(2), keywords: 'h2', run: () => applyBlock('H2') },
@@ -763,9 +771,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     { id: 'link', group: 'Insert', label: 'Link', icon: <LinkIcon size={15} />, keywords: 'url', run: () => { void insertUrl(); } },
     ...(spaceId ? [{ id: 'file', group: 'Insert', label: 'File', icon: <Paperclip size={15} />, keywords: 'upload image attach artifact',
       run: (at: { x: number; y: number }) => setPicker(at) }] : []),
-    ...(embedHost?.views ?? []).map((v) => ({
-      id: `embed:${v.id}`, group: 'Insert', label: v.label, hint: v.hint, icon: v.icon ?? null, translated: true,
-      run: () => insertEmbed({ view: v.id }),
+    ...(embedHost?.views ?? []).filter((v) => !v.group).map((v) => ({
+      id: `embed:${v.id}`, group: v.group ?? 'Insert', label: v.label, hint: v.hint, icon: v.icon ?? null, translated: true, keywords: v.keywords,
+      run: () => insertEmbed(v.insert ?? { view: v.id }),
     })),
     { id: 'bold', group: 'Formatting', label: 'Bold', icon: <Bold size={15} />, run: () => onMark('bold') },
     { id: 'italic', group: 'Formatting', label: 'Italic', icon: <Italic size={15} />, run: () => onMark('italic') },
@@ -814,7 +822,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         onMouseLeave={() => setHandles(null)}>
         <div ref={mountRef} />
         {!ready && <div className={compact ? 'min-h-[36px]' : 'min-h-[300px]'} />}
-        <DrawnBlocks registry={registry} editable={editable} />
+        <DrawnBlocks registry={registry} editable={editable} onEdited={() => onCommitRef.current?.(lastEmittedRef.current)} />
         <ChecklistMarks registry={marks} editable={editable} elementsById={elementsById} onToggle={toggleLine} />
         {editable && handles && <TableInsertHandles geom={handles} onInsertCol={insertCol} onInsertRow={insertRow} />}
         {editable && (

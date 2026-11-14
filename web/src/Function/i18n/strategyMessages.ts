@@ -500,6 +500,21 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   '{elapsed}% of the schedule has passed; {progress}% done': ['日程の {elapsed}% が経過、{progress}% 完了', '일정의 {elapsed}% 경과, {progress}% 완료', '{elapsed} % du calendrier écoulé ; {progress} % fait', '{elapsed} % del calendario transcurrido; {progress} % hecho'],
   'Behind schedule': ['遅れ', '지연', 'En retard', 'Con retraso'],
   'What this Strategy aims for… Type / for a live block': ['この Strategy で目指すこと…「/」でライブブロック', '이 Strategy가 목표로 하는 것… /로 라이브 블록', 'Ce que vise cette Strategy… Tapez / pour un bloc dynamique', 'Lo que busca esta Strategy… Escribe / para un bloque dinámico'],
+  // The frame's lines in a Strategy's description
+  'Frame': ['骨子', '골자', 'Ossature', 'Estructura'],
+  'Hypothesis': ['仮説', '가설', 'Hypothèse', 'Hipótesis'],
+  'Decided': ['決めたこと', '결정한 것', 'Décidé', 'Decidido'],
+  'Something to find out': ['確かめたいこと', '확인하고 싶은 것', 'Ce qu’il faut vérifier', 'Algo por comprobar'],
+  'What must be reached': ['達成したいこと', '달성해야 할 것', 'Ce qu’il faut atteindre', 'Lo que hay que alcanzar'],
+  'A choice made': ['選んだ方針', '선택한 방침', 'Un choix arrêté', 'Una decisión tomada'],
+  'Write what you want to find out…': ['確かめたいことを書く…', '확인하고 싶은 것을 적으세요…', 'Écrivez ce qu’il faut vérifier…', 'Escribe lo que quieres comprobar…'],
+  'Write what must be reached…': ['達成したいことを書く…', '달성해야 할 것을 적으세요…', 'Écrivez ce qu’il faut atteindre…', 'Escribe lo que hay que alcanzar…'],
+  'Write what was chosen…': ['選んだ方針を書く…', '선택한 방침을 적으세요…', 'Écrivez ce qui a été choisi…', 'Escribe lo que se eligió…'],
+  'Delete this line?': ['この行を削除しますか？', '이 줄을 삭제할까요?', 'Supprimer cette ligne ?', '¿Eliminar esta línea?'],
+  '{n} Elements rest on this line. Delete it anyway? They lose it as their reason.': ['この行を根拠にする Element が {n} 件あります。削除しますか？ それらの Element は根拠を失います。', '이 줄을 근거로 하는 Element가 {n}개 있습니다. 삭제할까요? 해당 Element는 근거를 잃습니다.', '{n} Elements reposent sur cette ligne. La supprimer quand même ? Ils perdent leur raison d’être.', '{n} Elements se apoyan en esta línea. ¿Eliminarla igualmente? Pierden su razón.'],
+  'This line cannot be read.': ['この行は読み取れません。', '이 줄을 읽을 수 없습니다.', 'Cette ligne est illisible.', 'No se puede leer esta línea.'],
+  'What this line pointed at has been deleted.': ['この行が指していた内容は削除されています。', '이 줄이 가리키던 내용이 삭제되었습니다.', 'Ce que cette ligne désignait a été supprimé.', 'Lo que señalaba esta línea se eliminó.'],
+  'Remove the line': ['行を取り除く', '줄 제거', 'Retirer la ligne', 'Quitar la línea'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(STRATEGY_MESSAGES).map(([key, row]) => [key, row[index]]));

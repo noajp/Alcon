@@ -8,14 +8,17 @@ import { ProgressBelt } from '@/Function/shared/ProgressBelt';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { requestElementDetail } from '@/Function/shared/element/elementDetailRequest';
-import { GanttChart } from '@/ui/icons';
+import { Flag, GanttChart, Lightbulb, Target } from '@/ui/icons';
 import { updateObject, type ClaywareObjectWithChildren, type ElementWithDetails } from '@/hooks/useSupabase';
-import type { EmbedHost, EmbedSpec } from '@/Function/notebook/editor/embedBlocks';
+import type { EmbedHost } from '@/Function/notebook/editor/embedBlocks';
 import { objectToGanttBar } from '@/ActivitySpace/execution/domain/DomainView';
+import { FrameLine } from './StrategyFrameLine';
+import { FRAME_VIEW, draftFrameSpec } from './frameLineModel';
 
-// The blocks a Strategy's description can hold: how far its work has come,
-// its Elements, and its Objects on a Gantt. Each reads the Strategy's own
-// Objects and Elements, so a block written once stays current.
+// The blocks a Strategy's description can hold: the lines of its frame (a
+// hypothesis, a success condition, something decided), how far its work has
+// come, its Elements, and its Objects on a Gantt. Each reads the Strategy's
+// own rows, so a block written once stays current.
 
 import type { ZoomLevel } from '@/ActivitySpace/execution/element/gantt';
 
@@ -80,8 +83,9 @@ export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged, 
       requestElementDetail(el.id);
       if (object) onOpenObject?.(object.id, object.domain_id ?? null);
     };
-    const render = (spec: EmbedSpec): ReactNode => {
+    const render: EmbedHost['render'] = (spec, block): ReactNode => {
       switch (spec.view) {
+        case FRAME_VIEW: return <FrameLine spec={spec} block={block} />;
         case 'progress': return <Progress elements={elements} />;
         case 'elements': return <ElementList elements={elements} onOpen={openElement} />;
         case 'gantt': return <ObjectsGantt objects={objects} onChanged={onChanged} zoom={timelineZoom} />;
@@ -90,11 +94,16 @@ export function useStrategyEmbeds({ elements, objects, onOpenObject, onChanged, 
     };
     return {
       views: [
+        { id: 'frame-assumption', group: 'Frame', label: t('Hypothesis'), hint: t('Something to find out'), keywords: 'hypothesis assumption premise kasetsu', icon: <Lightbulb size={15} />, insert: draftFrameSpec('assumption') },
+        { id: 'frame-measure', group: 'Frame', label: t('Success condition'), hint: t('What must be reached'), keywords: 'success condition measure goal kpi', icon: <Target size={15} />, insert: draftFrameSpec('measure') },
+        { id: 'frame-decision', group: 'Frame', label: t('Decided'), hint: t('A choice made'), keywords: 'decision decided choice', icon: <Flag size={15} />, insert: draftFrameSpec('decision') },
         { id: 'progress', label: t('Progress'), hint: t('How far its Elements have come'), icon: <ElementProgressMark size={14} status="in_progress" progress={50} muted /> },
         { id: 'elements', label: t('Elements'), hint: t('Every Element under its Objects'), icon: <ElementIcon size={14} /> },
         { id: 'gantt', label: t('Timeline'), hint: t('Its Objects on a timeline'), icon: <GanttChart size={14} /> },
       ],
       render,
+      // A frame line stands in the text as a sentence does.
+      line: (spec) => spec.view === FRAME_VIEW,
     };
   }, [elements, objects, onOpenObject, onChanged, timelineZoom, t]);
 }
