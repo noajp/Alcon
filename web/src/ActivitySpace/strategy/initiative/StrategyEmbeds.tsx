@@ -10,7 +10,7 @@ import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { requestElementDetail } from '@/Function/shared/element/elementDetailRequest';
 import { Flag, GanttChart, Lightbulb, Target } from '@/ui/icons';
 import { updateObject, type ClaywareObjectWithChildren, type ElementWithDetails } from '@/hooks/useSupabase';
-import type { EmbedHost, EmbedSpec } from '@/Function/notebook/editor/embedBlocks';
+import type { EmbedHost } from '@/Function/notebook/editor/embedBlocks';
 import { objectToGanttBar } from '@/ActivitySpace/execution/domain/DomainView';
 import { FrameLine } from './StrategyFrameLine';
 import { FRAME_VIEW, draftFrameSpec } from './frameLineModel';

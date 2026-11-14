@@ -36,6 +36,7 @@ interface Drawn {
 export class DrawnRegistry extends Portals<Drawn> {
   /** Set once the saved text's own blocks are drawn: one made after is new. */
   settled = false;
+  settle = () => { this.settled = true; };
 }
 
 const isEditing = (decorations: readonly Decoration[]) =>
@@ -125,7 +126,7 @@ export function DrawnBlocks({ registry, editable, onEdited }: {
   onEdited?: () => void;
 }) {
   const items = useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
-  useEffect(() => { registry.settled = true; }, [registry]);
+  useEffect(() => registry.settle(), [registry]);
   return <>{items.map(([key, item]) => createPortal(<DrawnBlock item={item} editable={editable} onEdited={onEdited} />, item.host, String(key)))}</>;
 }
 
