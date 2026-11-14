@@ -197,6 +197,13 @@ export const CARD_FLAT = 'rounded-lg bg-[var(--surface-rail)] border border-bord
  *  setting rows floating on the page ground (--surface-bg). */
 export const SETTINGS_ISLAND =
   'gloss-island gloss-sheen rounded-lg bg-card dark:bg-[var(--surface-rail)]';
+/** The ground of a choice control (a segmented track, a select) on an island:
+ *  a tint of the text colour, so it stands one step off whatever surface it
+ *  sits on in every theme — darker on a light island, lighter on a dark one.
+ *  A background difference only; fields take no border or ring. */
+export const CONTROL_WELL = 'bg-foreground/[0.06]';
+/** The same ground under the pointer. */
+export const CONTROL_WELL_HOVER = 'hover:bg-foreground/[0.1]';
 /** Shared geometry for Object and Element quick creation. */
 export const QUICK_CREATE = {
   panel: 'pointer-events-auto w-full max-w-[760px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-lg gloss-overlay p-4',

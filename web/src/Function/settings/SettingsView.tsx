@@ -28,8 +28,7 @@ import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 import { LanguageSelect } from '@/Function/i18n/LanguageSelect';
 import { SettingsIsland, SettingRow, SelectRow, SegmentedRow, ToggleRow } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { SlaSettings } from './SlaSettings';
-import { TimelineSettings } from './TimelineSettings';
+import { StrategySettings } from './StrategySettings';
 
 // =============================================================
 // SettingsView — content pane only. The settings NAV lives in
@@ -47,7 +46,6 @@ import { TimelineSettings } from './TimelineSettings';
  *  of their own. */
 const AREA_DESCRIPTIONS: Record<string, string> = {
   preferences: 'Language, appearance, and defaults for how Clayware works for you.',
-  timeline: 'How the Timeline is drawn',
   harnesses: 'How AI carries out a kind of work: the goal, the steps, where it stops and asks, the shape of the result and the connectors it uses.',
   connectors: 'The outside services AI can use when it works in this Space.',
   automation: 'The work that runs by itself — open one to see and change its flow.',
@@ -71,8 +69,7 @@ export function SettingsView() {
       case 'profile': return <ProfileSettings />;
       case 'notifications': return <NotificationSettings />;
       case 'security': return <AccountSettings />;
-      case 'initiative': return <SlaSettings />;
-      case 'timeline': return <TimelineSettings />;
+      case 'strategy': return <StrategySettings />;
       case 'element-types': return <TypeSettings kind="element" />;
       case 'element-labels': return <LabelSettings />;
       case 'element-templates': return <ElementTemplateSettings />;
@@ -175,7 +172,7 @@ function PreferencesPanel() {
 
       <SettingsIsland title={t('General')}>
         <SettingRow label={t('Language')} desc={t('Choose the language used across Clayware')}>
-          <LanguageSelect />
+          <LanguageSelect field />
         </SettingRow>
         <SegmentedRow
           label={t('Default home view')}

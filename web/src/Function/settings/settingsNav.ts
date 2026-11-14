@@ -5,7 +5,7 @@ import type React from 'react';
 import { useSyncExternalStore } from 'react';
 import { SlidersHorizontal, User, Bell, KeyRound, Plug, Globe, Users, Sparkles, Link2, Tag, FileText, Boxes } from '@/ui/icons';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/Function/shared/conceptIcons';
-import { NavStrategyIcon, NavAutomationIcon, NavTimelineIcon } from '@/Frame/sidebar/NavIcons';
+import { NavStrategyIcon, NavAutomationIcon } from '@/Frame/sidebar/NavIcons';
 
 // Shared Settings navigation model + a tiny external store for the page
 // in view. The settings nav lives in the AppSidebar (replacing the Activity
@@ -16,7 +16,9 @@ import { NavStrategyIcon, NavAutomationIcon, NavTimelineIcon } from '@/Frame/sid
 // One nav row is one page: nothing switches inside a page. The person's
 // own settings come first, then one section per thing being set up
 // (Strategy, Elements, Objects, AI) and the Space's administration last.
-// Only pages with something to set are listed.
+// Only pages with something to set are listed. A thing whose settings fit
+// one page is that page alone, under its own name (Strategy): the row
+// stands by itself, with no section label repeating it.
 
 export interface SettingsNavItem {
   id: string;
@@ -24,6 +26,9 @@ export interface SettingsNavItem {
   /** The page's heading, where the nav row is too short to stand alone
    *  ("Types" under Elements is headed "Element types"). */
   title?: string;
+  /** What the page holds, for the nav's search — the names of its parts
+   *  where the row's own name does not say them. */
+  holds?: string[];
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 export interface SettingsNavSection {
@@ -44,8 +49,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
   {
     title: 'Strategy',
     items: [
-      { id: 'initiative', label: 'Risk thresholds', icon: NavStrategyIcon },
-      { id: 'timeline', label: 'Timeline', icon: NavTimelineIcon },
+      { id: 'strategy', label: 'Strategy', holds: ['Risk thresholds', 'Timeline'], icon: NavStrategyIcon },
     ],
   },
   {
@@ -86,12 +90,27 @@ export const SETTINGS_ITEMS: Record<string, SettingsNavItem> = Object.fromEntrie
   SETTINGS_NAV.flatMap((s) => s.items.map((i) => [i.id, i])),
 );
 
+/** Pure. Whether the section of this name is one page under that same name,
+ *  so its row needs no label above it. */
+export function isLonePage(sectionTitle: string): boolean {
+  const section = SETTINGS_NAV.find((s) => s.title === sectionTitle);
+  return !!section && section.items.length === 1 && section.items[0].label === section.title;
+}
+
+/** Names a saved screen or a link may still carry for a part of a page:
+ *  each opens the page that holds it. */
+const PAGE_OF_PART: Record<string, string> = {
+  initiative: 'strategy',
+  timeline: 'strategy',
+};
+
 // ── External store: the page shown and a reveal nonce ──
 // Settings opens on the first page of the nav. setActiveSettingsSection
 // is a REVEAL (a sidebar click, a deep link, page.tsx's restore, the
 // OAuth return): it bumps the nonce, so SettingsView shows that page from
 // its top — re-revealing the page already shown starts it at the top
-// again. An id the nav does not have opens the first page.
+// again. The name of a part opens the page that holds it; an id the nav
+// does not have opens the first page.
 const FIRST_PAGE = SETTINGS_NAV[0].items[0];
 interface ActiveSettings { section: string; nonce: number }
 let active: ActiveSettings = { section: FIRST_PAGE.id, nonce: 0 };
@@ -102,7 +121,8 @@ const emit = () => listeners.forEach((l) => l());
 /** Reveals a settings page. Always bumps the reveal nonce, even when the
  *  page is unchanged. */
 export function setActiveSettingsSection(id: string) {
-  active = { section: SETTINGS_ITEMS[id] ? id : FIRST_PAGE.id, nonce: active.nonce + 1 };
+  const page = PAGE_OF_PART[id] ?? id;
+  active = { section: SETTINGS_ITEMS[page] ? page : FIRST_PAGE.id, nonce: active.nonce + 1 };
   emit();
 }
 

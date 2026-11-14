@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Search } from '@/ui/icons';
 import {
   SETTINGS_NAV,
+  isLonePage,
   useActiveSettingsSection,
   setActiveSettingsSection,
   type SettingsNavItem,
@@ -13,14 +14,16 @@ import { SidebarRow, SidebarSectionLabel } from '@/Function/shared/SidebarRow';
 
 
 // The Settings navigation rendered INSIDE the AppSidebar (it replaces the
-// Activity Space tree while Settings mode is active). One row is one page.
+// Activity Space tree while Settings mode is active). One row is one page;
+// a section that is a single page under its own name shows the row alone.
 export function SettingsSidebarPanel() {
   const { t } = useI18n();
   const active = useActiveSettingsSection();
   const [query, setQuery] = useState('');
 
-  // Search matches a page by its row label, its page heading or its
-  // section, so "Element" finds the three Element pages.
+  // Search matches a page by its row label, its page heading, what it holds
+  // or its section, so "Element" finds the three Element pages and
+  // "Timeline" finds Strategy.
   const filtered = useMemo((): { title: string; items: SettingsNavItem[] }[] => {
     const q = query.trim().toLowerCase();
     if (!q) return SETTINGS_NAV;
@@ -29,7 +32,7 @@ export function SettingsSidebarPanel() {
         title: s.title,
         items: t(s.title).toLowerCase().includes(q)
           ? s.items
-          : s.items.filter((item) => [item.label, item.title ?? ''].some((x) => t(x).toLowerCase().includes(q))),
+          : s.items.filter((item) => [item.label, item.title ?? '', ...(item.holds ?? [])].some((x) => t(x).toLowerCase().includes(q))),
       }))
       .filter((s) => s.items.length > 0);
   }, [query, t]);
@@ -50,7 +53,7 @@ export function SettingsSidebarPanel() {
 
       {filtered.map((section) => (
         <div key={section.title} className="mb-3">
-          <SidebarSectionLabel className="mb-1">{t(section.title)}</SidebarSectionLabel>
+          {!isLonePage(section.title) && <SidebarSectionLabel className="mb-1">{t(section.title)}</SidebarSectionLabel>}
           <div className="space-y-0.5">
             {section.items.map((item) => {
               const Icon = item.icon;

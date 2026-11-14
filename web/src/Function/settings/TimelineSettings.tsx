@@ -5,7 +5,7 @@ import { SegmentedRow, SelectRow, SettingsIsland, ToggleRow } from './SettingsCo
 import { TIMELINE_MONTHS_AHEAD_RANGE, TIMELINE_MONTHS_BACK_RANGE } from './preferencesStore';
 import { useUserPreferences } from './useUserPreferences';
 
-// Settings › Strategy › Timeline: how the Strategy Timeline is drawn for
+// Settings › Strategy, the Timeline part: how the Strategy Timeline is drawn for
 // this person — the span one screen shows, the window around this month,
 // and the marks on it. Saved to `user_preferences`; TimelineView reads the
 // cached copy.
@@ -20,15 +20,17 @@ function monthChoices(choices: number[], current: number, range: { min: number; 
   return all.filter((n) => n >= range.min && n <= range.max).map(String);
 }
 
-export function TimelineSettings() {
+/** `level` is the rank of the islands' headings: 3 where the Timeline is
+ *  one named part of a page, and its islands then sit closer together. */
+export function TimelineSettings({ level = 2 }: { level?: 2 | 3 } = {}) {
   const { t } = useI18n();
   const { preferences, error, savePreference } = useUserPreferences();
 
   return (
-    <div className="space-y-10">
+    <div className={level === 3 ? 'space-y-6' : 'space-y-10'}>
       {error && <div className="px-1 text-[12px] text-destructive">{t("Couldn't save: {error}", { error })}</div>}
 
-      <SettingsIsland title={t('Window')}>
+      <SettingsIsland title={t('Window')} level={level}>
         <SegmentedRow
           label={t('Scale')}
           desc={t('How much of the year one screen shows')}
@@ -52,7 +54,7 @@ export function TimelineSettings() {
         />
       </SettingsIsland>
 
-      <SettingsIsland title={t('Marks')}>
+      <SettingsIsland title={t('Marks')} level={level}>
         <ToggleRow
           label={t('Today marker')}
           desc={t('A line through today across every row')}
