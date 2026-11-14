@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarMonthPicker } from './CalendarPickers';
 import { toDateOnlyString as fmtDateOnly, dayNumberOf, shiftDateOnly, isSameDay, isOverdue as isDueDayPast } from '@/Function/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, Plus, X } from '@/ui/icons';
@@ -345,7 +346,9 @@ export function CalendarView({ elements: sourceElements, objects, onObjectClick,
           <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label={t('Previous period')}><ChevronLeft size={16} /></Button>
           <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label={t('Next period')}><ChevronRight size={16} /></Button>
         </ButtonAppearanceProvider>
-        <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
+        <h2 className="flex-1 min-w-0">
+          <CalendarMonthPicker title={headerTitle} value={currentDate} onPick={setCurrentDate} />
+        </h2>
         {onCreateEvent && (
           <Button size="sm" variant="secondary" onClick={() => onCreateEvent({ date: fmtDateOnly(currentDate), startMinutes: null })}>
             <Plus size={13} />{t('New event')}
