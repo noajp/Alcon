@@ -29,6 +29,16 @@ REST API（[api.md](api.md)）は、このうち日常の読み書き（`_shared
 
 担当にできるのは、Element と同じ Space の Worker だけ。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。`createElement` の `basisIntentIds` には、その Element が何のためにあるか（Strategy の成功条件・前提・意思決定の intent id。`getInitiative` で読める）を渡す。一つずつ判定し、置き換えられた intent、Element の Object が属していない Strategy の intent、編集できない Strategy の intent は結び付けず、`basisError` に id と理由を返す（ほかの id は結び付く）。
 
+## Clayware の考え方を伝える
+
+外部の AI にも、Clayware の設計の考え方で動いてもらうために、3 段で伝える（`_shared/claywareGuide.ts`）。
+
+1. 接続したときにサーバーが渡す説明（instructions）の冒頭に、考え方の要点を置く。人と AI の分担、Strategy → Object → Element、外の世界のものは Table に置くこと、ハーネスに従うこと、仕事を始める前に `getClaywareGuide` を読むこと。
+2. `getClaywareGuide` は考え方の全体と、見られる Space ごとの目指す姿（最上位の Strategy）とハーネスの一覧を返す。道具の一覧の先頭に置く。
+3. 考え方から外れた操作は、理由と、代わりにどうするかを添えて断る。judge / decide / approve / answer の Element を完了・レビュー待ちにすること（`updateElement`・`bulkUpdateElements`・Sub-element の完了・`reportOutcome` の completed）と、その動詞を外すことは断り、判断の材料をコメントに書くか `reportOutcome` の blocked で人に回すよう返す。REST API の同じ操作も同じく断る。よく取り違えられる道具（`createObject`・`createElement`・`createElements`・`updateElement`・`tableData`）は、説明にも置き場所を書き足す。
+
+Element の `action`（求める行動）は `createElement`・`createElements`・`updateElement` で書ける。
+
 ## Element を進めるとき（着手・報告）
 
 外部のエージェントは、Element を進めるあいだ、何をしているかを次の4つで Element に残す。人はアプリの Element の行・コメント・Activity で、誰（どのクライアント）がどこまで進めたかを確かめられる。

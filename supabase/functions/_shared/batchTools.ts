@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
+import { actionOf, ELEMENT_ACTIONS, normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
 import { basisErrorText, bindBasis, type BasisRefusal } from "./elementBasis.ts";
 
 // Several Elements under one Object in one write. Filing a list one
@@ -34,6 +34,7 @@ export const BATCH_TOOLS: ToolDef[] = [{
             type: { type: "string" },
             due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
             labels: { type: "array", items: { type: "string" } },
+            action: { type: "string", enum: [...ELEMENT_ACTIONS], description: "求める行動（createElement と同じ）" },
             basisIntentIds: { type: "array", items: { type: "string" }, description: "根拠にする Strategy の成功条件・前提・意思決定の intent id（createElement と同じ）" },
           },
           required: ["title"],
@@ -65,6 +66,11 @@ export async function runBatchTool(db: SupabaseClient, input: Record<string, unk
     const row: Record<string, unknown> = { id, object_id: objectId, title };
     for (const k of FIELDS) if (item[k] !== undefined) row[k] = item[k];
     if (Array.isArray(item.labels)) row.labels = item.labels;
+    if (item.action !== undefined) {
+      const a = actionOf(item.action);
+      if (!a.ok) return { ok: false, error: `elements[${i}].${a.error}` };
+      row.action = a.value;
+    }
     rows.push(normalizeStatusPatch(row));
   }
 
