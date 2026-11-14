@@ -263,14 +263,16 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
                   className="min-w-0 flex-1 text-[14px] font-medium text-foreground leading-[22px] bg-transparent border-none resize-none overflow-y-auto"
                 />
               ) : (
-                <p
-                  className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
+                <button
+                  type="button"
+                  aria-label={t('Rename {title}', { title: element.title })}
+                  className="min-w-0 flex-1 truncate text-left text-[13.5px] font-medium text-foreground leading-[22px] -mx-1 px-1 rounded cursor-text"
                   title={element.title}
                   onPointerDown={stop}
                   onClick={(e) => { stop(e); setEditingTitle(true); }}
                 >
                   {element.title}
-                </p>
+                </button>
               )}
               {/* The priority: the mark alone, always on the card — the slot
                   never appears or vanishes, and unset reads as the muted

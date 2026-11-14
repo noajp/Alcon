@@ -151,6 +151,7 @@ const CODE_REVIEW_MESSAGES: Record<string, Row> = {
   // Errors from the code-changes Edge Function
   'GitHub could not show this pull request. Connect GitHub in Settings › AI with a token that can read the repository.': ['GitHub がこの Pull Request を表示できませんでした。Settings › AI で、このリポジトリを読めるトークンで GitHub を接続してください。', 'GitHub에서 이 Pull Request를 표시할 수 없습니다. Settings › AI에서 이 저장소를 읽을 수 있는 토큰으로 GitHub를 연결하세요.', 'GitHub n’a pas pu afficher cette pull request. Connectez GitHub dans Settings › AI avec un jeton qui peut lire le dépôt.', 'GitHub no pudo mostrar esta pull request. Conecta GitHub en Settings › AI con un token que pueda leer el repositorio.'],
   'Paste a GitHub pull request URL (https://github.com/owner/repo/pull/123).': ['GitHub の Pull Request の URL を貼り付けてください（https://github.com/owner/repo/pull/123）。', 'GitHub Pull Request URL을 붙여 넣으세요 (https://github.com/owner/repo/pull/123).', 'Collez l’URL d’une pull request GitHub (https://github.com/owner/repo/pull/123).', 'Pega la URL de una pull request de GitHub (https://github.com/owner/repo/pull/123).'],
+  'Cited in the review': ['レビューで言及', '리뷰에서 언급됨', 'Cité dans la revue', 'Citado en la revisión'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(CODE_REVIEW_MESSAGES).map(([key, row]) => [key, row[index]]));

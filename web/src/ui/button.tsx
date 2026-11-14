@@ -30,9 +30,8 @@ const buttonVariants = cva(
     "font-medium",
     "disabled:pointer-events-none disabled:opacity-50",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
-    // The keyboard focus ring: the Button draws its own, in the theme's focus
-    // colour; globals.css gives every other control the same colour.
-    "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
+    // Keyboard focus is the tint globals.css lays on every control — no ring.
+    "outline-none",
   ].join(" "),
   {
     variants: {

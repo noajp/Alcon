@@ -122,12 +122,14 @@ function ObjectCard({ object: o, lead, workers, from, total, done, onOpen }: {
   };
 
   return (
-    <div role="button" tabIndex={0} onClick={() => onOpen?.(o.id)}
-      onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === 'Enter') onOpen?.(o.id); }}
+    // The card opens from anywhere a pointer lands; the keyboard opens it
+    // from its name, and its pickers stay controls of their own.
+    <div onClick={() => onOpen?.(o.id)}
       className={`group/card block w-full cursor-pointer p-3 text-left ${BOARD_CARD}`}>
       <span className="flex min-w-0 items-center gap-2">
         <ItemIcon icon={o.icon ?? null} color={o.color ?? null} size={14} fallback={<ObjectIcon size={14} />} />
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium leading-5 text-foreground">{o.name}</span>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onOpen?.(o.id); }}
+          className="min-w-0 flex-1 truncate text-left text-[13.5px] font-medium leading-5 text-foreground">{o.name}</button>
       </span>
       <CardDescription html={o.description} />
       {o.type && <span className="mt-2 flex min-w-0"><Chip className="max-w-full"><span className="truncate">{o.type}</span></Chip></span>}

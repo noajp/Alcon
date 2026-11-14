@@ -65,7 +65,14 @@ export const HOME_BOARD: BoardLayout = {
  */
 export const INITIATIVE_BOARD: BoardLayout = {
   band: [],
-  main: [{ id: 'cmp-tables', type: 'data-view' }],
+  // What a Strategy holds, in the order it is decided: how success is
+  // measured, what it takes as true, what was decided. Then its Tables.
+  main: [
+    { id: 'cmp-measures', type: 'campaign-measures' },
+    { id: 'cmp-assumptions', type: 'campaign-assumptions' },
+    { id: 'cmp-decisions', type: 'campaign-decisions' },
+    { id: 'cmp-tables', type: 'data-view' },
+  ],
   // The island beside the Overview: the Strategy's facts.
   rail: [{ id: 'cmp-properties', type: 'strategy-properties' }],
 };

@@ -400,6 +400,7 @@ const SHARED_MESSAGES: Record<string, Row> = {
   'Light (small model)': ['軽い（小さいモデル）', '가벼움(작은 모델)', 'Léger (petit modèle)', 'Ligero (modelo pequeño)'],
   'Standard': ['標準', '표준', 'Standard', 'Estándar'],
   'Heavy (large model)': ['重い（大きいモデル）', '무거움(큰 모델)', 'Lourd (grand modèle)', 'Pesado (modelo grande)'],
+  'Top-level containers for organizations, operations, or workspaces. Objects multi-home across Domains.': ['組織・業務・作業場所をまとめる最上位の入れ物です。Object は複数の Domain に属せます。', '조직, 운영, 작업 공간을 위한 최상위 컨테이너입니다. Object는 여러 Domain에 속할 수 있습니다.', 'Conteneurs de premier niveau pour les organisations, les opérations ou les espaces de travail. Un Object peut appartenir à plusieurs Domains.', 'Contenedores de primer nivel para organizaciones, operaciones o espacios de trabajo. Un Object puede pertenecer a varios Domains.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(SHARED_MESSAGES).map(([key, row]) => [key, row[index]]));

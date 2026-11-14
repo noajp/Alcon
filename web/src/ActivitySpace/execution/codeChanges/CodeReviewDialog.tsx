@@ -532,7 +532,7 @@ function FileList({ paths, focused, cited, isReviewed, onOpen }: {
                 <FileCode2 size={12} className="shrink-0 text-muted-foreground" />
                 <span className="shrink-0 text-foreground">{name}</span>
                 <span className="min-w-0 truncate text-muted-foreground">{dir}</span>
-                {cited.has(path) && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
+                {cited.has(path) && <span role="img" aria-label={t('Cited in the review')} title={t('Cited in the review')} className="ml-auto size-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
               </button>
             </li>
           );

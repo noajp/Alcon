@@ -183,14 +183,11 @@ describe('Button renders the CONTROL geometry', () => {
     expect(globals).toMatch(/button, a, input, select, textarea \{[\s\S]{0,200}--motion-fast/);
   });
 
-  it('shows keyboard focus with a ring, not an outline', () => {
-    // globals.css sets `*:focus-visible { outline: none }` *unlayered*, which
-    // beats any `@layer utilities` outline utility no matter how specific. A
-    // focus style written as `focus-visible:outline-*` renders nothing here.
-    // Pressable parts must visualize focus themselves.
+  it('draws no ring or outline of its own on focus', () => {
+    // Keyboard focus is the tint globals.css lays on every control; a ring
+    // or outline here would frame the button on top of it.
     const classes = renderButton().join(' ');
-    expect(classes).toContain('focus-visible:ring-2');
-    expect(classes).not.toMatch(/focus-visible:outline-\S/);
+    expect(classes).not.toMatch(/focus-visible:(ring|outline)-\S/);
   });
 
   it('distinguishes a trigger from a CTA by where the label sits', () => {

@@ -81,7 +81,8 @@ import type { InitiativeHealth } from './initiativeHealthModel';
 import { useInitiativeMeasureTallies } from './useInitiativeMeasureTallies';
 import { MeasureStatus } from './MeasureStatus';
 import type { MeasureTally } from './initiativeMeasureModel';
-import { formatDateOnly } from '@/Function/shared/dateUtils';
+import { formatDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
+import { outlook } from '@/Function/shared/pace';
 import { HealthBelt } from '@/Function/shared/HealthBelt';
 import { extractPlainText } from '@/Function/notebook/contentUtils';
 import { strategyFacts } from '@/Function/strategy/strategyFacts';
@@ -291,6 +292,9 @@ function InitiativeHealthCell({ health, measures, start, due }: { health: Initia
         <span className="flex shrink-0 items-center gap-1.5">
           <HealthBelt progress={health.progressPct} start={start} due={due} />
           <span className="w-7 text-right">{health.progressPct}%</span>
+          {start && due && outlook(health.progressPct, start, due, toDateOnlyString(new Date())) < 0 && (
+            <span className="shrink-0 text-[var(--status-danger)]">{t('Behind schedule')}</span>
+          )}
         </span>
       )}
       {/* What it is measured by, then what is on fire — after the belt, so
@@ -1078,7 +1082,7 @@ function StrategyDetailView({
           </div>
           <EmbedHostContext.Provider value={embeds}>
             <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
-              placeholder={t('Add description… Type / for a live block')} onSave={saveDescription} />
+              placeholder={t('What this Strategy aims for… Type / for a live block')} onSave={saveDescription} />
           </EmbedHostContext.Provider>
 
           {/* Under the description, as on an Element: one quiet row —
@@ -1221,7 +1225,9 @@ function StrategyDetailView({
                         className={`flex items-center gap-2 px-2 py-1 min-h-[2.375rem] rounded-md hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
                       >
                         <ItemIcon icon={obj.icon} color={obj.color} size={16} className="text-muted-foreground" fallback={<ObjectIcon size={16} />} />
-                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>
+                        {onOpenObject
+                          ? <button type="button" onClick={(e) => { e.stopPropagation(); onOpenObject(obj.id, obj.domain_id ?? null); }} className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0 text-left">{obj.name}</button>
+                          : <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{obj.name}</span>}
                         {/* The cells already draw read-only when handed no handler;
                             membership decides whether they get one. */}
                         <div className="w-20 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
@@ -1317,7 +1323,7 @@ function StrategyDetailView({
               {canEdit && pickerMode === 'closed' && objectsMenu(
                 <button type="button" className="flex min-h-[2.125rem] w-full items-center gap-2 px-2 text-left">
                   <span className="flex text-muted-foreground opacity-50"><ObjectIcon size={16} /></span>
-                  <span className="text-[14px] text-muted-foreground/60">{t('Add Objects')}</span>
+                  <span className="text-[14px] text-muted-foreground">{t('Add Objects')}</span>
                 </button>,
               )}
               </FoldSection>

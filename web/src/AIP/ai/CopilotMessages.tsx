@@ -73,6 +73,9 @@ export function CopilotMessageView({ message, streaming, onRetry, onEdit, onDeci
   const settled = message.done && !streaming;
   return (
     <div className="group space-y-1.5">
+      {/* Who wrote it, in words: an answer is told from the person's own
+          messages by more than its side of the column. */}
+      <div className="text-[11px] font-medium text-muted-foreground">{t('Athena')}</div>
       <ToolSteps events={events} live={streaming} answered={!!message.content} />
       {message.content && (
         <Answer content={message.content} chartColors={message.chartColors} settled={settled}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Hand } from '@/ui/icons';
 import { FONT } from '@/shared/designTokens';
+import { Button } from '@/ui/button';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { decideAgentActionById, fetchAgentActionById, useAgentAction } from '@/AIP/ai/agentData';
 import { ApprovalDecisionCard } from '@/Function/shared/ApprovalDecisionCard';
@@ -25,7 +26,12 @@ export function CopilotApprovalInboxCard({ actionId }: { actionId: string }) {
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  if (error) return <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not read the approval.')}</p>;
+  if (error) return (
+    <p role="alert" className={`flex items-center gap-2 ${FONT.sm} text-[var(--status-danger)]`}>
+      {t('Could not read the approval.')}
+      <Button variant="ghost" size="xs" onClick={() => void refresh()}>{t('Retry')}</Button>
+    </p>
+  );
   if (loading && !action) return <p className={`${FONT.sm} text-muted-foreground`}>{t('Opening…')}</p>;
   if (!action) return <p className={`${FONT.sm} text-muted-foreground`}>{t('This approval is no longer available.')}</p>;
 

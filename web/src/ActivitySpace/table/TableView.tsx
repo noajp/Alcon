@@ -278,6 +278,7 @@ function TableDetailView({ table, source }: { table: DataTable; source: TableSou
                 <button
                   key={n}
                   type="button"
+                  aria-current={n === clampedPage ? 'page' : undefined}
                   onClick={() => setPage(n)}
                   className={`h-6 min-w-[1.5rem] px-1.5 rounded-md tabular-nums transition-colors ${
                     clampedPage === n

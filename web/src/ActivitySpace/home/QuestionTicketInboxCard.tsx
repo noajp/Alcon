@@ -41,7 +41,12 @@ export function QuestionTicketInboxCard({ ticketId, onAnswered, nextWaiting, onW
   const workElementId = ticket?.element_id ?? null;
   useEffect(() => { if (ticket) onWork?.(workElementId); }, [ticket, workElementId, onWork]);
 
-  if (error) return <p role="alert" className={`${FONT.sm} text-[var(--status-danger)]`}>{t('Could not read the question.')}</p>;
+  if (error) return (
+    <p role="alert" className={`flex items-center gap-2 ${FONT.sm} text-[var(--status-danger)]`}>
+      {t('Could not read the question.')}
+      <Button variant="ghost" size="xs" onClick={() => void refresh()}>{t('Retry')}</Button>
+    </p>
+  );
   if (loading && !ticket) return <p className={`${FONT.sm} text-muted-foreground`}>{t('Opening…')}</p>;
   if (!ticket) return <p className={`${FONT.sm} text-muted-foreground`}>{t('This question is no longer available.')}</p>;
 

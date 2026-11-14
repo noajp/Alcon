@@ -122,7 +122,7 @@ export function WaitingChip({ reason }: { reason: WaitingReason }) {
   );
 }
 
-export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, empty, children }: {
+export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, empty, folded = false, children }: {
   /** Before the name: the column's mark. */
   mark?: React.ReactNode;
   label: string;
@@ -133,8 +133,24 @@ export function BoardColumn({ mark, label, count, action, onDragOver, onDrop, em
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   /** Shown when the column has no cards. */
   empty?: string;
+  /** An empty column folds to a narrow strip — its mark, name and count
+   *  standing upright — so the columns that hold cards have the width.
+   *  It still takes a dropped card. */
+  folded?: boolean;
   children?: React.ReactNode;
 }) {
+  if (folded) {
+    return (
+      <section aria-label={`${label} (${count})`}
+        className={cn('flex w-10 flex-shrink-0 flex-col items-center gap-2 rounded-xl py-3', BOARD_GROUND)}
+        onDragOver={onDragOver} onDrop={onDrop}>
+        {mark}
+        <span className="text-[12px] font-medium text-muted-foreground [writing-mode:vertical-rl]">{label}</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span>
+        {action}
+      </section>
+    );
+  }
   return (
     <section
       aria-label={label}

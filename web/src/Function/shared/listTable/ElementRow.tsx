@@ -10,6 +10,8 @@ import { deleteElement, addElementAssignee, removeElementAssignee, fetchAssignab
 import { withCurrentWorkers } from '@/Function/shared/assignableWorkers';
 import { describeBlocker, type DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
 import { useSortable } from '@dnd-kit/sortable';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { notifyError } from '@/Function/shared/toastStore';
 import type { Json } from '@/types/database';
 import { WorkerAvatar } from '@/Function/shared/WorkerAvatar';
 import { ElementProgressMark, getElementProgress } from '@/Function/shared/ElementProgressMark';
@@ -134,7 +136,16 @@ export const ElementRow = memo(function ElementRow({
       ref={setNodeRef}
       style={dragStyle}
       {...attributes}
+      // A table row stays a row to assistive tech: dnd-kit gives it
+      // role="button", which hides its cells and the controls in them.
+      role={undefined}
       {...dragListeners}
+      // Enter on the focused row opens it, as a click does; Space stays the
+      // drag key (dnd-kit's keyboard sensor).
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); e.currentTarget.click(); return; }
+        (dragListeners as { onKeyDown?: (event: React.KeyboardEvent) => void } | undefined)?.onKeyDown?.(e);
+      }}
       // Warm the detail facets while the pointer rests on the row, so the
       // click opens onto cached data (dwell-gated: a sweep warms nothing).
       onMouseEnter={() => scheduleElementDetailPrefetch(el)}
@@ -363,7 +374,13 @@ export const ElementRow = memo(function ElementRow({
         <ContextMenuItem
           className="gap-2 text-[var(--status-danger)] focus:text-[var(--status-danger)]"
           onPointerEnter={() => setOpenSub(null)}
-          onClick={() => { void deleteElement(el.id); }}
+          onClick={() => { void (async () => {
+            // Asked first, as the bulk delete is: the row and what hangs off it
+            // go at once (the Object's Deleted Elements can bring it back).
+            if (!await appDialog.confirm(t('Delete “{title}”? You can restore it from the Object’s Deleted Elements.', { title: el.title }))) return;
+            try { await deleteElement(el.id); }
+            catch (e) { notifyError(e, t('Could not delete the Element.')); }
+          })(); }}
         >
           <Trash2 className="size-3.5" /> {t('Delete')}
         </ContextMenuItem>

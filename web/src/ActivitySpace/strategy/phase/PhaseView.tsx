@@ -551,7 +551,9 @@ function PhaseDetailView({
                 className={`flex items-center gap-2 px-2 py-1 min-h-8 rounded-md group/row hover:bg-muted/40 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
               >
                 <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
-                <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{o.name}</span>
+                {onOpenObject
+                  ? <button type="button" onClick={(e) => { e.stopPropagation(); onOpenObject(o.id, phase.domain_id); }} className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0 text-left">{o.name}</button>
+                  : <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">{o.name}</span>}
                 {o.due_date && (
                   <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">{formatDateOnly(o.due_date, locale)}</span>
                 )}

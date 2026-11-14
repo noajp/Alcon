@@ -480,6 +480,9 @@ const EXECUTION_MESSAGES: Record<string, Row> = {
   // rows (cards flow sideways).
   'Vertical': ['縦', '세로', 'Vertical', 'Vertical'],
   'Horizontal': ['横', '가로', 'Horizontal', 'Horizontal'],
+  'Rename {title}': ['「{title}」の名前を変更', '“{title}” 이름 바꾸기', 'Renommer « {title} »', 'Cambiar el nombre de «{title}»'],
+  'Delete “{title}”? You can restore it from the Object’s Deleted Elements.': ['「{title}」を削除しますか？Object の「削除した Element」から元に戻せます。', '“{title}”을(를) 삭제할까요? Object의 삭제된 Element에서 복원할 수 있습니다.', 'Supprimer « {title} » ? Vous pourrez le restaurer depuis les Elements supprimés de l’Object.', '¿Eliminar «{title}»? Puedes restaurarlo desde los Elements eliminados del Object.'],
+  'Could not delete the Element.': ['Element を削除できませんでした。', 'Element를 삭제하지 못했습니다.', 'Impossible de supprimer l’Element.', 'No se pudo eliminar el Element.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(EXECUTION_MESSAGES).map(([key, row]) => [key, row[index]]));

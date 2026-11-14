@@ -81,6 +81,7 @@ function SubElementRow({ sub, workers, onOpen, onChanged }: {
         <DropdownMenuTrigger asChild>
           <button type="button" onClick={stop} onMouseDown={(e) => e.preventDefault()}
             title={t('Status: {value}', { value: t(STATUS[status].label) })}
+            aria-label={t('Status: {value}', { value: t(STATUS[status].label) })}
             className="flex shrink-0 items-center rounded-full transition-opacity hover:opacity-80">
             <ElementProgressMark status={status} size={16} />
           </button>
@@ -96,9 +97,10 @@ function SubElementRow({ sub, workers, onOpen, onChanged }: {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <span className={`min-w-0 flex-1 truncate text-[14px] font-medium ${status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }}
+        className={`min-w-0 flex-1 truncate text-left text-[14px] font-medium ${status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
         {sub.title}
-      </span>
+      </button>
 
       <span onClick={stop} className="shrink-0">
         <DatePopover value={sub.due_date ?? null} onChange={(d) => void save({ due_date: d })} align="end">

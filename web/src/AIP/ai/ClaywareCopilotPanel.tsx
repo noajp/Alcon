@@ -22,12 +22,11 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 const SlidesAssistant = dynamic(() => import('@/ActivitySpace/artifacts/slides/SlidesAssistant').then((m) => m.SlidesAssistant), { ssr: false });
 
 /** Where a conversation can start. Each is a request the AI can carry out
- *  with what the Space already holds. */
+ *  with what the Space already holds. Two, so the empty screen has one
+ *  thing to do — type — and a nudge, not a menu to read. */
 const STARTERS = [
   'Show what is waiting on me',
   'Find Elements that have stalled',
-  'Plan the next steps for a Strategy',
-  'Summarize this week’s progress',
 ];
 
 const FLOAT_KEY = 'clayware.copilot.float';
@@ -323,7 +322,7 @@ export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, varia
       {/* Conversation — empty state is intentionally blank; the placeholder
           in the composer is the only nudge. */}
       <div ref={listRef} className={`flex-1 overflow-y-auto pb-4 pt-3 text-[12.5px] leading-relaxed ${page ? 'px-8' : 'px-3'}`}>
-        <div className={`space-y-4 ${column}`}>
+        <div role="log" aria-label={t('Conversation')} className={`space-y-4 ${column}`}>
           {messages.map((m, i) => (
             <CopilotMessageView key={i} message={m} streaming={streaming && i === messages.length - 1 && !m.done}
               onRetry={!streaming && m.role === 'assistant' && i === messages.length - 1 ? () => retry({ context: contextNow() }) : undefined}
