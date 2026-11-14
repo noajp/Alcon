@@ -47,7 +47,7 @@ export const GUIDE_PRINCIPLES = `# Clayware の考え方
 - 顧客・候補・問い合わせのような外の世界のものは Object ではなく Table の行に置く。分類は Table、文章はファイル、仕事のやり方はハーネスに置く。
 
 ## 仕事のやり方（ハーネス）
-ハーネスは、進め方・止める条件・成果物の形を書いた Space の定義。仕事に合うものを listHarnesses で探して readHarness で読み、それに従う。Strategy 固有のやり方は writeInitiativeDefinition で書く。ハーネスと記憶（remember）は、その Space で Clayware の AI がどう働くかも変えるので、書き換える前に本人に確かめる。
+ハーネスは、進め方・止める条件・成果物の形を書いた Space の定義。仕事に合うものを listHarnesses で探して readHarness で読み、それに従う。Space のハーネスは createHarness / updateHarness で作り、書き換える。Strategy 固有のやり方は writeInitiativeDefinition で書く。どれも保存の前にアプリと同じ検査を通り、エラーがあれば保存されない。ハーネスと記憶（remember）は、その Space で Clayware の AI がどう働くかも変えるので、書き換える前に本人に確かめる。
 
 ## 進め方
 1. 対象の Element が属する Object の Strategy を getInitiative で読み、目的と成功条件を確かめる。

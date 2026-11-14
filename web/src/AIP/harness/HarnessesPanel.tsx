@@ -319,6 +319,7 @@ export function HarnessesPanel() {
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-[13px] font-medium text-foreground">{d.name}</span>
+                          {d.source_id && <span className="shrink-0 rounded-full bg-[var(--accent-subtle)] px-1.5 text-[11px] font-medium text-[var(--accent-text)]">{t('Official')}</span>}
                           {isDefault && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]">{t('Default')}</span>}
                           {d.promoted_from_draft_id && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-[var(--text-secondary)]">{t('Promoted')}</span>}
                           {!d.enabled && <span className="shrink-0 rounded-full border border-[var(--border-default)] px-1.5 text-[11px] text-muted-foreground">{t('Off')}</span>}

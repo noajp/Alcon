@@ -15,7 +15,7 @@ Clayware の AI（Athena）がアプリの AI パネルでできることを、�
 | Execution | listMyDomains / listObjects / listElements / getElement / findByText / getProgress / getRecentActivity / listWorkers | Element・Sub-element・Object の作成・更新・削除、移動、Object への結び付け、担当・ラベル・コメント、一括作成・一括更新・一括削除 |
 | Strategy | listInitiatives / getInitiative / getInitiativeExecution | Strategy の作成・更新・削除、成功条件・前提・意思決定の追加・更新・取り下げ、ハーネスの定義を書く、campaignMeasure |
 | Table | tableData（list / get） | tableData（Table・列・行・セルの create / update / delete） |
-| ファイル・ハーネス | listFiles / searchFiles / readFile / listHarnesses / readHarness | writeFile |
+| ファイル・ハーネス | listFiles / searchFiles / readFile / listHarnesses / readHarness | writeFile / createHarness / updateHarness（保存の前にアプリと同じ検査を通し、エラーがあれば保存しない） |
 | 記憶・ボード | recall_memory / widgetBoard（list / get） | remember / note_pending_capability / widgetBoard（create / update / delete） |
 | 着手・報告 | | claimElement / releaseElement / logProgress / reportOutcome |
 
