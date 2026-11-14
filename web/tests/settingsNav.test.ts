@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import {
   SETTINGS_ITEMS, SETTINGS_NAV,
+  isLonePage,
   setActiveSettingsSection,
   useActiveSettingsSection,
   useSettingsRevealNonce,
@@ -49,6 +50,14 @@ describe('settingsNav store', () => {
     act(() => setActiveSettingsSection('integrations'));
     expect(current.result.current.section).toBe('preferences');
   });
+
+  it('the name of a part opens the page that holds it', () => {
+    current = probe();
+    act(() => setActiveSettingsSection('timeline'));
+    expect(current.result.current.section).toBe('strategy');
+    act(() => setActiveSettingsSection('initiative'));
+    expect(current.result.current.section).toBe('strategy');
+  });
 });
 
 describe('nav model', () => {
@@ -60,5 +69,14 @@ describe('nav model', () => {
 
   it('lists no page without something to set', () => {
     for (const gone of ['phase', 'workload', 'calendar', 'connected']) expect(SETTINGS_ITEMS[gone]).toBeUndefined();
+  });
+
+  it('Strategy is one page under its own name, so its row stands without a section label', () => {
+    const strategy = SETTINGS_NAV.find((g) => g.title === 'Strategy')!;
+    expect(strategy.items.map((i) => i.id)).toEqual(['strategy']);
+    expect(isLonePage('Strategy')).toBe(true);
+    // A section of several pages, and one whose single page has another name, keep their label.
+    expect(isLonePage('Elements')).toBe(false);
+    expect(isLonePage('Objects')).toBe(false);
   });
 });

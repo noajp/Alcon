@@ -87,6 +87,17 @@ describe('one page per nav row', () => {
     expect(screen.getByText('Labels panel')).toBeTruthy();
   });
 
+  it('Strategy holds its risk thresholds and its Timeline on one page', () => {
+    act(() => setActiveSettingsSection('strategy'));
+    const view = renderPage();
+    expect(shown(view.container)).toEqual(['strategy']);
+    expect(screen.getByRole('heading', { level: 1, name: 'Strategy' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Risk thresholds' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Timeline' })).toBeTruthy();
+    expect(screen.getByText('SLA panel')).toBeTruthy();
+    expect(screen.getByText('Timeline panel')).toBeTruthy();
+  });
+
   it('Elements and Objects each open their own types', () => {
     act(() => setActiveSettingsSection('element-types'));
     renderPage();
