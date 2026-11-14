@@ -16,12 +16,13 @@ export type { Viewer };
  * server lets only people who can see that thing join (ADR 0041) — so nobody
  * learns who is looking at something they cannot open. Null: nothing to show.
  */
-function usePresence(topic: string | null): Viewer[] {
+/** The name this person shows to others: the one teammates already see on
+ *  assignments, then the profile's. */
+export function usePresenceName(enabled = true): { userId: string | null; name: string | null; pending: boolean } {
   const { userId } = useSessionUserId();
-  const enabled = !!userId && !!topic;
   const profile = useQuery({
     queryKey: ['presence-name', userId],
-    enabled,
+    enabled: enabled && !!userId,
     staleTime: Infinity,
     // The name teammates already see on assignments, then the profile's.
     queryFn: async () => {
@@ -33,17 +34,24 @@ function usePresence(topic: string | null): Viewer[] {
       return name?.trim() || null;
     },
   });
-  const name = profile.data ?? null;
+  return { userId: userId ?? null, name: profile.data ?? null, pending: profile.isPending };
+}
+
+function usePresence(topic: string | null): Viewer[] {
+  const { userId } = useSessionUserId();
+  const enabled = !!userId && !!topic;
+  const profile = usePresenceName(enabled);
+  const name = profile.name;
   const [viewers, setViewers] = useState<Viewer[]>([]);
 
   useEffect(() => {
-    if (!enabled || profile.isPending) return;
+    if (!enabled || profile.pending) return;
     const stop = watchPresence(topic!, userId!, name, setViewers);
     return () => {
       stop();
       setViewers([]);
     };
-  }, [enabled, profile.isPending, topic, userId, name]);
+  }, [enabled, profile.pending, topic, userId, name]);
 
   return enabled ? viewers : [];
 }

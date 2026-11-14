@@ -221,3 +221,62 @@ describe('Note editing by several people', () => {
     expect(store.getSnapshot('n').html).toBe('<p>mine</p>');
   });
 });
+
+describe('saving in place of the one who saves a Note edited together', () => {
+  it('saves when nobody else does', async () => {
+    const db = server('<p>a</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>ab</p>', { standIn: true });
+    await vi.runAllTimersAsync();
+    expect(db.row.html).toBe('<p>ab</p>');
+    expect(store.getSnapshot('n')).toMatchObject({ html: '<p>ab</p>', dirty: false });
+  });
+
+  it('stands down, unsaved and unmerged, when someone else saves first', async () => {
+    const db = server('<p>a</p><p>b</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>a!</p><p>b</p>', { standIn: true });
+    // The one who saves was only slow: a newer body of the same Note lands.
+    store.receive('n', db.set('<p>a!?</p><p>b</p>'));
+    expect(store.getSnapshot('n')).toMatchObject({ html: '<p>a!?</p><p>b</p>', dirty: false });
+    await vi.runAllTimersAsync();
+    expect(db.adapter.write).not.toHaveBeenCalled();
+    expect(db.row.html).toBe('<p>a!?</p><p>b</p>');
+  });
+
+  it('stands down when its save loses the race, without saving again', async () => {
+    const db = server('<p>a</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>mine</p>', { standIn: true });
+    db.set('<p>theirs</p>');                         // saved first, not yet heard of here
+    await store.flush('n');
+    expect(db.adapter.write).toHaveBeenCalledTimes(1);
+    expect(db.row.html).toBe('<p>theirs</p>');
+    expect(store.getSnapshot('n')).toMatchObject({ html: '<p>theirs</p>', dirty: false });
+  });
+
+  it("never turns this side's own unsaved draft into one that stands down", async () => {
+    const db = server('<p>a</p><p>b</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>A</p><p>b</p>');
+    store.edit('n', '<p>A!</p><p>b</p>', { standIn: true });
+    store.receive('n', db.set('<p>a</p><p>B</p>'));
+    await vi.runAllTimersAsync();
+    expect(db.row.html).toBe('<p>A!</p><p>B</p>');
+  });
+
+  it('saves a draft of its own made after standing in as its own', async () => {
+    const db = server('<p>a</p><p>b</p>');
+    const store = createNoteContentStore(db.adapter);
+    await store.load('n');
+    store.edit('n', '<p>a!</p><p>b</p>', { standIn: true });
+    store.edit('n', '<p>a!</p><p>b?</p>');
+    store.receive('n', db.set('<p>a</p><p>b</p><p>c</p>'));
+    await vi.runAllTimersAsync();
+    expect(db.row.html).toBe('<p>a!</p><p>b?</p><p>c</p>');
+  });
+});

@@ -2,33 +2,61 @@
 
 import { appDialog } from '@/Function/shared/appDialogStore';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { useEscapeLayer } from '@/Function/shared/keyboard';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { EditorState, TextSelection, type Command, type Plugin, type Transaction } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import type { Node as PMNode } from 'prosemirror-model';
+import {
+  CellSelection, TableMap, addColumn, addRow, deleteColumn, deleteRow, deleteTable, isInTable,
+  mergeCells, moveTableColumn, moveTableRow, selectedRect, splitCell,
+} from 'prosemirror-tables';
+import { ySyncPlugin, yCursorPlugin, yUndoPlugin, undo as yUndo, redo as yRedo } from 'y-prosemirror';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
-  AlignLeft, AlignCenter, AlignRight,
-  List, ListOrdered,
-  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus, Minus, Paperclip, FileText,
+  AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
+  Quote, Link as LinkIcon, Table as TableIcon, Minus, Paperclip, FileText,
 } from '@/ui/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
-import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from '@/Function/notebook/htmlSanitizer';
-import { patchBlocks } from '@/Function/notebook/noteMerge';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { MermaidLayer } from './MermaidLayer';
-import { EmbedLayer } from './EmbedLayer';
 import { EMBED_LANG, embedSource, useEmbedHost, type EmbedSpec } from './embedBlocks';
 import { ArtifactPicker, FILE_VIEW } from './fileBlocks';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { uploadToArtifacts } from '@/hooks/artifactData';
+import type { ElementWithDetails } from '@/hooks/useSupabase';
+import { openNoteCollab, type CollabEvent, type CollabUser, type NoteCollab } from '@/hooks/noteCollab';
+import { usePresenceName } from '@/hooks/usePresence';
 import { formatError } from '@/Function/shared/formatError';
 import { openInApp } from '@/Function/shared/appNavigation';
+import { mergeNote } from '../noteMerge';
+import type { SaveHow } from '../noteContentStore';
+import { schema } from '../pm/schema';
+import { docToHtml, htmlToDoc, isEmptyDoc } from '../pm/html';
+import { FRAGMENT, hashText, seedFromHtml } from '../pm/collab';
+import {
+  createTable, linkItems, placeBlock, setAlign, setBlock, setLink, toggleBlock, toggleChecked, toggleList,
+  toggleBold, toggleItalic, toggleStrike, toggleUnderline, type BlockTag, type ListKind,
+} from '../pm/commands';
+import {
+  clearSlash, cursors, drawnEditing, localHistory, noteKeymap, pmRedo, pmUndo,
+  shortcuts, slashKey, slashTrigger, tablePlugins,
+} from '../pm/plugins';
+import { DrawnBlocks, DrawnRegistry, drawnNodeView } from '../pm/drawn';
+import { ChecklistMarks, MarkRegistry, checklistMarks, type LineMark } from '../pm/marks';
+import {
+  FloatingToolbar, SlashMenu, TableContextMenu, TableInsertHandles, filterSlash, handlesKey, measureTableHandles,
+  type Mark, type SlashItem, type TableAction, type TableHandles,
+} from '../pm/NoteMenus';
+import { NoteEditorStyles } from '../pm/NoteEditorStyles';
 
 export interface NoteEditorProps {
   initialHtml?: string;
-  /** Shared body. External changes reconcile the DOM; own edits preserve the caret. */
+  /** Shared body. A body changed elsewhere (saved by someone, merged) is
+   *  brought in without moving the caret. */
   value?: string;
-  onChange?: (html: string) => void;
+  /** The body to save. `how.standIn`: this editor is not the one who saves
+   *  the shared body, and saves it in that one's stead. */
+  onChange?: (html: string, how?: SaveHow) => void;
   /** A one-click edit that can land while the editor is not focused (a
    *  checklist box), so no blur follows to save it: called right after its
    *  onChange, for a host that saves on blur to save now. */
@@ -36,15 +64,18 @@ export interface NoteEditorProps {
   editable?: boolean;
   /** Called when the user right-clicks on a list item (bullet/check). */
   onBulletContextMenu?: (info: BulletContextInfo) => void;
-  /** id → status for every Element. Bullets linked via data-element-id
-   *  render a read-only ○ that mirrors the linked Element's status. */
-  elementStatusById?: Record<string, string | null | undefined>;
+  /** The Elements the page holds, by id. A line made into one of them shows
+   *  its status live from here (otherwise the line reads its Element itself). */
+  elementsById?: Record<string, ElementWithDetails>;
   /** A short body inside another page (an Element's description): no
    *  page-tall minimum, the page's text size, smaller headings. Its text is
    *  kept as Markdown, so it offers no underline or alignment. */
   compact?: boolean;
   /** What an empty body says. */
   placeholder?: string;
+  /** The Note this body is, to edit it together with whoever else has it
+   *  open: everyone's typing shows as it happens, with their cursors. */
+  collab?: string;
 }
 
 export interface BulletContextInfo {
@@ -52,51 +83,115 @@ export interface BulletContextInfo {
   text: string;
   /** All list items currently selected (or [target] when nothing is selected). */
   texts: string[];
-  /** Source <li> nodes, parallel to `texts` — used to stamp the
-   *  data-element-id link back after → Element 化. */
+  /** Source <li> nodes, parallel to `texts` — used to link them back after → Element 化. */
   liNodes: HTMLLIElement[];
   /** Screen position to anchor a popover. */
   x: number;
   y: number;
 }
 
-/** Imperative handle so the parent header (PageView's Note-style
- *  button strip) can drive the editor without lifting the entire
- *  selection/contentEditable state up. */
+/** Imperative handle so the page around the editor can drive it. */
 export interface NoteEditorHandle {
-  applyBlock(tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE'): void;
-  applyList(kind: 'bullet' | 'dashed' | 'numbered' | 'check'): void;
+  applyBlock(tag: BlockTag): void;
+  applyList(kind: ListKind): void;
   insertTable(rows?: number, cols?: number): void;
   focus(): void;
-  /** Stamp data-element-id onto bullets just turned into Elements, then persist. */
+  /** Links lines just turned into Elements to them, then saves. */
   linkBullets(entries: { li: HTMLLIElement; elementId: string }[]): void;
 }
 
 const TOOLBAR_GAP = 8;
+/** How far in from a linked line's right edge its arrow answers a click. */
+const LINKED_EDGE_PX = 30;
+/** A change brought in from the saved body, not typed here. */
+const EXTERNAL = 'note-external';
+const CURSOR_COLORS = 6;
+/** How long the saved body may trail what is typed before an editor that
+ *  does not save it steps in for the one who does. */
+const STAND_IN_MS = 4000;
 
-/** One thing "/" offers. `run` gets the empty line it was typed on and
- *  where the menu stood. */
-interface SlashItem {
-  id: string; group: string; label: string; hint?: string; icon: React.ReactNode;
-  /** Words that also find it. */
-  keywords?: string;
-  /** Its label and hint are already in the reader's language (a page's own block). */
-  translated?: boolean;
-  search?: string;
-  run: (at: Element | null, pos: { x: number; y: number }) => void;
-}
-const SLASH_MENU_HEIGHT = 340;
-const filterSlash = (items: SlashItem[], query: string) => {
-  const q = query.trim().toLowerCase();
-  return q ? items.filter((item) => (item.search ?? '').includes(q)) : items;
+// The others' cursors. What they say of themselves is theirs to say: it is
+// shown as text and read as one of the cursor colours, nothing more.
+const toneOf = (user: unknown) => {
+  const tone = Number((user as { tone?: unknown } | null)?.tone);
+  return `var(--chart-${Number.isInteger(tone) && tone >= 1 && tone <= CURSOR_COLORS ? tone : 1})`;
 };
+function cursorBuilder(user: unknown): HTMLElement {
+  const cursor = document.createElement('span');
+  cursor.classList.add('ProseMirror-yjs-cursor');
+  cursor.style.borderColor = toneOf(user);
+  const label = document.createElement('div');
+  label.style.backgroundColor = toneOf(user);
+  label.textContent = String((user as { name?: unknown } | null)?.name ?? '').slice(0, 40);
+  cursor.append('\u2060', label, '\u2060');
+  return cursor;
+}
+const selectionBuilder = (user: unknown) => ({
+  class: 'ProseMirror-yjs-selection',
+  style: `background-color: color-mix(in srgb, ${toneOf(user)} 28%, transparent)`,
+});
 
-// Blocks whose style must NOT carry onto the next line. Headings are
-// single-line: Enter always drops to a paragraph. Quote / code are
-// multi-line containers: Enter adds a line, and Enter on an *empty* line
-// breaks out — otherwise a blockquote becomes inescapable.
-const HEADING_BLOCKS = new Set(['H1', 'H2', 'H3']);
-const CONTAINER_BLOCKS = new Set(['BLOCKQUOTE', 'PRE']);
+const { list_item, code_block, horizontal_rule, table: tableType, heading: headingType, blockquote: quoteType } = schema.nodes;
+
+/** The list item `li` stands for, and where it starts. */
+function itemAt(view: EditorView, li: Element): { node: PMNode; pos: number } | null {
+  if (!li.isConnected || !view.dom.contains(li)) return null;
+  const $pos = view.state.doc.resolve(view.posAtDOM(li, 0));
+  for (let d = $pos.depth; d > 0; d--) {
+    if ($pos.node(d).type === list_item) return { node: $pos.node(d), pos: $pos.before(d) };
+  }
+  return null;
+}
+
+/** Whether a list item is a line of plain text (no heading, quote or code in it). */
+function isPlainLine(item: PMNode): boolean {
+  let plain = true;
+  item.forEach((c) => { if (c.type === headingType || c.type === quoteType || c.type === code_block) plain = false; });
+  return plain;
+}
+
+/** The cell `cell` stands for: where it starts. */
+function cellAt(view: EditorView, cell: Element): number | null {
+  const $pos = view.state.doc.resolve(view.posAtDOM(cell, 0));
+  for (let d = $pos.depth; d > 0; d--) {
+    const role = $pos.node(d).type.spec.tableRole;
+    if (role === 'cell' || role === 'header_cell') return $pos.before(d);
+  }
+  return null;
+}
+
+/** The table `el` draws, as the table commands want it. */
+function tableAt(view: EditorView, el: HTMLTableElement) {
+  const cell = el.querySelector('td, th');
+  if (!cell) return null;
+  const $pos = view.state.doc.resolve(view.posAtDOM(cell, 0));
+  for (let d = $pos.depth; d > 0; d--) {
+    const node = $pos.node(d);
+    if (node.type === tableType) {
+      return { map: TableMap.get(node), tableStart: $pos.start(d), table: node, left: 0, top: 0, right: 0, bottom: 0 };
+    }
+  }
+  return null;
+}
+
+/** Brings `next` into the editor, replacing only the top-level blocks that
+ *  differ, so the caret stays where it was in the rest. */
+function replaceDoc(view: EditorView, next: PMNode): Transaction | null {
+  const current = view.state.doc;
+  if (current.eq(next)) return null;
+  const a = current.childCount, b = next.childCount;
+  let head = 0;
+  while (head < a && head < b && current.child(head).eq(next.child(head))) head++;
+  let tail = 0;
+  while (tail < a - head && tail < b - head && current.child(a - 1 - tail).eq(next.child(b - 1 - tail))) tail++;
+  let from = 0;
+  for (let i = 0; i < head; i++) from += current.child(i).nodeSize;
+  let to = from;
+  for (let i = head; i < a - tail; i++) to += current.child(i).nodeSize;
+  const blocks: PMNode[] = [];
+  for (let i = head; i < b - tail; i++) blocks.push(next.child(i));
+  return view.state.tr.replaceWith(from, to, blocks);
+}
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor({
   initialHtml,
@@ -105,2103 +200,650 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   onCommit,
   editable = true,
   onBulletContextMenu,
-  elementStatusById,
+  elementsById,
   compact = false,
   placeholder,
+  collab,
 }, handleRef) {
   const { t } = useI18n();
-  const ref = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
-  const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
-  // Right-click menu for table cells — anchored at the click point. The
-  // target cell is held in a ref so menu actions act on it regardless of
-  // where the selection drifts.
-  const [tableMenu, setTableMenu] = useState<{ x: number; y: number } | null>(null);
-  const tableCellRef = useRef<HTMLTableCellElement | null>(null);
-  // Rectangular cell selection (drag across cells). The highlighted cells live
-  // in selectedCellsRef and drive the "セルを結合する" item; HTML's own text
-  // selection is linear, so we track a clean rectangle ourselves.
-  const selectedCellsRef = useRef<HTMLTableCellElement[]>([]);
-  const cellDragAnchorRef = useRef<HTMLTableCellElement | null>(null);
-  const cellDraggingRef = useRef(false);
-  // Active column-resize drag (drag a column border to set its width).
-  const colResizeRef = useRef<{ left: HTMLTableColElement; right: HTMLTableColElement; startX: number; leftW: number; rightW: number } | null>(null);
-  // Geometry for the hover "+" insert handles (null = not hovering a table).
-  const [tableHandles, setTableHandles] = useState<TableHandleGeom | null>(null);
-  // Signature of the last computed handles so mousemove over the same table
-  // doesn't re-render every frame (geometry is stable until the table changes).
-  const handlesSigRef = useRef<string | null>(null);
-  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const initRef = useRef(false);
-  const lastEmittedRef = useRef<string>('');
-  // True while an IME composition is in flight. emit() rewrites the DOM
-  // (normalizeStructure / read-back), and doing that mid-composition tears
-  // the IME's composing range out from under it — the half-typed text then
-  // gets re-committed, duplicating characters. So we hold off until
-  // compositionend.
-  const composingRef = useRef(false);
-  const compositionStartHtmlRef = useRef('');
-  const deferredBodyRef = useRef<{ html: string } | null>(null);
-  // Last known caret/selection inside the editor. The always-on header
-  // toolbar lives outside the contentEditable, so clicking a button moves
-  // focus out and the live selection is gone by the time the command runs.
-  // We snapshot the editor selection on every change and restore it right
-  // before executing a command.
-  const savedRangeRef = useRef<Range | null>(null);
-  useEffect(() => {
-    const save = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0);
-      if (ref.current?.contains(range.commonAncestorContainer)) {
-        savedRangeRef.current = range.cloneRange();
-      }
-    };
-    document.addEventListener('selectionchange', save);
-    return () => document.removeEventListener('selectionchange', save);
-  }, []);
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const sessionRef = useRef<NoteCollab | null>(null);
+  const registry = useMemo(() => new DrawnRegistry(), []);
+  const marks = useMemo(() => new MarkRegistry(), []);
+  const [ready, setReady] = useState(false);
 
-  // Put the snapshot back before a command runs. Inline commands (bold,
-  // createLink) need the original, possibly non-collapsed, selection — a
-  // header-toolbar click can leave focus/selection collapsed, so we always
-  // re-apply the snapshot rather than trusting the live selection.
-  const restoreSelection = useCallback(() => {
-    const el = ref.current;
-    const saved = savedRangeRef.current;
-    if (!el) return;
-    const sel = window.getSelection();
-    if (!sel) return;
-    if (saved) {
-      el.focus();
-      try {
-        sel.removeAllRanges();
-        sel.addRange(saved.cloneRange());
-        return;
-      } catch {
-        /* saved range detached (DOM rewritten) — fall through */
-      }
-    }
-    if (sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
-    el.focus();
-  }, []);
+  // The latest props, for the editor's handlers made once.
+  const valueRef = useRef(value ?? initialHtml ?? '');
+  const onChangeRef = useRef(onChange);
+  const onCommitRef = useRef(onCommit);
+  const bulletRef = useRef(onBulletContextMenu);
+  const editableRef = useRef(editable);
+  const placeholderRef = useRef(placeholder ?? t('Start writing…'));
+  onChangeRef.current = onChange;
+  onCommitRef.current = onCommit;
+  bulletRef.current = onBulletContextMenu;
+  placeholderRef.current = placeholder ?? t('Start writing…');
 
-  const replaceBody = useCallback((html: string | undefined) => {
-    const el = ref.current;
-    if (!el) return;
-    if (!initRef.current) {
-      // New lines are paragraphs, matching the sanitizer's block model.
-      try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
-      initRef.current = true;
-    }
-    if (el.childNodes.length && html) {
-      // A body edited elsewhere (or merged with it) while this one is open:
-      // change only the paragraphs that differ, so the caret stays put.
-      patchBlocks(el, sanitizeHtml(html));
-    } else {
-      el.innerHTML = html ? sanitizeHtml(html) : '';
-      savedRangeRef.current = null;
-    }
-    if (isEditorEmpty(el)) el.innerHTML = '<p><br></p>';
-    el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
-    lastEmittedRef.current = el.innerHTML;
-  }, []);
+  /** The body as last saved from here (or brought in): what is not new. */
+  const lastEmittedRef = useRef('');
+  /** Set once the editor shows its first body; before that nothing saves. */
+  const initializedRef = useRef(false);
+  /** A body that came in while a word was being composed, and what the
+   *  editor held when it came: the two are put together once the word is in. */
+  const pendingRef = useRef<{ html: string; base: string } | null>(null);
+  /** Whether this editor was the one saving, the last time it looked. */
+  const wasSaverRef = useRef(false);
+  const couldEditRef = useRef(editable);
+  /** When the document, and the saved body, last changed (to tell which trails). */
+  const docChangedAtRef = useRef(0);
+  const valueChangedAtRef = useRef(0);
+  const standInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const standInJitter = useMemo(() => Math.floor(Math.random() * 1500), []);
+  /** The text a link is being asked for, kept in place while others type. */
+  const linkRangeRef = useRef<{ from: number; to: number } | null>(null);
+  /** The lines offered to be made into Elements, kept in place the same way. */
+  const offeredRef = useRef<{ dom: HTMLLIElement; pos: number }[]>([]);
 
-  // Own emitted input preserves the caret. An external body arriving during
-  // IME is held until compositionend; cancelling composition must still apply
-  // it even when React receives no subsequent value update.
-  useEffect(() => {
-    if (composingRef.current) {
-      deferredBodyRef.current = value === undefined ? null : { html: value };
-      return;
-    }
-    deferredBodyRef.current = null;
-    if (initRef.current && (value === undefined || value === lastEmittedRef.current)) return;
-    replaceBody(value ?? initialHtml);
-  }, [initialHtml, value, replaceBody]);
-
-  // "/" on an empty line opens the menu of everything a line can become: a
-  // style, a list, a table, a file, and the live blocks the page offers.
-  // What is typed after it narrows the menu.
-  const embedHost = useEmbedHost();
   const spaceId = useActiveSpaceId();
-  const [slash, setSlash] = useState<{ x: number; y: number; index: number; query: string; block: Element | null } | null>(null);
-  const slashItemsRef = useRef<SlashItem[]>([]);
-  const [picker, setPicker] = useState<{ x: number; y: number; block: Element | null } | null>(null);
+  const spaceIdRef = useRef(spaceId);
+  spaceIdRef.current = spaceId;
+  const embedHost = useEmbedHost();
+  const me = usePresenceName(!!collab && editable);
+  const user = useMemo<CollabUser>(
+    () => ({ name: me.name || t('Someone'), tone: (hashText(me.userId ?? '') % CURSOR_COLORS) + 1 }),
+    [me.name, me.userId, t],
+  );
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
+  const [slash, setSlash] = useState<{ x: number; y: number; query: string } | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [picker, setPicker] = useState<{ x: number; y: number } | null>(null);
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number; canMerge: boolean; canSplit: boolean } | null>(null);
+  const [handles, setHandles] = useState<TableHandles | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const fileBlockRef = useRef<Element | null>(null);
-  const emit = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    // Repair any bad nesting a structural command just produced before it
-    // persists. Cheap guard keeps plain typing untouched; the repair only
-    // moves element wrappers (text nodes are relocated, not recreated) so
-    // the live caret survives.
-    if (hasInvalidStructure(el)) normalizeStructure(el);
-    el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
-    const html = el.innerHTML;
+
+  // With others editing, one side saves the shared body for everyone (the
+  // session says which), so their saves never cross.
+  const isSaver = useCallback(() => {
+    const session = sessionRef.current;
+    return !session || session.isSaver();
+  }, []);
+  const canEdit = useCallback(() => {
+    const session = sessionRef.current;
+    return editableRef.current && (!session || session.ready);
+  }, []);
+
+  const emit = useCallback((doc: PMNode) => {
+    const html = docToHtml(doc);
     if (html === lastEmittedRef.current) return;
     lastEmittedRef.current = html;
-    onChange?.(html);
-  }, [onChange]);
+    onChangeRef.current?.(html);
+  }, []);
 
-  // Puts a block-level node where the line `at` is (at the end when that
-  // line is gone), with an empty line after it holding the caret.
-  const placeBlock = useCallback((node: HTMLElement, at: Element | null) => {
-    const el = ref.current;
-    if (!el) return;
-    const after = document.createElement('p');
-    after.appendChild(document.createElement('br'));
-    if (at && at.parentElement === el) { at.replaceWith(node); node.after(after); }
-    else { el.appendChild(node); el.appendChild(after); }
-    el.focus();
-    const range = document.createRange();
-    range.selectNodeContents(after);
-    range.collapse(true);
-    const sel = document.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    emit();
-  }, [emit]);
+  // The toolbar over selected text, and the "/" menu, follow the editor.
+  const syncUi = useCallback((view: EditorView) => {
+    const s = slashKey.getState(view.state);
+    if (s) {
+      const c = view.coordsAtPos(s.pos);
+      setSlash((prev) => (prev && prev.x === c.left && prev.y === c.bottom + 4 && prev.query === s.query ? prev : { x: c.left, y: c.bottom + 4, query: s.query }));
+    } else {
+      setSlash(null);
+      setSlashIndex(0);
+    }
+    // While a word is being composed (Japanese input) the text being
+    // converted reads as a selection; the toolbar is for text the person chose.
+    const { selection } = view.state;
+    if (!editableRef.current || view.composing || selection.empty || selection instanceof CellSelection || !view.hasFocus()) {
+      setToolbar(null);
+      return;
+    }
+    const sel = window.getSelection();
+    const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+    const rect = range && view.dom.contains(range.commonAncestorContainer) ? range.getBoundingClientRect() : null;
+    if (!rect || (rect.width === 0 && rect.height === 0)) { setToolbar(null); return; }
+    setToolbar({ x: rect.left + rect.width / 2, y: rect.top - TOOLBAR_GAP });
+  }, []);
 
-  const insertEmbed = useCallback((spec: EmbedSpec, at: Element | null) => {
-    const pre = document.createElement('pre');
-    pre.setAttribute('data-lang', EMBED_LANG);
-    pre.textContent = embedSource(spec);
-    placeBlock(pre, at);
-  }, [placeBlock]);
+  // An editor that does not save watches that what is typed gets saved. When
+  // the saved body trails it for a while (the one who saves is gone, asleep
+  // or cannot save), it saves in that one's stead. Never when the saved body
+  // is the newer of the two — then this side is the one behind.
+  const standIn = useCallback((view: EditorView) => {
+    const session = sessionRef.current;
+    if (!session || !initializedRef.current || !session.ready || session.isSaver()) return;
+    if (docChangedAtRef.current <= valueChangedAtRef.current) return;
+    const html = docToHtml(view.state.doc);
+    if (html !== valueRef.current) onChangeRef.current?.(html, { standIn: true });
+  }, []);
+  const armStandIn = useCallback(() => {
+    if (standInTimerRef.current) clearTimeout(standInTimerRef.current);
+    standInTimerRef.current = setTimeout(() => {
+      standInTimerRef.current = null;
+      if (viewRef.current) standIn(viewRef.current);
+    }, STAND_IN_MS + standInJitter);
+  }, [standIn, standInJitter]);
+
+  // A body saved elsewhere (an AI's edit, a save merged with another's) is
+  // brought into the editor by the one who saves.
+  const bringIn = useCallback((view: EditorView, html: string) => {
+    if (html === lastEmittedRef.current || !isSaver()) return;
+    // A word is being composed: the body waits, with what the editor holds
+    // now, and nothing is saved until the two are put together.
+    if (view.composing) {
+      pendingRef.current = { html, base: pendingRef.current?.base ?? docToHtml(view.state.doc) };
+      return;
+    }
+    const tr = replaceDoc(view, htmlToDoc(html));
+    if (tr) view.dispatch(tr.setMeta(EXTERNAL, true).setMeta('addToHistory', false));
+    lastEmittedRef.current = html;
+  }, [isSaver]);
+
+  // The word is in: the body that waited and what was typed meanwhile are put
+  // together paragraph by paragraph, and that is what is saved.
+  const settlePending = useCallback((view: EditorView) => {
+    const pending = pendingRef.current;
+    if (!pending || view.composing) return;
+    pendingRef.current = null;
+    const mine = docToHtml(view.state.doc);
+    const merged = mine === pending.base ? pending.html : mergeNote(pending.base, mine, pending.html);
+    lastEmittedRef.current = pending.html;
+    const tr = replaceDoc(view, htmlToDoc(merged));
+    if (tr) view.dispatch(tr.setMeta('addToHistory', false));
+    else if (isSaver()) emit(view.state.doc);
+  }, [emit, isSaver]);
+
+  const run = useCallback((cmd: Command) => {
+    const view = viewRef.current;
+    if (!view) return;
+    cmd(view.state, view.dispatch, view);
+    view.focus();
+  }, []);
+
+  const insertEmbed = useCallback((spec: EmbedSpec) => {
+    run(placeBlock(code_block.create({ lang: EMBED_LANG }, schema.text(embedSource(spec)))));
+  }, [run]);
 
   const uploadFiles = useCallback(async (files: File[]) => {
-    const at = fileBlockRef.current;
-    fileBlockRef.current = null;
-    if (!spaceId || !files.length) return;
+    const space = spaceIdRef.current;
+    if (!space || !files.length) return;
     try {
-      let line = at;
       for (const file of files) {
-        const saved = await uploadToArtifacts(spaceId, file);
-        insertEmbed({ view: FILE_VIEW, id: saved.id }, line);
-        line = null;
+        const saved = await uploadToArtifacts(space, file);
+        insertEmbed({ view: FILE_VIEW, id: saved.id });
       }
     } catch (err) {
       await appDialog.alert(formatError(err));
     }
-  }, [spaceId, insertEmbed]);
+  }, [insertEmbed]);
 
-  // Mirror each linked bullet's ○ to its Element's live status.
-  // `data-element-status` is derived — applied here and re-applied
-  // whenever element data changes; the sanitizer drops it so it never
-  // persists (only data-element-id, the link, survives a save).
-  const applyElementStatuses = useCallback(() => {
-    const el = ref.current;
-    if (!el || composingRef.current) return;
-    const before = el.innerHTML;
-    for (const li of Array.from(el.querySelectorAll<HTMLLIElement>('li[data-element-id]'))) {
-      const id = li.getAttribute('data-element-id');
-      const status = (id && elementStatusById?.[id]) || 'backlog';
-      // Only touch the DOM when the value actually changes — avoids needless
-      // mutations while the user is typing in the contentEditable.
-      if (li.getAttribute('data-element-status') !== status) {
-        li.setAttribute('data-element-status', status);
-      }
-    }
-    // Derived status marks alone are not a user edit. Preserve a real pending
-    // DOM edit, but do not let a trailing IME input event autosave these marks.
-    if (lastEmittedRef.current === before) lastEmittedRef.current = el.innerHTML;
-  }, [elementStatusById]);
+  // "/" keys, routed from the editor while the menu is open.
+  const slashKeyRef = useRef<(key: string) => boolean>(() => false);
 
-  // Re-apply after the initial content loads and on every element change.
+  // ── The editor ──────────────────────────────────────────────────────────
+  const collabId = collab && editable ? collab : null;
   useEffect(() => {
-    applyElementStatuses();
-  }, [applyElementStatuses, value]);
+    const mount = mountRef.current;
+    if (!mount) return;
+    let view: EditorView | null = null;
+    let session: NoteCollab | null = null;
+    let cancelled = false;
+    initializedRef.current = false;
 
-  // Stamp the data-element-id link onto bullets just turned into Elements
-  // (called by PageView after → Element 化), then persist.
-  const linkBullets = useCallback((entries: { li: HTMLLIElement; elementId: string }[]) => {
-    for (const { li, elementId } of entries) {
-      if (!li || !elementId) continue;
-      li.setAttribute('data-element-id', elementId);
-      li.setAttribute('data-element-status', elementStatusById?.[elementId] ?? 'backlog');
-    }
-    emit();
-  }, [emit, elementStatusById]);
-
-  // While a Japanese (or any IME) word is being composed, the text being
-  // converted reads as a selection; the toolbar is for text the person chose,
-  // so it stays away until the composition ends.
-  const updateToolbarPosition = useCallback(() => {
-    const sel = window.getSelection();
-    if (composingRef.current || !sel || sel.rangeCount === 0 || sel.isCollapsed) {
-      setToolbar(null);
-      return;
-    }
-    const range = sel.getRangeAt(0);
-    if (!ref.current?.contains(range.commonAncestorContainer)) {
-      setToolbar(null);
-      return;
-    }
-    const rect = range.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) {
-      setToolbar(null);
-      return;
-    }
-    setToolbar({
-      x: rect.left + rect.width / 2,
-      y: rect.top - TOOLBAR_GAP,
-    });
-  }, []);
-
-  const exec = useCallback((cmd: string, value?: string) => {
-    // Bring the (possibly drifted) caret back into the editor first so the
-    // command targets the user's text rather than nothing.
-    restoreSelection();
-    document.execCommand(cmd, false, value);
-    // execCommand applies inline `style="text-align: ..."` for justify.
-    // Convert to data-align so our sanitizer + CSS handles it cleanly.
-    normalizeAlignment(ref.current);
-    emit();
-    updateToolbarPosition();
-  }, [emit, updateToolbarPosition, restoreSelection]);
-
-  useEffect(() => {
-    const onSel = () => updateToolbarPosition();
-    document.addEventListener('selectionchange', onSel);
-    window.addEventListener('scroll', onSel, true);
-    window.addEventListener('resize', onSel);
-    return () => {
-      document.removeEventListener('selectionchange', onSel);
-      window.removeEventListener('scroll', onSel, true);
-      window.removeEventListener('resize', onSel);
-    };
-  }, [updateToolbarPosition]);
-
-  // A "/" that arrived as text rather than as its key (an input method, a
-  // phone's keyboard): a line holding only that opens the menu the same way.
-  const openSlashFromText = useCallback(() => {
-    const el = ref.current;
-    const sel = document.getSelection();
-    if (!el || !editable || !sel?.anchorNode || !el.contains(sel.anchorNode)) return false;
-    let node: Node | null = sel.anchorNode;
-    while (node && node.parentNode !== el) node = node.parentNode;
-    const block = node instanceof HTMLElement ? node : null;
-    if (!block || block.tagName === 'PRE' || block.tagName === 'TABLE') return false;
-    const text = block.textContent ?? '';
-    if (text !== '/' && text !== '／') return false;
-    const box = block.getBoundingClientRect();
-    block.innerHTML = '<br>';
-    const range = document.createRange();
-    range.selectNodeContents(block);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    setSlash({ x: box.left, y: box.bottom + 4, index: 0, query: '', block });
-    return true;
-  }, [editable]);
-
-  const handleInput = useCallback(() => {
-    // Let the IME finish; compositionend re-runs this work once committed.
-    // The placeholder still goes now: the text being composed is on the line.
-    if (composingRef.current) {
-      ref.current?.setAttribute('data-empty', 'false');
-      return;
-    }
-    openSlashFromText();
-    normalizeAlignment(ref.current);
-    emit();
-  }, [emit, openSlashFromText]);
-
-  const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-    setToolbar(null);
-    compositionStartHtmlRef.current = ref.current?.innerHTML ?? '';
-    deferredBodyRef.current = null;
-  }, []);
-
-  const handleCompositionEnd = useCallback(() => {
-    composingRef.current = false;
-    setToolbar(null);
-    const locallyChanged = ref.current?.innerHTML !== compositionStartHtmlRef.current;
-    const deferred = deferredBodyRef.current;
-    deferredBodyRef.current = null;
-    if (!locallyChanged && deferred) {
-      replaceBody(deferred.html);
-    } else if (locallyChanged) {
-      // A committed local composition is the latest edit. Its own controlled
-      // echo will be recognized rather than replacing the composition's caret.
-      openSlashFromText();
-      normalizeAlignment(ref.current);
-      emit();
-    }
-    // A cancelled composition leaves the line as it was — empty again, maybe.
-    if (ref.current) ref.current.setAttribute('data-empty', isEditorEmpty(ref.current) ? 'true' : 'false');
-    applyElementStatuses();
-  }, [applyElementStatuses, emit, replaceBody, openSlashFromText]);
-
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const html = e.clipboardData.getData('text/html');
-    const text = e.clipboardData.getData('text/plain');
-    const cleaned = html ? sanitizeHtml(html) : escapeText(text);
-    document.execCommand('insertHTML', false, cleaned);
-  }, []);
-
-  // Enter handling for "sticky" blocks so their style doesn't run forever.
-  // Returns true when it took over (caller should preventDefault). Plain
-  // Enter only — Shift+Enter falls through to a native soft break, and an
-  // IME-commit Enter is left alone.
-  const breakOutOfStickyBlock = useCallback((): boolean => {
-    const root = ref.current;
-    const sel = window.getSelection();
-    if (!root || !sel || sel.rangeCount === 0) return false;
-    let node: Node | null = sel.anchorNode;
-    let block: HTMLElement | null = null;
-    while (node && node !== root) {
-      if (node.nodeType === 1) {
-        const t = (node as HTMLElement).tagName;
-        if (HEADING_BLOCKS.has(t) || CONTAINER_BLOCKS.has(t) || t === 'P' || t === 'LI') {
-          block = node as HTMLElement;
-          break;
-        }
-      }
-      node = node.parentNode;
-    }
-    if (!block) return false;
-    const tag = block.tagName;
-    const empty = (block.textContent ?? '').trim() === '';
-    // Headings always exit; quote/code only when the current line is empty
-    // (so multi-line quotes/code still work, but you can always break out).
-    if (!HEADING_BLOCKS.has(tag) && !(CONTAINER_BLOCKS.has(tag) && empty)) return false;
-    const p = document.createElement('p');
-    p.appendChild(document.createElement('br'));
-    if (empty) block.replaceWith(p);
-    else block.after(p);
-    const r = document.createRange();
-    r.selectNodeContents(p);
-    r.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(r);
-    emit();
-    return true;
-  }, [emit]);
-
-  // Tab / Shift+Tab moves between table cells (and Tab in the last cell
-  // appends a new row, the way Note / Word do). Returns true when the
-  // caret was in a table and the key was handled.
-  const handleTableTab = useCallback((forward: boolean) => {
-    const root = ref.current;
-    if (!root) return false;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return false;
-    let node: Node | null = sel.anchorNode;
-    let cell: HTMLTableCellElement | null = null;
-    while (node && node !== root) {
-      if (node.nodeType === 1) {
-        const tag = (node as Element).tagName;
-        if (tag === 'TD' || tag === 'TH') { cell = node as HTMLTableCellElement; break; }
-      }
-      node = node.parentNode;
-    }
-    if (!cell) return false;
-    const table = cell.closest('table[data-note-table="true"]');
-    if (!table) return false;
-
-    const placeCaret = (target: Element) => {
-      const range = document.createRange();
-      range.selectNodeContents(target);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    };
-
-    const cells = Array.from(table.querySelectorAll<HTMLTableCellElement>('th, td'));
-    const idx = cells.indexOf(cell);
-    if (forward) {
-      if (idx < cells.length - 1) {
-        placeCaret(cells[idx + 1]);
-      } else {
-        // Last cell → append a new body row mirroring the column count.
-        const doc = table.ownerDocument;
-        const cols = table.querySelector('tr')?.children.length ?? 1;
-        const tbody = table.querySelector('tbody') ?? table;
-        const tr = doc.createElement('tr');
-        for (let i = 0; i < cols; i++) {
-          const td = doc.createElement('td');
-          td.appendChild(doc.createElement('br'));
-          tr.appendChild(td);
-        }
-        tbody.appendChild(tr);
-        placeCaret(tr.firstElementChild as Element);
-        emit();
-      }
-    } else if (idx > 0) {
-      placeCaret(cells[idx - 1]);
-    }
-    return true;
-  }, [emit]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (slash) {
-      const items = filterSlash(slashItemsRef.current, slash.query);
-      const n = items.length || 1;
-      if (e.key === 'ArrowDown') { e.preventDefault(); setSlash({ ...slash, index: (slash.index + 1) % n }); return; }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setSlash({ ...slash, index: (slash.index + n - 1) % n }); return; }
-      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-        e.preventDefault();
-        const item = items[slash.index];
-        setSlash(null);
-        item?.run(slash.block, slash);
-        return;
-      }
-      if (e.key === 'Backspace' && slash.query) { e.preventDefault(); setSlash({ ...slash, query: slash.query.slice(0, -1), index: 0 }); return; }
-      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !e.nativeEvent.isComposing) {
-        e.preventDefault();
-        setSlash({ ...slash, query: slash.query + e.key, index: 0 });
-        return;
-      }
-      setSlash(null);
-      if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); return; }
-    }
-    if (e.key === '/' && editable && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing && ref.current) {
-      const sel = document.getSelection();
-      let node: Node | null = sel?.anchorNode ?? null;
-      while (node && node.parentNode !== ref.current) node = node.parentNode;
-      const block = node instanceof Element ? node : null;
-      const empty = block ? !(block.textContent ?? '').trim() && block.tagName !== 'PRE' && block.tagName !== 'TABLE' : !(ref.current.textContent ?? '').trim();
-      if (empty) {
-        e.preventDefault();
-        const r = sel && sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : null;
-        const box = (block ?? ref.current).getBoundingClientRect();
-        setSlash({ x: r && r.left ? r.left : box.left, y: (r && r.bottom ? r.bottom : box.bottom) + 4, index: 0, query: '', block });
-        return;
-      }
-    }
-    if (e.key === 'Tab' && !e.nativeEvent.isComposing) {
-      if (handleTableTab(!e.shiftKey)) { e.preventDefault(); return; }
-    }
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-      if (breakOutOfStickyBlock()) { e.preventDefault(); return; }
-    }
-    // Cmd/Ctrl shortcuts that map to execCommand
-    const meta = e.metaKey || e.ctrlKey;
-    if (!meta) return;
-    const key = e.key.toLowerCase();
-    if (key === 'b') { e.preventDefault(); exec('bold'); }
-    else if (key === 'i') { e.preventDefault(); exec('italic'); }
-    else if (key === 'u') { e.preventDefault(); if (!compact) exec('underline'); }
-  }, [exec, breakOutOfStickyBlock, handleTableTab, compact, slash, editable]);
-
-  // Restore caret into the editor when triggering commands from the
-  // header toolbar — execCommand only runs against the focused
-  // contentEditable so we have to put the selection back first.
-  const focusEditor = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.focus();
-    const sel = window.getSelection();
-    if (!sel) return;
-    // Live selection already inside the editor → keep it.
-    if (sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
-    // Header-toolbar case: restore the last editor selection so the command
-    // acts on the line the user was on, not the end of the document.
-    if (savedRangeRef.current) {
-      sel.removeAllRanges();
-      sel.addRange(savedRangeRef.current);
-      return;
-    }
-    // Nothing saved yet → place caret at end.
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }, []);
-
-  const toggleChecklist = useCallback(() => {
-    focusEditor();
-    // Toggle the currently selected line(s) into a checklist <ul data-checklist="true">.
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    const root = ref.current;
-    if (!root || !root.contains(range.commonAncestorContainer)) return;
-
-    // Collect the block-level ancestors that the selection touches.
-    const blocks = collectSelectedBlocks(root, range);
-    if (blocks.length === 0) return;
-
-    // If every block is already a checklist item → unwrap to <p>.
-    const allChecklist = blocks.every((b) =>
-      b.tagName === 'LI' && (b.parentElement?.getAttribute('data-checklist') === 'true')
-    );
-
-    if (allChecklist) {
-      for (const li of blocks) {
-        const p = document.createElement('p');
-        p.innerHTML = li.innerHTML;
-        const ul = li.parentElement!;
-        ul.parentElement!.insertBefore(p, ul);
-        li.remove();
-        if (ul.children.length === 0) ul.remove();
-      }
-    } else {
-      wrapBlocksAsChecklist(blocks);
-    }
-    emit();
-  }, [emit, focusEditor]);
-
-  // Bulleted (•) and dashed (—) lists are both <ul>, distinguished by
-  // a data-style attribute so CSS can swap the marker. Numbered → <ol>.
-  const applyList = useCallback((kind: 'bullet' | 'dashed' | 'numbered' | 'check') => {
-    if (kind === 'check') {
-      toggleChecklist();
-      return;
-    }
-    focusEditor();
-    if (kind === 'numbered') {
-      exec('insertOrderedList');
-      return;
-    }
-    exec('insertUnorderedList');
-    // Walk up from the selection to find the <ul> we just created and
-    // tag it (bullet | dashed). The browser doesn't expose a "which list
-    // did insert-list create" handle, so we use the current selection.
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    let node: Node | null = range.startContainer;
-    while (node && node !== ref.current) {
-      if (node.nodeType === 1 && (node as HTMLElement).tagName === 'UL') {
-        const ul = node as HTMLElement;
-        if (kind === 'dashed') ul.setAttribute('data-style', 'dashed');
-        else ul.removeAttribute('data-style');
-        break;
-      }
-      node = node.parentNode;
-    }
-    emit();
-  }, [exec, toggleChecklist, focusEditor, emit]);
-
-  const applyBlock = useCallback((tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => {
-    focusEditor();
-    exec('formatBlock', tag);
-  }, [exec, focusEditor]);
-
-  const insertTable = useCallback((rows = 3, cols = 3) => {
-    focusEditor();
-    // Build a simple HTML table — header row + (rows) body rows.
-    const headerCells = Array.from({ length: cols }, () => '<th><br></th>').join('');
-    const bodyRows = Array.from({ length: rows }, () => {
-      const tds = Array.from({ length: cols }, () => '<td><br></td>').join('');
-      return `<tr>${tds}</tr>`;
-    }).join('');
-    const html = `<table data-note-table="true"><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table><p><br></p>`;
-    document.execCommand('insertHTML', false, html);
-    emit();
-  }, [focusEditor, emit]);
-
-  useImperativeHandle(handleRef, () => ({
-    applyBlock,
-    applyList,
-    insertTable,
-    focus: focusEditor,
-    linkBullets,
-  }), [applyBlock, applyList, insertTable, focusEditor, linkBullets]);
-
-  // Run a table mutation against the cell the menu was opened on, persist,
-  // and close the menu. All ops are plain DOM edits (see tbl* helpers below).
-  const runTableOp = useCallback((op: (cell: HTMLTableCellElement) => void) => {
-    const cell = tableCellRef.current;
-    if (cell && cell.isConnected) {
-      op(cell);
-      emit();
-    }
-    setTableMenu(null);
-    tableCellRef.current = null;
-  }, [emit]);
-
-  const clearCellSelection = useCallback(() => {
-    const root = ref.current;
-    if (!root) return;
-    for (const c of Array.from(root.querySelectorAll('[data-cell-sel]'))) c.removeAttribute('data-cell-sel');
-    selectedCellsRef.current = [];
-  }, []);
-
-  // Highlight the rectangle spanning anchor → current and remember its cells.
-  // Span-aware so dragging across already-merged cells stays a clean rectangle.
-  const applyCellRect = useCallback((anchor: HTMLTableCellElement, current: HTMLTableCellElement) => {
-    const table = anchor.closest('table');
-    if (!table || current.closest('table') !== table) return;
-    const g = tblBuildGrid(table);
-    const box = tblBoxOf(g, [anchor, current]);
-    if (!Number.isFinite(box.minR)) return;
-    tblExpandBox(g, box);
-    for (const c of Array.from(table.querySelectorAll('[data-cell-sel]'))) c.removeAttribute('data-cell-sel');
-    const sel: HTMLTableCellElement[] = [];
-    const seen = new Set<HTMLTableCellElement>();
-    for (let r = box.minR; r <= box.maxR; r++) {
-      for (let cc = box.minC; cc <= box.maxC; cc++) {
-        const cell = g.grid[r]?.[cc];
-        if (!cell || seen.has(cell)) continue;
-        seen.add(cell);
-        cell.setAttribute('data-cell-sel', 'true');
-        sel.push(cell);
-      }
-    }
-    selectedCellsRef.current = sel;
-  }, []);
-
-  // Merge the highlighted rectangle.
-  const runTableMerge = useCallback(() => {
-    const cells = selectedCellsRef.current;
-    if (cells.length >= 2) {
-      tblMergeCells(cells);
-      clearCellSelection(); // drop data-cell-sel before persisting
-      emit();
-    }
-    setTableMenu(null);
-    tableCellRef.current = null;
-  }, [emit, clearCellSelection]);
-
-  // Cell-selection drag wiring (attached to the editor in the JSX below).
-  const handleEditorMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return; // right-click keeps an existing cell selection
-    // A click on an un-linked checklist item's box checks or unchecks it.
-    // The box sits on the item's first line, so a click lower down (beside
-    // a nested list) is not on this item's box.
-    const target = e.target as HTMLElement;
-    const li = target.tagName === 'UL' || target.tagName === 'OL' ? null : target.closest('li');
-    // A linked line's mark (left) and arrow (right) open its Element, as a
-    // created Element's card in the chat does; the text between stays text.
-    const linkedId = li?.getAttribute('data-element-id');
-    if (li && linkedId && li.parentElement?.getAttribute('data-checklist') === 'true') {
-      const rect = li.getBoundingClientRect();
-      if (e.clientX - rect.left < LINKED_EDGE_PX || rect.right - e.clientX < LINKED_EDGE_PX) {
-        e.preventDefault();
+    const handleDOMEvents: NonNullable<ConstructorParameters<typeof EditorView>[1]>['handleDOMEvents'] = {
+      mousedown(v, event) {
+        if (event.button !== 0) return false;
+        const target = event.target as HTMLElement;
+        const li = target.tagName === 'UL' || target.tagName === 'OL' ? null : target.closest('li');
+        const linkedId = li?.getAttribute('data-element-id');
+        if (!li || !linkedId || !v.dom.contains(li) || li.parentElement?.getAttribute('data-checklist') !== 'true') return false;
+        // The arrow at a linked line's right opens its Element, as a created
+        // Element's card in the chat does (the mark at its left is its Status).
+        if (li.getBoundingClientRect().right - event.clientX >= LINKED_EDGE_PX) return false;
+        event.preventDefault();
         openInApp('domain-elements', { elementId: linkedId });
-        return;
-      }
-    }
-    if (li && !li.hasAttribute('data-element-id') && li.parentElement?.getAttribute('data-checklist') === 'true') {
-      const rect = li.getBoundingClientRect();
-      const lineHeight = parseFloat(getComputedStyle(li).lineHeight) || CHECK_BOX_HIT_PX;
-      if (e.clientX - rect.left < CHECK_BOX_HIT_PX && e.clientY - rect.top < lineHeight) {
-        e.preventDefault();
-        li.setAttribute('data-checked', li.getAttribute('data-checked') === 'true' ? 'false' : 'true');
-        emit();
-        if (ref.current) onCommit?.(ref.current.innerHTML);
-        return;
-      }
-    }
-    clearCellSelection();
-    cellDraggingRef.current = false;
-    const cell = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement | null;
-    cellDragAnchorRef.current = cell && cell.closest('table[data-note-table="true"]') ? cell : null;
-  }, [clearCellSelection, emit, onCommit]);
-
-  const handleEditorMouseDrag = useCallback((e: React.MouseEvent) => {
-    const anchor = cellDragAnchorRef.current;
-    if (!anchor || !(e.buttons & 1)) return;
-    // Use the cell under the cursor, NOT e.target: during a contentEditable
-    // text-selection drag the browser keeps firing mousemove with target =
-    // the mousedown cell, so e.target never reflects the row you've dragged
-    // into — which silently broke multi-row selection.
-    const el = (ref.current?.ownerDocument ?? document).elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    const cell = el?.closest('td, th') as HTMLTableCellElement | null;
-    if (!cell || cell.closest('table') !== anchor.closest('table')) return;
-    // Stay a normal text selection until the cursor leaves the anchor cell.
-    if (cell === anchor && !cellDraggingRef.current) return;
-    cellDraggingRef.current = true;
-    (ref.current?.ownerDocument.defaultView ?? window).getSelection()?.removeAllRanges();
-    applyCellRect(anchor, cell);
-  }, [applyCellRect]);
-
-  const handleEditorMouseUp = useCallback(() => {
-    cellDragAnchorRef.current = null;
-    cellDraggingRef.current = false;
-  }, []);
-
-  // Column-resize: start on a border-strip mousedown, then track the drag on
-  // document (so it survives the cursor leaving the editor). Adjust the two
-  // adjacent <col> widths, keeping their sum so the table width stays put.
-  const handleColResizeStart = useCallback((e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const colEls = tblEnsureColgroup(table);
-    const left = colEls[leftColIndex], right = colEls[leftColIndex + 1];
-    if (!left || !right) return;
-    const startX = e.clientX;
-    const leftW = parseFloat(left.style.width) || left.getBoundingClientRect().width || 80;
-    const rightW = parseFloat(right.style.width) || right.getBoundingClientRect().width || 80;
-    colResizeRef.current = { left, right, startX, leftW, rightW };
-    const MIN = 40;
-    const onMove = (ev: MouseEvent) => {
-      let d = ev.clientX - startX;
-      d = Math.max(d, -(leftW - MIN));
-      d = Math.min(d, rightW - MIN);
-      left.style.width = `${Math.round(leftW + d)}px`;
-      right.style.width = `${Math.round(rightW - d)}px`;
+        return true;
+      },
+      contextmenu(v, event) {
+        const target = event.target as HTMLElement;
+        const cell = target.closest('td, th');
+        if (cell && v.dom.contains(cell)) {
+          if (!editableRef.current) return false;
+          event.preventDefault();
+          const at = cellAt(v, cell);
+          if (at === null) return true;
+          // Keep cells selected together when the click is on one of them.
+          let inSelection = false;
+          const sel = v.state.selection;
+          if (sel instanceof CellSelection) sel.forEachCell((_n, pos) => { if (pos === at) inSelection = true; });
+          if (!inSelection) v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(at + 1))));
+          setTableMenu({ x: event.clientX, y: event.clientY, canMerge: mergeCells(v.state), canSplit: splitCell(v.state) });
+          return true;
+        }
+        const onBullet = bulletRef.current;
+        const li = target.closest('li');
+        if (!onBullet || !li || !v.dom.contains(li)) return false;
+        const clicked = itemAt(v, li);
+        if (!clicked) return false;
+        event.preventDefault();
+        // The lines selected, or the one clicked.
+        let items: { node: PMNode; pos: number }[] = [];
+        const { from, to, empty } = v.state.selection;
+        // An item counts when its own line is in the selection (not only an
+        // item nested under it).
+        if (!empty) v.state.doc.nodesBetween(from, to, (node, pos) => {
+          if (node.type === list_item && pos + 1 < to && pos + 1 + (node.firstChild?.nodeSize ?? 0) > from) items.push({ node, pos });
+          return true;
+        });
+        if (!items.length) items = [clicked];
+        // Only a line of plain text not yet made an Element becomes one.
+        const lines = items
+          .map((it) => ({ ...it, text: (it.node.firstChild?.isTextblock ? it.node.firstChild.textContent : '').trim() }))
+          .filter((it) => it.text && !it.node.attrs.elementId && isPlainLine(it.node))
+          .map((it) => ({ ...it, dom: v.nodeDOM(it.pos) }))
+          .filter((it): it is typeof it & { dom: HTMLLIElement } => it.dom instanceof HTMLLIElement);
+        if (!lines.length) return true;
+        offeredRef.current = lines.map((l) => ({ dom: l.dom, pos: l.pos }));
+        onBullet({ text: lines[0].text, texts: lines.map((l) => l.text), liNodes: lines.map((l) => l.dom), x: event.clientX, y: event.clientY });
+        return true;
+      },
+      compositionend(v) {
+        setTimeout(() => {
+          if (viewRef.current !== v) return;
+          settlePending(v);
+          // A "/" typed through an input method opens the menu the same way.
+          const { $from, empty } = v.state.selection;
+          const text = $from.parent.textContent;
+          if (empty && $from.parent.isTextblock && $from.parent.type !== code_block && (text === '/' || text === '／') && !slashKey.getState(v.state)) {
+            v.dispatch(v.state.tr.insertText('/', $from.start(), $from.end()).setMeta(slashKey, { pos: $from.start(), query: '' }));
+          }
+          syncUi(v);
+        }, 0);
+        return false;
+      },
+      blur(v) {
+        setTimeout(() => {
+          if (viewRef.current !== v) return;
+          settlePending(v);
+          if (!v.hasFocus()) setToolbar(null);
+        }, 0);
+        return false;
+      },
     };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      colResizeRef.current = null;
-      emit();
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [emit]);
 
-  // Compute the "+" handle geometry for whichever table the cursor is over
-  // (with a small margin so the edge handles stay reachable). Coordinates are
-  // relative to the editor content box, which is stable under scroll.
-  const refreshTableHandles = useCallback((clientX: number, clientY: number) => {
-    const editable = ref.current;
-    if (!editable) return;
-    lastPointerRef.current = { x: clientX, y: clientY };
-    // Margin must clear the bottom "+" bar (sits ~20px below the table) so
-    // hovering the bar doesn't fall outside the table region and hide it.
-    const M = 28;
-    const table = Array.from(editable.querySelectorAll<HTMLTableElement>('table[data-note-table="true"]'))
-      .find((t) => {
-        const r = t.getBoundingClientRect();
-        return clientX >= r.left - M && clientX <= r.right + M && clientY >= r.top - M && clientY <= r.bottom + M;
+    const create = (plugins: Plugin[], doc: PMNode | undefined) => {
+      if (cancelled) return;
+      const state = EditorState.create({ schema, doc, plugins });
+      view = new EditorView(mount, {
+        state,
+        editable: canEdit,
+        attributes: (s) => ({
+          class: `note-editor no-focus-ring outline-none leading-[1.65] text-foreground ${compact ? 'note-compact min-h-[36px] text-[14px]' : 'min-h-[300px] text-[15px]'}`,
+          'data-empty': isEmptyDoc(s.doc) ? 'true' : 'false',
+          'data-placeholder': placeholderRef.current,
+          spellcheck: 'false',
+        }),
+        nodeViews: { code_block: drawnNodeView(registry) },
+        handleDOMEvents,
+        handlePaste(_v, event) {
+          // A file on its own is placed in the text. Text copied from an
+          // office app comes with a picture of itself: the text is what is pasted.
+          const data = event.clipboardData;
+          const files = Array.from(data?.files ?? []);
+          if (!data || !files.length || !spaceIdRef.current || !editableRef.current) return false;
+          if (data.getData('text/html') || data.getData('text/plain')) return false;
+          event.preventDefault();
+          void uploadFiles(files);
+          return true;
+        },
+        handleDrop(v, event) {
+          const files = Array.from(event.dataTransfer?.files ?? []);
+          if (!files.length || !spaceIdRef.current || !editableRef.current) return false;
+          event.preventDefault();
+          const at = v.posAtCoords({ left: event.clientX, top: event.clientY });
+          if (at) v.dispatch(v.state.tr.setSelection(TextSelection.near(v.state.doc.resolve(at.pos))));
+          void uploadFiles(files);
+          return true;
+        },
+        dispatchTransaction(this: EditorView, tr: Transaction) {
+          // A cursor update queued just before the editor closed arrives after it.
+          if (this.isDestroyed) return;
+          const { state: next, transactions } = this.state.applyTransaction(tr);
+          this.updateState(next);
+          const changed = transactions.some((t) => t.docChanged);
+          const link = linkRangeRef.current;
+          if (link && changed) {
+            linkRangeRef.current = transactions.reduce((r, t) => ({ from: t.mapping.map(r.from, 1), to: t.mapping.map(r.to, -1) }), link);
+          }
+          if (offeredRef.current.length && changed) {
+            offeredRef.current = offeredRef.current.map((o) => ({ dom: o.dom, pos: transactions.reduce((pos, t) => t.mapping.map(pos, 1), o.pos) }));
+          }
+          if (changed && initializedRef.current) {
+            docChangedAtRef.current = performance.now();
+            if (tr.getMeta(EXTERNAL)) lastEmittedRef.current = docToHtml(next.doc);
+            else if (pendingRef.current) { /* saved with the body that waits (settlePending) */ }
+            else if (isSaver()) emit(next.doc);
+            else armStandIn();
+          }
+          syncUi(this);
+        },
       });
-    if (!table) {
-      if (handlesSigRef.current !== null) { handlesSigRef.current = null; setTableHandles(null); }
-      return;
+      viewRef.current = view;
+      // What was saved is not new: only what changes from here on saves.
+      lastEmittedRef.current = docToHtml(htmlToDoc(valueRef.current));
+      initializedRef.current = true;
+      couldEditRef.current = canEdit();
+      // A shared document already holding edits nobody saved: whoever saves takes them.
+      wasSaverRef.current = isSaver();
+      if (wasSaverRef.current) emit(view.state.doc);
+      setReady(true);
+    };
+
+    const common = (undo: Command, redo: Command): Plugin[] => [
+      slashTrigger((key) => slashKeyRef.current(key)),
+      ...tablePlugins(),
+      ...noteKeymap(undo, redo, { underline: !compact }),
+      shortcuts(),
+      checklistMarks(marks),
+      drawnEditing(),
+      ...cursors(),
+    ];
+
+    let off = () => {};
+    if (collabId) {
+      const s = openNoteCollab(collabId);
+      session = s;
+      sessionRef.current = s;
+      s.setUser(userRef.current);
+      // The shared document starts from the saved body, at once; if others
+      // hold an older one, the session takes theirs ('replaced').
+      s.start((doc) => seedFromHtml(doc, valueRef.current));
+      const bound = (): Plugin[] => [
+        ySyncPlugin(s.doc.getXmlFragment(FRAGMENT)),
+        yCursorPlugin(s.awareness, { cursorBuilder, selectionBuilder }),
+        yUndoPlugin(),
+        ...common(yUndo as Command, yRedo as Command),
+      ];
+      create(bound(), undefined);
+      off = s.subscribe((event: CollabEvent) => {
+        const v = viewRef.current;
+        if (!v) return;
+        if (event === 'replaced') {
+          linkRangeRef.current = null;
+          offeredRef.current = [];
+          v.updateState(EditorState.create({ schema, plugins: bound() }));
+        }
+        const can = canEdit();
+        if (can !== couldEditRef.current) { couldEditRef.current = can; v.setProps({ editable: canEdit }); }
+        // Taking over the saving: what nobody has saved yet is saved now.
+        const saver = isSaver();
+        if (saver && !wasSaverRef.current && initializedRef.current && !pendingRef.current) emit(v.state.doc);
+        wasSaverRef.current = saver;
+      });
+    } else {
+      create([...localHistory(), ...common(pmUndo, pmRedo)], htmlToDoc(valueRef.current));
     }
-    const rowsEls = Array.from(table.querySelectorAll('tr'));
-    const headerCells = Array.from(rowsEls[0]?.children ?? []);
-    if (!rowsEls.length || !headerCells.length) { setTableHandles(null); return; }
-    const er = editable.getBoundingClientRect();
-    const top = rowsEls[0].getBoundingClientRect().top - er.top;
-    const left = headerCells[0].getBoundingClientRect().left - er.left;
-    // Vertical gridlines: left edge of each column (the right edge is the
-    // right bar, so it's excluded from the between-handle candidates).
-    const colXs: { x: number; index: number }[] = [];
-    let idx = 0;
-    for (const c of headerCells) {
-      colXs.push({ x: c.getBoundingClientRect().left - er.left, index: idx });
-      idx += parseInt(c.getAttribute('colspan') || '1', 10);
-    }
-    const colCount = idx;
-    const rightX = headerCells[headerCells.length - 1].getBoundingClientRect().right - er.left;
-    // Horizontal gridlines: bottom of each row.
-    const rowBottoms = rowsEls.map((tr, j) => ({ y: tr.getBoundingClientRect().bottom - er.top, rowIndex: j }));
-    const tableBottom = rowBottoms[rowBottoms.length - 1].y;
 
-    // Snap distance: a "+" only appears once the cursor is within this many
-    // px of a gridline, so you get the one boundary you're pointing at (and
-    // hovering a cell's middle shows just the bottom bar, nothing else).
-    const SNAP = 12;
-    const relX = clientX - er.left;
-    const relY = clientY - er.top;
+    return () => {
+      cancelled = true;
+      off();
+      if (standInTimerRef.current) { clearTimeout(standInTimerRef.current); standInTimerRef.current = null; }
+      // Leaving while the saved body trails what was typed: save it, unless
+      // the one who saves does.
+      if (view) standIn(view);
+      view?.destroy();
+      if (viewRef.current === view) viewRef.current = null;
+      session?.release();
+      if (sessionRef.current === session) sessionRef.current = null;
+      initializedRef.current = false;
+      pendingRef.current = null;
+      setReady(false);
+    };
+    // The editor is made once per Note; its other inputs are read through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collabId, compact, registry, marks]);
 
-    let col: TableHandleGeom['col'] = null;
-    { let best: { x: number; index: number } | null = null, bd = SNAP;
-      for (const c of colXs) { const d = Math.abs(c.x - relX); if (d < bd) { bd = d; best = c; } }
-      if (best) col = { x: best.x, top, index: best.index }; }
+  // Who this is, for the others' view of where they are typing.
+  useEffect(() => {
+    if (ready) sessionRef.current?.setUser(user);
+  }, [ready, user]);
 
-    // Internal row gridlines only (the last one is covered by the bottom bar).
-    let rowBetween: TableHandleGeom['rowBetween'] = null;
-    { let best: { y: number; rowIndex: number } | null = null, bd = SNAP;
-      for (let j = 0; j < rowBottoms.length - 1; j++) { const d = Math.abs(rowBottoms[j].y - relY); if (d < bd) { bd = d; best = rowBottoms[j]; } }
-      if (best) rowBetween = { y: best.y, left, rowIndex: best.rowIndex }; }
+  // A body saved elsewhere, or merged with another's save.
+  useEffect(() => {
+    const next = value ?? initialHtml ?? '';
+    if (next !== valueRef.current) valueChangedAtRef.current = performance.now();
+    valueRef.current = next;
+    const view = viewRef.current;
+    if (view && initializedRef.current) bringIn(view, next);
+  }, [value, initialHtml, bringIn]);
 
-    // Reveal each bar only when the cursor is near its edge: the bottom bar
-    // when in the last row (or below), the right bar when in the last column
-    // (or right of it) — so you don't get both at once mid-table.
-    const lastRowTop = rowBottoms.length >= 2 ? rowBottoms[rowBottoms.length - 2].y : top;
-    const lastColLeft = colXs[colXs.length - 1]?.x ?? left;
-    const nearBottom = relY >= lastRowTop;
-    const nearRight = relX >= lastColLeft;
-    const bottomBar = nearBottom ? { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 } : null;
-    const rightBar = nearRight ? { left: rightX, top, height: tableBottom - top, colIndex: colCount } : null;
-    // Draggable resize strips on each internal column border (colXs[1..]).
-    const resizers = colXs.slice(1).map((c) => ({ x: c.x, top, height: tableBottom - top, leftColIndex: c.index - 1 }));
-    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|b${bottomBar ? 1 : 0}R${rightBar ? 1 : 0}|${Math.round(tableBottom)},${Math.round(rightX)}|${colXs.map((c) => Math.round(c.x)).join(',')}`;
-    if (sig === handlesSigRef.current) return;
-    handlesSigRef.current = sig;
-    setTableHandles({ table, bottomBar, rightBar, col, rowBetween, resizers });
+  useEffect(() => {
+    editableRef.current = editable;
+    couldEditRef.current = canEdit();
+    viewRef.current?.setProps({ editable: canEdit });
+  }, [editable, canEdit]);
+
+  // What an empty body says follows the page's language.
+  useEffect(() => { viewRef.current?.setProps({}); }, [placeholder, t]);
+
+  useEffect(() => {
+    const onMove = () => { const v = viewRef.current; if (v) syncUi(v); };
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => { window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove); };
+  }, [syncUi]);
+
+  // ── What the page and the menus ask for ────────────────────────────────
+  const applyBlock = useCallback((tag: BlockTag) => run(setBlock(tag)), [run]);
+  const applyList = useCallback((kind: ListKind) => run(toggleList(kind)), [run]);
+  // A header row and `rows` rows under it.
+  const insertTable = useCallback((rows = 3, cols = 3) => run(placeBlock(createTable(rows + 1, cols))), [run]);
+  const focus = useCallback(() => viewRef.current?.focus(), []);
+  // A line that is not an Element is checked or unchecked from its mark.
+  const toggleLine = useCallback((mark: LineMark) => {
+    const view = viewRef.current;
+    const at = mark.getPos();
+    if (!view || at === undefined || !editableRef.current) return;
+    if (toggleChecked(at - 1)(view.state, view.dispatch)) onCommitRef.current?.(lastEmittedRef.current);
   }, []);
+  const linkBullets = useCallback((entries: { li: HTMLLIElement; elementId: string }[]) => {
+    const view = viewRef.current;
+    if (!view) return;
+    // A line is found where it has moved to since it was offered (others may
+    // have typed, and redrawn it, while its Element was being made).
+    const placeOf = (li: HTMLLIElement): number | null => {
+      const offered = offeredRef.current.find((o) => o.dom === li);
+      if (offered && view.state.doc.nodeAt(offered.pos)?.type === list_item) return offered.pos;
+      return itemAt(view, li)?.pos ?? null;
+    };
+    const found = entries
+      .map(({ li, elementId }) => ({ pos: placeOf(li), elementId }))
+      .filter((e): e is { pos: number; elementId: string } => e.pos !== null && !!e.elementId);
+    offeredRef.current = [];
+    if (found.length) linkItems(found)(view.state, view.dispatch);
+  }, []);
+  useImperativeHandle(handleRef, () => ({ applyBlock, applyList, insertTable, focus, linkBullets }),
+    [applyBlock, applyList, insertTable, focus, linkBullets]);
 
-  const handleInsertCol = useCallback((table: HTMLTableElement, index: number) => {
-    tblInsertColAtIndex(table, index);
-    emit();
-    handlesSigRef.current = null; // geometry changed → recompute at the cursor
-    const p = lastPointerRef.current;
-    if (p) refreshTableHandles(p.x, p.y);
-  }, [emit, refreshTableHandles]);
-  const handleInsertRow = useCallback((table: HTMLTableElement, rowIndex: number) => {
-    const rowEl = table.querySelectorAll('tr')[rowIndex] as HTMLTableRowElement | undefined;
-    if (rowEl) {
-      tblInsertRowAfter(rowEl);
-      emit();
-      handlesSigRef.current = null;
-      const p = lastPointerRef.current;
-      if (p) refreshTableHandles(p.x, p.y);
-    }
-  }, [emit, refreshTableHandles]);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    // Table cell → table editing menu (takes priority over the bullet menu).
-    const cell = target.closest('td, th') as HTMLTableCellElement | null;
-    if (cell && cell.closest('table[data-note-table="true"]')) {
-      e.preventDefault();
-      tableCellRef.current = cell;
-      // Keep the rectangular drag-selection if present; otherwise fall back to
-      // a linear text selection spanning cells (e.g. keyboard select).
-      if (selectedCellsRef.current.length < 2 && ref.current) {
-        const linear = tblSelectedCells(ref.current);
-        if (linear.length >= 2) selectedCellsRef.current = linear;
-      }
-      setTableMenu({ x: e.clientX, y: e.clientY });
-      return;
-    }
-    if (!onBulletContextMenu) return;
-    const li = target.closest('li') as HTMLLIElement | null;
-    if (!li) return;
-    e.preventDefault();
-    const sel = window.getSelection();
-    let liNodes: HTMLLIElement[] = [li];
-    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-      const range = sel.getRangeAt(0);
-      const blocks = collectSelectedBlocks(ref.current!, range)
-        .filter((b): b is HTMLLIElement => b.tagName === 'LI');
-      if (blocks.length > 0) liNodes = blocks;
-    }
-    // Pair each <li> with its text; drop empties, lines already linked
-    // to an Element (one-shot conversion), and lines whose content is
-    // styled as a heading / quote / pre — only Regular-text bullets
-    // become Elements.
-    const items = liNodes
-      .map((n) => ({ node: n, text: (n.textContent ?? '').trim() }))
-      .filter(
-        (it) =>
-          it.text &&
-          !it.node.hasAttribute('data-element-id') &&
-          liIsRegularText(it.node),
-      );
-    if (items.length === 0) return;
-    onBulletContextMenu({
-      text: items[0].text,
-      texts: items.map((it) => it.text),
-      liNodes: items.map((it) => it.node),
-      x: e.clientX,
-      y: e.clientY,
-    });
-  }, [onBulletContextMenu]);
-
-  const insertLink = useCallback(async () => {
-    // Restore the editor selection first — the header toolbar button stole
-    // focus, and createLink needs the original (non-collapsed) selection to
-    // know which text to wrap.
-    restoreSelection();
-    // Toggle: if the caret/selection already sits inside an <a>, strip
-    // the link instead of prompting for a new URL.
-    if (selectionHasAncestor(ref.current, 'A')) {
-      exec('unlink');
-      return;
-    }
-    const editor = ref.current;
-    const originalBody = editor?.innerHTML;
-    const selection = window.getSelection();
-    const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+  const askUrl = useCallback(async (): Promise<string | null> => {
     const url = await appDialog.prompt(t('Link URL'), 'https://');
-    if (!url) return;
+    if (!url) return null;
     if (!/^(https?:\/\/|mailto:)/i.test(url)) {
       await appDialog.alert(t('Enter a URL that starts with http(s):// or mailto:.'));
-      return;
+      return null;
     }
-    if (!editor || ref.current !== editor || editor.innerHTML !== originalBody || !range || !editor.contains(range.commonAncestorContainer)) return;
-    savedRangeRef.current = range;
-    editor.focus();
-    selection?.removeAllRanges(); selection?.addRange(range);
-    exec('createLink', url);
-  }, [exec, restoreSelection, t]);
+    return url;
+  }, [t]);
 
-  // A link on a line of its own ("/" has no text selected to wrap): asks
-  // for the address and writes it as the link's text.
+  // The toolbar's link: selected text already linked is unlinked; otherwise
+  // it asks for the address.
+  const toggleLink = useCallback(async () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection;
+    if (view.state.doc.rangeHasMark(from, to, schema.marks.link)) { run(setLink(null)); return; }
+    // The text keeps its place while the address is asked for, whoever types.
+    linkRangeRef.current = { from, to };
+    const url = await askUrl();
+    const range = linkRangeRef.current;
+    linkRangeRef.current = null;
+    if (!url || viewRef.current !== view || !range || range.from >= range.to) return;
+    try {
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, range.from, range.to)));
+    } catch {
+      return; // the text is gone
+    }
+    run(setLink(url));
+  }, [askUrl, run]);
+
+  // A link on a line of its own: the address is its text.
   const insertUrl = useCallback(async () => {
-    const editor = ref.current;
-    const selection = window.getSelection();
-    const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-    const url = await appDialog.prompt(t('Link URL'), 'https://');
-    if (!url) return;
-    if (!/^(https?:\/\/|mailto:)/i.test(url)) {
-      await appDialog.alert(t('Enter a URL that starts with http(s):// or mailto:.'));
-      return;
-    }
-    if (!editor || ref.current !== editor || !range || !editor.contains(range.commonAncestorContainer)) return;
-    editor.focus();
-    selection?.removeAllRanges(); selection?.addRange(range);
-    const a = document.createElement('a');
-    a.href = url;
-    a.textContent = url;
-    exec('insertHTML', a.outerHTML);
-  }, [exec, t]);
+    const url = await askUrl();
+    if (url) run(setLink(url));
+  }, [askUrl, run]);
 
-  // Block-level toggle: applies `tag` if the current block isn't
-  // already that tag, otherwise reverts to <p>. Used by the floating
-  // toolbar's quote button and the style dropdown so a second click
-  // cancels the format instead of re-applying it.
-  const toggleBlock = useCallback(
-    (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => {
-      focusEditor();
-      const current = currentBlockTag(ref.current);
-      const next = current === tag ? 'P' : tag;
-      exec('formatBlock', next);
-    },
-    [exec, focusEditor],
-  );
+  const onMark = useCallback((mark: Mark) => {
+    run(mark === 'bold' ? toggleBold : mark === 'italic' ? toggleItalic : mark === 'underline' ? toggleUnderline : toggleStrike);
+  }, [run]);
+
+  const tableAction = useCallback((action: TableAction) => {
+    setTableMenu(null);
+    const view = viewRef.current;
+    if (!view) return;
+    const move = (dir: 'row' | 'col', by: -1 | 1): Command => (state, dispatch) => {
+      if (!isInTable(state)) return false;
+      const rect = selectedRect(state);
+      const from = dir === 'row' ? rect.top : rect.left;
+      const last = dir === 'row' ? rect.map.height - 1 : rect.map.width - 1;
+      const to = from + by;
+      if (to < 0 || to > last) return false;
+      return dir === 'row' ? moveTableRow({ from, to })(state, dispatch) : moveTableColumn({ from, to })(state, dispatch);
+    };
+    const commands: Record<TableAction, Command> = {
+      'merge': mergeCells, 'split': splitCell,
+      'row-up': move('row', -1), 'row-down': move('row', 1), 'col-left': move('col', -1), 'col-right': move('col', 1),
+      'delete-row': deleteRow, 'delete-col': deleteColumn, 'delete-table': deleteTable,
+    };
+    run(commands[action]);
+  }, [run]);
+
+  const insertCol = useCallback((el: HTMLTableElement, index: number) => {
+    const view = viewRef.current;
+    const rect = view && tableAt(view, el);
+    if (!view || !rect) return;
+    view.dispatch(addColumn(view.state.tr, rect, index));
+    setHandles(null);
+  }, []);
+  const insertRow = useCallback((el: HTMLTableElement, rowIndex: number) => {
+    const view = viewRef.current;
+    const rect = view && tableAt(view, el);
+    if (!view || !rect) return;
+    view.dispatch(addRow(view.state.tr, rect, rowIndex + 1));
+    setHandles(null);
+  }, []);
 
   // Everything "/" offers, in the order shown. A description keeps its text
   // as Markdown, so it has no underline or alignment.
-  const heading = (n: number) => <span className="text-[11px] font-semibold leading-none">H{n}</span>;
-  const rawSlash: SlashItem[] = [
+  const headingIcon = (n: number) => <span className="text-[11px] font-semibold leading-none">H{n}</span>;
+  const slashItems: SlashItem[] = [
     { id: 'p', group: 'Style', label: 'Text', icon: <FileText size={15} />, keywords: 'paragraph body', run: () => applyBlock('P') },
-    { id: 'h1', group: 'Style', label: 'Heading 1', icon: heading(1), keywords: 'title h1', run: () => applyBlock('H1') },
-    { id: 'h2', group: 'Style', label: 'Heading 2', icon: heading(2), keywords: 'h2', run: () => applyBlock('H2') },
-    { id: 'h3', group: 'Style', label: 'Heading 3', icon: heading(3), keywords: 'h3', run: () => applyBlock('H3') },
+    { id: 'h1', group: 'Style', label: 'Heading 1', icon: headingIcon(1), keywords: 'title h1', run: () => applyBlock('H1') },
+    { id: 'h2', group: 'Style', label: 'Heading 2', icon: headingIcon(2), keywords: 'h2', run: () => applyBlock('H2') },
+    { id: 'h3', group: 'Style', label: 'Heading 3', icon: headingIcon(3), keywords: 'h3', run: () => applyBlock('H3') },
     { id: 'quote', group: 'Style', label: 'Quote', icon: <Quote size={15} />, keywords: 'blockquote', run: () => applyBlock('BLOCKQUOTE') },
     { id: 'code', group: 'Style', label: 'Code block', icon: <span className="font-mono text-[11px] leading-none">{'</>'}</span>, keywords: 'pre mermaid', run: () => applyBlock('PRE') },
     { id: 'bullet', group: 'List', label: 'Bulleted list', icon: <List size={15} />, keywords: 'ul', run: () => applyList('bullet') },
     { id: 'numbered', group: 'List', label: 'Numbered list', icon: <ListOrdered size={15} />, keywords: 'ol', run: () => applyList('numbered') },
     { id: 'check', group: 'List', label: 'Checklist', icon: <ElementIcon size={15} />, keywords: 'todo task', run: () => applyList('check') },
     { id: 'table', group: 'Insert', label: 'Insert table', icon: <TableIcon size={15} />, keywords: 'grid', run: () => insertTable() },
-    { id: 'hr', group: 'Insert', label: 'Divider', icon: <Minus size={15} />, keywords: 'hr line rule', run: (at) => placeBlock(document.createElement('hr'), at) },
+    { id: 'hr', group: 'Insert', label: 'Divider', icon: <Minus size={15} />, keywords: 'hr line rule', run: () => run(placeBlock(horizontal_rule.create())) },
     { id: 'link', group: 'Insert', label: 'Link', icon: <LinkIcon size={15} />, keywords: 'url', run: () => { void insertUrl(); } },
-    ...(spaceId ? ([
-      { id: 'file', group: 'Insert', label: 'File', icon: <Paperclip size={15} />, keywords: 'upload image attach artifact',
-        run: (at, pos) => setPicker({ x: pos.x, y: pos.y, block: at }) },
-    ] satisfies SlashItem[]) : []),
+    ...(spaceId ? [{ id: 'file', group: 'Insert', label: 'File', icon: <Paperclip size={15} />, keywords: 'upload image attach artifact',
+      run: (at: { x: number; y: number }) => setPicker(at) }] : []),
     ...(embedHost?.views ?? []).map((v) => ({
       id: `embed:${v.id}`, group: 'Insert', label: v.label, hint: v.hint, icon: v.icon ?? null, translated: true,
-      run: (at) => insertEmbed({ view: v.id }, at),
-    } satisfies SlashItem)),
-    { id: 'bold', group: 'Formatting', label: 'Bold', icon: <Bold size={15} />, run: () => exec('bold') },
-    { id: 'italic', group: 'Formatting', label: 'Italic', icon: <Italic size={15} />, run: () => exec('italic') },
-    ...(compact ? [] : [{ id: 'underline', group: 'Formatting', label: 'Underline', icon: <UnderlineIcon size={15} />, run: () => exec('underline') }]),
-    { id: 'strike', group: 'Formatting', label: 'Strikethrough', icon: <Strikethrough size={15} />, run: () => exec('strikeThrough') },
+      run: () => insertEmbed({ view: v.id }),
+    })),
+    { id: 'bold', group: 'Formatting', label: 'Bold', icon: <Bold size={15} />, run: () => onMark('bold') },
+    { id: 'italic', group: 'Formatting', label: 'Italic', icon: <Italic size={15} />, run: () => onMark('italic') },
+    ...(compact ? [] : [{ id: 'underline', group: 'Formatting', label: 'Underline', icon: <UnderlineIcon size={15} />, run: () => onMark('underline') }]),
+    { id: 'strike', group: 'Formatting', label: 'Strikethrough', icon: <Strikethrough size={15} />, run: () => onMark('strike') },
     ...(compact ? [] : [
-      { id: 'left', group: 'Formatting', label: 'Align left', icon: <AlignLeft size={15} />, run: () => exec('justifyLeft') },
-      { id: 'center', group: 'Formatting', label: 'Align center', icon: <AlignCenter size={15} />, run: () => exec('justifyCenter') },
-      { id: 'right', group: 'Formatting', label: 'Align right', icon: <AlignRight size={15} />, run: () => exec('justifyRight') },
+      { id: 'left', group: 'Formatting', label: 'Align left', icon: <AlignLeft size={15} />, run: () => run(setAlign('left')) },
+      { id: 'center', group: 'Formatting', label: 'Align center', icon: <AlignCenter size={15} />, run: () => run(setAlign('center')) },
+      { id: 'right', group: 'Formatting', label: 'Align right', icon: <AlignRight size={15} />, run: () => run(setAlign('right')) },
     ]),
   ];
-  const slashItems = rawSlash.map((item) => ({ ...item, search: `${item.translated ? item.label : t(item.label)} ${item.label} ${item.keywords ?? ''}`.toLowerCase() }));
-  slashItemsRef.current = slashItems;
-  const shownSlash = slash ? filterSlash(slashItems, slash.query) : [];
-  // Opens upward when the line is low on the screen.
-  const slashTop = slash && typeof window !== 'undefined' && slash.y + SLASH_MENU_HEIGHT > window.innerHeight
-    ? Math.max(8, slash.y - SLASH_MENU_HEIGHT - 28) : slash?.y ?? 0;
+  const shownSlash = slash ? filterSlash(slashItems, slash.query, t) : [];
+
+  const closeSlash = useCallback(() => {
+    const view = viewRef.current;
+    if (view) view.dispatch(view.state.tr.setMeta(slashKey, null));
+  }, []);
+  const pickSlash = (item: SlashItem) => {
+    const view = viewRef.current;
+    const at = slash ?? { x: 0, y: 0 };
+    if (view) clearSlash(view);
+    item.run({ x: at.x, y: at.y });
+  };
+  slashKeyRef.current = (key) => {
+    const n = shownSlash.length || 1;
+    if (key === 'ArrowDown') { setSlashIndex((i) => (i + 1) % n); return true; }
+    if (key === 'ArrowUp') { setSlashIndex((i) => (i + n - 1) % n); return true; }
+    if (key === 'Enter') {
+      const item = shownSlash[Math.min(slashIndex, shownSlash.length - 1)];
+      if (item) pickSlash(item); else closeSlash();
+      return true;
+    }
+    if (key === 'Escape') { closeSlash(); return true; }
+    return false;
+  };
 
   return (
     <>
-      {/* Mouse handlers live on the wrapper (not the contentEditable) so that
-          moving the cursor onto an overlay "+" handle — which sits above the
-          editable as a sibling — doesn't fire the editable's mouseleave and
-          make the handles flicker out from under the pointer. */}
-      <div
-        ref={frameRef}
-        className="relative"
-        onMouseDown={editable ? handleEditorMouseDown : undefined}
-        onMouseMove={editable ? (e) => { if (colResizeRef.current) return; handleEditorMouseDrag(e); refreshTableHandles(e.clientX, e.clientY); } : undefined}
-        onMouseUp={editable ? handleEditorMouseUp : undefined}
-        onMouseLeave={() => { handlesSigRef.current = null; setTableHandles(null); }}
-      >
-        <div
-          ref={ref}
-          contentEditable={editable}
-          suppressContentEditableWarning
-          onInput={handleInput}
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          onPaste={handlePaste}
-          onKeyDown={handleKeyDown}
-          onContextMenu={handleContextMenu}
-          spellCheck={false}
-          data-placeholder={placeholder ?? t('Start writing…')}
-          className={`note-editor no-focus-ring outline-none leading-[1.65] text-foreground ${compact ? 'note-compact min-h-[36px] text-[14px]' : 'min-h-[300px] text-[15px]'}`}
-        />
-        {/* ```mermaid blocks drawn over their source. */}
-        <MermaidLayer root={ref} frame={frameRef} />
-        {/* ```clayware blocks drawn live over their source. */}
-        <EmbedLayer root={ref} frame={frameRef} editable={editable} />
-        {slash && createPortal(
-          <>
-            <div className="fixed inset-0 z-40" onMouseDown={(e) => { e.preventDefault(); setSlash(null); }} />
-            <div role="listbox" aria-label={t('Insert a block')}
-              className="fixed z-50 w-64 overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-xl"
-              style={{ left: Math.min(slash.x, window.innerWidth - 272), top: slashTop, maxHeight: SLASH_MENU_HEIGHT }}
-              onMouseDown={(e) => e.preventDefault()}>
-              {slash.query && <p className="px-3 pb-1 pt-0.5 text-[11.5px] text-muted-foreground">/{slash.query}</p>}
-              {shownSlash.map((item, i) => (
-                <div key={item.id}>
-                  {!slash.query && item.group !== shownSlash[i - 1]?.group && (
-                    <p className={`px-3 pb-1 text-[11px] font-medium text-muted-foreground ${i ? 'mt-1 border-t border-border/50 pt-2' : 'pt-1'}`}>{t(item.group)}</p>
-                  )}
-                  <button type="button" role="option" aria-selected={i === slash.index}
-                    ref={i === slash.index ? (node) => node?.scrollIntoView({ block: 'nearest' }) : undefined}
-                    onMouseEnter={() => { if (i !== slash.index) setSlash({ ...slash, index: i }); }}
-                    onClick={() => { setSlash(null); item.run(slash.block, slash); }}
-                    className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left ${i === slash.index ? 'bg-muted' : ''}`}>
-                    <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">{item.icon}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] text-foreground">{item.translated ? item.label : t(item.label)}</span>
-                      {item.hint && <span className="block truncate text-[11px] text-muted-foreground">{item.translated ? item.hint : t(item.hint)}</span>}
-                    </span>
-                  </button>
-                </div>
-              ))}
-              {!shownSlash.length && <p className="px-3 py-2 text-[12px] text-muted-foreground">{t('Nothing matches.')}</p>}
-            </div>
-          </>,
-          document.body,
-        )}
-        {picker && createPortal(
-          <ArtifactPicker spaceId={spaceId} x={Math.min(picker.x, window.innerWidth - 336)} y={Math.min(picker.y, window.innerHeight - 320)}
-            onClose={() => setPicker(null)}
-            onUpload={() => { fileBlockRef.current = picker.block; setPicker(null); fileInputRef.current?.click(); }}
-            onPick={(file) => { const at = picker.block; setPicker(null); insertEmbed({ view: FILE_VIEW, id: file.id }, at); }} />,
-          document.body,
-        )}
+      <div ref={frameRef} className="relative"
+        onMouseMove={editable ? (e) => {
+          const view = viewRef.current;
+          if (!view || !frameRef.current || e.buttons) return;
+          const next = measureTableHandles(view.dom as HTMLElement, frameRef.current, e.clientX, e.clientY);
+          if (handlesKey(next) !== handlesKey(handles) || next?.table !== handles?.table) setHandles(next);
+        } : undefined}
+        onMouseLeave={() => setHandles(null)}>
+        <div ref={mountRef} />
+        {!ready && <div className={compact ? 'min-h-[36px]' : 'min-h-[300px]'} />}
+        <DrawnBlocks registry={registry} editable={editable} />
+        <ChecklistMarks registry={marks} editable={editable} elementsById={elementsById} onToggle={toggleLine} />
+        {editable && handles && <TableInsertHandles geom={handles} onInsertCol={insertCol} onInsertRow={insertRow} />}
         {editable && (
           <input ref={fileInputRef} type="file" multiple hidden
             onChange={(e) => { const files = Array.from(e.target.files ?? []); e.target.value = ''; void uploadFiles(files); }} />
         )}
-        {editable && tableHandles && (
-          <TableInsertHandles
-            geom={tableHandles}
-            onInsertCol={handleInsertCol}
-            onInsertRow={handleInsertRow}
-            onResizeStart={handleColResizeStart}
-          />
-        )}
       </div>
 
-      {/* The toolbar follows the selection. */}
+      {slash && (
+        <SlashMenu x={slash.x} y={slash.y} query={slash.query} items={shownSlash} index={Math.min(slashIndex, Math.max(0, shownSlash.length - 1))}
+          onHover={setSlashIndex} onPick={pickSlash} onClose={closeSlash} />
+      )}
+      {picker && createPortal(
+        <ArtifactPicker spaceId={spaceId} x={Math.min(picker.x, window.innerWidth - 336)} y={Math.min(picker.y, window.innerHeight - 320)}
+          onClose={() => setPicker(null)}
+          onUpload={() => { setPicker(null); fileInputRef.current?.click(); }}
+          onPick={(file) => { setPicker(null); insertEmbed({ view: FILE_VIEW, id: file.id }); }} />,
+        document.body,
+      )}
       {toolbar && editable && (
-        <FloatingToolbar
-          x={toolbar.x}
-          y={toolbar.y}
-          markdownOnly={compact}
-          onCommand={exec}
-          onChecklist={toggleChecklist}
-          onLink={insertLink}
-          onToggleBlock={toggleBlock}
-        />
+        <FloatingToolbar x={toolbar.x} y={toolbar.y} markdownOnly={compact}
+          onMark={onMark} onAlign={(a) => run(setAlign(a))} onList={applyList}
+          onBlock={(tag) => run(toggleBlock(tag))} onLink={() => { void toggleLink(); }} />
       )}
-
-      {/* Table cell right-click menu — merge selection, move & delete rows/cols. */}
       {tableMenu && editable && (
-        <TableContextMenu
-          x={tableMenu.x}
-          y={tableMenu.y}
-          canMerge={selectedCellsRef.current.length >= 2}
-          canUnmerge={
-            (parseInt(tableCellRef.current?.getAttribute('colspan') || '1', 10)) > 1 ||
-            (parseInt(tableCellRef.current?.getAttribute('rowspan') || '1', 10)) > 1
-          }
-          onAction={runTableOp}
-          onMerge={runTableMerge}
-          onClose={() => { setTableMenu(null); tableCellRef.current = null; }}
-        />
+        <TableContextMenu x={tableMenu.x} y={tableMenu.y} canMerge={tableMenu.canMerge} canSplit={tableMenu.canSplit}
+          onAction={tableAction} onClose={() => setTableMenu(null)} />
       )}
-
-      <style jsx global>{`
-        .note-editor { position: relative; }
-        /* Placeholder. Driven by data-empty (set in JS) rather than :empty,
-           because after typing-then-deleting the DOM keeps a <p><br></p> and
-           never becomes truly :empty. Absolutely positioned so it overlays
-           the empty first line without nudging the caret. */
-        .note-editor[data-empty="true"]::before {
-          content: attr(data-placeholder);
-          position: absolute;
-          top: 0;
-          left: 0;
-          color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
-          pointer-events: none;
-        }
-        .note-editor h1 {
-          font-size: 1.75rem;
-          font-weight: 700;
-          letter-spacing: -0.01em;
-          line-height: 1.25;
-          margin: 1.2rem 0 0.4rem;
-        }
-        .note-editor h2 {
-          font-size: 1.3rem;
-          font-weight: 600;
-          line-height: 1.3;
-          margin: 1rem 0 0.3rem;
-        }
-        .note-editor h3 {
-          font-size: 1.05rem;
-          font-weight: 600;
-          line-height: 1.35;
-          margin: 0.85rem 0 0.25rem;
-        }
-        .note-editor p { margin: 0.25rem 0; min-height: 1em; }
-        .note-compact h1 { font-size: 1.15rem; margin: 0.9rem 0 0.3rem; }
-        .note-compact h2 { font-size: 1rem; margin: 0.8rem 0 0.25rem; }
-        .note-compact h3 { font-size: 0.95rem; margin: 0.7rem 0 0.2rem; }
-        .note-compact > :first-child { margin-top: 0; }
-        .note-editor blockquote {
-          border-left: 3px solid var(--border);
-          padding-left: 0.8rem;
-          margin: 0.5rem 0;
-          color: var(--muted-foreground);
-        }
-        /* A break in the text, not a frame: a faint rule with room around it. */
-        .note-editor hr {
-          border: 0;
-          border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-          margin: 1.25rem 0;
-        }
-        .note-editor pre {
-          background: color-mix(in srgb, var(--muted) 60%, transparent);
-          padding: 0.6rem 0.8rem;
-          border-radius: 6px;
-          font-family: ui-monospace, SFMono-Regular, monospace;
-          font-size: 13px;
-          overflow-x: auto;
-          margin: 0.5rem 0;
-        }
-        .note-editor code {
-          background: color-mix(in srgb, var(--muted) 50%, transparent);
-          padding: 0.1em 0.35em;
-          border-radius: 4px;
-          font-size: 0.92em;
-          font-family: ui-monospace, SFMono-Regular, monospace;
-        }
-        .note-editor pre code {
-          background: transparent;
-          padding: 0;
-        }
-        .note-editor a {
-          color: var(--primary);
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-        .note-editor ul, .note-editor ol {
-          padding-left: 1.6rem;
-          margin: 0.3rem 0;
-        }
-        /* Restore markers — Tailwind's preflight resets ul/ol to
-           list-style: none, which would hide bullets/numbers. The dashed and
-           checklist variants below re-override these with higher specificity. */
-        .note-editor ul { list-style: disc; }
-        .note-editor ol { list-style: decimal; }
-        .note-editor ul ul { list-style: circle; }
-        .note-editor ul ul ul { list-style: square; }
-        .note-editor li { margin: 0.15rem 0; }
-        /* Bold/italic — preflight can flatten these inside the editor, so set
-           them explicitly. (font-weight: bolder resolves to 400 here.) */
-        .note-editor b, .note-editor strong { font-weight: 700; }
-        .note-editor i, .note-editor em { font-style: italic; }
-
-        /* Dashed list: replace the default disc with an em-dash to match
-           Note' "— Dashed List" option in the style picker. */
-        .note-editor ul[data-style="dashed"] { list-style: none; padding-left: 1.2rem; }
-        .note-editor ul[data-style="dashed"] > li { position: relative; padding-left: 0.6rem; }
-        .note-editor ul[data-style="dashed"] > li::before {
-          content: "—";
-          position: absolute;
-          left: -0.8rem;
-          top: 0;
-          color: var(--muted-foreground);
-        }
-
-        /* Tables — minimal Note-style ruled table. Editable cells.
-           table-layout: fixed keeps columns evenly sized so typing into a
-           cell doesn't widen its column and shift the grid; long content
-           wraps inside the fixed width instead. */
-        .note-editor table[data-note-table="true"] {
-          border-collapse: collapse;
-          table-layout: fixed;
-          margin: 0.5rem 0;
-          width: 100%;
-          max-width: 100%;
-        }
-        .note-editor table[data-note-table="true"] th,
-        .note-editor table[data-note-table="true"] td {
-          /* Ruled so a table reads as one: --border alone is too faint to
-             see on the dark ground. */
-          border: 1px solid color-mix(in oklab, var(--foreground) 20%, transparent);
-          padding: 0.4rem 0.6rem;
-          text-align: left;
-          vertical-align: top;
-          overflow-wrap: break-word;
-          word-break: break-word;
-        }
-        .note-editor table[data-note-table="true"] th {
-          font-weight: 600;
-        }
-        /* Merged cells (rowspan) center their text vertically; the toolbar's
-           align buttons set data-align on the cell for horizontal alignment. */
-        .note-editor table[data-note-table="true"] td[rowspan],
-        .note-editor table[data-note-table="true"] th[rowspan] {
-          vertical-align: middle;
-        }
-        .note-editor table[data-note-table="true"] td[data-align="center"],
-        .note-editor table[data-note-table="true"] th[data-align="center"] { text-align: center; }
-        .note-editor table[data-note-table="true"] td[data-align="right"],
-        .note-editor table[data-note-table="true"] th[data-align="right"] { text-align: right; }
-        /* Rectangular cell selection (drag across cells) → merge candidate. */
-        .note-editor table[data-note-table="true"] td[data-cell-sel="true"],
-        .note-editor table[data-note-table="true"] th[data-cell-sel="true"] {
-          background: color-mix(in srgb, var(--accent-default) 28%, transparent);
-        }
-
-        /* Alignment via data-align attribute (style="text-align" is normalized away) */
-        .note-editor [data-align="center"] { text-align: center; }
-        .note-editor [data-align="right"]  { text-align: right;  }
-
-        /* Checklist row: [status ○] [text], the mark a pure CSS
-           pseudo-element. Every item is a task: un-linked items show the
-           Backlog dashed ring; → Element 化 links one to an Element and the
-           ○ then mirrors that Element's live status. */
-        .note-editor ul[data-checklist="true"] {
-          list-style: none;
-          padding-left: 0.25rem;
-        }
-        .note-editor ul[data-checklist="true"] > li {
-          position: relative;
-          padding-left: 1.5rem; /* 16px mark + 8px gap */
-          cursor: text;
-        }
-        /* ::before = the status ○. Default (un-linked) = Backlog dashed
-           ring; the linked-bullet rules below override it per status. */
-        .note-editor ul[data-checklist="true"] > li::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0.5lh; /* center on the line — uses CSS lh unit so it tracks line-height */
-          transform: translateY(-50%);
-          width: 1rem;
-          height: 1rem;
-          cursor: default;
-          background-repeat: no-repeat;
-          background-position: center;
-          background-size: contain;
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
-        }
-        /* An un-linked item's box is clicked to check it; checked, it fills
-           with a tick and the text recedes. */
-        .note-editor[contenteditable="true"] ul[data-checklist="true"] > li:not([data-element-id])::before {
-          cursor: pointer;
-        }
-        .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id]) {
-          color: var(--muted-foreground);
-        }
-        .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id])::before {
-          background-image: none;
-          background-color: var(--status-success);
-          -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><mask id='m'><rect width='16' height='16' fill='white'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></mask><circle cx='8' cy='8' r='7.4' mask='url(%23m)'/></svg>") center / contain no-repeat;
-          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><mask id='m'><rect width='16' height='16' fill='white'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></mask><circle cx='8' cy='8' r='7.4' mask='url(%23m)'/></svg>") center / contain no-repeat;
-        }
-        /* Linked bullet — set by → Element 化. The checkbox ::before is
-           replaced by a read-only ○ mirroring the linked Element's status
-           (data-element-status, applied from live data; never persisted).
-           A linked bullet is never struck through even if data-checked
-           lingers from before it was linked. */
-        .note-editor ul[data-checklist="true"] > li[data-element-id] {
-          color: inherit;
-          text-decoration: none;
-          /* An Element made from this line stands out as a card, the way the
-             chat shows the Elements it made: a framed band. The mark at its
-             left and the arrow at its right open the Element. */
-          margin: 4px 0;
-          padding: 6px 2rem 6px 2.1rem;
-          border: 1px solid var(--border-default);
-          border-radius: var(--radius-md);
-          background: var(--card);
-          box-shadow: var(--shadow-card);
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]::before {
-          left: 0.6rem;
-          top: calc(6px + 0.5lh);
-          cursor: pointer;
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]::after {
-          content: "";
-          position: absolute;
-          right: 0.6rem;
-          top: calc(6px + 0.5lh);
-          transform: translateY(-50%);
-          width: 14px;
-          height: 14px;
-          cursor: pointer;
-          opacity: 0.55;
-          background-color: var(--muted-foreground);
-          -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7M8 7h9v9'/></svg>") center / contain no-repeat;
-          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7M8 7h9v9'/></svg>") center / contain no-repeat;
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::after { opacity: 1; }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
-          cursor: pointer;
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]::before,
-        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="todo"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="in_progress"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23d49a1a' stroke-width='1.5'/><path d='M8 8 L8 3.1 A4.9 4.9 0 0 1 8 12.9 Z' fill='%23d49a1a'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="review"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%233b82f6' stroke-width='1.5'/><circle cx='8' cy='8' r='2.6' fill='%233b82f6'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="done"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%233d7a4a'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="blocked"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%23f43f5e'/><path d='M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="cancelled"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/><path d='M4.5 11.5 L11.5 4.5' stroke='%23999' stroke-width='1.5' stroke-linecap='round'/></svg>");
-        }
-      `}</style>
+      <NoteEditorStyles />
     </>
   );
 });
-
-// =============================================================
-// Floating toolbar — text-style dropdown + bold/italic/underline
-// + alignment + lists + link.
-// =============================================================
-// =============================================================
-// Table editing — pure DOM helpers used by the cell context menu.
-// The grid is treated as a plain rectangle (column ops are index-based);
-// horizontal merge adds colspan, which the sanitizer is taught to keep.
-// =============================================================
-
-function tblCellIndex(cell: HTMLTableCellElement): number {
-  return Array.from(cell.parentElement?.children ?? []).indexOf(cell);
-}
-function tblNewCell(doc: Document, tag: 'td' | 'th'): HTMLTableCellElement {
-  const c = doc.createElement(tag);
-  c.appendChild(doc.createElement('br'));
-  return c;
-}
-function tblColumnCount(table: Element): number {
-  let max = 0;
-  for (const row of Array.from(table.querySelectorAll('tr'))) {
-    let n = 0;
-    for (const c of Array.from(row.children)) n += parseInt(c.getAttribute('colspan') || '1', 10);
-    max = Math.max(max, n);
-  }
-  return max;
-}
-
-// Ensure a <colgroup> with one <col> per column so per-column widths (from
-// drag-resize) have somewhere to live. New cols default to the current even
-// width; existing widths are kept. Returns the <col> elements.
-function tblEnsureColgroup(table: HTMLTableElement): HTMLTableColElement[] {
-  const doc = table.ownerDocument;
-  const cols = tblColumnCount(table);
-  const evenW = () => Math.max(40, Math.floor(table.getBoundingClientRect().width / Math.max(1, cols)));
-  let cg = table.querySelector(':scope > colgroup');
-  if (!cg) {
-    cg = doc.createElement('colgroup');
-    const w = evenW();
-    for (let i = 0; i < cols; i++) {
-      const c = doc.createElement('col');
-      c.style.width = `${w}px`;
-      cg.appendChild(c);
-    }
-    table.insertBefore(cg, table.firstChild);
-  } else {
-    let n = cg.children.length;
-    while (n < cols) { const c = doc.createElement('col'); c.style.width = `${evenW()}px`; cg.appendChild(c); n++; }
-    while (n > cols) { cg.lastElementChild?.remove(); n--; }
-  }
-  return Array.from(cg.querySelectorAll('col')) as HTMLTableColElement[];
-}
-
-function tblDeleteRow(cell: HTMLTableCellElement) {
-  const row = cell.parentElement as HTMLTableRowElement;
-  const table = cell.closest('table')!;
-  if (table.querySelectorAll('tr').length <= 1) { table.remove(); return; }
-  row.remove();
-}
-
-function tblDeleteCol(cell: HTMLTableCellElement) {
-  const table = cell.closest('table')!;
-  if (tblColumnCount(table) <= 1) { table.remove(); return; }
-  const idx = tblCellIndex(cell);
-  for (const row of Array.from(table.querySelectorAll('tr'))) {
-    row.children[idx]?.remove();
-  }
-  table.querySelector(':scope > colgroup')?.children[idx]?.remove();
-}
-
-function tblMoveRow(cell: HTMLTableCellElement, dir: -1 | 1) {
-  const row = cell.parentElement as HTMLTableRowElement;
-  const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
-  if (!sib || sib.parentElement !== row.parentElement) return;
-  if (dir < 0) row.parentElement!.insertBefore(row, sib);
-  else row.parentElement!.insertBefore(sib, row);
-}
-
-function tblMoveCol(cell: HTMLTableCellElement, dir: -1 | 1) {
-  const table = cell.closest('table')!;
-  const idx = tblCellIndex(cell);
-  const target = idx + dir;
-  for (const row of Array.from(table.querySelectorAll('tr'))) {
-    const a = row.children[idx];
-    const b = row.children[target];
-    if (!a || !b) continue;
-    if (dir < 0) row.insertBefore(a, b);
-    else row.insertBefore(b, a);
-  }
-}
-
-// Cells touched by the current selection (drag across cells). Used to decide
-// whether "結合する" is available and what to merge.
-function tblSelectedCells(root: Element): HTMLTableCellElement[] {
-  const sel = (root.ownerDocument.defaultView ?? window).getSelection();
-  if (!sel || sel.rangeCount === 0) return [];
-  const range = sel.getRangeAt(0);
-  return Array.from(root.querySelectorAll<HTMLTableCellElement>('table[data-note-table="true"] td, table[data-note-table="true"] th'))
-    .filter((c) => range.intersectsNode(c));
-}
-
-// A spreadsheet-style grid map of the table that accounts for existing
-// colspan/rowspan: grid[r][c] → the cell occupying that slot (spanned slots
-// point at the same cell), and pos maps each cell to its top-left slot + spans.
-interface TblGrid {
-  grid: (HTMLTableCellElement | undefined)[][];
-  pos: Map<HTMLTableCellElement, { r: number; c: number; rowspan: number; colspan: number }>;
-}
-function tblBuildGrid(table: Element): TblGrid {
-  const rows = Array.from(table.querySelectorAll('tr'));
-  const grid: (HTMLTableCellElement | undefined)[][] = [];
-  const pos = new Map<HTMLTableCellElement, { r: number; c: number; rowspan: number; colspan: number }>();
-  for (let r = 0; r < rows.length; r++) {
-    if (!grid[r]) grid[r] = [];
-    let c = 0;
-    for (const cell of Array.from(rows[r].children) as HTMLTableCellElement[]) {
-      while (grid[r][c]) c++; // skip slots already filled by a span from above/left
-      const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-      const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-      pos.set(cell, { r, c, rowspan, colspan });
-      for (let dr = 0; dr < rowspan; dr++) {
-        if (!grid[r + dr]) grid[r + dr] = [];
-        for (let dc = 0; dc < colspan; dc++) grid[r + dr][c + dc] = cell;
-      }
-      c += colspan;
-    }
-  }
-  return { grid, pos };
-}
-
-// Grow a grid box until every cell it touches lies fully inside it, so the
-// merge/selection rectangle never cuts through an existing merged cell.
-function tblExpandBox(g: TblGrid, box: { minR: number; maxR: number; minC: number; maxC: number }) {
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let r = box.minR; r <= box.maxR; r++) {
-      for (let c = box.minC; c <= box.maxC; c++) {
-        const cell = g.grid[r]?.[c];
-        if (!cell) continue;
-        const p = g.pos.get(cell)!;
-        if (p.r < box.minR) { box.minR = p.r; changed = true; }
-        if (p.r + p.rowspan - 1 > box.maxR) { box.maxR = p.r + p.rowspan - 1; changed = true; }
-        if (p.c < box.minC) { box.minC = p.c; changed = true; }
-        if (p.c + p.colspan - 1 > box.maxC) { box.maxC = p.c + p.colspan - 1; changed = true; }
-      }
-    }
-  }
-}
-
-// Bounding grid box of a set of cells (in grid coords, span-aware).
-function tblBoxOf(g: TblGrid, cells: HTMLTableCellElement[]) {
-  const box = { minR: Infinity, maxR: -Infinity, minC: Infinity, maxC: -Infinity };
-  for (const cell of cells) {
-    const p = g.pos.get(cell);
-    if (!p) continue;
-    box.minR = Math.min(box.minR, p.r); box.maxR = Math.max(box.maxR, p.r + p.rowspan - 1);
-    box.minC = Math.min(box.minC, p.c); box.maxC = Math.max(box.maxC, p.c + p.colspan - 1);
-  }
-  return box;
-}
-
-// After a full-width vertical merge a row can end up with no cells of its own
-// (every column covered by a rowspan from above). Drop those empty <tr>s and
-// shrink the rowspans that crossed them, so no blank row is left behind.
-function tblPruneEmptyRows(table: Element) {
-  let again = true;
-  while (again) {
-    again = false;
-    const rows = Array.from(table.querySelectorAll('tr'));
-    const emptyIdx = rows.findIndex((tr) => tr.children.length === 0);
-    if (emptyIdx === -1) break;
-    const g = tblBuildGrid(table);
-    for (const [cell, p] of g.pos) {
-      if (p.r < emptyIdx && p.r + p.rowspan - 1 >= emptyIdx) {
-        const ns = p.rowspan - 1;
-        if (ns > 1) cell.setAttribute('rowspan', String(ns));
-        else cell.removeAttribute('rowspan');
-      }
-    }
-    rows[emptyIdx].remove();
-    again = true;
-  }
-}
-
-// Merge the bounding rectangle of the given cells into the top-left one,
-// using colspan/rowspan. Span-aware (grid model), so merging across cells
-// that are already merged stays a valid rectangle.
-function tblMergeCells(cells: HTMLTableCellElement[]) {
-  if (cells.length < 2) return;
-  const table = cells[0].closest('table');
-  if (!table) return;
-  const g = tblBuildGrid(table);
-  const box = tblBoxOf(g, cells);
-  if (!Number.isFinite(box.minR)) return;
-  tblExpandBox(g, box);
-  const anchor = g.grid[box.minR]?.[box.minC];
-  if (!anchor) return;
-  const anchorEmpty = () => anchor.childNodes.length === 1 && anchor.firstChild?.nodeName === 'BR';
-  const seen = new Set<HTMLTableCellElement>([anchor]);
-  for (let r = box.minR; r <= box.maxR; r++) {
-    for (let c = box.minC; c <= box.maxC; c++) {
-      const cell = g.grid[r]?.[c];
-      if (!cell || seen.has(cell)) continue;
-      seen.add(cell);
-      const empty = cell.childNodes.length === 1 && cell.firstChild?.nodeName === 'BR';
-      if (!empty) {
-        if (anchorEmpty()) anchor.firstChild?.remove();
-        while (cell.firstChild) anchor.appendChild(cell.firstChild);
-      }
-      cell.remove();
-    }
-  }
-  const colspan = box.maxC - box.minC + 1, rowspan = box.maxR - box.minR + 1;
-  if (colspan > 1) anchor.setAttribute('colspan', String(colspan)); else anchor.removeAttribute('colspan');
-  if (rowspan > 1) anchor.setAttribute('rowspan', String(rowspan)); else anchor.removeAttribute('rowspan');
-  tblPruneEmptyRows(table);
-}
-
-// Split a merged cell back into individual cells, refilling the spanned box.
-function tblUnmerge(cell: HTMLTableCellElement) {
-  const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
-  const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
-  if (colspan <= 1 && rowspan <= 1) return;
-  const table = cell.closest('table')!;
-  const rows = Array.from(table.querySelectorAll('tr'));
-  const tr = cell.closest('tr')!;
-  const rowIdx = rows.indexOf(tr);
-  const colIdx = Array.from(tr.children).indexOf(cell);
-  const doc = cell.ownerDocument;
-  cell.removeAttribute('colspan');
-  cell.removeAttribute('rowspan');
-  // Anchor row: re-add the columns that were absorbed to its right.
-  const isHead = tr.parentElement?.tagName === 'THEAD';
-  for (let i = 1; i < colspan; i++) tr.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), cell.nextSibling);
-  // Rows below (rowspan): re-add a full run of cells at the anchor column.
-  for (let r = 1; r < rowspan; r++) {
-    const lower = rows[rowIdx + r];
-    if (!lower) continue;
-    const lowerHead = lower.parentElement?.tagName === 'THEAD';
-    const ref = lower.children[colIdx] ?? null;
-    for (let i = 0; i < colspan; i++) lower.insertBefore(tblNewCell(doc, lowerHead ? 'th' : 'td'), ref);
-  }
-}
-
-// Index-based inserts used by the hover "+" handles (the context menu uses
-// the cell-relative variants above).
-function tblInsertColAtIndex(table: Element, index: number) {
-  const doc = table.ownerDocument;
-  for (const row of Array.from(table.querySelectorAll('tr'))) {
-    const isHead = row.parentElement?.tagName === 'THEAD';
-    row.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), row.children[index] ?? null);
-  }
-  // Keep a width-tracking colgroup in sync: clone the neighbour col's width.
-  const cg = table.querySelector(':scope > colgroup');
-  if (cg) {
-    const ref = cg.children[index] ?? null;
-    const col = doc.createElement('col');
-    const sibling = (ref ?? cg.lastElementChild) as HTMLElement | null;
-    if (sibling?.style?.width) col.style.width = sibling.style.width;
-    cg.insertBefore(col, ref);
-  }
-}
-function tblInsertRowAfter(rowEl: HTMLTableRowElement) {
-  const table = rowEl.closest('table')!;
-  const doc = table.ownerDocument;
-  const tbody = table.querySelector('tbody') ?? table;
-  const cols = tblColumnCount(table);
-  const tr = doc.createElement('tr');
-  for (let i = 0; i < cols; i++) tr.appendChild(tblNewCell(doc, 'td'));
-  if (rowEl.parentElement?.tagName === 'THEAD') tbody.insertBefore(tr, tbody.firstChild);
-  else rowEl.parentElement!.insertBefore(tr, rowEl.nextElementSibling);
-}
-
-export interface TableHandleGeom {
-  table: HTMLTableElement;
-  // Full-width "+" bar just below the table — appends a row at the end.
-  // Only set when the cursor is near the bottom edge.
-  bottomBar: { left: number; top: number; width: number; rowIndex: number } | null;
-  // Full-height "+" bar just right of the table — appends a column at the end.
-  // Only set when the cursor is near the right edge.
-  rightBar: { left: number; top: number; height: number; colIndex: number } | null;
-  // "+" at the nearest column gridline (only when the cursor is near one) —
-  // inserts a column there, including between existing columns.
-  col: { x: number; top: number; index: number } | null;
-  // "+" at the nearest internal row gridline (between rows) — inserts there.
-  rowBetween: { y: number; left: number; rowIndex: number } | null;
-  // Draggable strips on each internal column border for width resizing.
-  resizers: { x: number; top: number; height: number; leftColIndex: number }[];
-}
-
-// Notion-style insert affordances. The bottom bar is always present while the
-// table is hovered; the column/row "+" appear only as the cursor approaches a
-// gridline, so a single "+" shows at the boundary you're pointing at rather
-// than every boundary at once. Coordinates are relative to the editor's
-// content box. The overlay is click-through except on the buttons.
-function TableInsertHandles({
-  geom,
-  onInsertCol,
-  onInsertRow,
-  onResizeStart,
-}: {
-  geom: TableHandleGeom;
-  onInsertCol: (table: HTMLTableElement, index: number) => void;
-  onInsertRow: (table: HTMLTableElement, rowIndex: number) => void;
-  onResizeStart: (e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => void;
-}) {
-  const { t } = useI18n();
-  const dot =
-    'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all z-10';
-  return (
-    <div className="absolute inset-0 pointer-events-none z-20">
-      {/* Column-resize strips on each internal border (under the "+" handles
-          so the top "+" stays clickable). A thin line shows on hover. */}
-      {geom.resizers.map((rz, k) => (
-        <div
-          key={`rz${k}`}
-          onMouseDown={(e) => onResizeStart(e, geom.table, rz.leftColIndex)}
-          className="group pointer-events-auto absolute flex justify-center -translate-x-1/2 z-[5]"
-          style={{ left: rz.x, top: rz.top + 12, width: 9, height: Math.max(0, rz.height - 12), cursor: 'col-resize' }}
-        >
-          <span className="w-[2px] h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      ))}
-      {geom.bottomBar && (
-        <button
-          type="button"
-          title={t('Add row')}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onInsertRow(geom.table, geom.bottomBar!.rowIndex)}
-          className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-          style={{ left: geom.bottomBar.left, top: geom.bottomBar.top + 4, width: geom.bottomBar.width }}
-        >
-          <Plus size={12} />
-        </button>
-      )}
-      {geom.rightBar && (
-        // Outer strip stays flush with the table's right edge so the cursor
-        // never crosses an out-of-wrapper gap (which would fire mouseleave and
-        // hide the bar); the visible "+" inside is inset by 4px so it reads
-        // with the same little gap as the bottom "Add row" bar.
-        <div
-          className="pointer-events-auto absolute flex items-stretch"
-          style={{ left: geom.rightBar.left, top: geom.rightBar.top, width: 20, height: geom.rightBar.height }}
-        >
-          <button
-            type="button"
-            title={t('Add column')}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
-            className="ml-1 w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-          >
-            <Plus size={12} />
-          </button>
-        </div>
-      )}
-      {geom.col && (
-        <button
-          type="button"
-          title={t('Add column')}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onInsertCol(geom.table, geom.col!.index)}
-          className={dot}
-          style={{ left: geom.col.x, top: geom.col.top }}
-        >
-          <Plus size={11} />
-        </button>
-      )}
-      {geom.rowBetween && (
-        <button
-          type="button"
-          title={t('Add row')}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onInsertRow(geom.table, geom.rowBetween!.rowIndex)}
-          className={dot}
-          style={{ left: geom.rowBetween.left, top: geom.rowBetween.y }}
-        >
-          <Plus size={11} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// A row of buttons in the table context menu.
-function TblMenuItem({ label, onSelect, danger }: { label: string; onSelect: () => void; danger?: boolean }) {
-  const { t } = useI18n();
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={[
-        'w-full text-left px-2.5 py-1 text-[12px] rounded transition-colors',
-        danger ? 'text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
-      ].join(' ')}
-    >
-      {t(label)}
-    </button>
-  );
-}
-
-function TableContextMenu({
-  x,
-  y,
-  canMerge,
-  canUnmerge,
-  onAction,
-  onMerge,
-  onClose,
-}: {
-  x: number;
-  y: number;
-  canMerge: boolean;
-  canUnmerge: boolean;
-  onAction: (op: (cell: HTMLTableCellElement) => void) => void;
-  onMerge: () => void;
-  onClose: () => void;
-}) {
-  useEscapeLayer(true, onClose);
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-table-menu]')) onClose();
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [onClose]);
-
-  // Clamp horizontally so the menu stays on-screen.
-  const left = Math.min(x, window.innerWidth - 200);
-  const top = Math.min(y, window.innerHeight - 320);
-
-  return createPortal(
-    <div
-      data-table-menu
-      className="fixed z-50 min-w-[180px] py-1 bg-popover border border-border rounded-lg shadow-xl"
-      style={{ left, top }}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      {(canMerge || canUnmerge) && (
-        <>
-          {canMerge && <TblMenuItem label="Merge cells" onSelect={onMerge} />}
-          {canUnmerge && <TblMenuItem label="Split cell" onSelect={() => onAction(tblUnmerge)} />}
-          <TblDivider />
-        </>
-      )}
-      <TblMenuItem label="Move row up" onSelect={() => onAction((c) => tblMoveRow(c, -1))} />
-      <TblMenuItem label="Move row down" onSelect={() => onAction((c) => tblMoveRow(c, 1))} />
-      <TblMenuItem label="Move column left" onSelect={() => onAction((c) => tblMoveCol(c, -1))} />
-      <TblMenuItem label="Move column right" onSelect={() => onAction((c) => tblMoveCol(c, 1))} />
-      <TblDivider />
-      <TblMenuItem label="Delete row" danger onSelect={() => onAction(tblDeleteRow)} />
-      <TblMenuItem label="Delete column" danger onSelect={() => onAction(tblDeleteCol)} />
-      <TblMenuItem label="Delete table" danger onSelect={() => onAction((c) => c.closest('table')?.remove())} />
-    </div>,
-    document.body,
-  );
-}
-
-function TblDivider() {
-  return <div className="my-1 h-px bg-border" />;
-}
-
-function FloatingToolbar({
-  x,
-  y,
-  markdownOnly,
-  onCommand,
-  onChecklist,
-  onLink,
-  onToggleBlock,
-}: {
-  x: number;
-  y: number;
-  /** Text kept as Markdown: no underline or alignment, which it cannot say. */
-  markdownOnly?: boolean;
-  onCommand: (cmd: string, value?: string) => void;
-  onChecklist: () => void;
-  onLink: () => void;
-  onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
-}) {
-  // Constrain the toolbar to the viewport horizontally.
-  const width = markdownOnly ? 330 : 444;
-  const left = Math.max(8, Math.min(window.innerWidth - width - 8, x - width / 2));
-  const top = Math.max(8, y - 40);
-
-  return (
-    <div
-      className="fixed z-50 flex items-center gap-0.5 bg-popover border border-border rounded-lg shadow-lg px-1 py-1"
-      style={{ left, top, width }}
-      onMouseDown={(e) => e.preventDefault() /* keep selection */}
-    >
-      <TbStyleDropdown onToggleBlock={onToggleBlock} />
-      <TbDivider />
-      <TbBtn icon={Bold} title="Bold (⌘B)" onClick={() => onCommand('bold')} />
-      <TbBtn icon={Italic} title="Italic (⌘I)" onClick={() => onCommand('italic')} />
-      {!markdownOnly && <TbBtn icon={UnderlineIcon} title="Underline (⌘U)" onClick={() => onCommand('underline')} />}
-      <TbBtn icon={Strikethrough} title="Strikethrough" onClick={() => onCommand('strikeThrough')} />
-      <TbDivider />
-      {!markdownOnly && <>
-        <TbBtn icon={AlignLeft} title="Align left" onClick={() => onCommand('justifyLeft')} />
-        <TbBtn icon={AlignCenter} title="Align center" onClick={() => onCommand('justifyCenter')} />
-        <TbBtn icon={AlignRight} title="Align right" onClick={() => onCommand('justifyRight')} />
-        <TbDivider />
-      </>}
-      <TbBtn icon={List} title="Bulleted list" onClick={() => onCommand('insertUnorderedList')} />
-      <TbBtn icon={ListOrdered} title="Numbered list" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={ElementIcon} title="Checklist" onClick={onChecklist} />
-      <TbDivider />
-      <TbBtn icon={Quote} title="Quote" onClick={() => onToggleBlock('BLOCKQUOTE')} />
-      <TbBtn icon={LinkIcon} title="Link" onClick={onLink} />
-    </div>
-  );
-}
-
-function TbBtn({
-  icon: Icon,
-  title,
-  onClick,
-}: {
-  icon: React.ComponentType<{ size?: number }>;
-  title: string;
-  onClick: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <button
-      type="button"
-      title={t(title)}
-      aria-label={t(title)}
-      onClick={onClick}
-      className="inline-flex items-center justify-center h-7 w-7 rounded hover:bg-accent text-foreground/80 hover:text-foreground"
-    >
-      <Icon size={14} />
-    </button>
-  );
-}
-
-function TbDivider() {
-  return <span className="w-px h-4 bg-border mx-0.5" />;
-}
-
-const STYLE_OPTIONS: { tag: 'P' | 'H1' | 'H2' | 'H3'; label: string; className: string }[] = [
-  { tag: 'P', label: 'Regular text', className: 'text-[13px]' },
-  { tag: 'H1', label: 'Heading 1', className: 'text-[15px] font-bold' },
-  { tag: 'H2', label: 'Heading 2', className: 'text-[14px] font-semibold' },
-  { tag: 'H3', label: 'Heading 3', className: 'text-[13px] font-semibold' },
-];
-
-// Text-style picker for the floating toolbar — a single "Aa" dropdown
-// replacing separate heading buttons. Rendered inside the toolbar so the
-// click's mousedown hits the toolbar's preventDefault and the editor
-// selection survives long enough for formatBlock to apply.
-function TbStyleDropdown({
-  onToggleBlock,
-}: {
-  onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
-}) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocDown);
-    return () => document.removeEventListener('mousedown', onDocDown);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        title={t('Text style')}
-        aria-label={t('Text style')}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center gap-0.5 h-7 px-1.5 rounded hover:bg-accent text-foreground/80 hover:text-foreground"
-      >
-        <span className="text-[13px] font-semibold leading-none">Aa</span>
-        <ChevronDown size={11} />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl min-w-[160px]">
-          {STYLE_OPTIONS.map((opt) => (
-            <button
-              key={opt.tag}
-              type="button"
-              onClick={() => { onToggleBlock(opt.tag); setOpen(false); }}
-              className={`w-full flex items-center px-3 py-1.5 text-foreground hover:bg-accent transition-colors ${opt.className}`}
-            >
-              {t(opt.label)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// =============================================================
-// Helpers
-// =============================================================
-
-// Block-level tags we treat as a "current block" for toggle behaviour
-// in the floating toolbar. Excludes <li>: those are list items whose
-// surrounding <ul>/<ol> already convey the style.
-const BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE']);
-
-/** Returns the uppercase tag name of the innermost block-level
- *  ancestor of the current selection inside `root`, or null when the
- *  selection isn't in the editor. */
-function currentBlockTag(root: HTMLElement | null): string | null {
-  if (!root) return null;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-  let node: Node | null = sel.anchorNode;
-  while (node && node !== root) {
-    if (node.nodeType === 1 && BLOCK_TAGS.has((node as HTMLElement).tagName)) {
-      return (node as HTMLElement).tagName;
-    }
-    node = node.parentNode;
-  }
-  return null;
-}
-
-/** True when the current selection sits inside an element with the
- *  given uppercase tag name (e.g. 'A' for links). */
-function selectionHasAncestor(root: HTMLElement | null, tag: string): boolean {
-  if (!root) return false;
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return false;
-  let node: Node | null = sel.anchorNode;
-  while (node && node !== root) {
-    if (node.nodeType === 1 && (node as HTMLElement).tagName === tag) return true;
-    node = node.parentNode;
-  }
-  return false;
-}
-
-/** True when the given <li> contains a heading / quote / pre child —
- *  used to gate the "bullet → Element" right-click menu so that only
- *  Regular-text bullets can be turned into Elements. */
-function liIsRegularText(li: HTMLLIElement): boolean {
-  const STYLED = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE']);
-  for (const child of Array.from(li.children)) {
-    if (STYLED.has(child.tagName)) return false;
-  }
-  return true;
-}
-
-// How far from a checklist item's left edge a click lands on its box
-// (the 1rem box at the item's start, with a little slack).
-/** How far in from a linked line's edges its mark and arrow answer a click. */
-const LINKED_EDGE_PX = 30;
-const CHECK_BOX_HIT_PX = 20;
-
-// True when the editor holds no user content — blank text and no embedded
-// media. Empty paragraphs and empty headings count as empty so the "Start
-// writing…" placeholder shows; an empty list does not, since its own bullet
-// or checklist marks would sit on top of the placeholder.
-function isEditorEmpty(el: HTMLElement): boolean {
-  if ((el.textContent ?? '').replace(/\u200B/g, '').trim() !== '') return false;
-  return !el.querySelector('img, table, hr, ul, ol');
-}
-
-// Move a run of block elements into a single checklist <ul>, one <li> per
-// block, and return the new <li> nodes (in order). Shared by the checklist
-// toggle and "→ Element 化" so the two stay in lock-step.
-function wrapBlocksAsChecklist(blocks: HTMLElement[]): HTMLLIElement[] {
-  if (blocks.length === 0) return [];
-  const doc = blocks[0].ownerDocument;
-  const ul = doc.createElement('ul');
-  ul.setAttribute('data-checklist', 'true');
-  blocks[0].parentElement!.insertBefore(ul, blocks[0]);
-  const lis: HTMLLIElement[] = [];
-  for (const b of blocks) {
-    const li = doc.createElement('li');
-    li.setAttribute('data-checked', 'false');
-    li.innerHTML = b.innerHTML;
-    ul.appendChild(li);
-    b.remove();
-    lis.push(li);
-  }
-  return lis;
-}
-
-function escapeText(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>');
-}
-
-// Convert any inline `style="text-align: x"` produced by execCommand justify*
-// to `data-align="x"`. Keeps the DB shape consistent.
-function normalizeAlignment(root: HTMLElement | null): void {
-  if (!root) return;
-  const all = root.querySelectorAll<HTMLElement>('[style*="text-align"]');
-  for (const el of Array.from(all)) {
-    const m = el.getAttribute('style')?.match(/text-align\s*:\s*(left|center|right)/i);
-    if (!m) continue;
-    const align = m[1].toLowerCase();
-    el.style.removeProperty('text-align');
-    if (!el.getAttribute('style')?.trim()) el.removeAttribute('style');
-    if (align === 'left') el.removeAttribute('data-align');
-    else el.setAttribute('data-align', align);
-  }
-}
-
-// Find the block-level elements that the given range touches.
-function collectSelectedBlocks(root: HTMLElement, range: Range): HTMLElement[] {
-  const blockTags = new Set(['P', 'H1', 'H2', 'H3', 'LI', 'BLOCKQUOTE', 'PRE', 'DIV']);
-  const startBlock = closestBlock(range.startContainer, root, blockTags);
-  const endBlock = closestBlock(range.endContainer, root, blockTags);
-  if (!startBlock) return [];
-  if (startBlock === endBlock || !endBlock) return [startBlock];
-
-  // Walk forward in document order from startBlock to endBlock.
-  const all = Array.from(root.querySelectorAll<HTMLElement>('p, h1, h2, h3, li, blockquote, pre, div'));
-  const startIdx = all.indexOf(startBlock);
-  const endIdx = all.indexOf(endBlock);
-  if (startIdx < 0 || endIdx < 0) return [startBlock];
-  return all.slice(Math.min(startIdx, endIdx), Math.max(startIdx, endIdx) + 1);
-}
-
-function closestBlock(node: Node, root: HTMLElement, blockTags: Set<string>): HTMLElement | null {
-  let cur: Node | null = node.nodeType === 1 ? node : node.parentNode;
-  while (cur && cur !== root) {
-    if (cur.nodeType === 1 && blockTags.has((cur as HTMLElement).tagName)) {
-      return cur as HTMLElement;
-    }
-    cur = cur.parentNode;
-  }
-  return null;
-}
