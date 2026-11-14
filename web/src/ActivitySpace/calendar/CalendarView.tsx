@@ -939,7 +939,7 @@ function TimeGridView({
       })()}
 
       {/* Scrollable hour grid */}
-      <div ref={scrollRef} className="flex-1 overflow-auto [scrollbar-gutter:stable] relative">
+      <div ref={scrollRef} tabIndex={0} role="region" aria-label={t('Calendar')} className="flex-1 overflow-auto [scrollbar-gutter:stable] relative">
         <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
           {/* Hour rail */}
           <div className="w-14 flex-shrink-0 relative">

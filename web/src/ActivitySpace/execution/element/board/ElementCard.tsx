@@ -247,6 +247,7 @@ export function ElementCard({ element, onRefresh, onOpen, badge, object, extra, 
               {editingTitle ? (
                 <textarea
                   autoFocus
+                  aria-label={t('Element title')}
                   ref={titleRef}
                   rows={1}
                   value={titleDraft}

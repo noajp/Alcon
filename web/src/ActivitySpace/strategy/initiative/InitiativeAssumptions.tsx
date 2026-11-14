@@ -659,20 +659,20 @@ function Composer({
         rows={1}
         autoFocus
         onChange={(e) => onStatement(e.target.value)}
-        placeholder={t('What this Strategy is taking as true')}
+        aria-label={t('What this Strategy is taking as true')} placeholder={t('What this Strategy is taking as true')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <textarea
         value={cost}
         rows={1}
         onChange={(e) => onCost(e.target.value)}
-        placeholder={t('What it costs if it stops being true')}
+        aria-label={t('What it costs if it stops being true')} placeholder={t('What it costs if it stops being true')}
         className={`${FIELD} text-[13px] leading-relaxed resize-none`}
       />
       <input
         value={notedBy}
         onChange={(e) => onNotedBy(e.target.value)}
-        placeholder={t('Noted by')}
+        aria-label={t('Noted by')} placeholder={t('Noted by')}
         className={`${FIELD} text-[12px]`}
       />
       <div className="flex items-center justify-end gap-2">

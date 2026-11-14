@@ -54,7 +54,7 @@ export function MeFooter({ active, onOpen, onOpenView, onSettings }: {
       </span>
     </button>
     </PopoverTrigger>
-    <PopoverContent side="top" align="start" sideOffset={6} className="w-auto border-0 bg-transparent p-0 shadow-none">
+    <PopoverContent aria-label={t('Profile')} side="top" align="start" sideOffset={6} className="w-auto border-0 bg-transparent p-0 shadow-none">
       <ProfileMenu
         name={name ?? ''}
         email={user?.email ?? ''}

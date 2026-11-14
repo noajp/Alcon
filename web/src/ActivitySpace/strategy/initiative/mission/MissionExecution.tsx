@@ -178,17 +178,25 @@ export function MissionExecutionPanel({ ctx, objects, details, domains, aiWorker
   const answerAndPlan = async () => {
     if (!questions) return;
     const given = answeredQuestions(questions.items, answers);
+    // Answers that could not be kept as assumptions are counted, so the
+    // person is told after the Planner runs instead of losing them unseen.
+    let unsaved = 0;
     if (ctx.canEdit && given.length > 0) {
       const root = await ensureRoot().catch(() => null);
       if (root) {
         for (const g of given) {
           await createIntent({ strategy_id: ctx.initiativeId, parent_intent_id: root, kind: 'assumption', title: `${g.question} → ${g.answer}` })
-            .catch(() => undefined);
+            .catch(() => { unsaved += 1; });
         }
         ctx.refetch();
+      } else {
+        unsaved = given.length;
       }
     }
     await plan({ answers: given, noQuestions: true });
+    if (unsaved > 0) {
+      setError(t('{n} of your answers could not be saved as assumptions. The Planner used them for this plan; add them again on the Strategy to keep them.', { n: unsaved }));
+    }
   };
 
   const start = async (elementIds: string[]) => {

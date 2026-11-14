@@ -179,7 +179,7 @@ export function PageHead({
         className={`w-full resize-none overflow-hidden border-none bg-transparent focus:outline-none ${PAGE_TITLE}`}
         style={PAGE_TITLE_WEIGHT} />
       {under && <div className="mt-2">{under}</div>}
-      <div className="mt-3" aria-label={descriptionLabel}>
+      <div className="mt-3" role="group" aria-label={descriptionLabel}>
         <DescriptionEditor value={description} readOnly={!onSaveDescription}
           placeholder={descriptionPlaceholder} onSave={commitDescription} />
       </div>

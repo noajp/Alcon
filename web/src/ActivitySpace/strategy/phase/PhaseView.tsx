@@ -1,5 +1,6 @@
 'use client';
 
+import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { SidebarReveal } from '@/Function/shared/SidebarReveal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from '@/ui/icons';
@@ -919,13 +920,11 @@ function PhaseCreateDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg shadow-xl w-full max-w-md"
-        onClick={(e) => e.stopPropagation()}
-      >
+    // The shared dialog keeps focus inside and hands it back on close.
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="w-full max-w-md gap-0 p-0">
         <div className="h-10 flex items-center px-4 border-b border-border/60">
-          <span className="text-[13px] font-semibold text-foreground">{t('New Phase')}</span>
+          <DialogTitle className="text-[13px] font-semibold leading-normal text-foreground">{t('New Phase')}</DialogTitle>
           <div className="flex-1" />
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t('Close')}>
             <X size={14} />
@@ -964,7 +963,7 @@ function PhaseCreateDialog({
             {saving ? t('Saving…') : t('Create')}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

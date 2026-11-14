@@ -1294,7 +1294,7 @@ function AvailabilityMenu({
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={t('Add a note…')}
+            aria-label={t('Add a note…')} placeholder={t('Add a note…')}
             className="w-full rounded-md border-none bg-muted/40 px-2 py-1 text-[13px] placeholder:text-muted-foreground/60"
           />
         </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { useWorkspaceActions } from '@/Frame/WorkspaceActionsContext';
 import { useEffect, useRef, useState } from 'react';
 import { FileDown, FileText, Plus, Rows3, Columns3 } from '@/ui/icons';
@@ -446,10 +447,10 @@ function InsertColumnDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={close}>
-      <div className="w-[420px] rounded-lg bg-background shadow-xl border border-border/60" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="w-[420px] max-w-[calc(100vw-2rem)] gap-0 p-0">
         <div className="px-5 pt-4 pb-1">
-          <div className="text-[13px] font-semibold text-foreground">{t('Insert column')}</div>
+          <DialogTitle className="text-[13px] font-semibold leading-normal text-foreground">{t('Insert column')}</DialogTitle>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="space-y-1">
@@ -459,7 +460,7 @@ function InsertColumnDialog({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={t('e.g. Phone')}
+              aria-label={t('Name')} placeholder={t('e.g. Phone')}
               className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 border-none"
               onKeyDown={(e) => {
                 if (isCommitEnter(e) && name.trim() && !saving) {
@@ -472,6 +473,7 @@ function InsertColumnDialog({
           <div className="space-y-1">
             <div className="text-[11px] font-medium text-muted-foreground">{t('Type')}</div>
             <select
+              aria-label={t('Type')}
               value={type}
               onChange={(e) => setType(e.target.value as DataTableColumnType)}
               className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground border-none"
@@ -491,8 +493,8 @@ function InsertColumnDialog({
             {saving ? t('Adding…') : t('Add column')}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -583,10 +585,10 @@ function ImportCsvDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={close}>
-      <div className="w-[640px] max-h-[80vh] flex flex-col rounded-lg bg-background shadow-xl border border-border/60" onClick={(e) => e.stopPropagation()}>
+    <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined} className="w-[640px] max-w-[calc(100vw-2rem)] max-h-[80vh] flex flex-col gap-0 p-0">
         <div className="px-5 pt-4 pb-1">
-          <div className="text-[13px] font-semibold text-foreground">{t('Import data from CSV')}</div>
+          <DialogTitle className="text-[13px] font-semibold leading-normal text-foreground">{t('Import data from CSV')}</DialogTitle>
         </div>
         <div className="px-5 py-4 flex-1 overflow-auto">
           {!parsed ? (
@@ -652,8 +654,8 @@ function ImportCsvDialog({
             {importing ? t('Importing…') : t('Import')}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

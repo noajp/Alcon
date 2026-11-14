@@ -137,11 +137,12 @@ function deriveIdentifier(name: string): string {
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div>
-      <label className="block text-sm font-semibold text-foreground mb-1">{label}</label>
-      {hint && <p className="text-xs text-muted-foreground mb-2">{hint}</p>}
+    // The whole field is the label, so the control it holds is named by it.
+    <label className="block">
+      <span className="block text-sm font-semibold text-foreground mb-1">{label}</span>
+      {hint && <span className="block text-xs text-muted-foreground mb-2">{hint}</span>}
       {children}
-    </div>
+    </label>
   );
 }
 

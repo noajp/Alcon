@@ -151,6 +151,7 @@ export function SlaSettings({ level = 2 }: { level?: 2 | 3 } = {}) {
             {FIELDS.map((f) => (
               <SettingRow key={f.key} label={t(f.label)} desc={t(f.hint)}>
                 <ThresholdInput
+                  label={`${t(f.label)}, ${t(f.unit)}`}
                   // Remount whenever the saved value changes (commit, rollback,
                   // refetch), so the draft is always seeded from the truth and
                   // never goes stale on a same-key prop change.
@@ -183,8 +184,9 @@ export function SlaSettings({ level = 2 }: { level?: 2 | 3 } = {}) {
 const PLAIN_DIGITS = /^\d+$/;
 
 function ThresholdInput({
-  value, placeholder, max, unit, disabled, onCommit,
+  label, value, placeholder, max, unit, disabled, onCommit,
 }: {
+  label: string;
   value: number | undefined;
   placeholder: number;
   max: number;
@@ -219,6 +221,7 @@ function ThresholdInput({
     <div className="flex items-center gap-2">
       <input
         type="number"
+        aria-label={label}
         inputMode="numeric"
         min={1}
         max={max}

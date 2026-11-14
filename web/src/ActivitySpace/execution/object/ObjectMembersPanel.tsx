@@ -1,5 +1,6 @@
 'use client';
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
 import { appDialog } from '@/Function/shared/appDialogStore';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -152,17 +153,12 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
           </div>
         )}
 
-        {showAdd && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
-            onClick={() => setShowAdd(false)}
-          >
-            <div
-              className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-sm overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
+        {/* The shared dialog keeps focus inside, closes on Escape and hands
+            focus back to the Invite button. */}
+        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+          <DialogContent showCloseButton={false} className="w-full max-w-sm gap-0 overflow-hidden p-0">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <h3 className="text-[14px] font-semibold">{t('Invite to Object')}</h3>
+                <DialogTitle className="text-[14px] font-semibold leading-normal">{t('Invite to Object')}</DialogTitle>
                 <button
                   type="button"
                   onClick={() => setShowAdd(false)}
@@ -172,9 +168,9 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
                   <X size={14} />
                 </button>
               </div>
-              <p className="px-4 pt-3 text-[12px] text-muted-foreground">
+              <DialogDescription className="px-4 pt-3 text-[12px] text-muted-foreground">
                 {t('They join when they accept the invitation in their Inbox.')}
-              </p>
+              </DialogDescription>
               {inviteError && <p className="px-4 pt-2 text-[12px] text-[var(--status-danger)]">{inviteError}</p>}
               <div className="mt-2 max-h-[320px] overflow-y-auto divide-y divide-border/40">
                 {candidates.length === 0 ? (
@@ -199,9 +195,8 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
                   ))
                 )}
               </div>
-            </div>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -188,7 +188,7 @@ export function HeartbeatSettings({ spaceId, isOwner }: { spaceId: string; isOwn
       )}
 
       <div className="px-5 py-3.5">
-        <h4 className="text-[12px] font-medium text-foreground">{t('Wake history')}</h4>
+        <h3 className="text-[12px] font-medium text-foreground">{t('Wake history')}</h3>
         {wakes.length === 0 ? (
           <p className="mt-1 text-[12px] text-muted-foreground">{t('No wakes yet.')}</p>
         ) : (

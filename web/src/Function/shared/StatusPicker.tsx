@@ -194,6 +194,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 >
                   <input
                     type="number"
+                    aria-label={t('Progress')}
                     min={0}
                     max={100}
                     value={progressDraft}

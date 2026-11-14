@@ -55,7 +55,7 @@ export function AutomationSettings({ onOpenElement }: {
     <div className="space-y-8">
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-[13px] font-medium text-foreground">{t('Automations')}</h3>
+          <h2 className="text-[13px] font-medium text-foreground">{t('Automations')}</h2>
           {!creating && !builderCreating && (
             <span className="flex gap-2">
               <Button size="sm" variant="secondary" disabled={!spaceId} onClick={() => setBuilderCreating(true)}>{t('Build with Athena')}</Button>
@@ -97,7 +97,7 @@ function StrategyRunSettings() {
   return (
     <section className="space-y-2">
       <div>
-        <h3 className="text-[13px] font-medium text-foreground">{t('When a run finishes')}</h3>
+        <h2 className="text-[13px] font-medium text-foreground">{t('When a run finishes')}</h2>
         <p className="mt-0.5 text-[12px] text-muted-foreground">{t('What each Strategy’s AI work does when a run finishes.')}</p>
       </div>
       {error && <p role="alert" className="text-[12px] text-[var(--status-danger)]">{error}</p>}
