@@ -12,7 +12,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const HARNESS_TOOLS: ToolDef[] = [
   {
     name: "listHarnesses",
-    description: "Space のハーネス（仕事のやり方の定義）の一覧。名前と目的の 1 行だけを返す。いまの仕事に合うものがあれば readHarness で本文を読み、それに従う。spaceId を省くと見られる全 Space のもの。",
+    description: "Space のハーネス（仕事のやり方の定義）の一覧。名前と目的の 1 行だけを返す。official は Clayware の公式カタログから入れたもの、spaceDefault はその Space の既定。いまの仕事に合うものがあれば readHarness で本文を読み、それに従う。spaceId を省くと見られる全 Space のもの。",
     input_schema: {
       type: "object",
       properties: { spaceId: { type: "string" } },
@@ -96,7 +96,7 @@ export async function runHarnessTool(db: SupabaseClient, name: string, input: Re
   try {
     switch (name) {
       case "listHarnesses": {
-        let q = db.from("definitions").select("id, name, body, activity_space_id").eq("enabled", true).order("name").limit(200);
+        let q = db.from("definitions").select("id, name, body, activity_space_id, source_id").eq("enabled", true).order("name").limit(200);
         if (input.spaceId) {
           const spaceId = String(input.spaceId);
           if (!UUID.test(spaceId)) return { ok: false, error: "spaceId は UUID で渡してください" };
@@ -110,8 +110,10 @@ export async function runHarnessTool(db: SupabaseClient, name: string, input: Re
           const { data: spaces } = await db.from("activity_spaces").select("default_definition_id").in("id", spaceIds);
           for (const s of (spaces ?? []) as { default_definition_id: string | null }[]) if (s.default_definition_id) defaults.add(s.default_definition_id);
         }
-        const list = ((data ?? []) as { id: string; name: string; body: string; activity_space_id: string | null }[]).map((d) => ({
-          id: d.id, name: d.name, summary: harnessSummary(d.body ?? ""), spaceId: d.activity_space_id, ...(defaults.has(d.id) ? { spaceDefault: true } : {}),
+        // Official: added from Clayware's own catalog (Discover), as the app's list marks it.
+        const list = ((data ?? []) as { id: string; name: string; body: string; activity_space_id: string | null; source_id: string | null }[]).map((d) => ({
+          id: d.id, name: d.name, summary: harnessSummary(d.body ?? ""), spaceId: d.activity_space_id,
+          ...(d.source_id ? { official: true } : {}), ...(defaults.has(d.id) ? { spaceDefault: true } : {}),
         }));
         return { ok: true, data: list, meta: { rows: list.length } };
       }
