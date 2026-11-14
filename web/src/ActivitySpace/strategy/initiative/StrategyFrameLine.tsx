@@ -48,13 +48,15 @@ function LineText({ label, value, onChange, onCommit, placeholder, readOnly, aut
   value: string;
   onChange: (next: string) => void;
   /** The focus left, or Enter: keep what is written. */
-  onCommit: () => void;
+  onCommit: (how: 'enter' | 'blur') => void;
   placeholder: string;
   readOnly: boolean;
   autoFocus?: boolean;
   muted?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
+  // Whether the blur about to come is Enter's own.
+  const entered = useRef(false);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -65,7 +67,7 @@ function LineText({ label, value, onChange, onCommit, placeholder, readOnly, aut
     <textarea ref={ref} rows={1} value={value} placeholder={placeholder} aria-label={label} readOnly={readOnly} aria-readonly={readOnly}
       autoFocus={autoFocus} tabIndex={readOnly ? -1 : undefined}
       onChange={(e) => onChange(e.target.value)}
-      onBlur={onCommit}
+      onBlur={() => { const how = entered.current ? 'enter' : 'blur'; entered.current = false; onCommit(how); }}
       onKeyDown={(e) => {
         // One sentence: Enter keeps it, as the focus leaving does. It saves
         // by itself, so Escape keeps it too, and is used up here — the
@@ -73,6 +75,7 @@ function LineText({ label, value, onChange, onCommit, placeholder, readOnly, aut
         if (isCommitEnter(e) || isSubmitChord(e) || isCancelKey(e)) {
           e.preventDefault();
           e.stopPropagation();
+          entered.current = isCommitEnter(e) || isSubmitChord(e);
           e.currentTarget.blur();
         }
       }}
@@ -100,9 +103,13 @@ function DraftLine({ kind, written, block }: { kind: FrameKind; written: string;
   const [text, setText] = useState(written);
   const [busy, setBusy] = useState(false);
   if (!intent) return null;
-  const commit = async () => {
+  const commit = async (how: 'enter' | 'blur') => {
     if (busy) return;
     const title = text.trim();
+    // A sentence kept from a row that could not be made is tried again only
+    // when asked — Enter, or the sentence changed. The focus merely leaving
+    // (the error's own dialog takes it) must not start it over.
+    if (how === 'blur' && written && title === written.trim()) return;
     // Left empty, it was never written: the line goes, and nothing was made.
     if (!title) { block?.remove(); return; }
     setBusy(true);
@@ -137,8 +144,8 @@ function DraftLine({ kind, written, block }: { kind: FrameKind; written: string;
   };
   return (
     <LineShell kind={kind}>
-      <LineText label={t(KIND_LABEL[kind])} value={text} onChange={setText} onCommit={() => void commit()} placeholder={t(KIND_PLACEHOLDER[kind])}
-        readOnly={!intent.canEdit || busy} autoFocus={!!block?.fresh && intent.canEdit} />
+      <LineText label={t(KIND_LABEL[kind])} value={text} onChange={setText} onCommit={(how) => void commit(how)} placeholder={t(KIND_PLACEHOLDER[kind])}
+        readOnly={!intent.canEdit || busy} autoFocus={!!block?.fresh && !written && intent.canEdit} />
     </LineShell>
   );
 }

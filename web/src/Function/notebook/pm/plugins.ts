@@ -1,3 +1,4 @@
+import type { Node as PMNode } from 'prosemirror-model';
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection, type Command, type EditorState } from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
@@ -168,6 +169,37 @@ export function clearSlash(view: EditorView): void {
   view.dispatch(view.state.tr.delete(s.pos, end).setMeta(slashKey, null));
 }
 
+const isEmbed = (node: PMNode | null | undefined) =>
+  !!node && node.type === code_block && (EMBED_LANGS as readonly string[]).includes(node.attrs.lang as string);
+
+/**
+ * The caret taken out of a line it stands in, or null when it stands in none.
+ * It goes back the way it came when it came from below, onward otherwise,
+ * past every line that stands next to this one — lines are placed in a row,
+ * and the one beside is no better a place to type. With no text left that
+ * way it turns round, and a run of lines with nothing after it gets an empty
+ * paragraph to write in.
+ */
+function leaveLine(state: EditorState, isLine: (source: string) => boolean, cameFrom?: number) {
+  const { $from } = state.selection;
+  const line = (node: PMNode | null | undefined) => isEmbed(node) && isLine(node!.textContent);
+  if ($from.depth < 1 || !line($from.parent)) return null;
+  const tr = state.tr;
+  let start = $from.before($from.depth);
+  let end = start + $from.parent.nodeSize;
+  for (let next = tr.doc.resolve(end).nodeAfter; line(next); next = tr.doc.resolve(end).nodeAfter) end += next!.nodeSize;
+  for (let prev = tr.doc.resolve(start).nodeBefore; line(prev); prev = tr.doc.resolve(start).nodeBefore) start -= prev!.nodeSize;
+  const up = () => {
+    const found = start > 0 ? Selection.findFrom(tr.doc.resolve(start), -1, true) : null;
+    return found && found.from < start ? found : null;
+  };
+  const back = cameFrom !== undefined && cameFrom >= end ? up() : null;
+  if (back) return tr.setSelection(back);
+  if (!tr.doc.resolve(end).nodeAfter) tr.insert(end, paragraph.create());
+  const down = Selection.findFrom(tr.doc.resolve(end), 1, true);
+  return down ? tr.setSelection(down) : null;
+}
+
 /** A code block drawn as a diagram or a live view shows its source while the
  *  caret is in it. */
 export function drawnEditing(isLine: (source: string) => boolean = () => false): Plugin {
@@ -178,20 +210,7 @@ export function drawnEditing(isLine: (source: string) => boolean = () => false):
     // way it came from below, onward otherwise — and a line with nothing
     // after it gets an empty paragraph to write in.
     appendTransaction(_trs, before, state) {
-      const { $from } = state.selection;
-      if ($from.depth < 1 || $from.parent.type !== code_block) return null;
-      if (!(EMBED_LANGS as readonly string[]).includes($from.parent.attrs.lang as string) || !isLine($from.parent.textContent)) return null;
-      const start = $from.before($from.depth);
-      const end = start + $from.parent.nodeSize;
-      const tr = state.tr;
-      const cameFromBelow = before.selection.from >= end;
-      if (cameFromBelow && start > 0) {
-        const up = Selection.findFrom(tr.doc.resolve(start), -1, true);
-        if (up && up.from < start) return tr.setSelection(up);
-      }
-      if (end >= tr.doc.content.size) tr.insert(end, paragraph.create());
-      const down = Selection.findFrom(tr.doc.resolve(end), 1, true);
-      return down ? tr.setSelection(down) : null;
+      return leaveLine(state, isLine, before.selection.from);
     },
     props: {
       decorations(state: EditorState) {
@@ -205,18 +224,36 @@ export function drawnEditing(isLine: (source: string) => boolean = () => false):
         }
         return null;
       },
+      // A description that starts with a line opens with the caret in it and
+      // no transaction to move it: what is typed first goes beyond the line.
+      handleTextInput(view: EditorView, _from: number, _to: number, text: string) {
+        const tr = leaveLine(view.state, isLine);
+        if (!tr) return false;
+        view.dispatch(tr.insertText(text));
+        return true;
+      },
       // Backspace at the start of the line after a live view would join that
       // line's text onto the view's source and break it. It picks the view
       // up instead (an empty line goes); the next Backspace removes it.
       handleKeyDown(view: EditorView, event: KeyboardEvent) {
-        if (event.key !== 'Backspace' || event.isComposing) return false;
+        if (event.isComposing) return false;
         const { selection, doc } = view.state;
         const { $from } = selection;
+        // Delete at the end of the line before a live view would pull its
+        // source into that line: it picks the view up the same way.
+        if (event.key === 'Delete') {
+          if (!selection.empty || $from.depth < 1 || $from.parentOffset !== $from.parent.content.size) return false;
+          const after = $from.after($from.depth);
+          if (!isEmbed(doc.resolve(after).nodeAfter)) return false;
+          view.dispatch(view.state.tr.setSelection(NodeSelection.create(doc, after)));
+          return true;
+        }
+        if (event.key !== 'Backspace') return false;
         if (!selection.empty || $from.parentOffset !== 0 || $from.depth < 1) return false;
         const start = $from.before($from.depth);
         const before = doc.resolve(start).nodeBefore;
-        if (!before || before.type !== code_block || !(EMBED_LANGS as readonly string[]).includes(before.attrs.lang as string)) return false;
-        const at = start - before.nodeSize;
+        if (!isEmbed(before)) return false;
+        const at = start - before!.nodeSize;
         let tr = view.state.tr;
         if ($from.parent.content.size === 0 && $from.after($from.depth) < doc.content.size) tr = tr.delete(start, $from.after($from.depth));
         view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, at)));
