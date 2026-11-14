@@ -10,6 +10,8 @@ describe('renderNotificationEmail', () => {
     expect(e.subject).toBe('「見積書」の担当になりました');
     expect(e.text).toContain('佐藤 さんが、あなたを「見積書」の担当に加えました。');
     expect(e.text).toContain('https://app.example.com/?view=inbox');
+    const linked = renderNotificationEmail({ kind: 'assigned', title: 't', target: { type: 'element', title: '見積書', id: 'abc' }, appUrl: 'https://app.example.com/' });
+    expect(linked.text).toContain('https://app.example.com/?element=abc');
   });
 
   it('escapes what people typed', () => {
