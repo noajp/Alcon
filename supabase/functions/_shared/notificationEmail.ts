@@ -15,7 +15,7 @@ export interface NotificationEmailInput {
   body?: string | null;
   actorName?: string | null;
   /** What the notification is about: an Element, an Object or a Strategy. */
-  target?: { type: "element" | "object" | "strategy"; title: string } | null;
+  target?: { type: "element" | "object" | "strategy"; title: string; id?: string } | null;
   appUrl: string;
 }
 
@@ -24,11 +24,18 @@ export interface RenderedEmail { subject: string; text: string; html: string }
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+/** Where the email's button goes: the thing itself (`/?element=<id>` and the
+ *  like, read by web/src/lib/deepLink.ts), or the Inbox when there is none. */
+export function notificationLink(appUrl: string, target?: NotificationEmailInput["target"]): string {
+  const base = appUrl.replace(/\/+$/, "");
+  return target?.id ? `${base}/?${target.type}=${encodeURIComponent(target.id)}` : `${base}/?view=inbox`;
+}
+
 /** The email for one notification, in Japanese. Assignment, Lead, mention
  *  and comment read as their own sentence; any other kind carries the
  *  notification's own title. */
 export function renderNotificationEmail(n: NotificationEmailInput): RenderedEmail {
-  const link = `${n.appUrl.replace(/\/+$/, "")}/?view=inbox`;
+  const link = notificationLink(n.appUrl, n.target);
   const actor = n.actorName?.trim();
   const who = actor ? `${actor} さん` : "誰か";
   const t = n.target;
@@ -85,15 +92,15 @@ const BATCH = 25;
 async function targetOf(admin: Admin, n: { element_id?: string | null; object_id?: string | null; strategy_id?: string | null }): Promise<NotificationEmailInput["target"]> {
   if (n.element_id) {
     const { data } = await admin.from("elements").select("title").eq("id", n.element_id).maybeSingle();
-    return data?.title ? { type: "element", title: data.title } : null;
+    return data?.title ? { type: "element", title: data.title, id: n.element_id } : null;
   }
   if (n.object_id) {
     const { data } = await admin.from("objects").select("name").eq("id", n.object_id).maybeSingle();
-    return data?.name ? { type: "object", title: data.name } : null;
+    return data?.name ? { type: "object", title: data.name, id: n.object_id } : null;
   }
   if (n.strategy_id) {
     const { data } = await admin.from("strategies").select("name").eq("id", n.strategy_id).maybeSingle();
-    return data?.name ? { type: "strategy", title: data.name } : null;
+    return data?.name ? { type: "strategy", title: data.name, id: n.strategy_id } : null;
   }
   return null;
 }

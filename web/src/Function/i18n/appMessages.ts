@@ -4,6 +4,7 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const APP_MESSAGES: Record<string, Row> = {
+  'That link could not be opened. It may have been deleted, or you may not have access.': ['リンク先を開けませんでした。削除されたか、見る権限がない可能性があります。', '링크를 열 수 없습니다. 삭제되었거나 접근 권한이 없을 수 있습니다.', 'Impossible d’ouvrir ce lien. Il a peut-être été supprimé, ou vous n’y avez pas accès.', 'No se pudo abrir el enlace. Puede que se haya eliminado o que no tengas acceso.'],
   'Confirming your email…': ['メールアドレスを確認しています…', '이메일을 확인하는 중…', 'Confirmation de votre e-mail…', 'Confirmando tu correo…'],
   'This takes a moment.': ['少しお待ちください。', '잠시만 기다려 주세요.', 'Cela prend un instant.', 'Esto tarda un momento.'],
   'Email confirmed': ['メールアドレスを確認しました', '이메일이 확인되었습니다', 'E-mail confirmé', 'Correo confirmado'],

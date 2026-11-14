@@ -45,6 +45,9 @@ import { SidebarRevealContext } from '@/Function/shared/SidebarReveal';
 import { seedStarterSpace } from '@/Function/space/seedStarterSpace';
 import { OPEN_IN_APP_EVENT, type OpenInAppDetail } from '@/Function/shared/appNavigation';
 import { useModelKeyCheck } from '@/Function/team/useModelKeyCheck';
+import { clearPendingDeepLink, parseDeepLink, setPendingDeepLink, stripDeepLink, usePendingDeepLink } from '@/lib/deepLink';
+import { resolveDeepLink } from '@/hooks/deepLinkTarget';
+import { notifyError } from '@/Function/shared/toastStore';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -175,6 +178,31 @@ function AppContent() {
       setActiveSpaceId(first);
     }
   }, [activeSpaceExists, spaces, spacesLoading]);
+
+  // A link from outside the app (lib/deepLink.ts): read once, dropped from
+  // the address, found as this person can see it, and handed to the shell
+  // once it stands in the thing's Space. A Space the person is not a
+  // member of (a guest Domain's) is not switched to: guest Domains show in
+  // any Space.
+  const [deepLink] = useState(() => (typeof window === 'undefined' ? null : parseDeepLink(window.location.search)));
+  useEffect(() => {
+    if (!deepLink) return;
+    window.history.replaceState(window.history.state, '', stripDeepLink(window.location.href));
+    if (deepLink.kind === 'inbox') { setPendingDeepLink({ spaceId: null, view: 'inbox', nav: {}, placed: true }); return; }
+    let cancelled = false;
+    resolveDeepLink(deepLink)
+      .then((target) => { if (!cancelled) setPendingDeepLink(target ?? 'missing'); })
+      .catch(() => { if (!cancelled) setPendingDeepLink('missing'); });
+    return () => { cancelled = true; };
+  }, [deepLink]);
+  const pendingDeepLink = usePendingDeepLink();
+  useEffect(() => {
+    if (!pendingDeepLink || pendingDeepLink === 'missing' || pendingDeepLink.placed || spacesLoading) return;
+    const target = pendingDeepLink.spaceId;
+    const spaceId = target && spaces.some((s) => s.id === target) ? target : null;
+    if (spaceId && spaceId !== activeSpaceId) setActiveSpaceId(spaceId);
+    setPendingDeepLink({ ...pendingDeepLink, spaceId, placed: true });
+  }, [pendingDeepLink, spacesLoading, spaces, activeSpaceId]);
 
   // ── Domain: resolved WITHIN the active ActivitySpace ──
   const [activeDomainId, setActiveDomainIdState] = useState<string>(() => getActiveDomainId() ?? '');
@@ -335,10 +363,7 @@ function WorkspaceContent({
     if (screen?.settings) setActiveSettingsSection(screen.settings.section);
     return screen;
   });
-  // A link from a notification email (`/?view=inbox`, notificationEmail.ts)
-  // opens the Inbox, where the notification waits.
-  const [fromEmailLink] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'inbox');
-  const [initialTab] = useState<AppTab>(() => (fromEmailLink ? makeNewTab('inbox') : restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
+  const [initialTab] = useState<AppTab>(() => (restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTab]);
   const [activeTabId, setActiveTabId] = useState(initialTab.id);
 
@@ -515,6 +540,25 @@ function WorkspaceContent({
     setActiveTabId(next.activeTabId);
     setSidebarOverlay(false);
   };
+  // A link from outside the app, found and in this Space (AppContent):
+  // open it as ⌘K would. Nothing found, or not theirs to see: the Inbox,
+  // and a word why — without saying which of the two it was.
+  const pendingDeepLink = usePendingDeepLink();
+  useEffect(() => {
+    if (!pendingDeepLink) return;
+    if (pendingDeepLink !== 'missing' && (!pendingDeepLink.placed || (pendingDeepLink.spaceId && pendingDeepLink.spaceId !== activeSpaceId))) return;
+    // After this render: the shell may have just switched Space.
+    const timer = setTimeout(() => {
+      clearPendingDeepLink();
+      if (pendingDeepLink === 'missing') {
+        setActiveView('inbox');
+        notifyError(null, t('That link could not be opened. It may have been deleted, or you may not have access.'));
+      } else if (pendingDeepLink.view === 'inbox') setActiveView('inbox');
+      else openItem(pendingDeepLink.view, pendingDeepLink.nav);
+    }, 0);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingDeepLink, activeSpaceId]);
   // The strip's and palette's tab operations — the pure transitions in
   // tabState.ts, applied. A fresh tab opens at the home view.
   const applyTabState = (next: { tabs: AppTab[]; activeTabId: string }) => {
@@ -566,14 +610,6 @@ function WorkspaceContent({
   // from the URL, confirm the sign-in as this person (POST /finish — nothing
   // is stored before that) and open the Settings page it started from to
   // show the outcome.
-  // The email link's `?view=inbox` was read when the first tab was made;
-  // it comes off the address so a reload goes back to the usual screen.
-  useEffect(() => {
-    if (!fromEmailLink) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete('view');
-    window.history.replaceState(window.history.state, '', url.toString());
-  }, [fromEmailLink]);
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
