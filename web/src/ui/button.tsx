@@ -144,10 +144,11 @@ function Button({
         appearance === 'control' && shape === 'tab' && variant === 'secondary' && 'bg-[var(--surface-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-strong)]',
         appearance !== 'control' && 'rounded-[var(--control-tab-radius)] border-transparent hover:border-transparent aria-pressed:border-transparent aria-selected:border-transparent',
         appearance === 'inline' && variant === 'ghost' && 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] font-normal',
-        // The one decisive action (Create, Send, the empty state's verb) is a
-        // pill, like the tabs and the quick-create property chips beside it.
+        // The one decisive action (Create, Send, the empty state's verb, and
+        // its destructive twin Delete) is a pill, like the tabs and the
+        // quick-create property chips beside it.
         // A caller that sets its own corners (a split button's halves) keeps them.
-        variant === 'primary' && !/(^|\s)rounded-/.test(className ?? '') && 'rounded-full'
+        (variant === 'primary' || variant === 'danger') && !/(^|\s)rounded-/.test(className ?? '') && 'rounded-full'
       )}
       {...props}
     >
