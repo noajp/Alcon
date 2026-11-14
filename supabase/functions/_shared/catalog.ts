@@ -5,7 +5,7 @@ import { MEASURE_TOOLS, runMeasureTool } from "./measureTools.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 import { BATCH_TOOLS, runBatchTool } from "./batchTools.ts";
 import { FILE_TOOLS, runFileTool } from "./fileTools.ts";
-import { HARNESS_TOOLS, runHarnessTool } from "./harnessTools.ts";
+import { HARNESS_TOOLS, HARNESS_WRITE_TOOLS, runHarnessTool } from "./harnessTools.ts";
 import { MEMORY_TOOLS, runMemoryTool } from "./memoryTools.ts";
 import type { RunToolDef } from "./toolLoading.ts";
 
@@ -47,6 +47,7 @@ export const CATALOG: CatalogTool[] = [
   ...entries(BATCH_TOOLS, "execution"),
   ...entries(FILE_TOOLS, "files"),
   ...entries(HARNESS_TOOLS, "harness"),
+  ...entries(HARNESS_WRITE_TOOLS, "harness"),
   // Memory: recall reads in every entry; remember writes durable at a
   // person's word, so it is offered where a conversation can carry
   // that word (the panel, a Strategy conversation) — never to an
@@ -122,13 +123,14 @@ export const ENTRY_POLICIES: Record<Entry, EntryPolicy> = {
   // An Element's run (started by a person or an automation, possibly on
   // input from outside): it reads anything and does the work on the board
   // and in files. A change to a Strategy — the purpose, the success
-  // conditions the verifier checks, the harness the run follows — waits for
-  // the person's approval. It never removes anything, and Tables and boards
-  // it changes only through its own save_records.
+  // conditions the verifier checks, the harness the run follows (its own
+  // or the Space's) — waits for the person's approval. It never removes
+  // anything, and Tables and boards it changes only through its own
+  // save_records.
   element: {
     effects: ["read"],
     writeAreas: ["execution", "files"],
-    approveAreas: ["strategy"],
+    approveAreas: ["strategy", "harness"],
     core: [...READ_CORE.filter((n) => n !== "listHarnesses"), "createElement", "updateElement", "addElementComment", "createSubelement", "toggleSubelementComplete"],
   },
   // An AI outside Clayware (clayware-mcp) working as the person who
@@ -243,7 +245,7 @@ export async function runCatalogTool(
       case "files":
         return await runFileTool(db, name, input, { spaceId: under.spaceId ?? null });
       case "harness":
-        return await runHarnessTool(db, name, input);
+        return await runHarnessTool(db, name, input, actor);
       default:
         return await runBoardTool(db, name, input, actor);
     }

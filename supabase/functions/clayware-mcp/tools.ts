@@ -14,13 +14,13 @@ import type { McpTool, ToolHost } from "./protocol.ts";
 const IDEMPOTENT = new Set([
   "updateElement", "updateSubelement", "updateObject", "updateInitiative", "updateIntent",
   "addElementAssignee", "removeElementAssignee", "setElementLabels", "linkElementToObject", "unlinkElementFromObject",
-  "moveElement", "writeFile", "writeInitiativeDefinition", "claimElement", "releaseElement",
+  "moveElement", "writeFile", "writeInitiativeDefinition", "updateHarness", "claimElement", "releaseElement",
 ]);
 // Writes that overwrite what was there — a client should confirm these the
 // way it confirms a delete.
 const OVERWRITES = new Set([
   "updateElement", "updateSubelement", "updateObject", "updateInitiative", "updateIntent",
-  "setElementLabels", "bulkUpdateElements", "moveElement", "writeFile", "writeInitiativeDefinition",
+  "setElementLabels", "bulkUpdateElements", "moveElement", "writeFile", "writeInitiativeDefinition", "updateHarness",
 ]);
 
 // Display titles for the tool list. Client directories (Claude, ChatGPT)
