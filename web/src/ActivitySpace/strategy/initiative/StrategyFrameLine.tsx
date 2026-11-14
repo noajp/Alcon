@@ -205,7 +205,7 @@ type MeasureValues = Pick<Intent, 'target_value' | 'actual_value' | 'unit' | 'di
 /** Where a success condition stands, and the small form that sets it: the
  *  reading, the target, its unit and which way counts. A form with a Save, so
  *  Escape leaves it without keeping anything. */
-function StandingControl({ row, canEdit, onSave }: { row: Intent; canEdit: boolean; onSave: (values: MeasureValues) => Promise<void> }) {
+function StandingControl({ row, canEdit, onSave }: { row: Intent; canEdit: boolean; onSave: (values: Partial<MeasureValues>) => Promise<boolean> }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [actual, setActual] = useState('');
@@ -230,15 +230,23 @@ function StandingControl({ row, canEdit, onSave }: { row: Intent; canEdit: boole
     e.preventDefault();
     const a = parseMeasureValue(actual);
     const g = parseMeasureValue(target);
-    if (!a.ok || !g.ok) { setBad(true); return; }
+    // A condition is held to a number: the target cannot be left out.
+    if (!a.ok || !g.ok || g.value === null) { setBad(true); return; }
+    // Only what was changed is sent: a reading another surface wrote since
+    // this page read the row must survive a change to the target alone.
+    const patch: Partial<MeasureValues> = {};
+    if (g.value !== row.target_value) patch.target_value = g.value;
+    if ((unit.trim() || null) !== row.unit) patch.unit = unit.trim() || null;
+    if (direction !== row.direction) patch.direction = direction;
+    if (a.value !== row.actual_value) {
+      patch.actual_value = a.value;
+      patch.measured_at = a.value === null ? null : new Date().toISOString();
+    }
+    if (!Object.keys(patch).length) { setOpen(false); return; }
     setSaving(true);
     try {
-      await onSave({
-        actual_value: a.value, target_value: g.value, unit: unit.trim() || null, direction,
-        // A reading is dated when it changes; one left as it was keeps its date.
-        measured_at: a.value === null ? null : a.value === row.actual_value ? row.measured_at : new Date().toISOString(),
-      });
-      setOpen(false);
+      // Refused, the form stays open with what was typed.
+      if (await onSave(patch)) setOpen(false);
     } finally {
       setSaving(false);
     }
@@ -270,7 +278,7 @@ function StandingControl({ row, canEdit, onSave }: { row: Intent; canEdit: boole
               </button>
             ))}
           </div>
-          {bad && <p role="alert" className="text-[12px] text-[var(--status-danger-text)]">{t('Enter numbers for the reading and the target.')}</p>}
+          {bad && <p role="alert" className="text-[12px] text-[var(--status-danger-text)]">{t('Enter a number for the target, and for the reading if there is one.')}</p>}
           <div className="flex justify-end">
             <Button type="submit" size="sm" disabled={saving}>{t('Save')}</Button>
           </div>
@@ -310,16 +318,24 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
     }
   };
   /** One change to the row, shown at once and taken back if it is refused. */
-  const change = async (updates: Partial<Intent>, reading?: 'manual') => {
+  const change = async (updates: Partial<Intent>, reading?: 'manual'): Promise<boolean> => {
     const before = row;
     const swap = (to: Intent) => patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: bundle.subs.map((s) => (s.id === row.id ? to : s)) }));
     swap({ ...row, ...updates });
     try {
       await updateIntent(row.id, updates, reading);
       intent.refetch();
+      if (kind === 'measure') {
+        // What else reads a condition: the tallies, and its readings — the
+        // database appended one if the value changed.
+        void qc.invalidateQueries({ queryKey: ['initiative-measures'] });
+        void qc.invalidateQueries({ queryKey: ['measure-readings', row.id] });
+      }
+      return true;
     } catch (e) {
       swap(before);
       void appDialog.alert(formatError(e));
+      return false;
     }
   };
   const remove = async () => {

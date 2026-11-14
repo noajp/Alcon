@@ -104,7 +104,7 @@ export async function runStrategyTool(
         if (!initiative) return { ok: false, error: "Initiative not found" };
         const [intents, links, children] = await Promise.all([
           supabase.from("intents")
-            .select("id, kind, title, subtitle, status, horizon, target_value, actual_value, unit, direction, measured_at, decided_by_name, decided_at")
+            .select("id, kind, title, subtitle, status, verdict, horizon, target_value, actual_value, unit, direction, measured_at, decided_by_name, decided_at")
             .eq("strategy_id", id).is("superseded_by_intent_id", null)
             .order("order_index", { ascending: true }),
           supabase.from("strategy_objects").select("object_id").eq("strategy_id", id),

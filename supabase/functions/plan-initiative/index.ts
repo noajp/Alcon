@@ -263,7 +263,7 @@ Deno.serve(async (req: Request) => {
   if (!initiative) return json({ error: "Strategy not found" }, 404);
 
   const [intentsRes, linksRes] = await Promise.all([
-    db.from("intents").select("id, kind, title, subtitle, target_value, actual_value, unit, direction, status")
+    db.from("intents").select("id, kind, title, subtitle, target_value, actual_value, unit, direction, status, verdict")
       .eq("strategy_id", initiativeId).is("superseded_by_intent_id", null).neq("kind", "master").order("order_index"),
     db.from("strategy_objects").select("object_id").eq("strategy_id", initiativeId),
   ]);
@@ -336,9 +336,13 @@ Deno.serve(async (req: Request) => {
   const line = (r: Row) => String(r.title ?? "").replace(/\s+/g, " ").slice(0, 300);
   const measures = intents.filter((i) => i.kind === "measure").map((m) =>
     `- id: ${m.id} / ${line(m)}${m.target_value != null ? `（目標 ${m.direction === "at_most" ? "≦" : "≧"} ${m.target_value}${m.unit ?? ""}${m.actual_value != null ? `、現在 ${m.actual_value}${m.unit ?? ""}` : ""}）` : ""}`);
-  const assumptions = intents.filter((i) => i.kind === "assumption").map((a) => `- id: ${a.id} / ${line(a)}`);
+  // A hypothesis carries what was found out about it: one disproved is not
+  // ground to plan on, and work that tests it again is not wanted.
+  const verdictNote = (a: Row) => (a.verdict === "rejected" ? "（棄却済み：前提にしない）" : a.verdict === "supported" ? "（支持された）" : "（未検証）");
+  const assumptions = intents.filter((i) => i.kind === "assumption").map((a) => `- id: ${a.id} / ${line(a)}${verdictNote(a)}`);
   const decisions = intents.filter((i) => i.kind === "decision").map((d) => `- id: ${d.id} / ${line(d)}`);
-  const reasonIds = new Set(intents.filter((i) => i.kind === "assumption" || i.kind === "decision").map((i) => String(i.id)));
+  // A disproved hypothesis is no reason for new work.
+  const reasonIds = new Set(intents.filter((i) => (i.kind === "assumption" && i.verdict !== "rejected") || i.kind === "decision").map((i) => String(i.id)));
   const objectName = new Map(objects.map((o) => [String(o.id), String(o.name ?? "")]));
   const existing = elements.map((e) => `- ${line(e)}（${e.status ?? "todo"}、Object: ${objectName.get(String(e.object_id)) ?? "?"}）`);
   const objectLines = objects.map((o) =>

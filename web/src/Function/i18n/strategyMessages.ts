@@ -520,7 +520,7 @@ const STRATEGY_MESSAGES: Record<string, Row> = {
   'Verdict: {verdict}': ['判定：{verdict}', '판정: {verdict}', 'Verdict : {verdict}', 'Veredicto: {verdict}'],
   'Set target': ['目標を入れる', '목표 입력', 'Fixer la cible', 'Fijar objetivo'],
   'Which way counts': ['どちら向きで達成とするか', '어느 방향이 달성인지', 'Dans quel sens cela compte', 'En qué sentido cuenta'],
-  'Enter numbers for the reading and the target.': ['実測値と目標には数字を入れてください。', '측정값과 목표에는 숫자를 입력하세요.', 'Saisissez des nombres pour la mesure et la cible.', 'Introduce números en la lectura y el objetivo.'],
+  'Enter a number for the target, and for the reading if there is one.': ['目標には数字を入れてください。実測値も、入れる場合は数字で。', '목표에는 숫자를 입력하세요. 측정값도 입력한다면 숫자로.', 'Saisissez un nombre pour la cible, et pour la mesure s’il y en a une.', 'Introduce un número para el objetivo y, si la hay, para la lectura.'],
 };
 
 const column = (index: 0 | 1 | 2 | 3) => Object.fromEntries(Object.entries(STRATEGY_MESSAGES).map(([key, row]) => [key, row[index]]));
