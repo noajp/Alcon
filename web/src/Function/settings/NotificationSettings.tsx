@@ -3,7 +3,8 @@
 import { SettingsIsland, ToggleRow } from './SettingsControls';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useNotificationPreferences } from './useNotificationPreferences';
-import { NOTIFICATION_KINDS, NOTIFICATION_KIND_META } from '@/Function/shared/notificationKinds';
+import { useNotificationEmailPreferences } from './useNotificationEmailPreferences';
+import { EMAIL_NOTIFICATION_KINDS, NOTIFICATION_KINDS, NOTIFICATION_KIND_META } from '@/Function/shared/notificationKinds';
 
 const KIND_HINT: Partial<Record<string, string>> = {
   mention: 'Someone @mentions you in a comment',
@@ -19,6 +20,7 @@ const KIND_HINT: Partial<Record<string, string>> = {
 export function NotificationSettings() {
   const { t } = useI18n();
   const { muted, loading, error, pendingKinds, setKindMuted } = useNotificationPreferences();
+  const email = useNotificationEmailPreferences();
 
   return (
     <div className="space-y-6">
@@ -26,10 +28,10 @@ export function NotificationSettings() {
         {t('Choose which kinds of activity create a notification in your Inbox. Off means it never gets created — not just hidden.')}
       </p>
 
-      {error && (
-        <div className="text-[12px] text-destructive">{error}</div>
+      {(error || email.error) && (
+        <div className="text-[12px] text-destructive">{error || email.error}</div>
       )}
-      <SettingsIsland>
+      <SettingsIsland title={t('Inbox')}>
         {NOTIFICATION_KINDS.map((kind) => {
           const meta = NOTIFICATION_KIND_META[kind];
           const isEnabled = !muted.has(kind);
@@ -41,6 +43,23 @@ export function NotificationSettings() {
               value={isEnabled}
               onChange={(v) => setKindMuted(kind, !v)}
               disabled={loading || pendingKinds.has(kind)}
+            />
+          );
+        })}
+      </SettingsIsland>
+
+      <SettingsIsland title={t('By email')} description={t('Also send these to the email address you sign in with.')}>
+        {EMAIL_NOTIFICATION_KINDS.map((kind) => {
+          const meta = NOTIFICATION_KIND_META[kind];
+          const offInInbox = muted.has(kind);
+          return (
+            <ToggleRow
+              key={kind}
+              label={t(meta.label)}
+              caption={offInInbox ? t('Off in the Inbox, so no email either') : undefined}
+              value={!offInInbox && email.isEmailed(kind)}
+              onChange={(v) => email.setEmailed(kind, v)}
+              disabled={offInInbox || email.loading || email.pending.has(kind)}
             />
           );
         })}

@@ -335,7 +335,10 @@ function WorkspaceContent({
     if (screen?.settings) setActiveSettingsSection(screen.settings.section);
     return screen;
   });
-  const [initialTab] = useState<AppTab>(() => (restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
+  // A link from a notification email (`/?view=inbox`, notificationEmail.ts)
+  // opens the Inbox, where the notification waits.
+  const [fromEmailLink] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'inbox');
+  const [initialTab] = useState<AppTab>(() => (fromEmailLink ? makeNewTab('inbox') : restored ? makeNewTab(restored.view, restored.navigation) : makeNewTab(getCachedHomeViewId())));
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTab]);
   const [activeTabId, setActiveTabId] = useState(initialTab.id);
 
@@ -563,6 +566,14 @@ function WorkspaceContent({
   // from the URL, confirm the sign-in as this person (POST /finish — nothing
   // is stored before that) and open the Settings page it started from to
   // show the outcome.
+  // The email link's `?view=inbox` was read when the first tab was made;
+  // it comes off the address so a reload goes back to the usual screen.
+  useEffect(() => {
+    if (!fromEmailLink) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, [fromEmailLink]);
   useEffect(() => {
     const result = readOAuthReturn(window.location.search);
     if (!result) return;
