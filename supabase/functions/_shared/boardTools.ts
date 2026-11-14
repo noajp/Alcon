@@ -47,6 +47,69 @@ export function actionOf(v: unknown): { ok: true; value: string | null } | { ok:
     : { ok: false, error: `action must be one of ${ELEMENT_ACTIONS.join(" / ")}` };
 }
 
+/** Pure. Why a date field is not a calendar day ('YYYY-MM-DD' or null to
+ *  clear), or null when every listed field present is one. */
+export function dateFieldsError(input: Record<string, unknown>, keys: readonly string[]): string | null {
+  for (const k of keys) {
+    const v = input[k];
+    if (v === undefined || v === null) continue;
+    const s = String(v);
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00Z`) : null;
+    if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) return `${k} must be YYYY-MM-DD (or null to clear)`;
+  }
+  return null;
+}
+
+/** Pure. Why a start comes after its due day, or null. */
+export function spanError(start: unknown, due: unknown): string | null {
+  return typeof start === "string" && typeof due === "string" && start > due ? "start_date must not be after due_date" : null;
+}
+
+/** The colours a label, an Object or an Element can wear: web
+ *  Function/shared/labelColor.ts LABEL_PALETTE keys. */
+export const PALETTE_KEYS = ["grey", "darkgrey", "purple", "teal", "green", "yellow", "orange", "pink", "red"] as const;
+
+/** Pure. Why an icon string is not one the app draws, or null. Same forms
+ *  as web Function/shared/itemIcon/itemIconValue.ts: 'glyph:<Name>',
+ *  'lucide:<kebab-name>', an emoji, or null for the default. */
+export function iconError(v: unknown): string | null {
+  if (v === null) return null;
+  const s = String(v ?? "").trim();
+  if (/^glyph:[A-Z][A-Za-z0-9]*$/.test(s) || /^lucide:[a-z0-9]+(-[a-z0-9]+)*$/.test(s)) return null;
+  if (s && s.length <= 16 && !/[A-Za-z0-9<>]/.test(s)) return null;
+  return "icon must be 'glyph:<Name>', 'lucide:<kebab-name>', an emoji, or null";
+}
+
+/** Pure. Why a colour is not a palette key or '#rrggbb', or null. */
+export function colorError(v: unknown): string | null {
+  if (v === null) return null;
+  const s = String(v ?? "");
+  return (PALETTE_KEYS as readonly string[]).includes(s) || /^#[0-9a-fA-F]{6}$/.test(s)
+    ? null : `color must be one of ${PALETTE_KEYS.join(" / ")}, '#rrggbb', or null`;
+}
+
+const OBJECT_LOOK = {
+  start_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。Timeline の帯の始まり。null で解除" },
+  due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。Timeline の帯の終わり。null で解除" },
+  icon: { type: "string", description: "'glyph:<Name>'（Clayware のアイコン）/ 'lucide:<kebab-name>' / 絵文字。null で既定の Object アイコン" },
+  color: { type: "string", description: `アイコンの色。${PALETTE_KEYS.join(" / ")} か '#rrggbb'。null で既定` },
+  type: { type: "string", description: "Object type 名（Domain に既存のもの推奨）" },
+  leadWorkerId: { type: "string", description: "Lead（担当者）の Worker UUID。null で外す" },
+};
+
+/** Pure. The objects-row patch an Object tool's input asks for, or why not. */
+export function objectPatch(input: Record<string, unknown>): { ok: true; patch: Record<string, unknown> } | { ok: false; error: string } {
+  const patch: Record<string, unknown> = {};
+  for (const k of ["name", "prefix", "description", "start_date", "due_date", "icon", "color", "type"]) {
+    if (input[k] !== undefined) patch[k] = input[k];
+  }
+  if (input.leadWorkerId !== undefined) patch.lead_id = input.leadWorkerId;
+  const error = dateFieldsError(patch, ["start_date", "due_date"]) ?? spanError(patch.start_date, patch.due_date)
+    ?? (patch.icon !== undefined ? iconError(patch.icon) : null)
+    ?? (patch.color !== undefined ? colorError(patch.color) : null);
+  return error ? { ok: false, error } : { ok: true, patch };
+}
+
 export const BOARD_TOOLS: ToolDef[] = [
   {
     name: "listMyDomains",
@@ -160,6 +223,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
         priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
         type: { type: "string", description: "Element type 名（Domain に既存のもの推奨）" },
+        start_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。Timeline の帯の始まり" },
         due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
         labels: { type: "array", items: { type: "string" } },
         action: ACTION_SCHEMA,
@@ -182,6 +246,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
         priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
         type: { type: "string" },
+        start_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。Timeline の帯の始まり。null で解除" },
         due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。null で解除" },
         estimated_hours: { type: "number" },
         labels: { type: "array", items: { type: "string" } },
@@ -296,7 +361,7 @@ export const BOARD_TOOLS: ToolDef[] = [
   // ── Write: Object ───────────────────────────────────────────────────────
   {
     name: "createObject",
-    description: "Domain 内に新しい Object を作成する。",
+    description: "Domain 内に新しい Object を作成する。期間（start_date / due_date）を入れると Timeline に帯が出る。",
     input_schema: {
       type: "object",
       properties: {
@@ -304,6 +369,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         name: { type: "string" },
         prefix: { type: "string", description: "Element 採番用プレフィックス（任意）" },
         description: { type: "string" },
+        ...OBJECT_LOOK,
       },
       required: ["domainId", "name"],
       additionalProperties: false,
@@ -311,7 +377,7 @@ export const BOARD_TOOLS: ToolDef[] = [
   },
   {
     name: "updateObject",
-    description: "Object を更新（name / prefix / description）。",
+    description: "Object を更新（name / prefix / description / 期間 / アイコンと色 / type / Lead）。指定したフィールドだけ patch。",
     input_schema: {
       type: "object",
       properties: {
@@ -319,6 +385,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         name: { type: "string" },
         prefix: { type: "string" },
         description: { type: "string" },
+        ...OBJECT_LOOK,
       },
       required: ["id"],
       additionalProperties: false,
@@ -392,7 +459,7 @@ export const BOARD_TOOLS: ToolDef[] = [
   // ── Write: Bulk ─────────────────────────────────────────────────────────
   {
     name: "bulkUpdateElements",
-    description: "複数 Element を同じ patch で一括更新（status / priority / type / due_date / labels）。",
+    description: "複数 Element を同じ patch で一括更新（status / priority / type / start_date / due_date / labels）。",
     input_schema: {
       type: "object",
       properties: {
@@ -400,10 +467,25 @@ export const BOARD_TOOLS: ToolDef[] = [
         status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
         priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
         type: { type: "string" },
+        start_date: { type: "string" },
         due_date: { type: "string" },
         labels: { type: "array", items: { type: "string" } },
       },
       required: ["ids"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "setLabelColor",
+    description: "Domain のラベルの色を決める。決めるまでは名前から自動で色が付く。同じ Domain のその名前のラベルすべてに効く。",
+    input_schema: {
+      type: "object",
+      properties: {
+        domainId: { type: "string", description: "Domain UUID" },
+        label: { type: "string", description: "ラベル名" },
+        color: { type: "string", enum: [...PALETTE_KEYS, "auto"], description: "色。auto で名前から決まる自動の色に戻す" },
+      },
+      required: ["domainId", "label", "color"],
       additionalProperties: false,
     },
   },
@@ -549,9 +631,11 @@ export async function updateElementById(
   actor: BoardActor,
 ): Promise<ToolResult> {
   const patch: Record<string, unknown> = {};
-  for (const k of ["title", "description", "status", "priority", "type", "due_date", "due_time", "estimated_hours"]) {
+  for (const k of ["title", "description", "status", "priority", "type", "start_date", "due_date", "due_time", "estimated_hours"]) {
     if (input[k] !== undefined) patch[k] = input[k];
   }
+  const dateError = dateFieldsError(patch, ["start_date", "due_date"]) ?? spanError(patch.start_date, patch.due_date);
+  if (dateError) return { ok: false, error: dateError };
   if (Array.isArray(input.labels)) patch.labels = input.labels;
   if (input.action !== undefined) {
     const a = actionOf(input.action);
@@ -800,9 +884,11 @@ export async function runBoardTool(
         if (!objectId) return { ok: false, error: "objectId is required" };
         if (!title) return { ok: false, error: "title is required" };
         const payload: Record<string, unknown> = { object_id: objectId, title };
-        for (const k of ["description", "status", "priority", "type", "due_date"]) {
+        for (const k of ["description", "status", "priority", "type", "start_date", "due_date"]) {
           if (input[k] !== undefined) payload[k] = input[k];
         }
+        const dateError = dateFieldsError(payload, ["start_date", "due_date"]) ?? spanError(payload.start_date, payload.due_date);
+        if (dateError) return { ok: false, error: dateError };
         if (Array.isArray(input.labels)) payload.labels = input.labels;
         if (input.action !== undefined) {
           const a = actionOf(input.action);
@@ -1006,13 +1092,12 @@ export async function runBoardTool(
         const name = String(input.name ?? "").trim();
         if (!domainId) return { ok: false, error: "domainId is required" };
         if (!name) return { ok: false, error: "name is required" };
-        const payload: Record<string, unknown> = { domain_id: domainId, name };
-        for (const k of ["prefix", "description"]) {
-          if (input[k] !== undefined) payload[k] = input[k];
-        }
+        const look = objectPatch(input);
+        if (!look.ok) return look;
+        const payload: Record<string, unknown> = { ...look.patch, domain_id: domainId, name };
         const { data, error } = await supabase
           .from("objects").insert(payload)
-          .select("id, name, prefix, domain_id").single();
+          .select("id, name, prefix, domain_id, start_date, due_date, icon, color, type, lead_id").single();
         if (error) throw error;
         return { ok: true, data, meta: { rows: 1 } };
       }
@@ -1020,14 +1105,19 @@ export async function runBoardTool(
       case "updateObject": {
         const id = String(input.id ?? "");
         if (!id) return { ok: false, error: "id is required" };
-        const patch: Record<string, unknown> = {};
-        for (const k of ["name", "prefix", "description"]) {
-          if (input[k] !== undefined) patch[k] = input[k];
-        }
+        const look = objectPatch(input);
+        if (!look.ok) return look;
+        const patch = look.patch;
         if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+        // One end of the span may move alone; it must not cross the stored other end.
+        if ((patch.start_date && patch.due_date === undefined) || (patch.due_date && patch.start_date === undefined)) {
+          const { data: current } = await supabase.from("objects").select("start_date, due_date").eq("id", id).maybeSingle();
+          const crossed = spanError(patch.start_date ?? current?.start_date, patch.due_date ?? current?.due_date);
+          if (crossed) return { ok: false, error: crossed };
+        }
         const { data, error } = await supabase
-          .from("objects").update(patch).eq("id", id)
-          .select("id, name, prefix").single();
+          .from("objects").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id)
+          .select("id, name, prefix, start_date, due_date, icon, color, type, lead_id").single();
         if (error) throw error;
         return { ok: true, data, meta: { rows: 1 } };
       }
@@ -1102,9 +1192,11 @@ export async function runBoardTool(
         const idsRaw = Array.isArray(input.ids) ? input.ids as string[] : [];
         if (idsRaw.length === 0) return { ok: false, error: "ids required" };
         const patch: Record<string, unknown> = {};
-        for (const k of ["status", "priority", "type", "due_date"]) {
+        for (const k of ["status", "priority", "type", "start_date", "due_date"]) {
           if (input[k] !== undefined) patch[k] = input[k];
         }
+        const dateError = dateFieldsError(patch, ["start_date", "due_date"]) ?? spanError(patch.start_date, patch.due_date);
+        if (dateError) return { ok: false, error: dateError };
         if (Array.isArray(input.labels)) patch.labels = input.labels;
         if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
         const resolved: string[] = [];
@@ -1120,6 +1212,26 @@ export async function runBoardTool(
         if (error) throw error;
         for (const row of data ?? []) await audit(supabase, actor, row.id, describePatch(patch));
         return { ok: true, data: { updated: data?.length ?? 0, patch: normalized, items: data ?? [] }, meta: { rows: data?.length ?? 0 } };
+      }
+
+      case "setLabelColor": {
+        const domainId = String(input.domainId ?? "");
+        const label = String(input.label ?? "").trim();
+        const color = String(input.color ?? "");
+        if (!UUID_RE.test(domainId)) return { ok: false, error: "domainId must be a Domain UUID" };
+        if (!label) return { ok: false, error: "label is required" };
+        if (color !== "auto" && !(PALETTE_KEYS as readonly string[]).includes(color)) {
+          return { ok: false, error: `color must be one of ${PALETTE_KEYS.join(" / ")} or auto` };
+        }
+        // The same atomic merge the app's Label settings use, so a pick made
+        // here and one made in the app at the same time both land.
+        const { data, error } = await supabase.rpc("merge_domain_label_colors", {
+          p_domain_id: domainId,
+          p_set: color === "auto" ? {} : { [label]: color },
+          p_remove: color === "auto" ? [label] : [],
+        });
+        if (error) throw error;
+        return { ok: true, data: { domainId, label, color, labelColors: data ?? {} }, meta: { rows: 1 } };
       }
 
       case "bulkDeleteElements": {

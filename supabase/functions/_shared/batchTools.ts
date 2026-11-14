@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { actionOf, ELEMENT_ACTIONS, normalizeStatusPatch, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
+import { actionOf, dateFieldsError, ELEMENT_ACTIONS, normalizeStatusPatch, spanError, type BoardActor, type ToolDef, type ToolResult } from "./boardTools.ts";
 import { basisErrorText, bindBasis, type BasisRefusal } from "./elementBasis.ts";
 
 // Several Elements under one Object in one write. Filing a list one
@@ -10,7 +10,7 @@ import { basisErrorText, bindBasis, type BasisRefusal } from "./elementBasis.ts"
 // the rows of the same statement processed before it).
 
 const MAX_ROWS = 50;
-const FIELDS = ["description", "status", "priority", "type", "due_date"] as const;
+const FIELDS = ["description", "status", "priority", "type", "start_date", "due_date"] as const;
 
 export const BATCH_TOOLS: ToolDef[] = [{
   name: "createElements",
@@ -32,6 +32,7 @@ export const BATCH_TOOLS: ToolDef[] = [{
             status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
             priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
             type: { type: "string" },
+            start_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。Timeline の帯の始まり" },
             due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
             labels: { type: "array", items: { type: "string" } },
             action: { type: "string", enum: [...ELEMENT_ACTIONS], description: "求める行動（createElement と同じ）" },
@@ -65,6 +66,8 @@ export async function runBatchTool(db: SupabaseClient, input: Record<string, unk
     if (Array.isArray(item.basisIntentIds) && item.basisIntentIds.length > 0) reasons.set(id, item.basisIntentIds);
     const row: Record<string, unknown> = { id, object_id: objectId, title };
     for (const k of FIELDS) if (item[k] !== undefined) row[k] = item[k];
+    const dateError = dateFieldsError(row, ["start_date", "due_date"]) ?? spanError(row.start_date, row.due_date);
+    if (dateError) return { ok: false, error: `elements[${i}].${dateError}` };
     if (Array.isArray(item.labels)) row.labels = item.labels;
     if (item.action !== undefined) {
       const a = actionOf(item.action);

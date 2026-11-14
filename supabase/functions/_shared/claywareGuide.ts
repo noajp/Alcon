@@ -118,6 +118,16 @@ export function closingTargets(name: string, args: Record<string, unknown>): str
   }
 }
 
+/** Pure. The first Element a create call would file already closed (done or
+ *  review) with a person's verb — filing it closed is closing it. */
+export function createdClosedHuman(name: string, args: Record<string, unknown>): { title: string; action: string } | null {
+  const items = name === "createElement" ? [args]
+    : name === "createElements" && Array.isArray(args.elements) ? args.elements as Record<string, unknown>[]
+    : [];
+  const hit = items.find((e) => HUMAN.has(String(e?.action ?? "")) && CLOSING.has(String(e?.status ?? "")));
+  return hit ? { title: String(hit.title ?? ""), action: String(hit.action) } : null;
+}
+
 /** Pure. Why a person's Element is not closed by an AI, and what to do instead. */
 export function humanActionRefusal(title: string, action: string): string {
   return `「${title}」は ${action} の Element で、人が判断する仕事です。AI が代わりに完了やレビュー待ちにはしません。` +
@@ -130,6 +140,8 @@ export function humanActionRefusal(title: string, action: string): string {
  * the tool, which refuses it the usual way.
  */
 export async function steerRefusal(db: SupabaseClient, name: string, args: Record<string, unknown>): Promise<string | null> {
+  const filedClosed = createdClosedHuman(name, args);
+  if (filedClosed) return humanActionRefusal(filedClosed.title, filedClosed.action);
   // Taking a person's verb off an Element, then closing it, is the same act.
   const retyping = name === "updateElement" && args.action !== undefined && !HUMAN.has(String(args.action));
   const targets = [...new Set([...closingTargets(name, args), ...(retyping ? [String(args.id ?? "")] : [])])].filter(Boolean);
