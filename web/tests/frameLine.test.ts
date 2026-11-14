@@ -27,7 +27,8 @@ describe('embedSpecsIn', () => {
 describe('frameRef', () => {
   it('tells a line pointing at its row from one not yet written', () => {
     expect(frameRef(boundFrameSpec('row-1'))).toEqual({ id: 'row-1' });
-    expect(frameRef(draftFrameSpec('assumption'))).toEqual({ kind: 'assumption' });
+    expect(frameRef(draftFrameSpec('assumption'))).toEqual({ kind: 'assumption', text: '' });
+    expect(frameRef(draftFrameSpec('decision', 'Narrow to firms of 10–50'))).toEqual({ kind: 'decision', text: 'Narrow to firms of 10–50' });
   });
 
   it('is null for another block, and for a frame block naming neither a row nor a kind', () => {

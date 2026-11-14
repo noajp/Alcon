@@ -23,19 +23,21 @@ export function isFrameKind(kind: unknown): kind is FrameKind {
   return typeof kind === 'string' && (FRAME_KINDS as readonly string[]).includes(kind);
 }
 
-/** A line just placed: its kind, and no row yet. */
-export const draftFrameSpec = (kind: FrameKind): EmbedSpec => ({ view: FRAME_VIEW, kind });
+/** A line just placed: its kind, and no row yet. It carries a sentence only
+ *  when one was written and its row could not be made — kept for the retry. */
+export const draftFrameSpec = (kind: FrameKind, text?: string): EmbedSpec =>
+  (text ? { view: FRAME_VIEW, kind, text } : { view: FRAME_VIEW, kind });
 /** A line pointing at its row. */
 export const boundFrameSpec = (id: string): EmbedSpec => ({ view: FRAME_VIEW, id });
 
-export type FrameRef = { id: string } | { kind: FrameKind };
+export type FrameRef = { id: string } | { kind: FrameKind; text: string };
 
 /** What a block of the frame points at: its row, or — not yet written — the
  *  kind it will be. Null for any other block, and for one naming neither. */
 export function frameRef(spec: EmbedSpec): FrameRef | null {
   if (spec.view !== FRAME_VIEW) return null;
   if (typeof spec.id === 'string' && spec.id) return { id: spec.id };
-  return isFrameKind(spec.kind) ? { kind: spec.kind } : null;
+  return isFrameKind(spec.kind) ? { kind: spec.kind, text: typeof spec.text === 'string' ? spec.text : '' } : null;
 }
 
 /** The rows a description places, each once, in the order it places them. */

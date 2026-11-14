@@ -19,7 +19,7 @@ import {
 } from '@/ui/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { useI18n } from '@/Function/i18n/I18nProvider';
-import { EMBED_LANG, embedSource, useEmbedHost, type EmbedSpec } from './embedBlocks';
+import { EMBED_LANG, embedSource, parseEmbed, useEmbedHost, type EmbedSpec } from './embedBlocks';
 import { ArtifactPicker, FILE_VIEW } from './fileBlocks';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { uploadToArtifacts } from '@/hooks/artifactData';
@@ -250,6 +250,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const spaceIdRef = useRef(spaceId);
   spaceIdRef.current = spaceId;
   const embedHost = useEmbedHost();
+  // Which blocks the page calls lines, for the editor made once to ask later.
+  const embedLineRef = useRef(embedHost?.line);
+  useEffect(() => { embedLineRef.current = embedHost?.line; }, [embedHost]);
   const me = usePresenceName(!!collab && editable);
   const user = useMemo<CollabUser>(
     () => ({ name: me.name || t('Someone'), tone: (hashText(me.userId ?? '') % CURSOR_COLORS) + 1 }),
@@ -548,7 +551,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       ...noteKeymap(undo, redo, { underline: !compact }),
       shortcuts(),
       checklistMarks(marks),
-      drawnEditing(),
+      drawnEditing((source) => { const spec = parseEmbed(source); return !!spec && !!embedLineRef.current?.(spec); }),
       ...cursors(),
     ];
 

@@ -13,7 +13,7 @@ import type { Intent } from '@/types/database';
 import type { EmbedBlock, EmbedSpec } from '@/Function/notebook/editor/embedBlocks';
 import { useInitiativeIntentContext } from './InitiativeIntent';
 import {
-  FRAME_KINDS, boundFrameSpec, elementsOn, frameRef, isFrameKind, labelColumnEm, measureStanding,
+  FRAME_KINDS, boundFrameSpec, draftFrameSpec, elementsOn, frameRef, isFrameKind, labelColumnEm, measureStanding,
   placedFrameIds, unplacedFrameRows, type FrameKind,
 } from './frameLineModel';
 
@@ -91,11 +91,11 @@ function LineShell({ kind, children, tail }: { kind: FrameKind; children: React.
 }
 
 /** A line placed and not yet written: the row is made with its first sentence. */
-function DraftLine({ kind, block }: { kind: FrameKind; block?: EmbedBlock }) {
+function DraftLine({ kind, written, block }: { kind: FrameKind; written: string; block?: EmbedBlock }) {
   const { t } = useI18n();
   const intent = useInitiativeIntentContext();
   const qc = useQueryClient();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(written);
   const [busy, setBusy] = useState(false);
   if (!intent) return null;
   const commit = async () => {
@@ -125,9 +125,11 @@ function DraftLine({ kind, block }: { kind: FrameKind; block?: EmbedBlock }) {
       await createIntent({ id, strategy_id: intent.initiativeId, parent_intent_id: parent, kind, title, status: 'on_track', order_index: order });
       intent.refetch();
     } catch (e) {
-      // Not written: the row leaves the bundle, and the line says what it
-      // pointed at is gone and offers to be removed.
+      // Not written: the row leaves the bundle and the line goes back to a
+      // draft holding the sentence, so nothing typed is lost and the next
+      // Enter tries again.
       patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: bundle.subs.filter((sub) => sub.id !== id) }));
+      block?.update(draftFrameSpec(kind, title));
       void appDialog.alert(formatError(e));
     }
   };
@@ -240,7 +242,7 @@ export function FrameLine({ spec, block }: { spec: EmbedSpec; block?: EmbedBlock
   const intent = useInitiativeIntentContext();
   const ref = frameRef(spec);
   if (!intent || !ref) return <p className="py-1 text-[12px] text-muted-foreground">{t('This line cannot be read.')}</p>;
-  if ('kind' in ref) return <DraftLine kind={ref.kind} block={block} />;
+  if ('kind' in ref) return <DraftLine kind={ref.kind} written={ref.text} block={block} />;
   // Still reading: hold the line's room rather than call its row missing.
   if (!intent.data) return <div className="h-7" aria-hidden />;
   const row = intent.data.subs.find((s) => s.id === ref.id) ?? null;

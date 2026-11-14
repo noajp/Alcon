@@ -609,6 +609,12 @@ function StrategyDetailView({
   // listed as unplaced until the save lands.
   const [savedDescription, setSavedDescription] = useState(strategy.description ?? '');
   const [liveDescription, setLiveDescription] = useState(savedDescription);
+  // The text a save is carrying, until the Strategy reads back as it.
+  // Kept with the Strategy it belongs to: another Strategy opened meanwhile
+  // is never shown this one's text.
+  const [saving, setSaving] = useState<{ id: string; text: string } | null>(null);
+  if (saving && (saving.id !== strategy.id || (strategy.description ?? '') === saving.text)) setSaving(null);
+  const savingDescription = saving && saving.id === strategy.id ? saving.text : null;
   if ((strategy.description ?? '') !== savedDescription) {
     setSavedDescription(strategy.description ?? '');
     setLiveDescription(strategy.description ?? '');
@@ -887,11 +893,16 @@ function StrategyDetailView({
   const saveDescription = async (description: string) => {
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null) || !canEdit) return;
+    // What is being saved is what the editor is given back at once: handed
+    // the old text until the save returned, it would start over from it and
+    // take down whatever was open inside it.
+    setSaving({ id: strategy.id, text: trimmed ?? '' });
     try {
       await updateStrategy(strategy.id, { description: trimmed });
       setSaveError(null);
       onSaved();
     } catch (e) {
+      setSaving(null);
       console.error('Failed to save Strategy description:', e);
       setSaveError(t('Could not save the description'));
     }
@@ -1092,7 +1103,7 @@ function StrategyDetailView({
             <WidgetZone zone="band" className="mt-3" />
           </div>
           <EmbedHostContext.Provider value={embeds}>
-            <DescriptionEditor key={strategy.id} value={strategy.description ?? ''} readOnly={!canEdit}
+            <DescriptionEditor key={strategy.id} value={savingDescription ?? strategy.description ?? ''} readOnly={!canEdit}
               placeholder={t('What this Strategy aims for… Type / for a live block')} onSave={saveDescription} onChange={setLiveDescription} />
           </EmbedHostContext.Provider>
           {/* The frame's lines the description does not place stand after it. */}
