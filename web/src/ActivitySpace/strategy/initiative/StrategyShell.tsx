@@ -82,8 +82,7 @@ import type { InitiativeHealth } from './initiativeHealthModel';
 import { useInitiativeMeasureTallies } from './useInitiativeMeasureTallies';
 import { MeasureStatus } from './MeasureStatus';
 import type { MeasureTally } from './initiativeMeasureModel';
-import { formatDateOnly, toDateOnlyString } from '@/Function/shared/dateUtils';
-import { outlook } from '@/Function/shared/pace';
+import { formatDateOnly } from '@/Function/shared/dateUtils';
 import { HealthBelt } from '@/Function/shared/HealthBelt';
 import { extractPlainText } from '@/Function/notebook/contentUtils';
 import { strategyFacts } from '@/Function/strategy/strategyFacts';
@@ -293,9 +292,6 @@ function InitiativeHealthCell({ health, measures, start, due }: { health: Initia
         <span className="flex shrink-0 items-center gap-1.5">
           <HealthBelt progress={health.progressPct} start={start} due={due} />
           <span className="w-7 text-right">{health.progressPct}%</span>
-          {start && due && outlook(health.progressPct, start, due, toDateOnlyString(new Date())) < 0 && (
-            <span className="shrink-0 text-[var(--status-danger)]">{t('Behind schedule')}</span>
-          )}
         </span>
       )}
       {/* What it is measured by, then what is on fire — after the belt, so
