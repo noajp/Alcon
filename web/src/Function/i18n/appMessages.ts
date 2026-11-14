@@ -4,6 +4,13 @@
 type Row = [ja: string, ko: string, fr: string, es: string];
 
 const APP_MESSAGES: Record<string, Row> = {
+  'Confirming your email…': ['メールアドレスを確認しています…', '이메일을 확인하는 중…', 'Confirmation de votre e-mail…', 'Confirmando tu correo…'],
+  'This takes a moment.': ['少しお待ちください。', '잠시만 기다려 주세요.', 'Cela prend un instant.', 'Esto tarda un momento.'],
+  'Email confirmed': ['メールアドレスを確認しました', '이메일이 확인되었습니다', 'E-mail confirmé', 'Correo confirmado'],
+  'Opening Clayware…': ['Clayware を開いています…', 'Clayware를 여는 중…', 'Ouverture de Clayware…', 'Abriendo Clayware…'],
+  'This link no longer works': ['このリンクは使えません', '이 링크는 더 이상 사용할 수 없습니다', 'Ce lien ne fonctionne plus', 'Este enlace ya no funciona'],
+  'Confirmation links work once and expire after a while. If you already confirmed your email, sign in. Otherwise, sign up again to get a new link.': ['確認用のリンクは一度だけ使え、時間が経つと切れます。確認が済んでいればサインインしてください。まだなら、もう一度サインアップすると新しいリンクが届きます。', '확인 링크는 한 번만 사용할 수 있으며 시간이 지나면 만료됩니다. 이미 확인했다면 로그인하세요. 아니라면 다시 가입하여 새 링크를 받으세요.', 'Les liens de confirmation ne servent qu’une fois et expirent au bout d’un moment. Si vous avez déjà confirmé votre e-mail, connectez-vous. Sinon, inscrivez-vous à nouveau pour recevoir un nouveau lien.', 'Los enlaces de confirmación funcionan una vez y caducan pasado un tiempo. Si ya confirmaste tu correo, inicia sesión. Si no, regístrate de nuevo para recibir un enlace nuevo.'],
+  'Go to sign in': ['サインインへ', '로그인으로 이동', 'Aller à la connexion', 'Ir a iniciar sesión'],
   'Could not load what you can join. Try again.': ['参加できるものを読み込めませんでした。もう一度お試しください。', '참여할 수 있는 항목을 불러오지 못했습니다. 다시 시도하세요.', 'Impossible de charger ce que vous pouvez rejoindre. Réessayez.', 'No se pudo cargar lo que puedes unirte. Inténtalo de nuevo.'],
   'Could not join. You may not have access to it.': ['参加できませんでした。アクセス権がない可能性があります。', '참여하지 못했습니다. 접근 권한이 없을 수 있습니다.', 'Impossible de rejoindre. Vous n’y avez peut-être pas accès.', 'No se pudo unir. Es posible que no tengas acceso.'],
   'No notification selected': ['通知が選択されていません', '선택된 알림이 없습니다', 'Aucune notification sélectionnée', 'Ninguna notificación seleccionada'],
