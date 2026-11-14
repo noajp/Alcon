@@ -31,7 +31,7 @@ REST API（[api.md](api.md)）は、このうち日常の読み書き（`_shared
 
 Timeline に出る予定も、人が画面で組むのと同じように組める。Element の期間は `createElement`・`createElements`・`updateElement`・`bulkUpdateElements` の `start_date` / `due_date`、Object の期間・アイコン・色・type・Lead は `createObject`・`updateObject` の `start_date` / `due_date` / `icon` / `color` / `type` / `leadWorkerId` で書く。日付は `YYYY-MM-DD`（`null` で解除）で、始まりが終わりより後になる値は断る。アイコンと色はアプリが描ける形（`glyph:<Name>` / `lucide:<kebab-name>` / 絵文字、ラベルの色の名前か `#rrggbb`）だけを受け付ける。
 
-依存は「`waitingId` が `blockerId` を待つ」で、`addDependency` / `removeDependency` / `listDependencies` が Element どうし（`target: "element"`）と Object どうし（`target: "object"`）を扱う。つなぐ端は `kind`（`fs` 終わったら始める・既定 / `ss` / `ff` / `sf`）。輪になる依存は断り、同じ組がすでにあれば `kind` だけを合わせる。`listDependencies` は待っている相手（`waitsFor`）と待たれている相手（`blocks`）を、日付が順番に反していれば `conflict` を付けて返す。Timeline が赤い線で描くのと同じ判定。ラベルの色は `setLabelColor` で Domain ごとに決める（決めた色を外すのは Settings から）。Object の Lead にできるのは、その Domain で担当にできる Worker だけ。
+依存は「`waitingId` が `blockerId` を待つ」で、`addDependency` / `removeDependency` / `listDependencies` が Element どうし（`target: "element"`）と Object どうし（`target: "object"`）を扱う。つなぐ端は `kind`（`fs` 終わったら始める・既定 / `ss` / `ff` / `sf`）。輪になる依存は断り、同じ組がすでにあれば、`kind` を渡したときだけ合わせ、渡さなければそのままにする。`listDependencies` は待っている相手（`waitsFor`）と待たれている相手（`blocks`）を、日付が順番に反していれば `conflict` を付けて返す。Timeline が赤い線で描くのと同じ判定。ラベルの色は `setLabelColor` で Domain ごとに決める（決めた色を外すのは Settings から）。Object の Lead にできるのは、その Domain で担当にできる Worker だけ。
 
 ## Clayware の考え方を伝える
 

@@ -41,7 +41,7 @@ export const DEPENDENCY_TOOLS: ToolDef[] = [
   },
   {
     name: "addDependency",
-    description: "waitingId が blockerId を待つ、という依存を足す。Timeline にはこの2本の帯をつなぐ線が引かれる。同じ組がすでにあれば kind だけを合わせる。輪になる依存は作らない。",
+    description: "waitingId が blockerId を待つ、という依存を足す。Timeline にはこの2本の帯をつなぐ線が引かれる。同じ組がすでにあるときは、kind を渡したときだけ kind を合わせ、渡さなければそのままにする。輪になる依存は作らない。",
     input_schema: {
       type: "object",
       properties: {
@@ -154,8 +154,10 @@ export async function runDependencyTool(db: SupabaseClient, name: string, input:
   if (found) {
     // Already there: the same pair with another tie changes the tie, as the
     // Timeline's dependency menu does.
+    // Without an explicit kind the tie a person chose stays as it is.
     const current = dependencyKindOf(isElement ? found.attributes?.kind : found.kind) ?? "fs";
-    if (current === kind) return { ok: true, data: { id: found.id, kind, alreadyThere: true }, meta: { rows: 0 } };
+    const unspecified = input.kind === undefined || input.kind === null || input.kind === "";
+    if (unspecified || current === kind) return { ok: true, data: { id: found.id, kind: current, alreadyThere: true }, meta: { rows: 0 } };
     const { data, error } = isElement
       ? await db.from("element_edges").update({ attributes: { ...(found.attributes ?? {}), kind } }).eq("id", found.id).select("id")
       : await db.from("object_dependencies").update({ kind }).eq("id", found.id).select("id");
