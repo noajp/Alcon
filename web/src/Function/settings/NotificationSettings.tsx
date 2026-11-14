@@ -8,8 +8,8 @@ import { EMAIL_NOTIFICATION_KINDS, NOTIFICATION_KINDS, NOTIFICATION_KIND_META } 
 
 const KIND_HINT: Partial<Record<string, string>> = {
   mention: 'Someone @mentions you in a comment',
-  assigned: "You're assigned to an Element",
-  comment: 'A new comment on an Element you own or are assigned to',
+  assigned: "You're assigned to an Element, or made Lead of an Object",
+  comment: 'A new comment on an Element or Strategy you own, are assigned to, or have commented on',
   status_change: "An Element you're involved with changes status, or an agent run you started finishes or fails",
   approval_requested: 'Your approval is requested on an Element or by an AI workflow',
   approval_decided: 'A decision is recorded on an approval you requested',

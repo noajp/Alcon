@@ -1,8 +1,9 @@
 -- Notifications by email, chosen per kind in Settings > Notifications.
 --
 -- notification_email_preferences: one row per (person, kind) the person has
--- chosen for. Without a row, the default holds: `assigned` is emailed,
--- every other kind is not (notification_email_default).
+-- chosen for. Without a row, the default holds: what is addressed to the
+-- person — being assigned or made Lead, being mentioned, a comment on their
+-- work — is emailed; every other kind is not (notification_email_default).
 --
 -- notification_emails is the outbox. A notification that survives the mute
 -- filter (the BEFORE INSERT trigger drops muted kinds, so a muted kind is
@@ -34,7 +35,7 @@ begin
   execute $sql$
     create or replace function public.notification_email_default(p_kind text)
     returns boolean language sql immutable set search_path = '' as $fn$
-      select p_kind = 'assigned'
+      select p_kind in ('assigned', 'mention', 'comment')
     $fn$
   $sql$;
 

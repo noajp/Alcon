@@ -6,34 +6,47 @@ const { renderNotificationEmail, deliverNotificationEmails } = mod;
 
 describe('renderNotificationEmail', () => {
   it('names who assigned and the Element, and links to the Inbox', () => {
-    const e = renderNotificationEmail({ kind: 'assigned', title: 'You were added to 見積書', actorName: '佐藤', elementTitle: '見積書', appUrl: 'https://app.example.com/' });
+    const e = renderNotificationEmail({ kind: 'assigned', title: 'You were added to 見積書', actorName: '佐藤', target: { type: 'element', title: '見積書' }, appUrl: 'https://app.example.com/' });
     expect(e.subject).toBe('「見積書」の担当になりました');
     expect(e.text).toContain('佐藤 さんが、あなたを「見積書」の担当に加えました。');
     expect(e.text).toContain('https://app.example.com/?view=inbox');
   });
 
   it('escapes what people typed', () => {
-    const e = renderNotificationEmail({ kind: 'assigned', title: 't', actorName: '<b>x</b>', elementTitle: '<script>', appUrl: 'https://a.example' });
+    const e = renderNotificationEmail({ kind: 'assigned', title: 't', actorName: '<b>x</b>', target: { type: 'element', title: '<script>' }, appUrl: 'https://a.example' });
     expect(e.html).not.toContain('<script>');
     expect(e.html).toContain('&lt;script&gt;');
   });
 
+  it('says Lead for an Object, and names who mentioned or commented', () => {
+    const lead = renderNotificationEmail({ kind: 'assigned', title: 't', actorName: '佐藤', target: { type: 'object', title: '新規開拓' }, appUrl: 'https://a.example' });
+    expect(lead.subject).toBe('「新規開拓」の Lead になりました');
+    expect(lead.text).toContain('佐藤 さんが、あなたを「新規開拓」の Lead にしました。');
+    const mention = renderNotificationEmail({ kind: 'mention', title: 't', actorName: '佐藤', body: '確認お願いします', target: { type: 'strategy', title: '関東展開' }, appUrl: 'https://a.example' });
+    expect(mention.subject).toBe('佐藤 さんが「関東展開」であなたをメンションしました');
+    expect(mention.text).toContain('確認お願いします');
+    const comment = renderNotificationEmail({ kind: 'comment', title: 't', actorName: '佐藤', target: { type: 'element', title: '見積書' }, appUrl: 'https://a.example' });
+    expect(comment.subject).toBe('佐藤 さんが「見積書」にコメントしました');
+  });
+
   it('falls back to the notification title for other kinds', () => {
-    expect(renderNotificationEmail({ kind: 'mention', title: 'Mentioned you', appUrl: 'https://a.example' }).subject).toBe('Mentioned you');
+    expect(renderNotificationEmail({ kind: 'due_soon', title: 'Due soon: 見積書', appUrl: 'https://a.example' }).subject).toBe('Due soon: 見積書');
   });
 });
 
 describe('email defaults', () => {
-  it('only assignment is emailed by default, and it is offered', () => {
-    expect(notificationEmailDefault('assigned')).toBe(true);
-    expect(notificationEmailDefault('mention')).toBe(false);
-    expect(EMAIL_NOTIFICATION_KINDS).toContain('assigned');
+  it('what is addressed to the person is emailed by default, and offered', () => {
+    for (const kind of ['assigned', 'mention', 'comment']) {
+      expect(notificationEmailDefault(kind)).toBe(true);
+      expect(EMAIL_NOTIFICATION_KINDS).toContain(kind);
+    }
+    expect(notificationEmailDefault('due_soon')).toBe(false);
   });
 
   it('the server default matches the app default', async () => {
     const fs = await import('node:fs');
     const sql = fs.readFileSync(new URL('../../supabase/migrations/20270109090000_notification_emails.sql', import.meta.url), 'utf8');
-    expect(sql).toMatch(/select p_kind = 'assigned'/);
+    expect(sql).toMatch(/select p_kind in \('assigned', 'mention', 'comment'\)/);
   });
 });
 

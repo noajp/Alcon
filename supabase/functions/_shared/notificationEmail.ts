@@ -14,7 +14,8 @@ export interface NotificationEmailInput {
   title: string;
   body?: string | null;
   actorName?: string | null;
-  elementTitle?: string | null;
+  /** What the notification is about: an Element, an Object or a Strategy. */
+  target?: { type: "element" | "object" | "strategy"; title: string } | null;
   appUrl: string;
 }
 
@@ -23,21 +24,31 @@ export interface RenderedEmail { subject: string; text: string; html: string }
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-/** The email for one notification, in Japanese. Assignment reads as its own
- *  sentence; any other kind carries the notification's own title. */
+/** The email for one notification, in Japanese. Assignment, Lead, mention
+ *  and comment read as their own sentence; any other kind carries the
+ *  notification's own title. */
 export function renderNotificationEmail(n: NotificationEmailInput): RenderedEmail {
   const link = `${n.appUrl.replace(/\/+$/, "")}/?view=inbox`;
   const actor = n.actorName?.trim();
-  let subject: string;
-  let lead: string;
-  if (n.kind === "assigned" && n.elementTitle) {
-    subject = `「${n.elementTitle}」の担当になりました`;
-    lead = actor
-      ? `${actor} さんが、あなたを「${n.elementTitle}」の担当に加えました。`
-      : `あなたが「${n.elementTitle}」の担当に加わりました。`;
-  } else {
-    subject = n.title;
-    lead = n.title;
+  const who = actor ? `${actor} さん` : "誰か";
+  const t = n.target;
+  let subject = n.title;
+  let lead = n.title;
+  if (t) {
+    const name = `「${t.title}」`;
+    if (n.kind === "assigned" && t.type === "object") {
+      subject = `${name}の Lead になりました`;
+      lead = actor ? `${who}が、あなたを${name}の Lead にしました。` : `あなたが${name}の Lead になりました。`;
+    } else if (n.kind === "assigned") {
+      subject = `${name}の担当になりました`;
+      lead = actor ? `${who}が、あなたを${name}の担当に加えました。` : `あなたが${name}の担当に加わりました。`;
+    } else if (n.kind === "mention") {
+      subject = `${who}が${name}であなたをメンションしました`;
+      lead = `${subject}。`;
+    } else if (n.kind === "comment") {
+      subject = `${who}が${name}にコメントしました`;
+      lead = `${subject}。`;
+    }
   }
   const detail = n.body?.trim() ? n.body.trim().slice(0, 500) : "";
   const footer = "メールで受け取る通知は、Clayware の 設定 > 通知 で変えられます。";
@@ -70,6 +81,23 @@ type Admin = any;
 
 const BATCH = 25;
 
+/** The Element, Object or Strategy a notification points at, by name. */
+async function targetOf(admin: Admin, n: { element_id?: string | null; object_id?: string | null; strategy_id?: string | null }): Promise<NotificationEmailInput["target"]> {
+  if (n.element_id) {
+    const { data } = await admin.from("elements").select("title").eq("id", n.element_id).maybeSingle();
+    return data?.title ? { type: "element", title: data.title } : null;
+  }
+  if (n.object_id) {
+    const { data } = await admin.from("objects").select("name").eq("id", n.object_id).maybeSingle();
+    return data?.name ? { type: "object", title: data.name } : null;
+  }
+  if (n.strategy_id) {
+    const { data } = await admin.from("strategies").select("name").eq("id", n.strategy_id).maybeSingle();
+    return data?.name ? { type: "strategy", title: data.name } : null;
+  }
+  return null;
+}
+
 /** Sends what is queued. Returns counts for the tick's summary. */
 export async function deliverNotificationEmails(admin: Admin, env: EmailEnv): Promise<{ sent: number; failed: number; skipped: number }> {
   const out = { sent: 0, failed: 0, skipped: 0 };
@@ -86,23 +114,19 @@ export async function deliverNotificationEmails(admin: Admin, env: EmailEnv): Pr
     }
     try {
       const { data: n } = await admin.from("notifications")
-        .select("kind, title, body, actor_id, actor_name, element_id, is_read").eq("id", row.notification_id).maybeSingle();
+        .select("kind, title, body, actor_id, actor_name, element_id, object_id, strategy_id, is_read").eq("id", row.notification_id).maybeSingle();
       // Gone, or already read in the app before the email went out: nothing to tell.
       if (!n || n.is_read) { await mark({ status: "skipped", last_error: n ? "既読" : "通知がない" }); out.skipped += 1; continue; }
       const { data: user } = await admin.auth.admin.getUserById(row.recipient_id);
       const to = user?.user?.email;
       if (!to) { await mark({ status: "skipped", last_error: "宛先のメールアドレスがない" }); out.skipped += 1; continue; }
-      let elementTitle: string | null = null;
-      if (n.element_id) {
-        const { data: el } = await admin.from("elements").select("title").eq("id", n.element_id).maybeSingle();
-        elementTitle = el?.title ?? null;
-      }
+      const target = await targetOf(admin, n);
       let actorName: string | null = n.actor_name ?? null;
       if (!actorName && n.actor_id) {
         const { data: p } = await admin.from("profiles").select("display_name").eq("id", n.actor_id).maybeSingle();
         actorName = p?.display_name ?? null;
       }
-      const email = renderNotificationEmail({ kind: n.kind, title: n.title, body: n.body, actorName, elementTitle, appUrl: env.appUrl });
+      const email = renderNotificationEmail({ kind: n.kind, title: n.title, body: n.body, actorName, target, appUrl: env.appUrl });
       const res = await doFetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${env.apiKey}`, "idempotency-key": row.id },
