@@ -9,7 +9,7 @@ export const LABEL_PALETTE: { key: string; label: string; hex: string }[] = [
   { key: 'purple',   label: 'Purple',    hex: '#8b5cf6' },
   { key: 'teal',     label: 'Teal',      hex: '#14b8a6' },
   { key: 'green',    label: 'Green',     hex: '#10b981' },
-  { key: 'yellow',   label: 'Yellow',    hex: '#eab308' },
+  { key: 'yellow',   label: 'Yellow',    hex: '#ffd700' },
   { key: 'orange',   label: 'Orange',    hex: '#f97316' },
   { key: 'pink',     label: 'Pink',      hex: '#ec4899' },
   { key: 'red',      label: 'Red',       hex: '#ef4444' },
