@@ -10,7 +10,7 @@ export { sanitizeName };
 // initialize / ping / tools/list / tools/call, which is all a tool server
 // needs. Pure: the HTTP entry (index.ts) supplies the tools and the caller.
 
-export const SERVER_INFO = { name: "clayware", version: "0.3.1" } as const;
+export const SERVER_INFO = { name: "clayware", version: "0.3.2" } as const;
 
 /** Newest first. An unknown requested version is answered with the newest. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;

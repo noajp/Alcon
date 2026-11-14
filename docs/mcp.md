@@ -2,7 +2,7 @@
 
 外部の AI（Claude Code、Claude、ChatGPT など）やスクリプトから、接続した本人の権限で Clayware のデータを読み書きする入口。
 
-- エンドポイント: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-mcp`
+- エンドポイント: `https://clayware.app/mcp`
 - 方式: Streamable HTTP（状態を持たない。POST で JSON-RPC を 1 件送り、JSON で応答を受け取る）
 - 認証: claude.ai・ChatGPT などのコネクタは OAuth でサインイン、Claude Code やスクリプトは `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`）
 
@@ -82,7 +82,7 @@ Supabase のセッションの JWT（1 時間で切れる）も受け付ける�
 トークンを発行すると、それを埋め込んだコマンドがコピーボタン付きで表示される。
 
 ```bash
-claude mcp add --transport http clayware "https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-mcp?client=Claude%20Code" --header "Authorization: Bearer alc_pat_…"
+claude mcp add --transport http clayware "https://clayware.app/mcp?client=Claude%20Code" --header "Authorization: Bearer alc_pat_…"
 ```
 
 `?client=` に書いた名前が記録に使われる。省略した場合は、User-Agent から判別する。Authorization ヘッダーを送れる MCP クライアントやスクリプトなら、同じ方法で接続できる。
