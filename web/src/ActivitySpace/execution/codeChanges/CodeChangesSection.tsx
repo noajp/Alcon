@@ -82,7 +82,7 @@ export function CodeChangeRow({ change, onOpen, onUnlink, context }: {
           onClick={(e) => { e.stopPropagation(); onUnlink(); }}
           aria-label={t('Unlink')}
           title={t('Unlink')}
-          className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover/cc:opacity-100"
+          className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground group-hover/cc:opacity-100 focus-visible:opacity-100"
         >
           <X size={12} />
         </button>

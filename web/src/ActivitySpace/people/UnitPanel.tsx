@@ -100,7 +100,7 @@ export function UnitPanel({ unitId, onOpenUnit, onOpenWorker }: {
                 {canArrange && (
                   <button type="button" aria-label={t('Remove {name} from the unit', { name: w!.name })} title={t('Remove from the unit')}
                     onClick={() => removeMember.mutate({ unitId: unit.id, workerId: w!.id })}
-                    className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground group-hover/member:opacity-100">
+                    className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/member:opacity-100">
                     <X size={13} />
                   </button>
                 )}

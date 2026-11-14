@@ -1,6 +1,6 @@
 'use client';
 
-import { inboxRowText } from './inboxRow';
+import { inboxRowText, readableBody } from './inboxRow';
 import { Panel, PanelBody, PanelHeader } from '@/Function/shared/PanelLayout';
 
 import { useMemo, useState } from 'react';
@@ -133,7 +133,7 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
             <span>{text.event ?? t(meta.label)}</span>
             {n.actor_name && !text.event?.includes(n.actor_name) && <> · <span>{n.actor_name}</span></>}
           </span>
-          {text.detail && <span className="mt-0.5 line-clamp-2 break-all text-[11px] leading-4 text-muted-foreground/80">{text.detail}</span>}
+          {text.detail && <span className="mt-0.5 line-clamp-2 break-words text-[11px] leading-4 text-muted-foreground">{readableBody(text.detail, t)}</span>}
         </span>
       </button>
       <DropdownMenu>

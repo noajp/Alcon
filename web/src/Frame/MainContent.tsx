@@ -64,7 +64,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   if (notebookVisible && !notebookOpened) setNotebookOpened(true);
 
   return (
-    <div className="flex-1 flex flex-col bg-card overflow-hidden">
+    // The open screen is the page's main region, so assistive tech can jump
+    // past the sidebar to it.
+    <main className="flex-1 flex flex-col bg-card overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
           {notebookOpened && <NotebookSurface
             visible={notebookVisible}
@@ -267,6 +269,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -322,7 +322,7 @@ function LineComment({ comment, mine, onResolve, onDelete, onRetry, showLine }: 
         <p className="whitespace-pre-wrap text-foreground">{comment.body}</p>
       </div>
       <ButtonAppearanceProvider appearance="inline">
-        <div className={`flex shrink-0 opacity-0 transition-opacity group-hover/comment:opacity-100 ${external ? 'hidden' : ''}`}>
+        <div className={`flex shrink-0 opacity-0 transition-opacity group-hover/comment:opacity-100 focus-within:opacity-100 ${external ? 'hidden' : ''}`}>
           <Button variant="ghost" size="icon-xs" onClick={() => onResolve(comment.id, !comment.resolved)}
             aria-label={comment.resolved ? t('Reopen') : t('Resolve')} title={comment.resolved ? t('Reopen') : t('Resolve')}>
             {comment.resolved ? <RotateCcw size={12} /> : <Check size={12} />}

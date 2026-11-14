@@ -121,6 +121,10 @@ const isShellView = (view: string) => Object.prototype.hasOwnProperty.call(VIEW_
 // Below this viewport width the left sidebar auto-collapses so list/board
 // content keeps a usable width (matches Linear's narrow-window behavior).
 const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
+// Below this width (a phone) there is no room for the sidebar beside the
+// open screen whatever the person chose on a wider window: it is closed, and
+// opens as the drawer.
+const SIDEBAR_PHONE_WIDTH = 768;
 
 // The person's own sidebar choice, once they make one, outranks the width
 // band: stored device-locally ('1' = collapsed, '0' = shown), like the
@@ -464,12 +468,26 @@ function WorkspaceContent({
   });
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => readSidebarCollapsedChoice()
-      ?? (typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH),
+    () => (typeof window !== 'undefined' && window.innerWidth < SIDEBAR_PHONE_WIDTH)
+      || (readSidebarCollapsedChoice()
+        ?? (typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH)),
   );
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the strip's reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
+
+  // A window narrowed to a phone's width closes the sidebar (a fit, not the
+  // person's choice, so nothing is stored); widened past it again, the
+  // stored choice — or the width band — decides once more.
+  useEffect(() => {
+    const phone = window.matchMedia(`(max-width: ${SIDEBAR_PHONE_WIDTH - 0.02}px)`);
+    const apply = () => {
+      if (phone.matches) { setSidebarCollapsed(true); setSidebarOverlay(false); return; }
+      setSidebarCollapsed(readSidebarCollapsedChoice() ?? window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH);
+    };
+    phone.addEventListener('change', apply);
+    return () => phone.removeEventListener('change', apply);
+  }, []);
 
   // Active-tab convenience writers (for sidebar + command palette which target
   // the visible tab).

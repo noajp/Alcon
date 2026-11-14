@@ -390,9 +390,8 @@ export function ClaywareCopilotPanel({ open, onOpenChange, subject = null, varia
               }
             }}
             rows={1}
-            placeholder={streaming ? '…' : t('Ask Athena anything')}
+            placeholder={t('Ask Athena anything')}
             aria-label={t('Message AI')}
-            disabled={streaming}
             className={`max-h-48 min-h-6 w-full resize-none overflow-hidden bg-transparent px-1 leading-6 disabled:opacity-60 ${page ? 'text-[14px]' : 'text-[13px]'}`}
             style={{ fontWeight: 400 }}
           />

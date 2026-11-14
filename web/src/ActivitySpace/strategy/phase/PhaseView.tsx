@@ -8,6 +8,8 @@ import { NavPhaseIcon } from '@/Frame/sidebar/NavIcons';
 import { EmptyState } from '@/Function/shared/EmptyState';
 import { PageIcon, PageSection, PAGE_FRAME, PAGE_TITLE, PAGE_TITLE_WEIGHT } from '@/Function/shared/PageHead';
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { appDialog } from '@/Function/shared/appDialogStore';
+import { notifyError } from '@/Function/shared/toastStore';
 import { ObjectIcon } from '@/Frame/icons';
 import { ElementIcon } from '@/Function/shared/conceptIcons';
 import { ElementProgressMark } from '@/Function/shared/ElementProgressMark';
@@ -423,8 +425,9 @@ function PhaseDetailView({
   };
 
   const handleDelete = async () => {
+    if (!await appDialog.confirm(t('Delete the Phase “{name}”? Its Elements stay, without a Phase.', { name: phase.name }))) return;
     try { await deletePhase(phase.id); onSaved(); onBack(); }
-    catch (e) { console.error('Failed to delete Phase', e); }
+    catch (e) { notifyError(e, t('Could not delete the Phase.')); }
   };
 
   // planned ⇄ active are just the row; complete goes through the dialog, which
@@ -555,7 +558,7 @@ function PhaseDetailView({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void setObjectPhase(o.id, null); }}
                   aria-label={t('Remove {name} from this Phase', { name: o.name })}
-                  className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
+                  className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
                 >
                   <X size={12} />
                 </button>
@@ -639,7 +642,7 @@ function PhaseDetailView({
                   type="button"
                   onClick={() => void setElementPhase(el.id, null)}
                   aria-label={t('Remove {name} from this Phase', { name: el.title })}
-                  className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
+                  className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
                 >
                   <X size={12} />
                 </button>

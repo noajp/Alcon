@@ -1,6 +1,7 @@
 import { toDateOnlyString } from '@/Function/shared/dateUtils';
 import { elapsedShare, outlook, warmthGradient } from '@/Function/shared/pace';
 import { ProgressBelt } from '@/Function/shared/ProgressBelt';
+import { useI18n } from '@/Function/i18n/I18nProvider';
 
 // A belt's width, px. The gradient is drawn in px, so the belt is that wide.
 const WIDTH = 80;
@@ -18,6 +19,7 @@ export function HealthBelt({ progress, start, due, className = '' }: {
   due: string | null | undefined;
   className?: string;
 }) {
+  const { t } = useI18n();
   const today = toDateOnlyString(new Date());
   const elapsed = elapsedShare(start, due, today);
   if (elapsed === null || progress >= 100) {
@@ -25,7 +27,7 @@ export function HealthBelt({ progress, start, due, className = '' }: {
   }
   const gradient = warmthGradient(WIDTH, elapsed * WIDTH, outlook(progress, start, due, today));
   return (
-    <div role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}
+    <div role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} aria-label={t('Progress')}
       className={`relative h-2.5 shrink-0 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-foreground/[0.07] ${className}`}
       style={{ width: WIDTH }}>
       {gradient && <div className="absolute inset-0 rounded-[inherit]" style={{ backgroundImage: gradient }} />}

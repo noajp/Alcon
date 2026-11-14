@@ -1,6 +1,7 @@
 'use client';
 
 import { useI18n } from '@/Function/i18n/I18nProvider';
+import { readableBody } from './inboxRow';
 import { WakeSteps } from '@/Function/settings/HeartbeatSettings';
 
 /** A heartbeat digest in the reader: what the wake said, with the
@@ -16,7 +17,7 @@ export function HeartbeatInboxCard({ runId, title, body }: {
   return (
     <div>
       <h1 className="text-2xl font-semibold">{title}</h1>
-      {body && <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{body}</p>}
+      {body && <p className="mt-6 whitespace-pre-wrap text-[15px] leading-7 text-foreground/90">{readableBody(body, t)}</p>}
       <p className="mt-6 text-[13px] text-muted-foreground">
         {t('This digest came from a heartbeat wake. Each item is decided on its own screen; the wake only speaks.')}
       </p>
