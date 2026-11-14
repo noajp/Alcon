@@ -5,7 +5,7 @@
 export const COLOR_PALETTE = [
   { name: 'Blue', value: '#3b82f6' },
   { name: 'Green', value: '#22c55e' },
-  { name: 'Yellow', value: '#eab308' },
+  { name: 'Yellow', value: '#ffd700' },
   { name: 'Orange', value: '#f97316' },
   { name: 'Red', value: '#ef4444' },
   { name: 'Pink', value: '#ec4899' },
