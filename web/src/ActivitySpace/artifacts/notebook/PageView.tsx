@@ -4,12 +4,13 @@ import { useExplorerData } from '@/Function/shared/ExplorerDataContext';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FileDown, PanelLeft } from '@/ui/icons';
-import { useDomains } from '@/hooks/useSupabase';
+import { useDomains, type ElementWithDetails } from '@/hooks/useSupabase';
 import {
   NoteEditor,
   type NoteEditorHandle,
   type BulletContextInfo,
 } from '@/Function/notebook/editor/NoteEditor';
+import type { SaveHow } from '@/Function/notebook/noteContentStore';
 import { BulletExtractDialog } from './BulletExtractDialog';
 import { useI18n, translate } from '@/Function/i18n/I18nProvider';
 import { Button, ButtonAppearanceProvider } from '@/ui/button';
@@ -29,7 +30,7 @@ interface PageViewProps {
   linkedObjectId?: string | null;
   onLinkedObjectChange?: (objectId: string | null) => void;
   onTitleChange: (title: string) => void;
-  onContentChange: (html: string) => void;
+  onContentChange: (html: string, how?: SaveHow) => void;
   /** Open the Object draft dialog (Note → Object + Elements). */
   onObjectize: () => void;
   /** When true, the Object draft pipeline is currently running (AI summarize + draft). */
@@ -92,14 +93,14 @@ export function PageView({
   const elementDomainId = linkedObject?.domain_id ?? activeDomainId ?? null;
   const elementDefaultObjectId = linkedObject?.id ?? null;
 
-  // id → status for every Element across all Domains — lets the editor
-  // render each linked bullet's ○ as a read-only mirror of its Element.
-  const elementStatusById = useMemo<Record<string, string | null | undefined>>(() => {
-    const map: Record<string, string | null | undefined> = {};
+  // Every Element the app holds, by id: a line made into one shows its
+  // status live and opens its Status menu.
+  const elementsById = useMemo<Record<string, ElementWithDetails>>(() => {
+    const map: Record<string, ElementWithDetails> = {};
     for (const o of explorerData?.objects ?? []) {
-      for (const e of o.elements ?? []) map[e.id] = e.status;
+      for (const e of o.elements ?? []) map[e.id] = e;
     }
-    for (const e of explorerData?.rootElements ?? []) map[e.id] = e.status;
+    for (const e of explorerData?.rootElements ?? []) map[e.id] = e;
     return map;
   }, [explorerData]);
 
@@ -182,7 +183,7 @@ export function PageView({
             value={content}
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}
-            elementStatusById={elementStatusById}
+            elementsById={elementsById}
           />
         </div>
       </div>

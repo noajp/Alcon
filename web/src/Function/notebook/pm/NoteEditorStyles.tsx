@@ -196,10 +196,10 @@ export function NoteEditorStyles() {
         .note-editor [data-align="center"] { text-align: center; }
         .note-editor [data-align="right"]  { text-align: right;  }
 
-        /* Checklist row: [status ○] [text], the mark a pure CSS
-           pseudo-element. Every item is a task: un-linked items show the
-           Backlog dashed ring; → Element 化 links one to an Element and the
-           ○ then mirrors that Element's live status. */
+        /* Checklist row: [mark] [text]. The mark is the app's Status mark,
+           drawn by the editor into .note-mark (pm/marks): a line not yet an
+           Element shows Backlog, or Done once checked; a line made into an
+           Element shows that Element's status and opens its Status menu. */
         .note-editor ul[data-checklist="true"] {
           list-style: none;
           padding-left: 0.25rem;
@@ -209,47 +209,29 @@ export function NoteEditorStyles() {
           padding-left: 1.5rem; /* 16px mark + 8px gap */
           cursor: text;
         }
-        /* ::before = the status ○. Default (un-linked) = Backlog dashed
-           ring; the linked-bullet rules below override it per status. */
-        .note-editor ul[data-checklist="true"] > li::before {
-          content: "";
+        .note-editor ul[data-checklist="true"] > li > .note-mark {
           position: absolute;
           left: 0;
-          top: 0.5lh; /* center on the line — uses CSS lh unit so it tracks line-height */
+          top: 0.5lh; /* centred on the first line — lh tracks the line height */
           transform: translateY(-50%);
+          display: flex;
           width: 1rem;
           height: 1rem;
+          align-items: center;
+          justify-content: center;
           cursor: default;
-          background-repeat: no-repeat;
-          background-position: center;
-          background-size: contain;
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
+          user-select: none;
         }
-        /* An un-linked item's box is clicked to check it; checked, it fills
-           with a tick and the text recedes. */
-        .note-editor[contenteditable="true"] ul[data-checklist="true"] > li:not([data-element-id])::before {
-          cursor: pointer;
-        }
+        /* A checked line that is not an Element recedes. */
         .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id]) {
           color: var(--muted-foreground);
         }
-        .note-editor ul[data-checklist="true"] > li[data-checked="true"]:not([data-element-id])::before {
-          background-image: none;
-          background-color: var(--status-success);
-          -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><mask id='m'><rect width='16' height='16' fill='white'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></mask><circle cx='8' cy='8' r='7.4' mask='url(%23m)'/></svg>") center / contain no-repeat;
-          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><mask id='m'><rect width='16' height='16' fill='white'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></mask><circle cx='8' cy='8' r='7.4' mask='url(%23m)'/></svg>") center / contain no-repeat;
-        }
-        /* Linked bullet — set by → Element 化. The checkbox ::before is
-           replaced by a read-only ○ mirroring the linked Element's status
-           (data-element-status, applied from live data; never persisted).
-           A linked bullet is never struck through even if data-checked
-           lingers from before it was linked. */
+        /* A line made into an Element stands out as a card, the way the chat
+           shows the Elements it made: a framed band. Its mark is its Status;
+           the arrow at its right opens the Element. */
         .note-editor ul[data-checklist="true"] > li[data-element-id] {
           color: inherit;
           text-decoration: none;
-          /* An Element made from this line stands out as a card, the way the
-             chat shows the Elements it made: a framed band. The mark at its
-             left and the arrow at its right open the Element. */
           margin: 4px 0;
           padding: 6px 2rem 6px 2.1rem;
           border: 1px solid var(--border-default);
@@ -257,10 +239,9 @@ export function NoteEditorStyles() {
           background: var(--card);
           box-shadow: var(--shadow-card);
         }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]::before {
+        .note-editor ul[data-checklist="true"] > li[data-element-id] > .note-mark {
           left: 0.6rem;
           top: calc(6px + 0.5lh);
-          cursor: pointer;
         }
         .note-editor ul[data-checklist="true"] > li[data-element-id]::after {
           content: "";
@@ -277,31 +258,6 @@ export function NoteEditorStyles() {
           mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17 17 7M8 7h9v9'/></svg>") center / contain no-repeat;
         }
         .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::after { opacity: 1; }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
-          cursor: pointer;
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id]::before,
-        .note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="todo"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="in_progress"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23d49a1a' stroke-width='1.5'/><path d='M8 8 L8 3.1 A4.9 4.9 0 0 1 8 12.9 Z' fill='%23d49a1a'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="review"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%233b82f6' stroke-width='1.5'/><circle cx='8' cy='8' r='2.6' fill='%233b82f6'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="done"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%233d7a4a'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="blocked"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%23f43f5e'/><path d='M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/></svg>");
-        }
-        .note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="cancelled"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/><path d='M4.5 11.5 L11.5 4.5' stroke='%23999' stroke-width='1.5' stroke-linecap='round'/></svg>");
-        }
     `}</style>
   );
 }

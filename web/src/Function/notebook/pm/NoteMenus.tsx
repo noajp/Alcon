@@ -281,9 +281,12 @@ export function measureTableHandles(root: HTMLElement, frame: HTMLElement, clien
   };
 }
 
-export const handlesKey = (h: TableHandles | null) => h
-  ? `${h.col?.index ?? '-'}|${h.rowBetween?.rowIndex ?? '-'}|${h.bottomBar ? Math.round(h.bottomBar.top) : '-'}|${h.rightBar ? Math.round(h.rightBar.left) : '-'}|${h.col ? Math.round(h.col.x) : ''}`
-  : '';
+/** Pure. What tells one placing of the "+" from another. */
+export const handlesKey = (h: TableHandles | null) => (h ? [
+  h.col?.index ?? '-', h.rowBetween?.rowIndex ?? '-',
+  ...[h.col?.x, h.col?.top, h.rowBetween?.y, h.rowBetween?.left, h.bottomBar?.left, h.bottomBar?.top, h.bottomBar?.width,
+    h.rightBar?.left, h.rightBar?.top, h.rightBar?.height].map((n) => (n === undefined ? '-' : Math.round(n))),
+].join('|') : '');
 
 export function TableInsertHandles({ geom, onInsertCol, onInsertRow }: {
   geom: TableHandles;

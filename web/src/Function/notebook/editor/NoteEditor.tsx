@@ -8,7 +8,7 @@ import { EditorState, TextSelection, type Command, type Plugin, type Transaction
 import { EditorView } from 'prosemirror-view';
 import type { Node as PMNode } from 'prosemirror-model';
 import {
-  CellSelection, TableMap, addColumn, addRow, deleteColumn, deleteRow, deleteTable,
+  CellSelection, TableMap, addColumn, addRow, deleteColumn, deleteRow, deleteTable, isInTable,
   mergeCells, moveTableColumn, moveTableRow, selectedRect, splitCell,
 } from 'prosemirror-tables';
 import { ySyncPlugin, yCursorPlugin, yUndoPlugin, undo as yUndo, redo as yRedo } from 'y-prosemirror';
@@ -23,10 +23,13 @@ import { EMBED_LANG, embedSource, useEmbedHost, type EmbedSpec } from './embedBl
 import { ArtifactPicker, FILE_VIEW } from './fileBlocks';
 import { useActiveSpaceId } from '@/Function/space/activeSpaceStore';
 import { uploadToArtifacts } from '@/hooks/artifactData';
-import { openNoteCollab, type NoteCollab } from '@/hooks/noteCollab';
+import type { ElementWithDetails } from '@/hooks/useSupabase';
+import { openNoteCollab, type CollabEvent, type CollabUser, type NoteCollab } from '@/hooks/noteCollab';
 import { usePresenceName } from '@/hooks/usePresence';
 import { formatError } from '@/Function/shared/formatError';
 import { openInApp } from '@/Function/shared/appNavigation';
+import { mergeNote } from '../noteMerge';
+import type { SaveHow } from '../noteContentStore';
 import { schema } from '../pm/schema';
 import { docToHtml, htmlToDoc, isEmptyDoc } from '../pm/html';
 import { FRAGMENT, hashText, seedFromHtml } from '../pm/collab';
@@ -35,10 +38,11 @@ import {
   toggleBold, toggleItalic, toggleStrike, toggleUnderline, type BlockTag, type ListKind,
 } from '../pm/commands';
 import {
-  clearSlash, cursors, drawnEditing, elementStatus, localHistory, noteKeymap, pmRedo, pmUndo,
-  shortcuts, slashKey, slashTrigger, statusKey, tablePlugins,
+  clearSlash, cursors, drawnEditing, localHistory, noteKeymap, pmRedo, pmUndo,
+  shortcuts, slashKey, slashTrigger, tablePlugins,
 } from '../pm/plugins';
 import { DrawnBlocks, DrawnRegistry, drawnNodeView } from '../pm/drawn';
+import { ChecklistMarks, MarkRegistry, checklistMarks, type LineMark } from '../pm/marks';
 import {
   FloatingToolbar, SlashMenu, TableContextMenu, TableInsertHandles, filterSlash, handlesKey, measureTableHandles,
   type Mark, type SlashItem, type TableAction, type TableHandles,
@@ -50,7 +54,9 @@ export interface NoteEditorProps {
   /** Shared body. A body changed elsewhere (saved by someone, merged) is
    *  brought in without moving the caret. */
   value?: string;
-  onChange?: (html: string) => void;
+  /** The body to save. `how.standIn`: this editor is not the one who saves
+   *  the shared body, and saves it in that one's stead. */
+  onChange?: (html: string, how?: SaveHow) => void;
   /** A one-click edit that can land while the editor is not focused (a
    *  checklist box), so no blur follows to save it: called right after its
    *  onChange, for a host that saves on blur to save now. */
@@ -58,8 +64,9 @@ export interface NoteEditorProps {
   editable?: boolean;
   /** Called when the user right-clicks on a list item (bullet/check). */
   onBulletContextMenu?: (info: BulletContextInfo) => void;
-  /** id → status for every Element. Lines linked to an Element show its status. */
-  elementStatusById?: Record<string, string | null | undefined>;
+  /** The Elements the page holds, by id. A line made into one of them shows
+   *  its status live from here (otherwise the line reads its Element itself). */
+  elementsById?: Record<string, ElementWithDetails>;
   /** A short body inside another page (an Element's description): no
    *  page-tall minimum, the page's text size, smaller headings. Its text is
    *  kept as Markdown, so it offers no underline or alignment. */
@@ -94,13 +101,35 @@ export interface NoteEditorHandle {
 }
 
 const TOOLBAR_GAP = 8;
-/** How far in from a linked line's edges its mark and arrow answer a click. */
+/** How far in from a linked line's right edge its arrow answers a click. */
 const LINKED_EDGE_PX = 30;
-/** How far from a checklist item's left edge a click lands on its box. */
-const CHECK_BOX_HIT_PX = 20;
 /** A change brought in from the saved body, not typed here. */
 const EXTERNAL = 'note-external';
 const CURSOR_COLORS = 6;
+/** How long the saved body may trail what is typed before an editor that
+ *  does not save it steps in for the one who does. */
+const STAND_IN_MS = 4000;
+
+// The others' cursors. What they say of themselves is theirs to say: it is
+// shown as text and read as one of the cursor colours, nothing more.
+const toneOf = (user: unknown) => {
+  const tone = Number((user as { tone?: unknown } | null)?.tone);
+  return `var(--chart-${Number.isInteger(tone) && tone >= 1 && tone <= CURSOR_COLORS ? tone : 1})`;
+};
+function cursorBuilder(user: unknown): HTMLElement {
+  const cursor = document.createElement('span');
+  cursor.classList.add('ProseMirror-yjs-cursor');
+  cursor.style.borderColor = toneOf(user);
+  const label = document.createElement('div');
+  label.style.backgroundColor = toneOf(user);
+  label.textContent = String((user as { name?: unknown } | null)?.name ?? '').slice(0, 40);
+  cursor.append('\u2060', label, '\u2060');
+  return cursor;
+}
+const selectionBuilder = (user: unknown) => ({
+  class: 'ProseMirror-yjs-selection',
+  style: `background-color: color-mix(in srgb, ${toneOf(user)} 28%, transparent)`,
+});
 
 const { list_item, code_block, horizontal_rule, table: tableType, heading: headingType, blockquote: quoteType } = schema.nodes;
 
@@ -171,7 +200,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   onCommit,
   editable = true,
   onBulletContextMenu,
-  elementStatusById,
+  elementsById,
   compact = false,
   placeholder,
   collab,
@@ -182,6 +211,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const viewRef = useRef<EditorView | null>(null);
   const sessionRef = useRef<NoteCollab | null>(null);
   const registry = useMemo(() => new DrawnRegistry(), []);
+  const marks = useMemo(() => new MarkRegistry(), []);
   const [ready, setReady] = useState(false);
 
   // The latest props, for the editor's handlers made once.
@@ -189,7 +219,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const onChangeRef = useRef(onChange);
   const onCommitRef = useRef(onCommit);
   const bulletRef = useRef(onBulletContextMenu);
-  const statusRef = useRef(elementStatusById);
   const editableRef = useRef(editable);
   const placeholderRef = useRef(placeholder ?? t('Start writing…'));
   onChangeRef.current = onChange;
@@ -201,14 +230,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const lastEmittedRef = useRef('');
   /** Set once the editor shows its first body; before that nothing saves. */
   const initializedRef = useRef(false);
-  /** A body that came in while a word was being composed. */
-  const pendingRef = useRef<string | null>(null);
+  /** A body that came in while a word was being composed, and what the
+   *  editor held when it came: the two are put together once the word is in. */
+  const pendingRef = useRef<{ html: string; base: string } | null>(null);
+  /** Whether this editor was the one saving, the last time it looked. */
+  const wasSaverRef = useRef(false);
+  const couldEditRef = useRef(editable);
+  /** When the document, and the saved body, last changed (to tell which trails). */
+  const docChangedAtRef = useRef(0);
+  const valueChangedAtRef = useRef(0);
+  const standInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const standInJitter = useMemo(() => Math.floor(Math.random() * 1500), []);
+  /** The text a link is being asked for, kept in place while others type. */
+  const linkRangeRef = useRef<{ from: number; to: number } | null>(null);
+  /** The lines offered to be made into Elements, kept in place the same way. */
+  const offeredRef = useRef<{ dom: HTMLLIElement; pos: number }[]>([]);
 
   const spaceId = useActiveSpaceId();
   const spaceIdRef = useRef(spaceId);
   spaceIdRef.current = spaceId;
   const embedHost = useEmbedHost();
   const me = usePresenceName(!!collab && editable);
+  const user = useMemo<CollabUser>(
+    () => ({ name: me.name || t('Someone'), tone: (hashText(me.userId ?? '') % CURSOR_COLORS) + 1 }),
+    [me.name, me.userId, t],
+  );
+  const userRef = useRef(user);
+  userRef.current = user;
 
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
   const [slash, setSlash] = useState<{ x: number; y: number; query: string } | null>(null);
@@ -218,13 +266,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const [handles, setHandles] = useState<TableHandles | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // With others editing, the one who joined first saves the shared body for
-  // everyone, so their saves never cross; when they leave the next one does.
+  // With others editing, one side saves the shared body for everyone (the
+  // session says which), so their saves never cross.
   const isSaver = useCallback(() => {
     const session = sessionRef.current;
-    if (!session) return true;
-    const ids = [...session.awareness.getStates().keys()];
-    return !ids.length || Math.min(...ids) === session.doc.clientID;
+    return !session || session.isSaver();
+  }, []);
+  const canEdit = useCallback(() => {
+    const session = sessionRef.current;
+    return editableRef.current && (!session || session.ready);
   }, []);
 
   const emit = useCallback((doc: PMNode) => {
@@ -258,13 +308,53 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setToolbar({ x: rect.left + rect.width / 2, y: rect.top - TOOLBAR_GAP });
   }, []);
 
+  // An editor that does not save watches that what is typed gets saved. When
+  // the saved body trails it for a while (the one who saves is gone, asleep
+  // or cannot save), it saves in that one's stead. Never when the saved body
+  // is the newer of the two — then this side is the one behind.
+  const standIn = useCallback((view: EditorView) => {
+    const session = sessionRef.current;
+    if (!session || !initializedRef.current || !session.ready || session.isSaver()) return;
+    if (docChangedAtRef.current <= valueChangedAtRef.current) return;
+    const html = docToHtml(view.state.doc);
+    if (html !== valueRef.current) onChangeRef.current?.(html, { standIn: true });
+  }, []);
+  const armStandIn = useCallback(() => {
+    if (standInTimerRef.current) clearTimeout(standInTimerRef.current);
+    standInTimerRef.current = setTimeout(() => {
+      standInTimerRef.current = null;
+      if (viewRef.current) standIn(viewRef.current);
+    }, STAND_IN_MS + standInJitter);
+  }, [standIn, standInJitter]);
+
+  // A body saved elsewhere (an AI's edit, a save merged with another's) is
+  // brought into the editor by the one who saves.
   const bringIn = useCallback((view: EditorView, html: string) => {
     if (html === lastEmittedRef.current || !isSaver()) return;
-    if (view.composing) { pendingRef.current = html; return; }
+    // A word is being composed: the body waits, with what the editor holds
+    // now, and nothing is saved until the two are put together.
+    if (view.composing) {
+      pendingRef.current = { html, base: pendingRef.current?.base ?? docToHtml(view.state.doc) };
+      return;
+    }
     const tr = replaceDoc(view, htmlToDoc(html));
     if (tr) view.dispatch(tr.setMeta(EXTERNAL, true).setMeta('addToHistory', false));
     lastEmittedRef.current = html;
   }, [isSaver]);
+
+  // The word is in: the body that waited and what was typed meanwhile are put
+  // together paragraph by paragraph, and that is what is saved.
+  const settlePending = useCallback((view: EditorView) => {
+    const pending = pendingRef.current;
+    if (!pending || view.composing) return;
+    pendingRef.current = null;
+    const mine = docToHtml(view.state.doc);
+    const merged = mine === pending.base ? pending.html : mergeNote(pending.base, mine, pending.html);
+    lastEmittedRef.current = pending.html;
+    const tr = replaceDoc(view, htmlToDoc(merged));
+    if (tr) view.dispatch(tr.setMeta('addToHistory', false));
+    else if (isSaver()) emit(view.state.doc);
+  }, [emit, isSaver]);
 
   const run = useCallback((cmd: Command) => {
     const view = viewRef.current;
@@ -308,29 +398,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         if (event.button !== 0) return false;
         const target = event.target as HTMLElement;
         const li = target.tagName === 'UL' || target.tagName === 'OL' ? null : target.closest('li');
-        if (!li || !v.dom.contains(li) || li.parentElement?.getAttribute('data-checklist') !== 'true') return false;
-        const rect = li.getBoundingClientRect();
-        // A linked line's mark (left) and arrow (right) open its Element, as a
-        // created Element's card in the chat does; the text between stays text.
-        const linkedId = li.getAttribute('data-element-id');
-        if (linkedId) {
-          if (event.clientX - rect.left < LINKED_EDGE_PX || rect.right - event.clientX < LINKED_EDGE_PX) {
-            event.preventDefault();
-            openInApp('domain-elements', { elementId: linkedId });
-            return true;
-          }
-          return false;
-        }
-        // An unlinked item's box checks or unchecks it. The box sits on the
-        // item's first line, so a click lower down is not on it.
-        if (!editableRef.current) return false;
-        const lineHeight = parseFloat(getComputedStyle(li).lineHeight) || CHECK_BOX_HIT_PX;
-        if (event.clientX - rect.left >= CHECK_BOX_HIT_PX || event.clientY - rect.top >= lineHeight) return false;
-        const item = itemAt(v, li);
-        if (!item) return false;
+        const linkedId = li?.getAttribute('data-element-id');
+        if (!li || !linkedId || !v.dom.contains(li) || li.parentElement?.getAttribute('data-checklist') !== 'true') return false;
+        // The arrow at a linked line's right opens its Element, as a created
+        // Element's card in the chat does (the mark at its left is its Status).
+        if (li.getBoundingClientRect().right - event.clientX >= LINKED_EDGE_PX) return false;
         event.preventDefault();
-        toggleChecked(item.pos)(v.state, v.dispatch);
-        onCommitRef.current?.(lastEmittedRef.current);
+        openInApp('domain-elements', { elementId: linkedId });
         return true;
       },
       contextmenu(v, event) {
@@ -358,24 +432,28 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         // The lines selected, or the one clicked.
         let items: { node: PMNode; pos: number }[] = [];
         const { from, to, empty } = v.state.selection;
-        if (!empty) v.state.doc.nodesBetween(from, to, (node, pos) => { if (node.type === list_item) items.push({ node, pos }); return true; });
+        // An item counts when its own line is in the selection (not only an
+        // item nested under it).
+        if (!empty) v.state.doc.nodesBetween(from, to, (node, pos) => {
+          if (node.type === list_item && pos + 1 < to && pos + 1 + (node.firstChild?.nodeSize ?? 0) > from) items.push({ node, pos });
+          return true;
+        });
         if (!items.length) items = [clicked];
         // Only a line of plain text not yet made an Element becomes one.
         const lines = items
-          .map((it) => ({ ...it, text: (it.node.firstChild?.textContent ?? '').trim() }))
+          .map((it) => ({ ...it, text: (it.node.firstChild?.isTextblock ? it.node.firstChild.textContent : '').trim() }))
           .filter((it) => it.text && !it.node.attrs.elementId && isPlainLine(it.node))
           .map((it) => ({ ...it, dom: v.nodeDOM(it.pos) }))
           .filter((it): it is typeof it & { dom: HTMLLIElement } => it.dom instanceof HTMLLIElement);
         if (!lines.length) return true;
+        offeredRef.current = lines.map((l) => ({ dom: l.dom, pos: l.pos }));
         onBullet({ text: lines[0].text, texts: lines.map((l) => l.text), liNodes: lines.map((l) => l.dom), x: event.clientX, y: event.clientY });
         return true;
       },
       compositionend(v) {
         setTimeout(() => {
           if (viewRef.current !== v) return;
-          const pending = pendingRef.current;
-          pendingRef.current = null;
-          if (pending !== null) bringIn(v, pending);
+          settlePending(v);
           // A "/" typed through an input method opens the menu the same way.
           const { $from, empty } = v.state.selection;
           const text = $from.parent.textContent;
@@ -386,7 +464,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         }, 0);
         return false;
       },
-      blur(v) { setTimeout(() => { if (viewRef.current === v && !v.hasFocus()) setToolbar(null); }, 0); return false; },
+      blur(v) {
+        setTimeout(() => {
+          if (viewRef.current !== v) return;
+          settlePending(v);
+          if (!v.hasFocus()) setToolbar(null);
+        }, 0);
+        return false;
+      },
     };
 
     const create = (plugins: Plugin[], doc: PMNode | undefined) => {
@@ -394,7 +479,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       const state = EditorState.create({ schema, doc, plugins });
       view = new EditorView(mount, {
         state,
-        editable: () => editableRef.current,
+        editable: canEdit,
         attributes: (s) => ({
           class: `note-editor no-focus-ring outline-none leading-[1.65] text-foreground ${compact ? 'note-compact min-h-[36px] text-[14px]' : 'min-h-[300px] text-[15px]'}`,
           'data-empty': isEmptyDoc(s.doc) ? 'true' : 'false',
@@ -404,8 +489,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         nodeViews: { code_block: drawnNodeView(registry) },
         handleDOMEvents,
         handlePaste(_v, event) {
-          const files = Array.from(event.clipboardData?.files ?? []);
-          if (!files.length || !spaceIdRef.current) return false;
+          // A file on its own is placed in the text. Text copied from an
+          // office app comes with a picture of itself: the text is what is pasted.
+          const data = event.clipboardData;
+          const files = Array.from(data?.files ?? []);
+          if (!data || !files.length || !spaceIdRef.current || !editableRef.current) return false;
+          if (data.getData('text/html') || data.getData('text/plain')) return false;
           event.preventDefault();
           void uploadFiles(files);
           return true;
@@ -420,11 +509,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           return true;
         },
         dispatchTransaction(this: EditorView, tr: Transaction) {
-          const next = this.state.apply(tr);
+          // A cursor update queued just before the editor closed arrives after it.
+          if (this.isDestroyed) return;
+          const { state: next, transactions } = this.state.applyTransaction(tr);
           this.updateState(next);
-          if (tr.docChanged && initializedRef.current) {
+          const changed = transactions.some((t) => t.docChanged);
+          const link = linkRangeRef.current;
+          if (link && changed) {
+            linkRangeRef.current = transactions.reduce((r, t) => ({ from: t.mapping.map(r.from, 1), to: t.mapping.map(r.to, -1) }), link);
+          }
+          if (offeredRef.current.length && changed) {
+            offeredRef.current = offeredRef.current.map((o) => ({ dom: o.dom, pos: transactions.reduce((pos, t) => t.mapping.map(pos, 1), o.pos) }));
+          }
+          if (changed && initializedRef.current) {
+            docChangedAtRef.current = performance.now();
             if (tr.getMeta(EXTERNAL)) lastEmittedRef.current = docToHtml(next.doc);
+            else if (pendingRef.current) { /* saved with the body that waits (settlePending) */ }
             else if (isSaver()) emit(next.doc);
+            else armStandIn();
           }
           syncUi(this);
         },
@@ -433,8 +535,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       // What was saved is not new: only what changes from here on saves.
       lastEmittedRef.current = docToHtml(htmlToDoc(valueRef.current));
       initializedRef.current = true;
-      // Joining others who have edits not yet saved: whoever saves takes them.
-      if (isSaver()) emit(view.state.doc);
+      couldEditRef.current = canEdit();
+      // A shared document already holding edits nobody saved: whoever saves takes them.
+      wasSaverRef.current = isSaver();
+      if (wasSaverRef.current) emit(view.state.doc);
       setReady(true);
     };
 
@@ -443,27 +547,41 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       ...tablePlugins(),
       ...noteKeymap(undo, redo, { underline: !compact }),
       shortcuts(),
-      elementStatus(() => statusRef.current),
+      checklistMarks(marks),
       drawnEditing(),
       ...cursors(),
     ];
 
+    let off = () => {};
     if (collabId) {
-      session = openNoteCollab(collabId);
-      sessionRef.current = session;
-      const s = session;
-      // Someone else becoming the one who saves, or leaving it to this side.
-      const onPeers = () => { const v = viewRef.current; if (v && initializedRef.current && isSaver()) emit(v.state.doc); };
-      s.awareness.on('change', onPeers);
-      void s.settled.then((how) => {
-        if (cancelled) return;
-        if (how === 'alone') seedFromHtml(s.doc, valueRef.current);
-        create([
-          ySyncPlugin(s.doc.getXmlFragment(FRAGMENT)),
-          yCursorPlugin(s.awareness),
-          yUndoPlugin(),
-          ...common(yUndo as Command, yRedo as Command),
-        ], undefined);
+      const s = openNoteCollab(collabId);
+      session = s;
+      sessionRef.current = s;
+      s.setUser(userRef.current);
+      // The shared document starts from the saved body, at once; if others
+      // hold an older one, the session takes theirs ('replaced').
+      s.start((doc) => seedFromHtml(doc, valueRef.current));
+      const bound = (): Plugin[] => [
+        ySyncPlugin(s.doc.getXmlFragment(FRAGMENT)),
+        yCursorPlugin(s.awareness, { cursorBuilder, selectionBuilder }),
+        yUndoPlugin(),
+        ...common(yUndo as Command, yRedo as Command),
+      ];
+      create(bound(), undefined);
+      off = s.subscribe((event: CollabEvent) => {
+        const v = viewRef.current;
+        if (!v) return;
+        if (event === 'replaced') {
+          linkRangeRef.current = null;
+          offeredRef.current = [];
+          v.updateState(EditorState.create({ schema, plugins: bound() }));
+        }
+        const can = canEdit();
+        if (can !== couldEditRef.current) { couldEditRef.current = can; v.setProps({ editable: canEdit }); }
+        // Taking over the saving: what nobody has saved yet is saved now.
+        const saver = isSaver();
+        if (saver && !wasSaverRef.current && initializedRef.current && !pendingRef.current) emit(v.state.doc);
+        wasSaverRef.current = saver;
       });
     } else {
       create([...localHistory(), ...common(pmUndo, pmRedo)], htmlToDoc(valueRef.current));
@@ -471,28 +589,32 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
     return () => {
       cancelled = true;
+      off();
+      if (standInTimerRef.current) { clearTimeout(standInTimerRef.current); standInTimerRef.current = null; }
+      // Leaving while the saved body trails what was typed: save it, unless
+      // the one who saves does.
+      if (view) standIn(view);
       view?.destroy();
       if (viewRef.current === view) viewRef.current = null;
-      session?.destroy();
+      session?.release();
       if (sessionRef.current === session) sessionRef.current = null;
       initializedRef.current = false;
+      pendingRef.current = null;
       setReady(false);
     };
     // The editor is made once per Note; its other inputs are read through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collabId, compact, registry]);
+  }, [collabId, compact, registry, marks]);
 
   // Who this is, for the others' view of where they are typing.
   useEffect(() => {
-    const session = sessionRef.current;
-    if (!session || !ready) return;
-    const color = `var(--chart-${(hashText(me.userId ?? '') % CURSOR_COLORS) + 1})`;
-    session.awareness.setLocalStateField('user', { name: me.name || t('Someone'), color });
-  }, [ready, me.name, me.userId, t]);
+    if (ready) sessionRef.current?.setUser(user);
+  }, [ready, user]);
 
   // A body saved elsewhere, or merged with another's save.
   useEffect(() => {
     const next = value ?? initialHtml ?? '';
+    if (next !== valueRef.current) valueChangedAtRef.current = performance.now();
     valueRef.current = next;
     const view = viewRef.current;
     if (view && initializedRef.current) bringIn(view, next);
@@ -500,14 +622,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   useEffect(() => {
     editableRef.current = editable;
-    viewRef.current?.setProps({ editable: () => editableRef.current });
-  }, [editable]);
+    couldEditRef.current = canEdit();
+    viewRef.current?.setProps({ editable: canEdit });
+  }, [editable, canEdit]);
 
-  useEffect(() => {
-    statusRef.current = elementStatusById;
-    const view = viewRef.current;
-    if (view) view.dispatch(view.state.tr.setMeta(statusKey, true));
-  }, [elementStatusById, ready]);
+  // What an empty body says follows the page's language.
+  useEffect(() => { viewRef.current?.setProps({}); }, [placeholder, t]);
 
   useEffect(() => {
     const onMove = () => { const v = viewRef.current; if (v) syncUi(v); };
@@ -522,13 +642,27 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // A header row and `rows` rows under it.
   const insertTable = useCallback((rows = 3, cols = 3) => run(placeBlock(createTable(rows + 1, cols))), [run]);
   const focus = useCallback(() => viewRef.current?.focus(), []);
+  // A line that is not an Element is checked or unchecked from its mark.
+  const toggleLine = useCallback((mark: LineMark) => {
+    const view = viewRef.current;
+    const at = mark.getPos();
+    if (!view || at === undefined || !editableRef.current) return;
+    if (toggleChecked(at - 1)(view.state, view.dispatch)) onCommitRef.current?.(lastEmittedRef.current);
+  }, []);
   const linkBullets = useCallback((entries: { li: HTMLLIElement; elementId: string }[]) => {
     const view = viewRef.current;
     if (!view) return;
+    // A line is found where it has moved to since it was offered (others may
+    // have typed, and redrawn it, while its Element was being made).
+    const placeOf = (li: HTMLLIElement): number | null => {
+      const offered = offeredRef.current.find((o) => o.dom === li);
+      if (offered && view.state.doc.nodeAt(offered.pos)?.type === list_item) return offered.pos;
+      return itemAt(view, li)?.pos ?? null;
+    };
     const found = entries
-      .map(({ li, elementId }) => ({ item: itemAt(view, li), elementId }))
-      .filter((e): e is { item: { node: PMNode; pos: number }; elementId: string } => !!e.item && !!e.elementId)
-      .map((e) => ({ pos: e.item.pos, elementId: e.elementId }));
+      .map(({ li, elementId }) => ({ pos: placeOf(li), elementId }))
+      .filter((e): e is { pos: number; elementId: string } => e.pos !== null && !!e.elementId);
+    offeredRef.current = [];
     if (found.length) linkItems(found)(view.state, view.dispatch);
   }, []);
   useImperativeHandle(handleRef, () => ({ applyBlock, applyList, insertTable, focus, linkBullets }),
@@ -545,16 +679,23 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, [t]);
 
   // The toolbar's link: selected text already linked is unlinked; otherwise
-  // it asks for the address. The text must still be there once it is given.
+  // it asks for the address.
   const toggleLink = useCallback(async () => {
     const view = viewRef.current;
     if (!view) return;
     const { from, to } = view.state.selection;
     if (view.state.doc.rangeHasMark(from, to, schema.marks.link)) { run(setLink(null)); return; }
-    const doc = view.state.doc;
+    // The text keeps its place while the address is asked for, whoever types.
+    linkRangeRef.current = { from, to };
     const url = await askUrl();
-    if (!url || viewRef.current !== view || view.state.doc !== doc) return;
-    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, from, to)));
+    const range = linkRangeRef.current;
+    linkRangeRef.current = null;
+    if (!url || viewRef.current !== view || !range || range.from >= range.to) return;
+    try {
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, range.from, range.to)));
+    } catch {
+      return; // the text is gone
+    }
     run(setLink(url));
   }, [askUrl, run]);
 
@@ -573,6 +714,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const view = viewRef.current;
     if (!view) return;
     const move = (dir: 'row' | 'col', by: -1 | 1): Command => (state, dispatch) => {
+      if (!isInTable(state)) return false;
       const rect = selectedRect(state);
       const from = dir === 'row' ? rect.top : rect.left;
       const last = dir === 'row' ? rect.map.height - 1 : rect.map.width - 1;
@@ -673,6 +815,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         <div ref={mountRef} />
         {!ready && <div className={compact ? 'min-h-[36px]' : 'min-h-[300px]'} />}
         <DrawnBlocks registry={registry} editable={editable} />
+        <ChecklistMarks registry={marks} editable={editable} elementsById={elementsById} onToggle={toggleLine} />
         {editable && handles && <TableInsertHandles geom={handles} onInsertCol={insertCol} onInsertRow={insertRow} />}
         {editable && (
           <input ref={fileInputRef} type="file" multiple hidden

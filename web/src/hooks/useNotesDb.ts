@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
-import { createNoteContentStore, EMPTY_NOTE_CONTENT } from '@/Function/notebook/noteContentStore';
+import { createNoteContentStore, EMPTY_NOTE_CONTENT, type SaveHow } from '@/Function/notebook/noteContentStore';
 import { retainChannel } from './sharedRealtime';
 import type {
   NoteNode,
@@ -497,8 +497,8 @@ export function useNoteContent(noteId: string | null) {
     ));
   }, [noteId, store, userId]);
 
-  const save = useCallback((html: string) => {
-    if (noteId && store?.getSnapshot(noteId).ready) store.edit(noteId, html);
+  const save = useCallback((html: string, how?: SaveHow) => {
+    if (noteId && store?.getSnapshot(noteId).ready) store.edit(noteId, html, how);
   }, [noteId, store]);
   const retry = useCallback(() => {
     if (noteId && store) void store.retry(noteId);

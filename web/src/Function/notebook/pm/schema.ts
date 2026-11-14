@@ -113,7 +113,11 @@ export const schema = new Schema({
         const href = (d as HTMLElement).getAttribute('href') ?? '';
         return SAFE_HREF.test(href.trim()) ? { href } : false;
       } }],
-      toDOM: (m): DOMOutputSpec => ['a', { href: m.attrs.href, rel: 'noopener noreferrer', target: '_blank' }, 0],
+      // An address that came some other way than this page's HTML (from
+      // another person's editor) is held to the same rule: only a safe one
+      // is ever written into the page or the saved body.
+      toDOM: (m): DOMOutputSpec => ['a', SAFE_HREF.test(String(m.attrs.href).trim())
+        ? { href: m.attrs.href, rel: 'noopener noreferrer', target: '_blank' } : {}, 0],
     },
     strong: {
       parseDOM: [{ tag: 'strong' }, { tag: 'b' }, { style: 'font-weight', getAttrs: (v) => /^(bold(er)?|[6-9]\d{2})$/.test(v as string) && null }],

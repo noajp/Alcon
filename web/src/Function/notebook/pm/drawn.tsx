@@ -10,6 +10,7 @@ import { useI18n } from '@/Function/i18n/I18nProvider';
 import { renderMermaid } from '@/Function/shared/MermaidDiagram';
 import { parseEmbed, useEmbedHost } from '../editor/embedBlocks';
 import { FILE_VIEW, FileBlock } from '../editor/fileBlocks';
+import { Portals } from './portals';
 import { isDrawnBlock } from './schema';
 
 // A code block that is drawn rather than read: a ```mermaid diagram, or a
@@ -28,25 +29,7 @@ interface Drawn {
 }
 
 /** The drawn blocks of one editor, for it to draw into. */
-export class DrawnRegistry {
-  private items = new Map<number, Drawn>();
-  private snapshot: [number, Drawn][] = [];
-  private listeners = new Set<() => void>();
-  private next = 1;
-
-  add(item: Drawn): number { const key = this.next++; this.items.set(key, item); this.changed(); return key; }
-  update(key: number, patch: Partial<Drawn>) {
-    const prev = this.items.get(key);
-    if (!prev) return;
-    if (Object.entries(patch).every(([k, v]) => prev[k as keyof Drawn] === v)) return;
-    this.items.set(key, { ...prev, ...patch });
-    this.changed();
-  }
-  remove(key: number) { if (this.items.delete(key)) this.changed(); }
-  subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
-  getSnapshot = () => this.snapshot;
-  private changed() { this.snapshot = [...this.items]; for (const fn of this.listeners) fn(); }
-}
+export class DrawnRegistry extends Portals<Drawn> {}
 
 const isEditing = (decorations: readonly Decoration[]) =>
   decorations.some((d) => (d as unknown as { spec?: { editing?: boolean } }).spec?.editing);

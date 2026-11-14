@@ -1,21 +1,21 @@
 import { Plugin, PluginKey, TextSelection, type Command, type EditorState } from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
-import { baseKeymap, chainCommands, exitCode } from 'prosemirror-commands';
+import { baseKeymap, chainCommands, exitCode, newlineInCode } from 'prosemirror-commands';
 import { history, redo as pmRedo, undo as pmUndo } from 'prosemirror-history';
-import { inputRules, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
+import { InputRule, inputRules, textblockTypeInputRule, wrappingInputRule } from 'prosemirror-inputrules';
+import { canJoin, findWrapping } from 'prosemirror-transform';
 import { liftListItem, sinkListItem, splitListItem } from 'prosemirror-schema-list';
 import { addRowAfter, columnResizing, goToNextCell, isInTable, tableEditing } from 'prosemirror-tables';
 import { dropCursor } from 'prosemirror-dropcursor';
 import { gapCursor } from 'prosemirror-gapcursor';
-import type { Node as PMNode } from 'prosemirror-model';
 import { schema } from './schema';
 import { toggleBold, toggleItalic, toggleStrike, toggleUnderline } from './commands';
 
-// The behaviour of a Note: keys, Markdown-style shortcuts, the "/" menu's
-// trigger, linked lines' live status and the placeholder.
+// The behaviour of a Note: keys, Markdown-style shortcuts and the "/" menu's
+// trigger.
 
-const { paragraph, heading, blockquote, code_block, bullet_list, ordered_list, list_item } = schema.nodes;
+const { paragraph, heading, blockquote, code_block, bullet_list, ordered_list, list_item, hard_break } = schema.nodes;
 
 /** Enter on an empty last line of a code block leaves it (two Enters close it). */
 const leaveCodeOnEmptyLine: Command = (state, dispatch) => {
@@ -30,6 +30,29 @@ const leaveCodeOnEmptyLine: Command = (state, dispatch) => {
     tr.setSelection(TextSelection.create(tr.doc, after + 1));
     dispatch(tr.scrollIntoView());
   }
+  return true;
+};
+
+/** Enter in a list starts a new item. The new item is its own: it is not
+ *  checked, and not the Element the line above was made into. */
+const splitItem: Command = (state, dispatch) => splitListItem(list_item)(state, dispatch && ((tr) => {
+  const $pos = tr.selection.$from;
+  for (let d = $pos.depth; d > 0; d--) {
+    const item = $pos.node(d);
+    if (item.type !== list_item) continue;
+    const checked = $pos.node(d - 1).attrs.checklist ? false : null;
+    if (item.attrs.elementId !== null || item.attrs.checked !== checked) {
+      tr.setNodeMarkup($pos.before(d), undefined, { ...item.attrs, checked, elementId: null });
+    }
+    break;
+  }
+  dispatch(tr);
+}));
+
+/** Shift-Enter breaks the line without starting a new block. */
+const breakLine: Command = (state, dispatch) => {
+  if (!state.selection.$from.parent.inlineContent) return false;
+  if (dispatch) dispatch(state.tr.replaceSelectionWith(hard_break.create()).scrollIntoView());
   return true;
 };
 
@@ -50,7 +73,8 @@ export function noteKeymap(undo: Command, redo: Command, { underline = true } = 
     keymap({
       'Mod-z': undo, 'Mod-y': redo, 'Mod-Shift-z': redo,
       'Mod-b': toggleBold, 'Mod-i': toggleItalic, 'Mod-u': underline ? toggleUnderline : () => true, 'Mod-Shift-x': toggleStrike,
-      'Enter': chainCommands(leaveCodeOnEmptyLine, splitListItem(list_item)),
+      'Enter': chainCommands(leaveCodeOnEmptyLine, splitItem),
+      'Shift-Enter': chainCommands(newlineInCode, breakLine),
       'Mod-Enter': exitCode,
       'Tab': chainCommands(nextCellOrNewRow, sinkListItem(list_item), () => true),
       'Shift-Tab': chainCommands(goToNextCell(-1), liftListItem(list_item), () => true),
@@ -63,14 +87,28 @@ export function noteKeymap(undo: Command, redo: Command, { underline = true } = 
 export const localHistory = () => [history()];
 export { pmUndo, pmRedo };
 
+/** "[] " makes the line a checklist line, unchecked, carrying on a checklist
+ *  just above it. */
+const checklistRule = new InputRule(/^\s*\[\s?\]\s$/, (state, _match, start, end) => {
+  const tr = state.tr.delete(start, end);
+  const range = tr.doc.resolve(start).blockRange();
+  const wrapping = range && findWrapping(range, bullet_list, { checklist: true });
+  if (!range || !wrapping) return null;
+  tr.wrap(range, wrapping.map((w) => (w.type === list_item ? { type: w.type, attrs: { ...w.attrs, checked: false } } : w)));
+  const above = tr.doc.resolve(start - 1).nodeBefore;
+  if (above && above.type === bullet_list && above.attrs.checklist && canJoin(tr.doc, start - 1)) tr.join(start - 1);
+  return tr;
+});
+
 /** "# ", "- ", "1. ", "[] ", "> " and "```" turn a line into that block. */
 export function shortcuts(): Plugin {
   return inputRules({
     rules: [
       textblockTypeInputRule(/^(#{1,3})\s$/, heading, (m) => ({ level: m[1].length })),
       wrappingInputRule(/^\s*>\s$/, blockquote),
-      wrappingInputRule(/^\s*([-*])\s$/, bullet_list),
-      wrappingInputRule(/^\s*\[\s?\]\s$/, bullet_list, { checklist: true }),
+      // A new list joins the one above only when it is the same kind of list.
+      wrappingInputRule(/^\s*([-*])\s$/, bullet_list, null, (_m, above) => !above.attrs.checklist && !above.attrs.dashed),
+      checklistRule,
       wrappingInputRule(/^(\d+)\.\s$/, ordered_list),
       textblockTypeInputRule(/^```$/, code_block),
     ],
@@ -127,33 +165,6 @@ export function clearSlash(view: EditorView): void {
   const $pos = view.state.doc.resolve(s.pos);
   const end = s.pos + $pos.parent.content.size;
   view.dispatch(view.state.tr.delete(s.pos, end).setMeta(slashKey, null));
-}
-
-// ── Linked lines' live status ────────────────────────────────────────────
-
-export const statusKey = new PluginKey<DecorationSet>('note-element-status');
-
-/** Each line linked to an Element shows that Element's status (never saved). */
-export function elementStatus(get: () => Record<string, string | null | undefined> | undefined): Plugin<DecorationSet> {
-  const build = (doc: PMNode) => {
-    const map = get() ?? {};
-    const decos: Decoration[] = [];
-    doc.descendants((node, pos) => {
-      if (node.type === list_item && node.attrs.elementId) {
-        decos.push(Decoration.node(pos, pos + node.nodeSize, { 'data-element-status': map[node.attrs.elementId as string] ?? 'backlog' }));
-      }
-      return true;
-    });
-    return DecorationSet.create(doc, decos);
-  };
-  return new Plugin<DecorationSet>({
-    key: statusKey,
-    state: {
-      init: (_c, state) => build(state.doc),
-      apply: (tr, prev) => (tr.docChanged || tr.getMeta(statusKey) ? build(tr.doc) : prev),
-    },
-    props: { decorations: (state) => statusKey.getState(state) },
-  });
 }
 
 /** A code block drawn as a diagram or a live view shows its source while the
