@@ -131,10 +131,10 @@ export function DrawnBlocks({ registry, editable, onEdited }: {
 }
 
 function DrawnBlock({ item, editable, onEdited }: { item: Drawn; editable: boolean; onEdited?: () => void }) {
-  if (item.editing) return null;
+  if (item.editing && item.lang === 'mermaid') return null;
   return item.lang === 'mermaid'
     ? <MermaidDrawing source={item.source} onEdit={editable ? item.edit : undefined} />
-    : <EmbedDrawing source={item.source} editable={editable} onEdit={item.edit} onRemove={item.remove}
+    : <EmbedDrawing source={item.source} editing={item.editing} editable={editable} onEdit={item.edit} onRemove={item.remove}
         block={{
           fresh: item.fresh,
           update: (next) => { item.rewrite(embedSource(next)); onEdited?.(); },
@@ -166,12 +166,15 @@ function MermaidDrawing({ source, onEdit }: { source: string; onEdit?: () => voi
   );
 }
 
-function EmbedDrawing({ source, editable, onEdit, onRemove, block }: { source: string; editable: boolean; onEdit: () => void; onRemove: () => void; block: EmbedBlock }) {
+function EmbedDrawing({ source, editing, editable, onEdit, onRemove, block }: { source: string; editing: boolean; editable: boolean; onEdit: () => void; onRemove: () => void; block: EmbedBlock }) {
   const { t } = useI18n();
   const host = useEmbedHost();
   const spec = parseEmbed(source);
   // A line stands in the text as a sentence does, and brings its own controls.
   const line = !!spec && !!host?.line?.(spec);
+  // The caret in a block shows its source — except a line's: its sentence is
+  // written on the line itself, and its source is never what one wants there.
+  if (editing && !line) return null;
   return (
     <div data-line={line || undefined} className={`group/embed relative bg-card ${line ? '' : 'rounded-md'}`}>
       {!spec ? <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">{t('This block cannot be read. Edit its source.')}</p>

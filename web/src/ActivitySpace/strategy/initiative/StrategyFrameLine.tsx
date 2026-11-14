@@ -104,23 +104,30 @@ function DraftLine({ kind, block }: { kind: FrameKind; block?: EmbedBlock }) {
     // Left empty, it was never written: the line goes, and nothing was made.
     if (!title) { block?.remove(); return; }
     setBusy(true);
+    // The line points at its row before the row is written: the description
+    // saves as the focus leaves, and what it saves must already name the row.
+    // The row is in the bundle at once too, so the line never shows as
+    // pointing at nothing.
+    const id = crypto.randomUUID();
+    const order = Math.max(0, ...(intent.data?.subs ?? []).map((s) => s.order_index ?? 0)) + 1;
+    const now = new Date().toISOString();
+    const provisional: Intent = {
+      id, strategy_id: intent.initiativeId, parent_intent_id: intent.data?.master?.id ?? null, kind, title,
+      target_value: null, actual_value: null, unit: null, measured_at: null, direction: null, slug: null, subtitle: null,
+      captured_dimensions: [], uncaptured_dimensions: [], abandoned: null, horizon: null, status: 'on_track',
+      decided_by_name: null, decided_by_role: null, decided_at: null, superseded_by_intent_id: null,
+      order_index: order, created_by: '', created_at: now, updated_at: now,
+    };
+    patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: [...bundle.subs, provisional] }));
+    block?.update(boundFrameSpec(id));
     try {
       const parent = await intent.ensureRoot();
-      const row = await createIntent({
-        strategy_id: intent.initiativeId,
-        parent_intent_id: parent,
-        kind,
-        title,
-        status: 'on_track',
-        order_index: Math.max(0, ...(intent.data?.subs ?? []).map((s) => s.order_index ?? 0)) + 1,
-      });
-      // The row is in the bundle before the line points at it, so the line
-      // never shows as pointing at nothing.
-      patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: [...bundle.subs, row] }));
-      block?.update(boundFrameSpec(row.id));
+      await createIntent({ id, strategy_id: intent.initiativeId, parent_intent_id: parent, kind, title, status: 'on_track', order_index: order });
       intent.refetch();
     } catch (e) {
-      setBusy(false);
+      // Not written: the row leaves the bundle, and the line says what it
+      // pointed at is gone and offers to be removed.
+      patchBundle(qc, intent.initiativeId, (bundle) => ({ ...bundle, subs: bundle.subs.filter((sub) => sub.id !== id) }));
       void appDialog.alert(formatError(e));
     }
   };

@@ -34,6 +34,11 @@ export function NoteEditorStyles() {
           height: 0; min-height: 0; padding: 0; overflow: hidden; opacity: 0; margin: 0;
         }
         .note-editor .note-drawn.is-editing > .note-drawn-view { display: none; }
+        /* A line keeps its drawing with the caret in it too. */
+        .note-editor .note-drawn.is-editing:has(> .note-drawn-view [data-line]) > .note-drawn-view { display: block; }
+        .note-editor .note-drawn.is-editing:has(> .note-drawn-view [data-line]) > pre {
+          height: 0; min-height: 0; padding: 0; overflow: hidden; opacity: 0; margin: 0;
+        }
         /* Where the others editing this Note are. */
         .note-editor .ProseMirror-yjs-cursor {
           position: relative; margin-left: -1px; margin-right: -1px;
