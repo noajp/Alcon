@@ -12,7 +12,8 @@ import { throwOnFailedWrites } from './writeResults';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Domain, DomainInsert, DomainUpdate } from '@/types/database';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { hydrateDomainLabelColors } from '@/Function/shared/labelColor';
 
 
 // ============================================
@@ -442,6 +443,13 @@ export function useDomains() {
   });
   const allData = query.data?.domains ?? EMPTY_DOMAINS;
   const mySpaceIdList = query.data?.mySpaceIds ?? EMPTY_IDS;
+
+  // Every label chip reads its Domain's picked colours from one shared
+  // catalogue. Seed it from the Domain list itself (Domains not seeded yet),
+  // so a chip draws the picked colour on any screen — not only after a view
+  // that seeds its own Domain (the Objects list, an Element's page, Settings)
+  // has been opened.
+  useEffect(() => { hydrateDomainLabelColors(allData); }, [allData]);
 
   // Scope to the active ActivitySpace — Domains carry an activity_space_id, so
   // the sidebar/list show only the current space's Domains. Re-filters live on
