@@ -63,14 +63,15 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 405, headers: { ...corsHeaders, allow: "POST, OPTIONS" } });
   }
 
-  if (!acceptsProtocolHeader(req.headers.get("mcp-protocol-version"))) {
-    return json(400, { error: "unsupported MCP-Protocol-Version" });
-  }
-
   const userAgent = req.headers.get("user-agent");
   const auth = await authenticateCaller(req, { client: clientName(url, userAgent) });
   if (!auth.ok) return auth.status === 401 ? unauthorized(auth.detail) : json(auth.status, { error: auth.error });
   const { caller } = auth;
+  // Checked after auth: a client on a version this server does not know
+  // still gets the 401 that tells it where to sign in.
+  if (!acceptsProtocolHeader(req.headers.get("mcp-protocol-version"))) {
+    return json(400, { error: "unsupported MCP-Protocol-Version" });
+  }
 
   const actor = {
     agent: clientLabel(
