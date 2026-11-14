@@ -66,7 +66,7 @@ export function ExecutionChain({ columns, className, onDropStatus, columnAction,
   return (
     <div className={className ?? 'flex h-full gap-3 overflow-x-auto px-4 pb-4 pt-1'}>
       {STATUS_ORDER.map((status) => (
-        <BoardColumn key={status} {...groupProps(status)} folded={columns[status].length === 0}>
+        <BoardColumn key={status} {...groupProps(status)}>
           {columns[status].map((c) => <div key={c.key}>{c.node}</div>)}
         </BoardColumn>
       ))}
