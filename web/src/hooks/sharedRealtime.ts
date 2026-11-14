@@ -1,6 +1,6 @@
 'use client';
 
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { RealtimeChannel, RealtimeChannelOptions } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 // One websocket subscription per topic, however many subscribers ask for it.
@@ -19,10 +19,20 @@ import { supabase } from '@/lib/supabase';
 
 const RELEASE_GRACE_MS = 50;
 
+/** How a topic's channel is opened, and who hears whether it is joined. Like
+ *  `build`, these are the first subscriber's and must not close over
+ *  component state. */
+export interface ChannelSetup {
+  config?: RealtimeChannelOptions['config'];
+  /** Every change of the channel's join status ('SUBSCRIBED', 'CLOSED', …). */
+  onStatus?: (status: string) => void;
+}
+
 interface Entry {
   channel: RealtimeChannel | null;
   count: number;
   build: (channel: RealtimeChannel) => RealtimeChannel;
+  setup: ChannelSetup;
   removal: ReturnType<typeof setTimeout> | null;
   leaving: Promise<void> | null;
 }
@@ -31,7 +41,9 @@ const entries = new Map<string, Entry>();
 function open(topic: string, entry: Entry): void {
   const start = () => {
     if (entry.count === 0 || entry.channel) return;
-    entry.channel = entry.build(supabase.channel(topic)).subscribe((status, err) => {
+    const made = entry.setup.config ? supabase.channel(topic, { config: entry.setup.config }) : supabase.channel(topic);
+    entry.channel = entry.build(made).subscribe((status, err) => {
+      entry.setup.onStatus?.(status);
       // A silent CHANNEL_ERROR looks exactly like "no changes happened" —
       // say so. The usual cause is a table missing from the
       // supabase_realtime publication (see supabase/migrations).
@@ -59,10 +71,11 @@ function close(topic: string, entry: Entry): void {
 export function retainChannel(
   topic: string,
   build: (channel: RealtimeChannel) => RealtimeChannel,
+  setup: ChannelSetup = {},
 ): () => void {
   let entry = entries.get(topic);
   if (!entry) {
-    entry = { channel: null, count: 0, build, removal: null, leaving: null };
+    entry = { channel: null, count: 0, build, setup, removal: null, leaving: null };
     entries.set(topic, entry);
   }
   if (entry.removal) {

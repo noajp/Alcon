@@ -9,7 +9,13 @@ import { mergeNote } from './noteMerge';
  * from, then saved again. A body that arrives live (Realtime) is taken as it
  * is when nothing here is unsaved, and merged into the draft when something
  * is; one that arrives during a save is looked at again once the save is
- * done, since the save itself may be what replaced it. */
+ * done, since the save itself may be what replaced it.
+ *
+ * A Note edited together has one side that saves the shared body. Another
+ * side may save it in that one's stead (a *stand-in* save: the one who saves
+ * is gone or slow). A stand-in never competes: if anyone else saves first,
+ * theirs stands and the stand-in is dropped, unmerged — both are the same
+ * shared body, and the other is at least as new. */
 interface NoteContentSnapshot {
   html: string;
   ready: boolean;
@@ -32,6 +38,8 @@ interface Entry {
   stamp: string | null;
   /** A live change that came in while a save was running. */
   missed: boolean;
+  /** The unsaved draft is a stand-in save. */
+  standIn: boolean;
   listeners: Set<() => void>;
   revision: number;
   savedRevision: number;
@@ -55,6 +63,10 @@ function asError(error: unknown): Error {
 
 export interface NoteBody { html: string; stamp: string | null }
 
+/** How a body is saved. `standIn`: in place of the one who saves the shared
+ *  body — dropped if anyone else saves first. */
+export interface SaveHow { standIn?: boolean }
+
 export function createNoteContentStore(adapter: {
   read: (noteId: string) => Promise<NoteBody>;
   /** Saves over version `stamp` (null: there is no row yet). 'conflict' when
@@ -66,7 +78,7 @@ export function createNoteContentStore(adapter: {
     let entry = entries.get(noteId);
     if (!entry) {
       entry = { snapshot: { ...EMPTY_NOTE_CONTENT, loading: true }, listeners: new Set(),
-        base: '', stamp: null, missed: false,
+        base: '', stamp: null, missed: false, standIn: false,
         revision: 0, savedRevision: 0, timer: null, read: null, write: null };
       entries.set(noteId, entry);
     }
@@ -122,9 +134,14 @@ export function createNoteContentStore(adapter: {
         try {
           const saved = await adapter.write(noteId, html, entry.stamp);
           if (saved === 'conflict') {
+            const theirs = await adapter.read(noteId);
+            // A stand-in, and someone else saved first: theirs stands.
+            if (entry.standIn && entry.revision === revision) {
+              standDown(entry, theirs);
+              continue;
+            }
             // Someone else saved first: put both together and try again.
             if (++conflicts > 5) throw new Error('This Note keeps changing. Try again in a moment.');
-            const theirs = await adapter.read(noteId);
             const merged = mergeNote(entry.base, entry.snapshot.html, theirs.html);
             entry.base = theirs.html;
             entry.stamp = theirs.stamp;
@@ -141,6 +158,7 @@ export function createNoteContentStore(adapter: {
           entry.savedRevision = revision;
           entry.base = html;
           entry.stamp = saved.stamp;
+          if (entry.revision === revision) entry.standIn = false;
           update(entry, { dirty: entry.revision > revision });
         } catch (error) {
           // Keep the newest draft, including edits made during this failed
@@ -163,11 +181,22 @@ export function createNoteContentStore(adapter: {
     return entry.write;
   }
 
+  /** Drops a stand-in draft for the body someone else saved. */
+  function standDown(entry: Entry, theirs: NoteBody) {
+    clearTimer(entry);
+    entry.standIn = false;
+    entry.savedRevision = entry.revision;
+    entry.base = theirs.html;
+    entry.stamp = theirs.stamp;
+    update(entry, { html: theirs.html, dirty: false });
+  }
+
   /** A body someone saved (live, or read back after a save). */
   function receive(noteId: string, body: NoteBody) {
     const entry = entries.get(noteId);
     if (!entry || !entry.snapshot.ready || sameStamp(body.stamp, entry.stamp)) return;
     if (entry.write) { entry.missed = true; return; }
+    if (entry.snapshot.dirty && entry.standIn) { standDown(entry, body); return; }
     const html = entry.snapshot.dirty ? mergeNote(entry.base, entry.snapshot.html, body.html) : body.html;
     entry.base = body.html;
     entry.stamp = body.stamp;
@@ -183,9 +212,12 @@ export function createNoteContentStore(adapter: {
     },
     load,
     receive,
-    edit(noteId: string, html: string) {
+    edit(noteId: string, html: string, how: SaveHow = {}) {
       const entry = entryFor(noteId);
       if (html === entry.snapshot.html) return;
+      // A draft of this side's own stays its own: only a clean body, or
+      // another stand-in, is replaced by a stand-in.
+      entry.standIn = !!how.standIn && (entry.standIn || !entry.snapshot.dirty);
       entry.revision += 1;
       update(entry, { html, ready: true, loading: false, dirty: true, error: null, errorKind: null });
       clearTimer(entry);

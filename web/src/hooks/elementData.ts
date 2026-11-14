@@ -1,6 +1,7 @@
 'use client';
 
 import type { DependencyBlocker } from '@/Function/shared/element/dependencyReadiness';
+import { getQueryClient } from '@/lib/queryClient';
 import { computeBlockers, upstreamIdsOf } from '@/Function/shared/element/dependencyReadiness';
 import { applyOptimisticExplorerPatch, cachedElementStatus, invalidateElementDetail } from '@/Function/sync/explorerCache';
 import {
@@ -432,6 +433,11 @@ export function useElementById(elementId: string | null | undefined) {
     element: query.data ?? null,
     settled: !elementId || query.isFetched,
   };
+}
+
+/** Reads again an Element that useElementById holds (it was changed here). */
+export function refreshElementById(elementId: string): void {
+  void getQueryClient().invalidateQueries({ queryKey: ['element-by-id', elementId] });
 }
 
 // ============================================

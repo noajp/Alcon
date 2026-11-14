@@ -1,6 +1,7 @@
-// Minimal allowlist-based HTML sanitizer for the Note-style editor.
-// We control both the writer (NoteEditor) and the reader (PageView), so
-// the sanitizer only needs to defend against pasted HTML and malformed input.
+// Allowlist-based HTML sanitizer for Note bodies: the vocabulary a body may
+// hold, as HTML in and HTML out. The editor reads a body through its own
+// document model (pm/html), which holds the same vocabulary; this is for
+// code that handles a body's HTML without the editor.
 //
 // Allowed shape:
 //   blocks  : h1, h2, h3, p, blockquote, pre, ul, ol, li, hr, br
