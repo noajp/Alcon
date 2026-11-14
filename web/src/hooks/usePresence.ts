@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSessionUserId } from './useWidgetDocument';
+import { watchPresence, type Viewer } from './presenceRoom';
 import type { SubjectKind } from '@/Function/widget/types';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export interface Viewer { userId: string; name: string }
+export type { Viewer };
 
 /**
  * Who else has something open right now, on a private presence channel the
@@ -45,22 +46,10 @@ function usePresence(topic: string | null): Viewer[] {
 
   useEffect(() => {
     if (!enabled || profile.pending) return;
-    const channel = supabase.channel(topic!, {
-      config: { private: true, presence: { key: userId! } },
-    });
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState<{ name?: unknown }>();
-      setViewers(Object.entries(state)
-        .filter(([key]) => key !== userId)
-        // Names are what other members announce: shown as text, never trusted further.
-        .map(([key, metas]) => ({ userId: key, name: String(metas[0]?.name || 'Someone').slice(0, 80) })));
-    });
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') void channel.track({ name: name || 'Someone' });
-    });
+    const stop = watchPresence(topic!, userId!, name, setViewers);
     return () => {
+      stop();
       setViewers([]);
-      void supabase.removeChannel(channel);
     };
   }, [enabled, profile.pending, topic, userId, name]);
 
