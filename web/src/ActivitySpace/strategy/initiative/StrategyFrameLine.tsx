@@ -42,7 +42,9 @@ function patchBundle(qc: QueryClient, strategyId: string, change: (bundle: Inten
 }
 
 /** A sentence that grows with what is written in it, one line to start. */
-function LineText({ value, onChange, onCommit, placeholder, readOnly, autoFocus, muted }: {
+function LineText({ label, value, onChange, onCommit, placeholder, readOnly, autoFocus, muted }: {
+  /** What the sentence is, for someone who cannot see the label beside it. */
+  label: string;
   value: string;
   onChange: (next: string) => void;
   /** The focus left, or Enter: keep what is written. */
@@ -60,7 +62,7 @@ function LineText({ value, onChange, onCommit, placeholder, readOnly, autoFocus,
     el.style.height = `${el.scrollHeight}px`;
   }, [value]);
   return (
-    <textarea ref={ref} rows={1} value={value} placeholder={placeholder} readOnly={readOnly} aria-readonly={readOnly}
+    <textarea ref={ref} rows={1} value={value} placeholder={placeholder} aria-label={label} readOnly={readOnly} aria-readonly={readOnly}
       autoFocus={autoFocus} tabIndex={readOnly ? -1 : undefined}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onCommit}
@@ -74,7 +76,7 @@ function LineText({ value, onChange, onCommit, placeholder, readOnly, autoFocus,
           e.currentTarget.blur();
         }
       }}
-      className={`block w-full resize-none overflow-hidden border-none bg-transparent p-0 text-[14px] leading-[1.65] outline-none placeholder:text-muted-foreground/60 ${muted ? 'text-muted-foreground line-through' : 'text-foreground'}`} />
+      className={`block w-full resize-none overflow-hidden rounded-sm border-none bg-transparent p-0 text-[14px] leading-[1.65] outline-none focus-visible:bg-muted/50 placeholder:text-muted-foreground/60 ${muted ? 'text-muted-foreground line-through' : 'text-foreground'}`} />
   );
 }
 
@@ -135,7 +137,7 @@ function DraftLine({ kind, written, block }: { kind: FrameKind; written: string;
   };
   return (
     <LineShell kind={kind}>
-      <LineText value={text} onChange={setText} onCommit={() => void commit()} placeholder={t(KIND_PLACEHOLDER[kind])}
+      <LineText label={t(KIND_LABEL[kind])} value={text} onChange={setText} onCommit={() => void commit()} placeholder={t(KIND_PLACEHOLDER[kind])}
         readOnly={!intent.canEdit || busy} autoFocus={!!block?.fresh && intent.canEdit} />
     </LineShell>
   );
@@ -215,7 +217,7 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" title={t('More')} aria-label={t('More')}
-                className="flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/line:opacity-100 data-[state=open]:opacity-100">
+                className="flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/line:opacity-100 data-[state=open]:opacity-100">
                 <MoreHorizontal size={14} />
               </button>
             </DropdownMenuTrigger>
@@ -229,7 +231,7 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
       </div>
     }>
       <div onFocus={() => setFocused(true)}>
-        <LineText value={text} onChange={setText} onCommit={() => void save()} placeholder={t(KIND_PLACEHOLDER[kind])}
+        <LineText label={t(KIND_LABEL[kind])} value={text} onChange={setText} onCommit={() => void save()} placeholder={t(KIND_PLACEHOLDER[kind])}
           readOnly={!intent.canEdit} muted={reversed} />
       </div>
     </LineShell>
