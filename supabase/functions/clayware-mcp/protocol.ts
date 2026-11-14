@@ -10,7 +10,7 @@ export { sanitizeName };
 // initialize / ping / tools/list / tools/call, which is all a tool server
 // needs. Pure: the HTTP entry (index.ts) supplies the tools and the caller.
 
-export const SERVER_INFO = { name: "clayware", version: "0.3.0" } as const;
+export const SERVER_INFO = { name: "clayware", version: "0.3.1" } as const;
 
 /** Newest first. An unknown requested version is answered with the newest. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;
@@ -27,6 +27,8 @@ export const INSTRUCTIONS = [
 
 export interface McpTool {
   name: string;
+  /** Human-readable display name (MCP tool title). Directories require one on every tool. */
+  title: string;
   description: string;
   inputSchema: Record<string, unknown>;
   annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };

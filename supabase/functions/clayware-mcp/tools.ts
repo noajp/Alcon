@@ -23,10 +23,29 @@ const OVERWRITES = new Set([
   "setElementLabels", "bulkUpdateElements", "moveElement", "writeFile", "writeInitiativeDefinition",
 ]);
 
+// Display titles for the tool list. Client directories (Claude, ChatGPT)
+// require a human-readable title on every tool. Names that humanize badly
+// get an explicit title here; the rest are derived from the tool name.
+const TITLES: Record<string, string> = {
+  getClaywareGuide: "Clayware guide",
+  tableData: "Table data",
+  widgetBoard: "Widget board",
+  campaignMeasure: "Campaign measure",
+  note_pending_capability: "Note a pending capability",
+};
+
+function toolTitle(name: string): string {
+  const known = TITLES[name];
+  if (known) return known;
+  const words = name.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function toMcp(def: AgentToolDef): McpTool {
   const readOnly = def.effect === "read";
   return {
     name: def.name,
+    title: toolTitle(def.name),
     description: def.description,
     inputSchema: def.input_schema,
     annotations: {
