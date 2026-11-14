@@ -217,7 +217,7 @@ function RowLine({ row, kind, block }: { row: Intent; kind: FrameKind; block?: E
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" title={t('More')} aria-label={t('More')}
-                className="flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring group-hover/line:opacity-100 data-[state=open]:opacity-100">
+                className="flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-opacity hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:opacity-100 group-hover/line:opacity-100 data-[state=open]:opacity-100">
                 <MoreHorizontal size={14} />
               </button>
             </DropdownMenuTrigger>
