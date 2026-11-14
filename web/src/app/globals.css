@@ -32,7 +32,7 @@
   --status-warning-text:       #9a6200;
   --status-success-text:       #1c7c33;
   --element-status-review-text: #8a6500;
-  --focus-ring:                var(--accent-hover);
+  --focus-wash:                color-mix(in srgb, var(--text-primary) 10%, transparent);
 
   /* ---- Status (semantic only) ---- */
   --status-success:        #27a644;
@@ -312,7 +312,7 @@
   --status-warning-text:       var(--status-warning);
   --status-success-text:       var(--status-success);
   --element-status-review-text: var(--element-status-review);
-  --focus-ring:                #8fa8e6;
+  --focus-wash:                color-mix(in srgb, var(--text-primary) 12%, transparent);
 
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);
@@ -569,16 +569,14 @@ textarea.quick-create-title {
 .app-sidebar *::-webkit-scrollbar { display: none; }
 
 /* ---- Focus rings ----
- * A pointer never draws a ring: clicking a button or a link leaves it as it
- * was. Moving by keyboard does — whatever takes the focus shows a ring drawn
- * inside its own edge, so it is never clipped by a scrolling list. Text
- * fields are the exception: inputs / contenteditable never get a border or
- * ring, and show focus by their caret.
+ * No rings and no frames. Keyboard focus tints the control, the way a
+ * hovered row is tinted: a wash of the text colour laid over whatever ground
+ * the control has (an inset shadow, so a filled button keeps its colour and
+ * the wash follows its corners). Text fields show focus by their caret.
  */
 *:focus { outline: none; }
-:where(a, button, summary, [role], [tabindex]):not(input, textarea, select, [contenteditable="true"], [tabindex="-1"], [data-slot="button"]):focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
+:where(a, button, summary, [role], [tabindex]):not(input, textarea, select, [contenteditable="true"], [tabindex="-1"]):focus-visible {
+  box-shadow: inset 0 0 0 100vmax var(--focus-wash);
 }
 
 /* ---- Touch ----
