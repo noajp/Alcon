@@ -8,13 +8,24 @@
 
 ## できること
 
-| 読み取り | 書き込み |
-|---|---|
-| listMyDomains / listObjects / listElements / getElement / findByText / getProgress / getRecentActivity / listWorkers / listInitiatives / getInitiative | createElement / updateElement / addElementComment / addElementAssignee / setElementLabels / createSubelement / toggleSubelementComplete / claimElement / releaseElement / logProgress / reportOutcome |
+Clayware の AI（Athena）がアプリの AI パネルでできることを、接続した外部の AI が本人として行える。考えて進めるのは外部の AI で、Clayware 側のモデルは呼ばれない（Clayware の API の費用はかからない）。
+
+| 範囲 | 読み取り | 書き込み・削除 |
+|---|---|---|
+| Execution | listMyDomains / listObjects / listElements / getElement / findByText / getProgress / getRecentActivity / listWorkers | Element・Sub-element・Object の作成・更新・削除、移動、Object への結び付け、担当・ラベル・コメント、一括作成・一括更新・一括削除 |
+| Strategy | listInitiatives / getInitiative / getInitiativeExecution | Strategy の作成・更新・削除、成功条件・前提・意思決定の追加・更新・取り下げ、ハーネスの定義を書く、campaignMeasure |
+| Table | tableData（list / get） | tableData（Table・列・行・セルの create / update / delete） |
+| ファイル・ハーネス | listFiles / searchFiles / readFile / listHarnesses / readHarness | writeFile |
+| 記憶・ボード | recall_memory / widgetBoard（list / get） | remember / note_pending_capability / widgetBoard（create / update / delete） |
+| 着手・報告 | | claimElement / releaseElement / logProgress / reportOutcome |
+
+道具は Clayware の AI と同じカタログ（`_shared/catalog.ts` の入口 `external`）から出し、同じコードで実行する（`_shared/externalTools.ts` の `agentToolDefs` / `runAgentTool`）。AI パネルと同じく承認待ちにはせず、削除と上書きは MCP の `destructiveHint` を付けて、クライアント側で本人に確かめさせる。出さないのは、仕事を Clayware のモデルに渡す `start_promotion` と、外部サービスへの連携（Space の Connectors）。連携の書き込みは Clayware の AI が承認を通して行う。
+
+REST API（[api.md](api.md)）は、このうち日常の読み書き（`_shared/externalTools.ts` の `EXTERNAL_READ_TOOLS` / `EXTERNAL_WRITE_TOOLS`）だけを、道具ごとの経路で出している。
 
 `createSubelement` / `toggleSubelementComplete` が扱う Sub-element は、親の Element（`parent_id`）を持つ普通の Element で、親と同じ Object に入る。完了は status `done`、再開は `todo`。`getElement` は `subElements` に並べる。
 
-削除、一括変更、Object 間の移動、Object の編集はできない。この許可リスト（`_shared/externalTools.ts`）は REST API（[api.md](api.md)）と共通。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
+見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。書き込みは Element の Activity に「… — via Claude Code (MCP · token: laptop)」の形で、どのトークン経由かまで記録され、コメントは AI 名で投稿される。
 
 担当にできるのは、Element と同じ Space の Worker だけ。`listWorkers` は `elementId` を渡すとその Element に割り当てられる Worker を、`objectId` / `domainId` を渡すとその Domain を見られる人を、引数なしなら本人が属する Space 全体の Worker を返す。`addElementAssignee` は Space の外の Worker を `Worker is outside this Element's Space` で断り、`createElement` の `assigneeWorkerIds` は割り当てられない Worker を飛ばして `assigneeError` に名前を返す。`createElement` の `basisIntentIds` には、その Element が何のためにあるか（Strategy の成功条件・前提・意思決定の intent id。`getInitiative` で読める）を渡す。一つずつ判定し、置き換えられた intent、Element の Object が属していない Strategy の intent、編集できない Strategy の intent は結び付けず、`basisError` に id と理由を返す（ほかの id は結び付く）。
 
@@ -37,7 +48,7 @@ lease は `claim_element()` / `release_element()` だけを通して書く。担
 
 - 名前、有効期限（30 日・90 日・無期限）、権限（読み取りと書き込み／読み取りのみ）を選ぶ。平文が表示されるのは発行したときの 1 回だけで、DB にはハッシュだけが残る
 - 一覧には、権限・有効期限・最終使用日時と接続元が出る。取り消すと、次の要求から 401 になる
-- 関数はトークンを本人の 5 分間の JWT に交換して動くので、見える範囲と書ける範囲はアプリでの本人の権限と同じ。読み取りのみのトークンには読み取りのツールだけが見え、書き込みは `Unknown tool` で断られる
+- 関数はトークンを本人の 5 分間の JWT に交換して動くので、見える範囲と書ける範囲はアプリでの本人の権限と同じ。読み取りのみのトークンには読み取りのツール（と、読む操作だけが通る tableData・widgetBoard・campaignMeasure）だけが見え、書き込みは `Unknown tool` か `This connection is read-only` で断られる
 - 外部の AI やスクリプトは、トークンを発行・取り消し・一覧できない（アプリからだけ）
 - 有効なトークンは 1 人 20 個まで
 - パスワードを変更しても、トークンは取り消されない。使わなくなったトークンは取り消す
@@ -72,7 +83,7 @@ claude mcp add --transport http clayware "https://rkugtcqztkkacvoylupw.supabase.
 env -u SUPABASE_ACCESS_TOKEN supabase functions deploy clayware-mcp --project-ref rkugtcqztkkacvoylupw --no-verify-jwt --use-api
 ```
 
-`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（保護リソースのメタデータを指す `WWW-Authenticate` 付き）を返し、メタデータをトークンなしで配るため。トークンの検証は関数の中で行う。`_shared/externalTools.ts` を変更したら `clayware-api` も、`_shared/boardTools.ts` を変更したら `clayware-api` も再デプロイする。
+`--no-verify-jwt` を付けるのは、トークンがない場合や、期限切れ・取り消し済みの場合に、関数自身が MCP の形式に沿った 401（保護リソースのメタデータを指す `WWW-Authenticate` 付き）を返し、メタデータをトークンなしで配るため。トークンの検証は関数の中で行う。`_shared/externalTools.ts`・`_shared/boardTools.ts` を変更したら `clayware-api` も、`_shared/catalog.ts` とそこから使う道具を変更したら `run-agent` も再デプロイする。
 
 PAT と OAuth を受け付けるには、Edge Function のシークレット `CLAYWARE_JWT_SIGNING_KEY` に、プロジェクトの JWT シークレット（Legacy JWT secret）を入れる。ない場合、PAT と OAuth のトークンは 500「server not configured」で断られ、セッションの JWT だけが通る。OAuth にはさらに次を行う。
 

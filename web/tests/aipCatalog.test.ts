@@ -69,6 +69,13 @@ describe('the tool catalog', () => {
     for (const t of catalog.CATALOG) expect(catalog.decideCall('panel', t, { action: 'delete' }), t.name).toBe('allow');
   });
 
+  it('lets an outside AI (MCP) run what the panel runs, except handing work to Clayware\'s own model', () => {
+    for (const t of catalog.CATALOG) {
+      expect(catalog.decideCall('external', t, { action: 'delete' }), t.name).toBe(t.name === 'start_promotion' ? 'deny' : 'allow');
+    }
+    expect(names(catalog.toolsFor('external'))).not.toContain('start_promotion');
+  });
+
   it('loads each entry\'s core up front and defers the rest, core first', () => {
     for (const entry of ENTRIES) {
       const tools = catalog.toolsFor(entry) as T[];
