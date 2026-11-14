@@ -80,20 +80,21 @@ export function DomainOverview({ domainId, onNavigate, onViewChange, onOpenNote 
             name={t('Access')} label={domain.privacy === 'private' ? t('Private') : 'Space'} dense />
           {domain.identifier && <RailRow icon={<Hash className="size-3.5 text-muted-foreground" />} name={t('Identifier')} label={domain.identifier} dense />}
           {/* The Strategies this Domain's Objects serve: what its work is for, read first. */}
-          <RailRow icon={<NavStrategyIcon size={14} />} name={t('Related Strategies')} dense
-            placeholder={initiatives.length === 0}
-            label={initiatives.length === 0 ? t('None') : (
-              <span className="flex min-w-0 items-center gap-1 truncate">
-                {initiatives.map(({ initiative }, i) => (
-                  <span key={initiative.id} className="min-w-0 truncate">
-                    <button type="button" className="truncate hover:underline"
-                      onClick={() => { onNavigate({ strategyId: initiative.id }); onViewChange?.('strategy'); }}>
-                      {initiative.name}
-                    </button>{i < initiatives.length - 1 ? ',' : ''}
-                  </span>
+          <div className="flex items-start gap-2 rounded-md px-2 py-1.5 text-[13px] leading-5">
+            <span className="w-24 shrink-0 pt-px text-left text-[12px] text-muted-foreground">Strategy</span>
+            {initiatives.length === 0 ? <span className="text-muted-foreground">{t('None')}</span> : (
+              <span className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-1">
+                {initiatives.map(({ initiative }) => (
+                  <button key={initiative.id} type="button" title={initiative.name}
+                    className="flex min-w-0 max-w-full items-center gap-1.5 text-foreground hover:underline"
+                    onClick={() => { onNavigate({ strategyId: initiative.id }); onViewChange?.('strategy'); }}>
+                    <NavStrategyIcon size={14} />
+                    <span className="truncate">{initiative.name}</span>
+                  </button>
                 ))}
               </span>
-            )} />
+            )}
+          </div>
           <button type="button" className="w-full" onClick={() => { onNavigate({ objectId: null }); onViewChange?.('objects'); }}>
             <RailRow icon={<ObjectIcon size={14} />} name="Objects" label={String(explorer.objects.length)} dense />
           </button>
