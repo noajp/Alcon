@@ -60,19 +60,12 @@ export const HOME_BOARD: BoardLayout = {
  * Strategy detail — one page. The work the page draws already says how far
  * it is, so the band starts empty; under the work, the Tables its AI runs
  * keep (hidden until there is one).
- * Success conditions, premises, decisions and the rest are widgets someone
- * adds when they want them.
+ * What a Strategy holds — how success is measured, what it takes as true,
+ * what was decided — is written as lines of its description, not placed here.
  */
 export const INITIATIVE_BOARD: BoardLayout = {
   band: [],
-  // What a Strategy holds, in the order it is decided: how success is
-  // measured, what it takes as true, what was decided. Then its Tables.
-  main: [
-    { id: 'cmp-measures', type: 'campaign-measures' },
-    { id: 'cmp-assumptions', type: 'campaign-assumptions' },
-    { id: 'cmp-decisions', type: 'campaign-decisions' },
-    { id: 'cmp-tables', type: 'data-view' },
-  ],
+  main: [{ id: 'cmp-tables', type: 'data-view' }],
   // The island beside the Overview: the Strategy's facts.
   rail: [{ id: 'cmp-properties', type: 'strategy-properties' }],
 };
