@@ -15,6 +15,7 @@ const IDEMPOTENT = new Set([
   "updateElement", "updateSubelement", "updateObject", "updateInitiative", "updateIntent",
   "addElementAssignee", "removeElementAssignee", "setElementLabels", "linkElementToObject", "unlinkElementFromObject",
   "moveElement", "writeFile", "writeInitiativeDefinition", "updateHarness", "claimElement", "releaseElement",
+  "addDependency", "removeDependency", "setLabelColor",
 ]);
 // Writes that overwrite what was there — a client should confirm these the
 // way it confirms a delete.

@@ -4,6 +4,7 @@ import { STRATEGY_TOOLS, STRATEGY_WRITE_TOOLS, runStrategyTool, runStrategyWrite
 import { MEASURE_TOOLS, runMeasureTool } from "./measureTools.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 import { BATCH_TOOLS, runBatchTool } from "./batchTools.ts";
+import { DEPENDENCY_TOOLS, DEPENDENCY_TOOL_NAMES, runDependencyTool } from "./dependencyTools.ts";
 import { FILE_TOOLS, runFileTool } from "./fileTools.ts";
 import { HARNESS_TOOLS, HARNESS_WRITE_TOOLS, runHarnessTool } from "./harnessTools.ts";
 import { MEMORY_TOOLS, runMemoryTool } from "./memoryTools.ts";
@@ -28,9 +29,9 @@ export interface CatalogTool extends ToolDef {
   effect: ToolEffect;
 }
 
-const DELETES = new Set(["deleteElement", "deleteSubelement", "deleteObject", "bulkDeleteElements", "removeIntent", "deleteInitiative"]);
+const DELETES = new Set(["deleteElement", "deleteSubelement", "deleteObject", "bulkDeleteElements", "removeIntent", "deleteInitiative", "removeDependency"]);
 const READS = new Set([
-  "listMyDomains", "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers",
+  "listMyDomains", "listObjects", "listElements", "getElement", "findByText", "getProgress", "getRecentActivity", "listWorkers", "listDependencies",
   "listInitiatives", "getInitiative", "getInitiativeExecution", "listFiles", "searchFiles", "readFile", "listHarnesses", "readHarness",
   "recall_memory",
 ]);
@@ -45,6 +46,7 @@ export const CATALOG: CatalogTool[] = [
   ...entries(MEASURE_TOOLS as ToolDef[], "strategy"),
   ...entries(BOARD_TOOLS, "execution"),
   ...entries(BATCH_TOOLS, "execution"),
+  ...entries(DEPENDENCY_TOOLS, "execution"),
   ...entries(FILE_TOOLS, "files"),
   ...entries(HARNESS_TOOLS, "harness"),
   ...entries(HARNESS_WRITE_TOOLS, "harness"),
@@ -237,6 +239,7 @@ export async function runCatalogTool(
   try {
     if (name === "campaignMeasure") return await runMeasureTool(db, input);
     if (name === "createElements") return await runBatchTool(db, input, actor);
+    if (DEPENDENCY_TOOL_NAMES.has(name)) return await runDependencyTool(db, name, input);
     if (tool.area === "memory") return await runMemoryTool(db, name, input, actor, under.spaceId ?? null);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(db, name, input);
     switch (tool.area) {
