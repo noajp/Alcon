@@ -29,6 +29,24 @@ export interface BoardActor {
   userId: string | null;
 }
 
+/** The verbs an Element can ask for (elements.action); the first four only a
+ *  person carries. Same table as web Function/shared/elementActionKinds.ts. */
+export const ELEMENT_ACTIONS = ["judge", "decide", "approve", "answer", "plan", "research", "create", "execute", "verify", "report", "send", "delegate", "monitor"] as const;
+export const HUMAN_ELEMENT_ACTIONS = ["judge", "decide", "approve", "answer"] as const;
+const ACTION_SCHEMA = {
+  type: "string",
+  enum: [...ELEMENT_ACTIONS],
+  description: "求める行動。judge（選択肢を量る）/ decide（決めて確定させる）/ approve（承認）/ answer（人にしか分からないことを答える）は人だけ。ほかは AI もできる",
+};
+
+/** Pure. A valid action, null to clear, or an error. */
+export function actionOf(v: unknown): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (v === null) return { ok: true, value: null };
+  return typeof v === "string" && (ELEMENT_ACTIONS as readonly string[]).includes(v)
+    ? { ok: true, value: v }
+    : { ok: false, error: `action must be one of ${ELEMENT_ACTIONS.join(" / ")}` };
+}
+
 export const BOARD_TOOLS: ToolDef[] = [
   {
     name: "listMyDomains",
@@ -144,6 +162,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         type: { type: "string", description: "Element type 名（Domain に既存のもの推奨）" },
         due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
         labels: { type: "array", items: { type: "string" } },
+        action: ACTION_SCHEMA,
         assigneeWorkerIds: { type: "array", items: { type: "string" }, description: "初期アサインの worker id 群" },
         basisIntentIds: { type: "array", items: { type: "string" }, description: "この Element が何のためにあるか：根拠にする Strategy の成功条件・前提・意思決定の intent id（getInitiative で読んだもの）。Strategy が変わったとき、影響を受ける Element を見つけるのに使う" },
       },
@@ -166,6 +185,7 @@ export const BOARD_TOOLS: ToolDef[] = [
         due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。null で解除" },
         estimated_hours: { type: "number" },
         labels: { type: "array", items: { type: "string" } },
+        action: ACTION_SCHEMA,
       },
       required: ["id"],
       additionalProperties: false,
@@ -533,6 +553,11 @@ export async function updateElementById(
     if (input[k] !== undefined) patch[k] = input[k];
   }
   if (Array.isArray(input.labels)) patch.labels = input.labels;
+  if (input.action !== undefined) {
+    const a = actionOf(input.action);
+    if (!a.ok) return { ok: false, error: a.error };
+    patch.action = a.value;
+  }
   if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
   const normalized = normalizeStatusPatch(patch);
   const { data, error } = await supabase
@@ -779,6 +804,11 @@ export async function runBoardTool(
           if (input[k] !== undefined) payload[k] = input[k];
         }
         if (Array.isArray(input.labels)) payload.labels = input.labels;
+        if (input.action !== undefined) {
+          const a = actionOf(input.action);
+          if (!a.ok) return { ok: false, error: a.error };
+          payload.action = a.value;
+        }
         const normalized = normalizeStatusPatch(payload);
         const { data, error } = await supabase
           .from("elements")

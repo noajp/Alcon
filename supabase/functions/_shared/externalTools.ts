@@ -5,6 +5,7 @@ import { AGENT_REPORT_TOOLS, isAgentReportTool, runAgentReportTool, type CallerN
 import type { CallerAccess } from "./callerAuth.ts";
 import { CATALOG, catalogTool, effectOfCall, offeredIn, runCatalogTool, type ToolEffect } from "./catalog.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
+import { GUIDE_TOOL, runGuideTool, steeredDescription, steerRefusal } from "./claywareGuide.ts";
 
 // What a caller outside the app may do — through MCP (clayware-mcp) or REST
 // (clayware-api); both read this one list. Reads, plus the writes a person
@@ -83,6 +84,8 @@ export async function runExternalTool(
 ): Promise<ToolResult> {
   const offered = externalToolDefs(access).some((t) => t.name === name);
   if (!offered) return { ok: false, error: `Tool ${name} is not available to this connection` };
+  const steer = await steerRefusal(supabase, name, args).catch(() => null);
+  if (steer) return { ok: false, error: steer };
   if (STRATEGY_NAMES.has(name)) return await runStrategyTool(supabase, name, args);
   if (isAgentReportTool(name)) return await runAgentReportTool(supabase, name, args, actor, notify, binding);
   return await runBoardTool(supabase, name, args, actor);
@@ -92,7 +95,8 @@ export async function runExternalTool(
 //
 // MCP reaches what Clayware's own AI reaches from the panel: every catalog
 // tool the "external" entry offers (catalog.ts), the Table tool, and the
-// lease and report tools above. The outside model is the brain, so no
+// lease and report tools above — and the guide to how Clayware works
+// (claywareGuide.ts), which also steers the calls that cut across it. The outside model is the brain, so no
 // Clayware model is called and nothing is metered. The REST API keeps the
 // day-to-day list above: each of its tools is a route of its own.
 
@@ -106,6 +110,7 @@ export interface AgentToolDef extends ToolDef {
 
 /** Pure. What one call of an outside agent's tool does. */
 export function agentCallEffect(name: string, args: Record<string, unknown>): ToolEffect | null {
+  if (name === GUIDE_TOOL.name) return "read";
   if (name === TABLE_TOOL.name) {
     const action = typeof args.action === "string" ? args.action : "";
     return action === "list" || action === "get" ? "read" : action === "create" || action === "update" ? "write" : "delete";
@@ -120,6 +125,7 @@ export function agentToolDefs(access: CallerAccess = "read_write"): AgentToolDef
   const effectOf = (t: ToolDef & { effect?: ToolEffect }): ToolEffect =>
     ACTION_TOOLS.has(t.name) ? "delete" : t.effect ?? "write";
   const all: AgentToolDef[] = [
+    { ...GUIDE_TOOL, effect: "read" },
     ...CATALOG.filter((t) => offeredIn("external", t)).map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema, effect: effectOf(t) })),
     { ...TABLE_TOOL, effect: "delete" },
     ...AGENT_REPORT_TOOLS.map((t) => ({ ...t, effect: "write" as const })),
@@ -127,7 +133,9 @@ export function agentToolDefs(access: CallerAccess = "read_write"): AgentToolDef
   // A read-only connection is offered the reads, and the action tools for their reads.
   const offered = access === "read_write" ? all : all.filter((t) => t.effect === "read" || ACTION_TOOLS.has(t.name));
   const rank: Record<ToolEffect, number> = { read: 0, write: 1, delete: 2 };
-  return offered.sort((a, b) => rank[a.effect] - rank[b.effect]);
+  return offered
+    .map((t) => ({ ...t, description: steeredDescription(t.name, t.description) }))
+    .sort((a, b) => rank[a.effect] - rank[b.effect]);
 }
 
 /**
@@ -146,6 +154,10 @@ export async function runAgentTool(
   if (access !== "read_write" && agentCallEffect(name, args) !== "read") {
     return { ok: false, error: "This connection is read-only" };
   }
+  if (name === GUIDE_TOOL.name) return await runGuideTool(supabase, args);
+  // A call that cuts across how Clayware works is answered with why.
+  const steer = await steerRefusal(supabase, name, args).catch(() => null);
+  if (steer) return { ok: false, error: steer };
   if (isAgentReportTool(name)) return await runAgentReportTool(supabase, name, args, actor, notify);
   if (name === TABLE_TOOL.name) {
     try {
