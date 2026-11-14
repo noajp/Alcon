@@ -445,9 +445,10 @@ export function useDomains() {
   const mySpaceIdList = query.data?.mySpaceIds ?? EMPTY_IDS;
 
   // Every label chip reads its Domain's picked colours from one shared
-  // catalogue. Fill it from the Domain list itself, so a chip draws the
-  // picked colour on any screen — not only after a view that seeds its own
-  // Domain (the Objects list, an Element's page, Settings) has been opened.
+  // catalogue. Seed it from the Domain list itself (Domains not seeded yet),
+  // so a chip draws the picked colour on any screen — not only after a view
+  // that seeds its own Domain (the Objects list, an Element's page, Settings)
+  // has been opened.
   useEffect(() => { hydrateDomainLabelColors(allData); }, [allData]);
 
   // Scope to the active ActivitySpace — Domains carry an activity_space_id, so
