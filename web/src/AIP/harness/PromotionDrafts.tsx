@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDateTime } from '@/Function/shared/dateUtils';
 import { formatError } from '@/Function/shared/formatError';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -309,7 +310,7 @@ export function PromotionDraftDialog({ draft, isOwner, definitions, objectNames,
           <DialogDescription className="pt-1 text-[12px]">
             {t(SOURCE_LABEL[draft.source_kind])}
             {draft.expires_at && draft.status === 'awaiting_review'
-              ? ` · ${t('Expires {date}', { date: new Date(draft.expires_at).toLocaleDateString() })}` : ''}
+              ? ` · ${t('Expires {date}', { date: formatDateTime(draft.expires_at, { year: 'numeric', month: 'short', day: 'numeric' }) })}` : ''}
           </DialogDescription>
         </DialogHeader>
 

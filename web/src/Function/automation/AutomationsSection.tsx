@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { OptionMenu } from '@/Function/shared/OptionMenu';
-import { formatRelative } from '@/Function/shared/dateUtils';
+import { formatRelative, formatDateTime } from '@/Function/shared/dateUtils';
 import { useI18n } from '@/Function/i18n/I18nProvider';
 import { useObjects } from '@/Function/sync/explorerData';
 import { describeCron, parseCron, nextCronRun } from '@/AIP/automation/cron';
@@ -155,7 +155,7 @@ function AutomationListRow({ a, objects, onOpen }: {
   const status = automationStatusOf(a);
   const statusText = status.kind === 'off' ? t('Off')
     : status.kind === 'failed' ? <span className="text-[var(--status-danger)]">{t('Last start failed')}</span>
-    : status.kind === 'next' ? t('Next {when}', { when: new Date(status.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })
+    : status.kind === 'next' ? t('Next {when}', { when: formatDateTime(status.at, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })
     : status.kind === 'last' ? t('Last {when}', { when: formatRelative(status.at) }) : '';
   return (
     <li className="border-b border-border/50">
@@ -235,7 +235,7 @@ function NewAutomation({ spaceId, objects, sources, onCancel, onCreated }: {
           </div>
           <Input value={cron} onChange={(e) => setCron(e.target.value)} aria-label={t('Cron expression')} className="font-mono" />
           <p className={`text-[12px] ${problem ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>
-            {problem ?? (next ? t('{when} — next {at} ({zone})', { when: describeCron(cron), at: next.toLocaleString(), zone: TIMEZONE }) : t('This never runs.'))}
+            {problem ?? (next ? t('{when} — next {at} ({zone})', { when: describeCron(cron), at: formatDateTime(next), zone: TIMEZONE }) : t('This never runs.'))}
           </p>
         </div>
       )}

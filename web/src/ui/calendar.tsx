@@ -15,6 +15,7 @@
 //
 // If you re-run the shadcn generator, re-apply this file by hand.
 
+import { formatDateTime } from '@/Function/shared/dateUtils';
 import * as React from "react"
 import {
   ChevronDownIcon,
@@ -56,7 +57,7 @@ function Calendar({
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: (date) =>
-          date.toLocaleString("default", { month: "short" }),
+          formatDateTime(date, { month: "short" }),
         ...formatters,
       }}
       classNames={{

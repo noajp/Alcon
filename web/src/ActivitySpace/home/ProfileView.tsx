@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDateTime } from '@/Function/shared/dateUtils';
 import { useMemo, useState } from 'react';
 import { FileText } from '@/ui/icons';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -45,7 +46,7 @@ export function ProfileView({ onNavigate, onViewChange }: Props) {
   const role = useSpaceRole(spaceId);
   // Their local time, as the card reads it.
   const now = useNowMinute(true);
-  const localTime = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(now);
+  const localTime = formatDateTime(now, { hour: '2-digit', minute: '2-digit' });
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const name = profile?.display_name || user?.email?.split('@')[0] || t('You');
   // The person's Worker id (wrk_015) is the handle other surfaces show.
