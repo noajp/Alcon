@@ -61,7 +61,16 @@ export const ObjectRow = memo(function ObjectRow({
       ref={setNodeRef}
       style={dragStyle}
       {...attributes}
+      // A table row stays a row to assistive tech: dnd-kit gives it
+      // role="button", which hides its cells and the controls in them.
+      role={undefined}
       {...dragListeners}
+      // Enter on the focused row opens it, as a click does; Space stays the
+      // drag key (dnd-kit's keyboard sensor).
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); e.currentTarget.click(); return; }
+        (dragListeners as { onKeyDown?: (event: React.KeyboardEvent) => void } | undefined)?.onKeyDown?.(e);
+      }}
       // The Object list never scrolls horizontally (overflow-x-hidden on the
       // wrap), so nothing can slide under the sticky Name cells — the selected
       // tint safely spans the full rounded band. Without a trailing "+"

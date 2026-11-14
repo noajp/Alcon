@@ -125,7 +125,7 @@ function InboxRow({ notification: n, selected, locale, onSelect, onToggleRead, o
         <span className="min-w-0 flex-1">
           {/* What it is about, then what happened and who, then the detail. */}
           <span className="flex items-start gap-2">
-            <span className={`min-w-0 flex-1 line-clamp-2 break-words text-[12px] leading-[17px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{text.subject}</span>
+            <span className={`min-w-0 flex-1 line-clamp-2 break-words text-[13px] leading-[18px] ${n.is_read ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{text.subject}</span>
             <time dateTime={n.created_at} title={new Date(n.created_at).toLocaleString(locale)} className="mt-px shrink-0 text-[10px] tabular-nums text-muted-foreground">{relativeTime(n.created_at, locale, t)}</time>
             {!n.is_read && <span aria-label={t('Unread')} className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent-default)]" />}
           </span>

@@ -66,8 +66,8 @@
      Backlog and To Do blend the theme's own muted-foreground so they re-tone
      with the surface ramp (and with the .app-sidebar override) instead of
      freezing one gray. The hues are theme-invariant, like --status-*. */
-  --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 60%, transparent);
-  --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+  --element-status-backlog:     color-mix(in oklab, var(--muted-foreground) 75%, transparent);
+  --element-status-todo:        color-mix(in oklab, var(--muted-foreground) 85%, transparent);
   --element-status-in-progress: #2f9e44;
   --element-status-review:      #eab308;
   --element-status-done:        var(--accent-default);
@@ -100,8 +100,8 @@
      than introducing a second. */
   --priority-urgent: var(--status-danger);
   --priority-high:   var(--status-warning);
-  --priority-medium: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
-  --priority-low:    color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  --priority-medium: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+  --priority-low:    color-mix(in oklab, var(--muted-foreground) 70%, transparent);
 
   /* ---- Chart series (two-tone progress charts — e.g. Phase burn-up) ----
      Linear pairs a warm "Started" with a cool "Completed" (yellow/violet).
@@ -133,7 +133,7 @@
   /* ---- Text — Light ---- */
   --text-primary:   #14161a;
   --text-secondary: #3a3d44;
-  --text-tertiary:  #6c707a;
+  --text-tertiary:  #63676f;
   --text-disabled:  #a8aab0;
 
   /* ---- Spacing ---- */
@@ -579,6 +579,15 @@ textarea.quick-create-title {
 :where(a, button, summary, [role], [tabindex]):not(input, textarea, select, [contenteditable="true"], [tabindex="-1"], [data-slot="button"]):focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
+}
+
+/* ---- Touch ----
+ * Icon buttons are drawn small for a mouse. On a touch screen each takes a
+ * press in the 44px around it, without moving anything on the page.
+ */
+@media (pointer: coarse) {
+  [data-slot="button"][data-size^="icon"] { position: relative; }
+  [data-slot="button"][data-size^="icon"]::after { content: ""; position: absolute; inset: -10px; }
 }
 
 /* ---- Colour as text ----

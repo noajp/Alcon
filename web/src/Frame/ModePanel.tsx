@@ -42,7 +42,9 @@ export function ModePanel({ activeView, onNavigate, onViewChange }: {
   if (!body) return null;
   return (
     <ButtonAppearanceProvider appearance="navigation">
-      <aside className="flex w-[var(--sidebar-width)] shrink-0 flex-col overflow-hidden border-r border-[var(--gloss-rim)] bg-[var(--surface-well)]">{body}</aside>
+      {/* The Inbox list is read, not just picked from: its subjects need the
+          room to show a line, so it is wider than the other panels. */}
+      <aside className={`flex ${mode === 'inbox' ? 'w-[320px] max-w-[40%]' : 'w-[var(--sidebar-width)]'} shrink-0 flex-col overflow-hidden border-r border-[var(--gloss-rim)] bg-[var(--surface-well)]`}>{body}</aside>
     </ButtonAppearanceProvider>
   );
 }

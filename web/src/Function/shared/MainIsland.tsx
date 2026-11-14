@@ -41,9 +41,11 @@ export function IslandHeader({ crumbs, count, after, actions }: {
                 {c.icon}<span className="truncate">{c.label}</span>
               </button>
             ) : (
-              <span className={`flex max-w-[260px] shrink-0 items-center gap-1 truncate px-1.5 py-0.5 ${last ? 'text-[13px] font-semibold text-foreground' : 'text-[13px] font-medium text-muted-foreground'}`}>
+              (() => { const Tag = last ? 'h1' : 'span'; return (
+              <Tag className={`flex max-w-[260px] shrink-0 items-center gap-1 truncate px-1.5 py-0.5 ${last ? 'text-[13px] font-semibold text-foreground' : 'text-[13px] font-medium text-muted-foreground'}`}>
                 {c.icon}<span className="truncate">{c.label}</span>
-              </span>
+              </Tag>);
+              })()
             )}
           </Fragment>
         );

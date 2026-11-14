@@ -21,13 +21,10 @@ import { translate } from '@/Function/i18n/I18nProvider';
 // inline style or a recharts `fill` read SEMANTIC_COLORS below. Nothing builds
 // its own status palette.
 // ============================================
-// `textColor` is what a small standalone text label (no adjacent dot/ring —
-// e.g. the Overdue/Milestones/Upcoming widget rows' 11px status word) should
-// read. It equals `color` for every status except `blocked`, whose base hue
-// (#eab308) reads ~1.9:1 against white at that size — well under AA — even
-// though the same hue is fine for the larger ring mark / dot it also colors.
-// `--element-status-blocked-text` is a darkened variant of the same base var
-// (globals.css), not a second palette: only the one hue that needed it.
+// `textColor` is what a small standalone text label (no adjacent dot/ring)
+// should read. A status colour used as text takes the per-theme -text value
+// in globals.css (the yellow In Review, darkened on light themes); Blocked
+// keeps its own darkened variant.
 export const STATUS = {
   backlog:     { label: 'Backlog',     color: 'text-[var(--element-status-backlog)]',     textColor: 'text-[var(--element-status-backlog)]',     bg: 'bg-[var(--element-status-backlog-subtle)]',     dot: 'bg-[var(--element-status-backlog)]',     icon: 'Circle' },
   todo:        { label: 'To Do',       color: 'text-[var(--element-status-todo)]',        textColor: 'text-[var(--element-status-todo)]',        bg: 'bg-[var(--element-status-todo-subtle)]',        dot: 'bg-[var(--element-status-todo)]',        icon: 'Circle' },

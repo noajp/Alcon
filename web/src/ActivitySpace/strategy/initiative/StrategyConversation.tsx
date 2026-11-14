@@ -205,8 +205,10 @@ function AgentTurn({ segments, onPlan, onAnswered, elementStatus, runStatuses, s
   integrations: Parameters<typeof missingConnectors>[1];
   drafts: readonly IntegrationDraft[];
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-2">
+      <div className="text-[11px] font-medium text-muted-foreground">{t('Athena')}</div>
       {segments.map((s, i) => s.kind === 'text'
         ? <MarkdownLite key={i} text={s.text} className="text-[13px] leading-relaxed text-foreground" />
         : (

@@ -206,6 +206,24 @@ export function AppSidebar({
     setCreateMenuOpen(true);
   };
 
+  // The create menu answers the keyboard as a menu does: it opens with its
+  // first item focused, the arrows move through it, Escape or Tab closes it
+  // and focus goes back to the "+".
+  const closeCreateMenu = () => { setCreateMenuOpen(false); createBtnRef.current?.focus(); };
+  useEffect(() => {
+    if (!createMenuOpen) return;
+    createMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus();
+  }, [createMenuOpen]);
+  const onCreateMenuKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')];
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); closeCreateMenu(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); items[(at + 1) % items.length]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(at - 1 + items.length) % items.length]?.focus(); }
+    else if (e.key === 'Home') { e.preventDefault(); items[0]?.focus(); }
+    else if (e.key === 'End') { e.preventDefault(); items[items.length - 1]?.focus(); }
+  };
+
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -378,6 +396,8 @@ export function AppSidebar({
               <Button variant="ghost" size="icon-xs" className="text-muted-foreground"
                 ref={createBtnRef}
                 type="button"
+                aria-haspopup={railMode === 'tables' || railMode === 'notebook' || railMode === 'calendar' ? undefined : 'menu'}
+                aria-expanded={createMenuOpen || undefined}
                 onClick={openCreateMenu}
                 title={t(createLabel)}
                 aria-label={t(createLabel)}
@@ -424,6 +444,17 @@ export function AppSidebar({
               const over = rowDrop?.item === item && draggedRow !== null && draggedRow !== item ? rowDrop.place : null;
               return (
                 <div key={item} draggable className="relative"
+                  // Alt+↑ / Alt+↓ moves the focused row, the keyboard's drag.
+                  onKeyDown={(e) => {
+                    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+                    const at = sidebarOrder.indexOf(item);
+                    const target = sidebarOrder[e.key === 'ArrowUp' ? at - 1 : at + 1];
+                    if (!target) return;
+                    e.preventDefault();
+                    const next = moveSidebarItem(sidebarOrder, item, target, e.key === 'ArrowUp' ? 'before' : 'after');
+                    setSidebarOrder(next);
+                    saveSidebarOrder(next);
+                  }}
                   onDragStart={(e) => { setDraggedRow(item); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', item); }}
                   onDragEnd={() => { setDraggedRow(null); setRowDrop(null); }}
                   onDragOver={(e) => {
@@ -535,9 +566,12 @@ export function AppSidebar({
           the original Domain / Object / Note menu. */}
       {createMenuOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
+          <div className="fixed inset-0 z-40" aria-hidden="true" onClick={() => setCreateMenuOpen(false)} />
           <div
             ref={createMenuRef}
+            role="menu"
+            aria-label={t(createLabel ?? 'Create new')}
+            onKeyDown={onCreateMenuKey}
             className="fixed w-52 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
@@ -906,9 +940,11 @@ function CreateMenuItem({ icon, label, desc, onClick, disabled = false }: {
 }) {
   return (
     <button
+      type="button"
+      role="menuitem"
       onClick={onClick}
       disabled={disabled}
-      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors text-left disabled:opacity-50 disabled:hover:bg-transparent"
+      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent focus-visible:bg-accent transition-colors text-left disabled:opacity-50 disabled:hover:bg-transparent"
     >
       <span className="mt-0.5 w-4 flex items-center justify-center text-muted-foreground">{icon}</span>
       <span className="flex-1 min-w-0">

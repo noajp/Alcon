@@ -690,12 +690,10 @@ export function ListTable({
                       </button>
                     </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className={`bg-card pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
-                      <button
-                        type="button"
-                        onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pl-3.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
-                        aria-label={isCollapsed ? t('Expand') : t('Collapse')}
-                      >
+                      {/* The band toggles from anywhere on it (the button laid
+                          over it), and its "+" is a control of its own above
+                          that button — not a control inside another. */}
+                      <div className="relative w-full min-h-[2.625rem] flex items-center min-w-0 pl-3.5 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left">
                         {/* The band spans the whole table, wider than the pane,
                             and a cell that wide cannot stick — so the name
                             and count stick inside it instead, at the x the
@@ -709,26 +707,25 @@ export function ListTable({
                           </span>
                         </span>
                         <span className="flex-1" />
+                        <button
+                          type="button"
+                          onClick={() => toggle(section.id)}
+                          aria-expanded={!isCollapsed}
+                          aria-label={`${section.name}: ${isCollapsed ? t('Expand') : t('Collapse')}`}
+                          className="absolute inset-0 rounded-r-lg"
+                        />
                         {onAddElement && (
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); onAddElement(section); }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onAddElement(section);
-                              }
-                            }}
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            className="relative z-10 inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                             title={t('Add Element to {name}', { name: section.name })}
                             aria-label={t('Add Element to {name}', { name: section.name })}
                           >
                             <Plus size={14} />
-                          </span>
+                          </button>
                         )}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 )}

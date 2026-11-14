@@ -169,7 +169,13 @@ export function AgentRunPanel({ agent, onRunAgain }: { agent: Agent; onRunAgain:
 
   return (
     <section className="space-y-2">
-      {agent.error && <p className="px-1 text-[12px] text-[var(--status-danger)]">{agent.error}</p>}
+      {agent.error && (
+        <div role="alert" className="flex items-center gap-2 px-1 text-[12px] text-[var(--status-danger)]">
+          <span className="min-w-0 flex-1">{agent.error}</span>
+          {/* A run that never started has no controls of its own below. */}
+          {!run && <Button variant="ghost" size="xs" disabled={agent.starting} onClick={onRunAgain}>{t('Retry')}</Button>}
+        </div>
+      )}
       {run && (
         <div>
           <TraceHeadline trace={trace} controls={

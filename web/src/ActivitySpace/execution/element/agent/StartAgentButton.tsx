@@ -66,6 +66,7 @@ export function StartAgentButton({
           tone,
         )}
         title={hasRun ? t('Run the agent again') : t('Start with the agent')}
+        aria-label={hasRun ? t('Run the agent again') : t('Start with the agent')}
       >
         <Icon className="h-3.5 w-3.5" />
       </button>
