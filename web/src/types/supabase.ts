@@ -4625,6 +4625,27 @@ export type Database = {
           },
         ]
       }
+      notification_email_preferences: {
+        Row: {
+          enabled: boolean
+          kind: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          enabled: boolean
+          kind: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          enabled?: boolean
+          kind?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string

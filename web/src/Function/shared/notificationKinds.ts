@@ -48,3 +48,11 @@ export function notificationKindMeta(kind: string): NotificationKindMeta {
     label: kind ? kind.replace(/_/g, ' ') : translate('Update'),
   };
 }
+
+// Kinds a person may also get by email (Settings > Notifications). What is
+// addressed to the person (assigned or made Lead, mentioned, a comment on
+// their work) is emailed until they say otherwise — the same default as
+// notification_email_default() in
+// supabase/migrations/20270109090000_notification_emails.sql.
+export const EMAIL_NOTIFICATION_KINDS: NotificationKind[] = ['assigned', 'mention', 'comment', 'approval_requested', 'due_soon', 'invite'];
+export const notificationEmailDefault = (kind: string): boolean => kind === 'assigned' || kind === 'mention' || kind === 'comment';

@@ -44,7 +44,9 @@
 //                                      code-changes record, and a
 //                                      review comment or a CI failure
 //                                      starts a bounded follow-up run
-//                                      that amends the PR.
+//                                      that amends the PR. The same
+//                                      tick sends the notifications
+//                                      people chose to get by email.
 //   POST ?hook=<id> (x-clayware-token)    an outside event for a webhook
 //                                      automation; the body is its input
 //   POST { fire: id } (signed in)      "Run now" from the Automation screen,
@@ -80,6 +82,7 @@ import { deriveConstraintDrafts, evaluateConstraintEffects, type ConstraintClust
 import { claimExpiredQuestionTickets, settleRunBlockedByQuestions, type QuestionTicketRow } from "../_shared/questionTickets.ts";
 import { reapWorkspaces } from "../_shared/workspaceLifecycle.ts";
 import { routeCodingEvents } from "../_shared/codingIteration.ts";
+import { deliverNotificationEmails } from "../_shared/notificationEmail.ts";
 import { deriveScopeFromDefinition, loadDerivationIntegrations, rootChainScope, strategyIdForObject } from "../_shared/chainScope.ts";
 
 const corsHeaders = {
@@ -486,6 +489,18 @@ async function tick(env: Env): Promise<Record<string, number>> {
   const now = new Date();
   let fired = 0, scheduled = 0, resumed = 0, expired = 0;
 
+  // Notifications the recipient chose to get by email (notificationEmail.ts),
+  // first, so a slow step below never holds an email back.
+  let emailsSent = 0, emailsFailed = 0, emailsSkipped = 0;
+  try {
+    const r = await deliverNotificationEmails(env.admin, {
+      apiKey: Deno.env.get("RESEND_API_KEY"), from: Deno.env.get("NOTIFY_EMAIL_FROM"), appUrl: Deno.env.get("APP_URL"),
+    });
+    emailsSent = r.sent; emailsFailed = r.failed; emailsSkipped = r.skipped;
+  } catch (e) {
+    console.error("automations: notification emails failed", e instanceof Error ? e.message : e);
+  }
+
   // A schedule with no next time yet (made outside the screen, or its cron fixed).
   const { data: unset } = await env.admin.from("automations").select("id, cron, timezone")
     .eq("enabled", true).eq("kind", "schedule").is("next_run_at", null).limit(50);
@@ -811,7 +826,7 @@ async function tick(env: Env): Promise<Record<string, number>> {
       console.error("automations: heartbeat failed", s.id, e instanceof Error ? e.message : e);
     }
   }
-  return { fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, workspacesExpired, workspacesRunEnded, devEventsScanned, devEventsSynced, devCiRecorded, amendRunsStarted, devEventsNoted, amendExhausted, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
+  return { emailsSent, emailsFailed, emailsSkipped, fired, scheduled, resumed, expired, draftsExpired, episodesExpired, promotionsSettled, promotionsExpired, definitionTestsSettled, outcomesInserted, outcomesSignalled, outcomeRollups, calibrationRows, calibrationOpened, calibrationRefreshed, constraintsDrafted, constraintEffectsEvaluated, autonomyRecords, autonomyPromoted, autonomyDemoted, credentialRequestsExpired, credentialStashesExpired, questionTicketsExpired, questionRunsBlocked, workspacesExpired, workspacesRunEnded, devEventsScanned, devEventsSynced, devCiRecorded, amendRunsStarted, devEventsNoted, amendExhausted, heartbeats, heartbeatsDeferred, heartbeatsDisabled };
 }
 
 async function webhook(env: Env, req: Request, id: string): Promise<Response> {
