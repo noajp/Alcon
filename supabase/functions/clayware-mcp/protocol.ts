@@ -9,7 +9,7 @@ export { sanitizeName };
 // initialize / ping / tools/list / tools/call, which is all a tool server
 // needs. Pure: the HTTP entry (index.ts) supplies the tools and the caller.
 
-export const SERVER_INFO = { name: "clayware", version: "0.1.0" } as const;
+export const SERVER_INFO = { name: "clayware", version: "0.2.0" } as const;
 
 /** Newest first. An unknown requested version is answered with the newest. */
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
@@ -20,7 +20,9 @@ export const INSTRUCTIONS = [
   "Element に着手する前に、所属 Object に紐づく Initiative（getInitiative）で目的と成功条件を確かめる。",
   "ステータス: backlog / todo / in_progress / review / done / blocked / cancelled。優先度: urgent / high / medium / low。日付は YYYY-MM-DD。",
   "Element を進めるときは claimElement で着手を宣言し（断られたらその Element は進めない）、節目ごとに logProgress、最後に reportOutcome（completed / partial / blocked）で締める。権限を超える判断が要るときは blocked で人に判断を求める。session には作業ごとの名前を渡し、同じ値を使い続ける。",
-  "書き込みは Element の Activity に接続元の AI 名で記録される。削除・一括変更はこのサーバーからはできない。",
+  "Clayware の AI（Athena）がアプリでできることを、あなたが代わりに行う。Strategy・Object・Element・Table（tableData）・ファイル・ハーネス・記憶・ボードを読み書きできる。Clayware 側のモデルは呼ばれないので、考えて進めるのはあなた。",
+  "仕事のやり方はハーネスに書いてある。始める前に listHarnesses / readHarness で該当するものを読み、それに従う。",
+  "書き込みは接続元の AI 名で記録される。削除・一括変更・上書きは、何が変わるかをユーザーに示して了解を得てから行う。judge / decide / approve / answer の Element は人の判断なので、代わりに閉じず reportOutcome の blocked で人に回す。",
 ].join("\n");
 
 export interface McpTool {

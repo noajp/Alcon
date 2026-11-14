@@ -1,6 +1,6 @@
 # Clayware REST API
 
-スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で Clayware のデータを読み書きする入口。MCP（[mcp.md](mcp.md)）と同じツールを HTTP の形で出している。
+スクリプト、ノーコードツール、他の SaaS から、トークンを発行した本人の権限で Clayware のデータを読み書きする入口。MCP（[mcp.md](mcp.md)）のツールのうち、日常の読み書きを HTTP の形で出している。
 
 - ベース URL: `https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/clayware-api`
 - 認証: `Authorization: Bearer <個人用アクセストークン>`（`alc_pat_…`。Settings › API で発行）
@@ -37,7 +37,7 @@
 
 Sub-element は、親の Element（`parent_id`）を持つ普通の Element で、親と同じ Object に入る。`/elements/{id}` の `subElements` に並び、それ自体も Element として読み書きできる。
 
-削除、一括変更、Object 間の移動、Object の編集はできない（MCP と同じ）。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。担当にできるのは Element と同じ Space の Worker だけ。読み取りのみのトークンは GET だけが通る。着手・報告の4経路の振る舞いは [mcp.md](mcp.md) の「Element を進めるとき」と同じ。
+削除、一括変更、Object 間の移動、Object の編集はできない（MCP からはできる）。見える範囲と書ける範囲は、アプリでの本人の権限（RLS）と同じ。担当にできるのは Element と同じ Space の Worker だけ。読み取りのみのトークンは GET だけが通る。着手・報告の4経路の振る舞いは [mcp.md](mcp.md) の「Element を進めるとき」と同じ。
 
 ## 応答
 

@@ -81,7 +81,7 @@ export function effectOfCall(tool: CatalogTool, input: Record<string, unknown>):
 
 // ── Entries ─────────────────────────────────────────────────────────────────
 
-export type Entry = "panel" | "conversation" | "element";
+export type Entry = "panel" | "conversation" | "element" | "external";
 
 /** allow: runs now. approve: runs once the person who started the run approves
  *  exactly this call. deny: the entry may not run it. */
@@ -96,6 +96,8 @@ export interface EntryPolicy {
   approveAreas?: ToolArea[];
   /** Further tools allowed by name. */
   also?: string[];
+  /** Tools refused by name, whatever the effects allow. */
+  except?: string[];
   /** Loaded up front; the rest load when the model searches for them. */
   core: string[];
 }
@@ -129,11 +131,23 @@ export const ENTRY_POLICIES: Record<Entry, EntryPolicy> = {
     approveAreas: ["strategy"],
     core: [...READ_CORE.filter((n) => n !== "listHarnesses"), "createElement", "updateElement", "addElementComment", "createSubelement", "toggleSubelementComplete"],
   },
+  // An AI outside Clayware (clayware-mcp) working as the person who
+  // connected it: the panel's reach, with the outside model as the brain
+  // in place of Clayware's, so no Clayware model is called. The person
+  // is in that client's chat, and the client confirms deletes and
+  // overwrites there (clayware-mcp marks them destructive). Not offered:
+  // start_promotion, which hands the work to Clayware's own model.
+  external: {
+    effects: ["read", "write", "delete"],
+    except: ["start_promotion"],
+    core: [],
+  },
 };
 
 /** Pure. What the entry does with one call. */
 export function decideCall(entry: Entry, tool: CatalogTool, input: Record<string, unknown>): Decision {
   const p = ENTRY_POLICIES[entry];
+  if (p.except?.includes(tool.name)) return "deny";
   if (p.also?.includes(tool.name)) return "allow";
   const effect = effectOfCall(tool, input);
   if (p.effects.includes(effect)) return "allow";

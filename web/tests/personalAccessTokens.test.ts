@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 // Personal access tokens (ADR 0032): the pure parts of the edge auth path.
 const auth = await import(new URL('../../supabase/functions/_shared/delegatedAuth.ts', import.meta.url).pathname);
 const protocol = await import(new URL('../../supabase/functions/clayware-mcp/protocol.ts', import.meta.url).pathname);
-const { mcpTools, mcpHost, MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
+const { mcpTools, mcpHost } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
 const client = await import(new URL('../../supabase/functions/_shared/integrationClient.ts', import.meta.url).pathname);
 
 const {
@@ -116,10 +116,11 @@ describe('clientLabel with a token', () => {
 describe('read-only tokens', () => {
   it('are offered no write tool', () => {
     const names = mcpTools('read').map((t: { name: string }) => t.name);
-    expect(names).toEqual([...MCP_READ_TOOLS]);
-    for (const w of MCP_WRITE_TOOLS) expect(names).not.toContain(w);
-    expect(mcpTools('read').every((t: { annotations: { readOnlyHint: boolean } }) => t.annotations.readOnlyHint)).toBe(true);
-    expect(mcpTools('read_write').map((t: { name: string }) => t.name)).toEqual([...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS]);
+    for (const w of ['createElement', 'updateElement', 'deleteElement', 'writeFile', 'claimElement']) expect(names).not.toContain(w);
+    // Besides reads, only the action tools, offered for their reads.
+    const writable = mcpTools('read').filter((t: { annotations: { readOnlyHint: boolean } }) => !t.annotations.readOnlyHint).map((t: { name: string }) => t.name);
+    expect(writable.sort()).toEqual(['campaignMeasure', 'tableData', 'widgetBoard']);
+    expect(mcpTools('read_write').length).toBeGreaterThan(names.length);
   });
 
   it('refuse a write call with INVALID_PARAMS before any tool runs', async () => {
@@ -133,6 +134,8 @@ describe('read-only tokens', () => {
     expect((res.body as { error: { code: number } }).error.code).toBe(RPC.INVALID_PARAMS);
     // Called directly, the host still refuses.
     expect(await host.call('updateElement', {})).toMatchObject({ ok: false });
+    // An action tool's writing action is refused too.
+    expect(await host.call('tableData', { action: 'delete', entity: 'row', id: USER })).toMatchObject({ ok: false, error: 'This connection is read-only' });
     expect(touched).toEqual([]);
   });
 });

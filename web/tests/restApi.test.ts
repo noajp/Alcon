@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 // The REST API (clayware-api, ELE_PLT-006): the pure routing layer.
 const routes = await import(new URL('../../supabase/functions/clayware-api/routes.ts', import.meta.url).pathname);
 const external = await import(new URL('../../supabase/functions/_shared/externalTools.ts', import.meta.url).pathname);
-const { MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
+const { mcpTools } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
 
 const {
   ROUTES, apiPath, matchRoute, planRequest, validateArgs, queryArgs, errorForToolFailure, toResponse,
@@ -27,9 +27,9 @@ function plan(method: string, path: string, opts: { query?: string; body?: unkno
 }
 
 describe('the allowlist', () => {
-  it('is the one MCP offers', () => {
-    expect([...MCP_READ_TOOLS]).toEqual([...EXTERNAL_READ_TOOLS]);
-    expect([...MCP_WRITE_TOOLS]).toEqual([...EXTERNAL_WRITE_TOOLS]);
+  it('is a part of what MCP offers', () => {
+    const mcp = mcpTools().map((t: { name: string }) => t.name);
+    for (const n of [...EXTERNAL_READ_TOOLS, ...EXTERNAL_WRITE_TOOLS]) expect(mcp).toContain(n);
   });
 
   it('gives every allowed tool exactly one route and no route to anything else', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 const protocol = await import(new URL('../../supabase/functions/clayware-mcp/protocol.ts', import.meta.url).pathname);
-const { mcpTools, mcpHost, MCP_READ_TOOLS, MCP_WRITE_TOOLS } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
+const { mcpTools, mcpHost } = await import(new URL('../../supabase/functions/clayware-mcp/tools.ts', import.meta.url).pathname);
 const board = await import(new URL('../../supabase/functions/_shared/boardTools.ts', import.meta.url).pathname);
 
 const { handleBody, clientLabel, negotiateVersion, SUPPORTED_PROTOCOL_VERSIONS, RPC } = protocol;
@@ -110,8 +110,8 @@ describe('MCP protocol', () => {
     const calls: string[] = [];
     const ok = await handleBody(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'getElement', arguments: { id: 'x' } } }), host(calls));
     expect((ok.body as { result: { isError: boolean } }).result.isError).toBe(false);
-    // deleteElement exists in the shared module but is not an MCP tool.
-    const refused = await handleBody(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'deleteElement', arguments: { id: 'x' } } }), host(calls));
+    // start_promotion exists in the catalog but is not an MCP tool.
+    const refused = await handleBody(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'start_promotion', arguments: { id: 'x' } } }), host(calls));
     expect((refused.body as { error: { code: number } }).error.code).toBe(RPC.INVALID_PARAMS);
     expect(calls).toEqual(['getElement']);
   });
@@ -125,18 +125,26 @@ describe('MCP protocol', () => {
 });
 
 describe('MCP tool surface', () => {
-  it('offers reads and everyday writes only — no deletes, bulk writes or moves', () => {
+  it('offers what the AI panel reaches, plus Tables and the lease and report tools', () => {
     const names = mcpTools().map((t: { name: string }) => t.name);
-    expect(names).toEqual([...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS]);
-    expect(names.some((n: string) => /delete|bulk|move|unlink|Object$/.test(n))).toBe(false);
+    for (const n of ['listElements', 'deleteElement', 'createObject', 'bulkUpdateElements', 'updateInitiative', 'writeFile', 'readHarness', 'remember', 'tableData', 'widgetBoard', 'claimElement', 'reportOutcome']) {
+      expect(names).toContain(n);
+    }
+    expect(new Set(names).size).toBe(names.length);
+    // Handing work to Clayware's own model is not offered.
+    expect(names).not.toContain('start_promotion');
   });
 
-  it('marks reads read-only and overwrites destructive', () => {
-    for (const tool of mcpTools()) {
-      expect(tool.annotations.destructiveHint).toBe(['updateElement', 'setElementLabels'].includes(tool.name));
-      expect(tool.annotations.readOnlyHint).toBe(MCP_READ_TOOLS.includes(tool.name));
-      expect(tool.inputSchema.type).toBe('object');
-    }
+  it('lists reads first and marks deletes and overwrites destructive', () => {
+    const tools = mcpTools();
+    const firstWrite = tools.findIndex((t: { annotations: { readOnlyHint: boolean } }) => !t.annotations.readOnlyHint);
+    expect(tools.slice(firstWrite).every((t: { annotations: { readOnlyHint: boolean } }) => !t.annotations.readOnlyHint)).toBe(true);
+    type Tool = { name: string; annotations: { readOnlyHint: boolean; destructiveHint: boolean } };
+    const by = new Map<string, Tool>(tools.map((t: Tool) => [t.name, t]));
+    for (const n of ['deleteElement', 'bulkDeleteElements', 'deleteInitiative', 'updateElement', 'tableData']) expect(by.get(n)!.annotations.destructiveHint, n).toBe(true);
+    for (const n of ['listElements', 'getInitiative', 'readFile']) expect(by.get(n)!.annotations.readOnlyHint, n).toBe(true);
+    for (const n of ['createElement', 'addElementComment', 'claimElement']) expect(by.get(n)!.annotations.destructiveHint, n).toBe(false);
+    for (const tool of tools) expect(tool.inputSchema.type).toBe('object');
   });
 });
 
