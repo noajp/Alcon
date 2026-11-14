@@ -178,6 +178,7 @@ export function PageView({
 
           <NoteEditor
             ref={editorRef}
+            collab={fileId}
             value={content}
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}

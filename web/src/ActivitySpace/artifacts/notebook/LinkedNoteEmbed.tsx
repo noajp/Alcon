@@ -71,6 +71,7 @@ export function LinkedNoteEmbed({
         ) : (
           <NoteEditor
             key={noteId}
+            collab={noteId}
             value={html}
             onChange={save}
             editable={editable}
